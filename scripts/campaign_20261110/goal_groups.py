@@ -565,9 +565,16 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             value = anchor["planned_start_poses"].get(name)
             require(value is not None, f"fresh anchor has no recorded tray pose: {name}")
             plan[field] = {"position": value[0], "orientation": value[1]}
-        candidates = anchor["summary"].get("campaign_goal_space", {}).get("target_poses", [])
-        require(candidates, "disembedding needs a fresh anchor with verified destination-floor goal candidates")
-        plan["goal_pose"] = candidates[int(digest({"group": group_id, "anchor": anchor["instance_id"]}), 16) % len(candidates)]
+        if reuse_anchor_goal:
+            value = anchor["planned_goal_poses"].get(plan["target_name"])
+            require(value is not None, "tray goal reuse requires a recorded target goal")
+            plan["goal_pose"] = value if isinstance(value, dict) else {"position": value[0], "orientation": value[1]}
+            plan["goal_selection"] = "fresh_anchor"
+        else:
+            candidates = anchor["summary"].get("campaign_goal_space", {}).get("target_poses", [])
+            require(candidates, "disembedding needs a fresh anchor with verified destination-floor goal candidates")
+            plan["goal_pose"] = candidates[int(digest({"group": group_id, "anchor": anchor["instance_id"]}), 16) % len(candidates)]
+            plan["goal_selection"] = "native_region"
         plan["schema"] = TRAY_SCHEMA
         plan["crowdedness_range"] = plan.pop("magnitude_range")
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")

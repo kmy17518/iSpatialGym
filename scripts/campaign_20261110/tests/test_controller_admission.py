@@ -59,6 +59,27 @@ def test_admission_identity_keeps_applied_scale_and_light_separate(tmp_path, mon
     assert base != admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {"gain": 2}})
 
 
+def test_new_attachment_runtime_can_be_scoped_without_rekeying_existing_families():
+    scoped = {"admitted_tasks": ["configuration_matching-attachment"]}
+    assert admission.task_allowed("configuration_matching-attachment", scoped)
+    assert not admission.task_allowed("alignment-axial", scoped)
+    assert admission.task_allowed("alignment-axial", {})
+    with pytest.raises(c.ContractError, match="task scope"):
+        admission.task_allowed("alignment-axial", {"admitted_tasks": ["invented_task"]})
+
+
+def test_author_upgrade_reopens_only_the_fixed_gap_and_retains_previous_evidence():
+    previous = {"sha256": "a"*64, "reason": next(iter(admission.FIXED_AUTHOR_GAPS)), "observed_at": 123}
+    state = {"checked_gates": {"tray": dict(previous), "other": {"sha256": "b"*64, "reason": "replay QA missing"}}}
+    admission.reconcile_author_gaps(state)
+    assert "sha256" not in state["checked_gates"]["tray"]
+    assert state["checked_gates"]["other"]["sha256"] == "b"*64
+    assert state["author_retry_history"][0]["previous_observation"] == previous
+    assert state["author_retry_history"][0]["helper_sha256"] == c.file_digest(admission.__file__)
+    admission.reconcile_author_gaps(state)
+    assert len(state["author_retry_history"]) == 1
+
+
 def test_catalog_is_additive_and_changed_existing_seed_is_rejected(tmp_path):
     path = tmp_path / "controllers/groups/catalog.json"
     a, b = {"id": "a", "key": "unchanged"}, {"id": "b", "key": "new"}

@@ -36,7 +36,9 @@ def main():
         put(proposal['task'], proposal['class_id'], 'eval_model', 'ready_role_candidates_reserved',
             'Globally reserved role proposal exists; this report contains no physical task gate for this class.', [reservation], 0)
     default_path = root / 'heldout_probes/remaining_alignment_attachment_disembed_native_v2/default_geometry.json'
-    review_path = default_path.with_name('model_visual_review.json')
+    review_path = default_path.with_name('model_visual_review_r2.json')
+    if not review_path.is_file():
+        review_path = default_path.with_name('model_visual_review.json')
     if default_path.is_file() and review_path.is_file():
         defaults, review = json.loads(default_path.read_text()), json.loads(review_path.read_text())
         if defaults.get('status') == 'native_defaults_and_geometry_recorded' and review.get('default_geometry_sha256') == sha(default_path):
@@ -54,7 +56,8 @@ def main():
                         'Exact native default scales, bounds and collision meshes are recorded and appearance-reviewed; task geometry and dependencies remain separate gates.',
                         [default_path, review_path, reservation], 1)
     folders = ('heldout_room_materialized_v2', 'heldout_small_pairs_v1', 'heldout_articulation_v1', 'heldout_carton_hhlmbi_v1',
-               'heldout_block_materialized_v2', 'heldout_mental_isgm10_v1', 'heldout_lef_ief09_v1', 'heldout_pot_tbsjnw_v1', 'heldout_model_table_tasks_v1')
+               'heldout_block_materialized_v2', 'heldout_mental_isgm10_v1', 'heldout_lef_ief09_v1', 'heldout_pot_tbsjnw_v1', 'heldout_model_table_tasks_v1',
+               'heldout_model_disembedding_v1', 'heldout_model_wall_v3')
     manifests = [root / folder / 'contract_candidates.json' for folder in folders]
     index_path = root / 'manifests/category_materialization_index_v4.json'
     index = json.loads(index_path.read_text())
@@ -86,6 +89,21 @@ def main():
                 put(task, cls, split, 'target_grasp_library_positive' if status == 'admitted' else 'blocked_target_grasp_library',
                     'Exact target library passed native identity/scale and positive-grasp admission. Task maps, task geometry, demo and replay require their own evidence.' if status == 'admitted' else
                     'Target library was excluded by native admission: ' + item['reason'] + '. No threshold or scale exception applied.', [audit_path, source], 3)
+    dependency_path = root / 'manifests/held_dependency_admission_v1/audit.json'
+    if dependency_path.is_file():
+        dependency = json.loads(dependency_path.read_text())
+        for item in dependency['admitted']:
+            require_positive = item.get('positive_grasps', 0) > 0
+            assert require_positive, 'admission report contains nonpositive library'
+            # The digest-bound native admission report records the private
+            # library audit; this status reporter does not reopen cross-account
+            # library bytes or claim a later map/physical gate.
+            for cls in item['campaign_classes']:
+                task = class_tasks.get(('eval_model', cls))
+                if task:
+                    put(task, cls, 'eval_model', 'target_grasp_library_positive',
+                        'Exact target library passed native identity, default-scale and positive-grasp admission. Exact-height maps and task geometry/demo/replay remain separate gates.',
+                        [dependency_path], 3)
     bound_path = root / 'manifests/floating_consumer_contracts_r5.json'
     bound = json.loads(bound_path.read_text())
     for template in bound['templates']:

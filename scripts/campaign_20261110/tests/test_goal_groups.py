@@ -140,6 +140,17 @@ class GoalGroupControllerTests(unittest.TestCase):
                 g.prepare_group(anchor=anchor, template=template, campaign_id="new", group_id="bad", output=root / "groups/bad",
                                 code_sha256=c.file_digest(code / ".snapshot_commit"), physics_sha256=c.digest("physics"),
                                 data_sha256=c.digest("maps"), magnitude_range=[.3, .45])
+            anchor["planned_goal_poses"] = {"apple.n.01_1": [[1.02, 2.01, .8], [0, 0, 0, 1]]}
+            repeated = root / "groups/reused"
+            g.prepare_group(anchor=anchor, template=template, campaign_id="new", group_id="reused", output=repeated,
+                            code_sha256=c.file_digest(code / ".snapshot_commit"), physics_sha256=c.digest("physics"),
+                            data_sha256=c.digest("maps"), magnitude_range=[.3, .45], reuse_anchor_goal=True)
+            exact = g.read_json(repeated / "goal_plan.json")
+            self.assertEqual(exact["goal_pose"], region[0])
+            self.assertEqual(exact["destination_pose"], plan["destination_pose"])
+            self.assertEqual(exact["source_pose"], plan["source_pose"])
+            self.assertEqual(exact["goal_selection"], "fresh_anchor")
+            self.assertFalse(exact["source_instance_is_member"])
 
     def test_pair_author_preserves_partner_and_varies_nextto_gap_before_new_starts(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -51,6 +51,42 @@ def bind_one(template, job, metadata_path, code, reservations, hashes, policy_po
     load_pool_for_template(template)
     meta = json.loads(metadata_path.read_text())
     directory = metadata_path.parent
+    relocation_path = directory / 'native_source_relocation.json'
+    relocation = None
+    if relocation_path.is_file():
+        proof = json.loads(relocation_path.read_text())
+        original_path = Path(proof['original_metadata'])
+        require(proof['schema'] == 'isg-native-source-relocation-v1' and proof['changed_fields'] in (['customs'], ['customs', 'activity_definition']), 'invalid native source relocation')
+        require(sha(original_path) == proof['original_metadata_sha256'] and sha(metadata_path) == proof['metadata_sha256'], 'relocated metadata bytes changed')
+        original = json.loads(original_path.read_text())
+        require(original['customs'] == proof['original_customs'], 'relocation original customs locator differs')
+        expected_meta = {**original, 'customs': proof['customs']}
+        if 'activity_definition' in proof['changed_fields']:
+            definition = (directory / proof['activity_definition']).resolve()
+            require(definition.is_relative_to(directory.resolve()) and sha(definition) == original['bddl_sha256'] == proof['native_bddl_sha256'], 'relocated BDDL bytes differ')
+            expected_meta['activity_definition'] = proof['activity_definition']
+        require(expected_meta == meta, 'native metadata changed beyond verified source locators')
+        export = proof.get('private_source_export')
+        if export:
+            audit_path = Path(export['path'])
+            require(sha(audit_path) == export['sha256'], 'private source export audit changed')
+            audit = json.loads(audit_path.read_text())
+            require(audit['schema'] == 'isg-private-source-copy-audit-v1', 'invalid private source export')
+            matches = [row for row in audit['records'] if row['source'] == proof['original_customs']]
+            require(len(matches) == 1 and matches[0]['sha256'] == proof['customs_sha256'], 'private customs source identity differs')
+            copied = (audit_path.parent / matches[0]['relative_path']).resolve()
+            require(copied.is_relative_to(audit_path.parent.resolve()) and str(copied) == export['copied_customs'], 'unsafe private customs export path')
+            require(sha(copied) == proof['customs_sha256'], 'private customs export bytes changed')
+        else:
+            require(sha(Path(proof['original_customs'])) == proof['customs_sha256'], 'original customs bytes changed')
+        require(sha(Path(proof['customs'])) == proof['customs_sha256'], 'relocated customs bytes changed')
+        for copied in proof['copied_files']:
+            relative = Path(copied['relative_path'])
+            require(not relative.is_absolute() and '..' not in relative.parts, 'unsafe native copy path')
+            require(sha(original_path.parent / relative) == copied['sha256'], 'original native source changed')
+            if str(relative) != 'template_meta.json':
+                require(sha(directory / relative) == copied['sha256'], 'native copy changed')
+        relocation = dict(path=str(relocation_path), sha256=sha(relocation_path), original_metadata=str(original_path), original_metadata_sha256=sha(original_path))
     full = directory / 'template.json'
     require(meta.get('n_written', 0) > 0, 'no successful native sample')
     require(sha(full) == meta['template_sha256'], 'native template SHA mismatch')
@@ -105,6 +141,8 @@ def bind_one(template, job, metadata_path, code, reservations, hashes, policy_po
         'source_candidate_manifest_sha256': sha(Path(job['source_manifest'])), 'admitted_dependency': dependency,
         'reservation_policy_sha256': policy_pointer['policy_sha256'], 'reservation_asset_hash_manifest_sha256': policy_pointer['asset_hashes']['sha256'],
         'fresh_geometry_tros': [{'path': str(path), 'sha256': sha(path)} for path in tros], 'production_released': False}
+    if relocation:
+        setup['native_source_relocation'] = relocation
     result = Template(template_id=template.template_id, task=template.task, class_id=template.class_id, split=template.split,
         scene=template.scene, room=template.room, objects=tuple(refs),
         definition_sha256=digest(dict(candidate_definition_sha256=template.definition_sha256, fresh_template_sha256=sha(full),

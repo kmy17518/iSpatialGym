@@ -93,6 +93,13 @@ def controller_reasons(root, catalog):
             seeds=config.get('seeds',config.get('families',[]))
             if isinstance(seeds,dict):
                 seeds=[dict(value,id=key) for key,value in seeds.items()]
+            if config.get('seed_catalog') and config.get('schema')=='isg-group-controller-v1':
+                path=Path(config['seed_catalog']).resolve()
+                require(path.is_relative_to(Path(root).resolve()/'controllers'),'controller seed catalog outside campaign')
+                admitted,catalog_source=observed_json(path,'admitted_seed_catalog');sources.append(catalog_source)
+                require(admitted.get('schema')=='isg-group-seed-catalog-v1'
+                        and admitted.get('campaign_id')==config.get('campaign_id'),'controller seed catalog identity differs')
+                seeds=list(seeds)+admitted['seeds']
             if not seeds and state.get('families'):
                 seeds=[{'id':key,'class_id':key} for key in state['families']]
             for spec in seeds:
@@ -119,9 +126,47 @@ def controller_reasons(root, catalog):
                 reasons[(task,class_id)].append({"controller":directory.name,"status":status,"reason":str(message),
                     'split':scope.get('split',spec.get('split')),'observed_at':epoch(state.get('updated_at',state.get('updated_at_unix')),source['mtime']),
                     "state_source":str(state_path),"source_kind":"controller_observation"})
+            for identity,record in state.get('records',{}).items():
+                if not isinstance(record,dict) or not record.get('admission_id'):
+                    continue
+                scope=config_scope(record['prepared']['config'],root,sources)
+                status=record.get('status','status not recorded')
+                message=record.get('error') or record.get('reason') or {
+                    'ready':'Fresh training canary prepared; awaiting dispatch.',
+                    'external_submission':'Fresh training canary queued or running; exact runtime demo and replay gate required.',
+                    'admitted':'Exact runtime training gate passed; seed admitted to bounded refill.',
+                }.get(status,status)
+                reasons[(scope['task'],scope['class_id'])].append({
+                    'controller':directory.name,'admission_id':identity,'status':status,'reason':str(message),
+                    'split':scope['split'],'observed_at':epoch(state.get('updated_at'),source['mtime']),
+                    'state_source':str(state_path),'source_kind':'controller_observation'})
         except (ValueError,KeyError,TypeError,OSError) as exc:
             errors.append({"source":str(directory),"error":type(exc).__name__+": "+str(exc)})
     return reasons,sources,errors
+
+
+def failure_observation(job, root):
+    """Summarize structured failures; raw logs never enter dashboard responses."""
+    job=Path(job).resolve();root=Path(root).resolve()
+    require(job.is_relative_to(root/'out'),'failure source outside campaign')
+    rejected=Counter();failed=Counter();proof=[];parts=[]
+    for path in sorted((job/'inst').glob('*/*/template_meta.json')):
+        data,source=observed_json(path,'sampling_failure_summary');proof.append(source)
+        rejected.update({k:v for k,v in data.get('rejections',{}).items() if isinstance(v,int) and v>0})
+    path=job/'results.jsonl'
+    if path.is_file():
+        body=path.read_bytes();proof.append({'path':str(path),'sha256':hashlib.sha256(body).hexdigest(),
+                                            'mtime':path.stat().st_mtime,'kind':'demo_failure_summary'})
+        for line in body.decode(errors='replace').splitlines():
+            try:row=json.loads(line)
+            except ValueError:continue
+            if row.get('success') is False:failed[str(row.get('reason') or row.get('status') or 'unspecified')]+=1
+    if failed:parts.append('demo failures: '+', '.join(f'{name} ({count})' for name,count in failed.most_common(3)))
+    if rejected:parts.append('sampling rejections: '+', '.join(f'{name} ({count})' for name,count in rejected.most_common(3)))
+    if not parts and (job/'sample.rc').exists():
+        code=(job/'sample.rc').read_text().strip()
+        if code and code!='0':parts.append('sampler exit '+code+'; no structured rejection report available')
+    return '; '.join(parts),proof
 
 
 def validation_reasons(root, catalog):
@@ -133,8 +178,12 @@ def validation_reasons(root, catalog):
         for job_id,row in state.get('gates',{}).items():
             class_id=row.get('key');task=catalog.get(class_id)
             split=None
+            progress=[]
             if row.get('source_job_dir'):
                 try:
+                    job=Path(row['source_job_dir']).resolve()
+                    require(job.is_relative_to(Path(root).resolve()/'out'),'validation job outside campaign')
+                    if (job/'job.env').exists():progress.append((job/'job.env').stat().st_mtime)
                     path_config=job_config(row['source_job_dir'],root)
                     if path_config:
                         scope=config_scope(path_config,root,sources)
@@ -144,10 +193,28 @@ def validation_reasons(root, catalog):
             if task is None:
                 try:task=task_for_alias(class_id or '')
                 except ValueError:continue
+            output=Path(row['output']).resolve() if row.get('output') else None
+            if output and output.is_relative_to(Path(root).resolve()/'validation') and output.exists():
+                progress.append(output.stat().st_mtime)
+            validated_at=epoch((row.get('gate') or {}).get('validated_at'),0)
+            if validated_at:progress.append(validated_at)
+            message=str(row.get('reason') or row.get('error') or row.get('status'))
+            failure_sources=[]
+            if row.get('source_job_dir') and row.get('status') in ('demo_missing','demo_failed','replay_failed'):
+                try:detail,failure_sources=failure_observation(row['source_job_dir'],root)
+                except (ValueError,OSError,TypeError) as exc:
+                    detail='structured failure observation unavailable'
+                    errors.append({'source':row['source_job_dir'],'error':'failure summary: '+str(exc)})
+                if detail and not (row.get('reason') or row.get('error')):message+='; '+detail
+                if row.get('status')=='replay_failed':
+                    result=(row.get('gate') or {}).get('result') or {}
+                    if result.get('reason') or result.get('error'):
+                        message+='; replay: '+str(result.get('reason') or result.get('error'))
             reasons[(task,class_id)].append({'source_kind':'validation_observation','job_id':job_id,
                 'state_source':str(path),'source_job_dir':row.get('source_job_dir'),'split':split,
-                'status':row.get('status'),'reason':str(row.get('reason') or row.get('error') or row.get('status')),
-                'observed_at':epoch(row.get('updated_at',state.get('updated_at')),source['mtime'])})
+                'status':row.get('status'),'reason':message,'failure_sources':failure_sources,
+                'observed_at':epoch(row.get('updated_at',state.get('updated_at')),source['mtime']),
+                'progress_at':max(progress) if progress else None})
     except (ValueError,KeyError,TypeError,OSError) as exc:
         errors.append({'source':str(path),'error':type(exc).__name__+': '+str(exc)})
     return reasons,sources,errors
@@ -203,6 +270,23 @@ def _identities(row, root, cache):
     return cache[key]
 
 
+def coverage_reason(evidence):
+    """Keep old failed candidates from masking a later validated configuration."""
+    if not evidence:return 'No controller evidence in this snapshot.'
+    controller=[row for row in evidence if row.get('source_kind')=='controller_observation']
+    if controller:
+        return max(controller,key=lambda row:row.get('observed_at') or 0)['reason']
+    validation=[row for row in evidence if row.get('source_kind')=='validation_observation']
+    if validation and any(row.get('status')=='validated' for row in validation):
+        latest=max(validation,key=lambda row:row.get('progress_at') or row.get('observed_at') or 0)
+        if latest.get('status')=='validated':
+            return 'Demo and physics replay passed; awaiting production or committed acceptance.'
+        return ('At least one configuration passed demo and physics replay; latest candidate observation: '
+                +latest['reason']+'. Remaining instances are not yet accepted.')
+    latest=max(evidence,key=lambda row:row.get('progress_at') or row.get('observed_at') or 0)
+    return latest['reason']
+
+
 def summarize(rows, catalog, *, root, observed_at, reasons=None, sources=(), errors=()):
     """Count committed IDs only; geometry candidates and demo logs are not input."""
     root=Path(root).resolve();reasons=reasons or {}
@@ -226,11 +310,7 @@ def summarize(rows, catalog, *, root, observed_at, reasons=None, sources=(), err
         evidence=[row for row in reasons.get((task,class_id),()) if row.get('split')==split]
         if split=='eval_category':
             evidence=[entry for (t,_),entries in reasons.items() if t==task for entry in entries if entry.get('split')==split]
-        controller=[row for row in evidence if row.get('source_kind')=='controller_observation']
-        latest=max(controller or evidence,key=lambda row:row.get('observed_at') or 0) if evidence else None
-        reason=latest['reason'] if latest else 'No controller evidence in this snapshot.'
-        if latest and latest.get('source_kind')=='validation_observation' and latest.get('status')=='validated':
-            reason='Demo and replay passed; awaiting production or committed acceptance.'
+        reason=coverage_reason(evidence)
         complete=target is not None and accepted>=target
         class_rows.append({'class_id':class_id,'task':task,'split':split,'accepted':accepted,'target':target,
             'remaining':max(0,target-accepted) if target is not None else None,'scope':scope,

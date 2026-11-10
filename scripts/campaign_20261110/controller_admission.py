@@ -20,6 +20,25 @@ from scripts.campaign_20261110.group_lane import check_reservations, physical_te
 from scripts.campaign_20261110.reservation_policy import active_policy
 from scripts.campaign_20261110.storage import atomic_directory_lock
 
+AUTHOR_RECONCILIATION = "tray_anchor_goal_reuse_v1"
+FIXED_AUTHOR_GAPS = {
+    "ContractError: disembedding needs a fresh anchor with verified destination-floor goal candidates",
+}
+
+
+def reconcile_author_gaps(state):
+    """Re-audit unchanged source bytes only for this explicit fixed author gap."""
+    if state.get("author_reconciliation") == AUTHOR_RECONCILIATION:
+        return
+    for path, observation in state.get("checked_gates", {}).items():
+        if observation.get("reason") not in FIXED_AUTHOR_GAPS:
+            continue
+        state.setdefault("author_retry_history", []).append({"gate": path, "previous_observation": dict(observation),
+            "helper_revision": AUTHOR_RECONCILIATION, "helper_sha256": file_digest(__file__), "observed_at": time.time()})
+        observation.pop("sha256", None)
+        observation["retry_author_revision"] = AUTHOR_RECONCILIATION
+    state["author_reconciliation"] = AUTHOR_RECONCILIATION
+
 
 def source_proof(gate_path, *, root, started_at, campaign_id):
     """Audit one annotated anchor without treating it as accepted dataset data."""
@@ -82,6 +101,15 @@ def admission_id(template, snapshot, perturbations):
                    "code": file_digest(Path(snapshot) / ".snapshot_commit"), "perturbations": perturbations})
 
 
+def task_allowed(task, cfg):
+    tasks = cfg.get("admitted_tasks")
+    if tasks is None:
+        return True
+    require(isinstance(tasks, list) and tasks and len(tasks) == len(set(tasks))
+            and all(groups.supports(value) for value in tasks), "invalid admission task scope")
+    return task in tasks
+
+
 def append_seed(catalog, spec, campaign_id):
     catalog = Path(catalog)
     with atomic_directory_lock(catalog.with_suffix(".lockdir")):
@@ -101,6 +129,7 @@ def prepare(proof, allocation, cfg, root):
     from scripts.campaign_20261110.goal_batches import prepare_batch, submission_command
     from ispatialgym.sampling.campaign_goal_queue import schema_for_task
     template = held.template_from(proof["template"])
+    require(task_allowed(template.task, cfg), "task outside immutable admission scope")
     runtime = Path(cfg["snapshot"]) / "ispatialgym/sampling/campaign_goal_queue.py"
     require(runtime.is_file() and schema_for_task(template.task) in runtime.read_text(),
             "target snapshot does not support this queue schema")
@@ -227,10 +256,12 @@ def main():
         with atomic_directory_lock(path.with_suffix(".lockdir")):
             state = read(path, {"config_sha256": digest(cfg), "records": {}, "checked_gates": {}})
             require(state["config_sha256"] == digest(cfg), "admission controller config changed")
+            reconcile_author_gaps(state)
             save = lambda: write_json_atomic(path, state)
             rows, queue = allocations(root), slurm_status()
             for source in cfg.get("existing_bootstraps", []):
                 record = read(source); template = held.template_from(read(record["prepared"]["config"])["template"])
+                require(task_allowed(template.task, cfg), "bootstrap task outside immutable admission scope")
                 identity = admission_id(template, cfg["snapshot"], read(record["prepared"]["config"])["perturbations"])
                 if identity not in state["records"]:
                     record["admission_id"] = identity
@@ -265,6 +296,7 @@ def main():
                 try:
                     proof = source_proof(gate, root=root, started_at=cfg["started_at"], campaign_id=cfg["campaign_id"])
                     template = held.template_from(proof["template"])
+                    require(task_allowed(template.task, cfg), "task outside immutable admission scope")
                     identity = admission_id(template, cfg["snapshot"], proof["perturbations"])
                     found = [r for r in rows if Path(r["job_dir"]).resolve() == Path(proof["source_job"])]
                     require(len(found) == 1, "anchor allocation missing or ambiguous")

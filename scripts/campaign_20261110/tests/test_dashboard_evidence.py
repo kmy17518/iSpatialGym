@@ -66,6 +66,33 @@ def test_family_reasons_without_unversioned_config_and_split_separation(tmp_path
     assert len(report['unassigned_reason_evidence'])==1
 
 
+def test_dynamic_seed_and_admission_reasons_stay_on_actual_training_split(tmp_path):
+    from dataclasses import replace
+    standards=tmp_path/'standards.json';catalog(standards);classes=de.standard_catalog(standards)
+    source=tmp_path/'groups/new/campaign_config.json'
+    fixture,_=candidate(tmp_path/'fixture',1)
+    template=replace(fixture.template,split='train',class_id='object_scaling-apple')
+    c.write_json_atomic(source,{'split':'train','template':asdict(template),
+        'validation_key':{'template_sha256':template.fingerprint}})
+    seed_catalog=tmp_path/'controllers/generic/catalog.json'
+    c.write_json_atomic(seed_catalog,{'schema':'isg-group-seed-catalog-v1','campaign_id':'campaign',
+        'seeds':[{'id':'admitted','class_id':'object_scaling-apple','seed_config':str(source)}]})
+    c.write_json_atomic(seed_catalog.with_name('config.json'),{'schema':'isg-group-controller-v1',
+        'campaign_id':'campaign','seeds':[], 'seed_catalog':str(seed_catalog)})
+    c.write_json_atomic(seed_catalog.with_name('state.json'),{'updated_at':900,'seeds':{'admitted':{'status':'quota_or_room_capacity_complete'}}})
+    c.write_json_atomic(tmp_path/'controllers/admission/state.json',{'updated_at':950,'records':{'one':{
+        'admission_id':'one','status':'external_submission','prepared':{'config':str(source)}}}})
+    reasons,sources,errors=de.controller_reasons(tmp_path,classes)
+    assert not errors and len(reasons['object_scaling','object_scaling-apple'])==2
+    assert all(row['split']=='train' for row in reasons['object_scaling','object_scaling-apple'])
+    assert any(row['kind']=='admitted_seed_catalog' for row in sources)
+    report=de.summarize([],classes,root=tmp_path,observed_at=1000,reasons=reasons)
+    by_split={row['split']:row for row in report['classes'] if row['class_id']=='object_scaling-apple'}
+    assert 'exact runtime demo and replay' in by_split['train']['reason']
+    assert by_split['eval_standard']['reason']=='No controller evidence in this snapshot.'
+    assert report['accepted_total']==0
+
+
 def test_pipeline_reasons_require_owned_unchanged_evidence_and_never_add_counts(tmp_path):
     standards=tmp_path/'standards.json';catalog(standards);classes=de.standard_catalog(standards)
     proof=tmp_path/'native_report.json';c.write_json_atomic(proof,{'positive_library':False})
@@ -85,6 +112,29 @@ def test_pipeline_reasons_require_owned_unchanged_evidence_and_never_add_counts(
     c.write_json_atomic(status,{'schema':'isg-campaign-pipeline-status-v1','campaign_id':'campaign_20261110','rows':[row]})
     reasons,_,errors=de.pipeline_reasons(tmp_path,classes)
     assert not reasons and 'outside campaign' in errors[0]['error']
+
+
+def test_old_failure_does_not_mask_later_pass_in_same_monitor_snapshot():
+    old={'source_kind':'validation_observation','status':'demo_missing','reason':'demo_missing',
+         'observed_at':1000,'progress_at':100}
+    passed={**old,'status':'validated','reason':'validated','progress_at':900}
+    assert de.coverage_reason([old,passed])=='Demo and physics replay passed; awaiting production or committed acceptance.'
+    later={**old,'status':'replay_queued','reason':'replay_queued','progress_at':950}
+    text=de.coverage_reason([old,passed,later])
+    assert 'one configuration passed' in text and 'replay_queued' in text
+    blocked={'source_kind':'controller_observation','reason':'strict bucket has no feasible start','observed_at':999}
+    assert de.coverage_reason([old,passed,later,blocked])==blocked['reason']
+
+
+def test_structured_failure_summary_keeps_raw_logs_out(tmp_path):
+    job=tmp_path/'out/job'
+    c.write_json_atomic(job/'inst/task/scene/template_meta.json',{'rejections':{'grasp_unreachable':12,'no_stance':4}})
+    (job/'results.jsonl').write_text('{"success":false,"reason":"not_settled"}\n{"success":true}\n')
+    (job/'sample.log').write_text('RAW_PRIVATE_LOG_MUST_NOT_APPEAR')
+    text,proof=de.failure_observation(job,tmp_path)
+    assert 'not_settled (1)' in text and 'grasp_unreachable (12)' in text
+    assert 'RAW_PRIVATE_LOG' not in text and len(proof)==2
+    assert all(item['sha256']==c.file_digest(item['path']) for item in proof)
 
 
 def test_history_measures_only_accepted_counts_and_rejects_regression(tmp_path):
