@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -8,6 +9,58 @@ from scripts.campaign_20261110 import controller_families as c
 
 
 class FamilyControllerTests(unittest.TestCase):
+    def recovered_fixture(self, root, *, group=False, mode='physics_action_open_loop'):
+        job = root / 'out/fresh'
+        job.mkdir(parents=True)
+        row = {'key': 'a', 'jobid': '12', 'job_dir': str(job)}
+        stage = {'status': 'failed', 'allocation': row, 'directory': str(root/'groups/g'), 'index': 50000000}
+        state = {'history': [{'name': 'g', 'group' if group else 'anchor': stage}], 'consecutive_failures': 3}
+        path = c.gate_path(root, row)
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({'success': True, 'replay_mode': mode, 'source_job': str(job)}))
+        return state, path
+
+    def test_late_physics_recovery_resumes_without_overwriting_failed_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state, path = self.recovered_fixture(root)
+            self.assertTrue(c.restore_recovered_cycle({'class_id': 'a'}, state, root))
+            self.assertEqual(state['current']['anchor']['status'], 'waiting')
+            self.assertEqual(state['history'][0]['anchor']['status'], 'failed')
+            self.assertEqual(state['current']['recovery_evidence']['gate_sha256'], c.file_digest(path))
+            self.assertEqual(state['consecutive_failures'], 0)
+            state.pop('current')
+            self.assertFalse(c.restore_recovered_cycle({'class_id': 'a'}, state, root))
+
+    def test_recovery_preserves_group_identity_for_strict_reaudit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state, _ = self.recovered_fixture(root, group=True)
+            self.assertTrue(c.restore_recovered_cycle({'class_id': 'a'}, state, root))
+            self.assertEqual(state['current']['name'], 'g')
+            self.assertEqual(state['current']['group']['allocation']['jobid'], '12')
+
+    def test_recovery_never_uses_kinematic_gates_or_overrides_disabled_family(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state, path = self.recovered_fixture(root, mode='kinematic')
+            self.assertFalse(c.restore_recovered_cycle({'class_id': 'a'}, state, root))
+            data = json.loads(path.read_text()); data['replay_mode'] = 'physics_action_open_loop'; path.write_text(json.dumps(data))
+            self.assertFalse(c.restore_recovered_cycle({'class_id': 'a', 'allow_new_cycles': False}, state, root))
+            data['source_job'] = '/outside'; path.write_text(json.dumps(data))
+            with self.assertRaises(ValueError):
+                c.restore_recovered_cycle({'class_id': 'a'}, state, root)
+
+    def test_spooled_group_does_not_submit_directly(self):
+        record = {'status': 'ready', 'directory': '/campaign/groups/unique', 'index': 50000000}
+        with patch('scripts.campaign_20261110.controller_spool.enqueue_record') as enqueue, patch.object(c, 'run_logged') as submit:
+            c.perform_submit(record, ['python', 'submit_fast.py', 'submit'], lambda: None, [], {'class_id': 'a'},
+                Path('/campaign'), 'goal_groups', '/snapshot', 3, dispatch_spool=True)
+            enqueue.assert_called_once()
+            submit.assert_not_called()
+            self.assertEqual(record['status'], 'external_submission')
+            self.assertTrue(record['dry_run_passed'])
+
     def test_bucket_deficits_are_strict_and_stop_at_quota(self):
         self.assertEqual(c.next_bucket({("eval_standard", 0): 3}, [3, 4, 3]), 1)
         self.assertIsNone(c.next_bucket({("eval_standard", 0): 3, ("eval_standard", 1): 4,

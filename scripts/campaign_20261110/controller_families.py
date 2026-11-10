@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import copy
 import csv
 import json
 import os
@@ -149,13 +150,27 @@ def run_logged(cmd, path):
     require(result.returncode == 0, "command failed; inspect " + str(path))
 
 
-def perform_submit(record, cmd, save, rows, spec, root, tag, snapshot, count):
+def perform_submit(record, cmd, save, rows, spec, root, tag, snapshot, count, *, dispatch_spool=False):
     row = reconcile(rows, key=spec["class_id"], index=record["index"], count=count, snapshot=snapshot, tag=tag)
     if row:
         record.update(allocation=row, status="waiting")
         save()
         return
     require(record["status"] != "submitting", "submission outcome ambiguous; ledger reconciliation required")
+    if dispatch_spool:
+        receipt = root / 'dispatch/receipts' / (Path(record['directory']).name + '.json')
+        # Persist the intent before any external submission. All dispatchers use
+        # the same token lock and immutable command identity.
+        record.update(command=cmd, count=count, dispatch_receipt=str(receipt), status='external_submission')
+        record['dispatch_intent'] = str(root / 'dispatch/ready' / receipt.name)
+        save()
+        if tag == 'family_anchor':
+            run_logged(cmd + ['--dispatch-spool'], Path(record['directory']) / 'controller_submit.log')
+        else:
+            from scripts.campaign_20261110.controller_spool import enqueue_record
+            record['dry_run_passed'] = True  # exact command dry-run completed by advance
+            enqueue_record(root, record, save, priority=25)
+        return
     record.update(status="submitting", command_sha256=digest(cmd), submission_started_at=time.time())
     save()  # An interrupted sbatch never permits an automatic second submission.
     run_logged(cmd, Path(record["directory"]) / "controller_submit.log")
@@ -164,6 +179,34 @@ def perform_submit(record, cmd, save, rows, spec, root, tag, snapshot, count):
     require(row is not None, "submit returned without a durable matching allocation")
     record.update(allocation=row, status="waiting")
     save()
+
+
+def restore_recovered_cycle(spec, state, root):
+    """Reconsider a failed attempt only after its real physics gate recovered."""
+    if state.get('current') or spec.get('allow_new_cycles', True) is False:
+        return False
+    for cycle in reversed(state.get('history', [])):
+        stage = cycle.get('group') or cycle.get('anchor') or {}
+        if stage.get('status') != 'failed' or cycle.get('late_recovery'):
+            continue
+        row = stage.get('allocation') or {}
+        if not row or row.get('key') != spec['class_id']:
+            continue
+        gate_file = gate_path(root, row)
+        gate = read(gate_file, {})
+        if gate.get('success') is not True or gate.get('replay_mode') != 'physics_action_open_loop':
+            continue
+        job = Path(row['job_dir']).resolve()
+        require(job.is_relative_to(root / 'out') and Path(gate.get('source_job', '')).resolve() == job,
+                'recovered gate source differs from the owned allocation')
+        restored = copy.deepcopy(cycle)
+        restored_stage = restored.get('group') or restored['anchor']
+        restored_stage['status'] = 'waiting'
+        restored['recovery_evidence'] = {'gate_path': str(gate_file), 'gate_sha256': file_digest(gate_file), 'at': time.time()}
+        cycle['late_recovery'] = restored['recovery_evidence']
+        state.update(current=restored, status='recovered_replay', consecutive_failures=0)
+        return True
+    return False
 
 
 def prepare_from_anchor(spec, anchor_record, group_id, output, magnitude_range, root, started_at):
@@ -204,6 +247,7 @@ def claim(record, spec, cfg, root):
 
 def advance(spec, state, cfg, root, queue, allowance, save):
     from scripts.campaign_20261110.goal_groups import submission_command
+    from scripts.campaign_20261110.controller_held import job_terminal
     counts = accepted_counts(root, spec["class_id"])
     state["counts"] = {split + ":" + str(bucket): n for (split, bucket), n in counts.items()}
     bucket = next_bucket(counts, spec["eval_quotas"])
@@ -239,13 +283,34 @@ def advance(spec, state, cfg, root, queue, allowance, save):
                                      v2_root=spec["v2_root"], base_index=group["index"])
             cmd[cmd.index("--kcollect") + 1] = str(spec.get("kcollect", 2))
             run_logged(cmd + ["--dry-run"], Path(group["directory"]) / "controller_dry.txt")
-            perform_submit(stage, cmd, save, allocations(root), spec, root, "goal_groups", spec["group_snapshot"], 3)
+            perform_submit(stage, cmd, save, allocations(root), spec, root, "goal_groups", spec["group_snapshot"], 3,
+                           dispatch_spool=cfg.get('dispatch_spool', False))
         else:
             cmd = anchor_command(spec, root, stage["directory"], stage["index"], cfg["helper_snapshot"])
-            perform_submit(stage, cmd, save, allocations(root), spec, root, "family_anchor", spec["anchor_snapshot"], 1)
+            perform_submit(stage, cmd, save, allocations(root), spec, root, "family_anchor", spec["anchor_snapshot"], 1,
+                           dispatch_spool=cfg.get('dispatch_spool', False))
         return 1
+    if stage['status'] == 'external_submission':
+        receipt = read(stage['dispatch_receipt'], {})
+        require(receipt.get('status') != 'blocked', 'dispatch blocked: ' + str(receipt.get('error')))
+        if not receipt and not Path(stage['dispatch_intent']).exists():
+            # A crash before the ready-file publication is safe to reconcile:
+            # this path only publishes an immutable intent, never runs sbatch.
+            if group:
+                from scripts.campaign_20261110.controller_spool import enqueue_record
+                stage['dry_run_passed'] = True
+                enqueue_record(root, stage, save, priority=25)
+            else:
+                run_logged(stage['command'] + ['--dispatch-spool'], Path(stage['directory']) / 'controller_submit.log')
+        row = reconcile(allocations(root), key=spec['class_id'], index=stage['index'], count=3 if group else 1,
+                        snapshot=spec['group_snapshot'] if group else spec['anchor_snapshot'],
+                        tag='goal_groups' if group else 'family_anchor')
+        if row is None:
+            return 0
+        stage.update(allocation=row, status='waiting')
+        save()
     row = stage["allocation"]
-    ended = row["jobid"] not in queue and terminal(row["jobid"])
+    ended = job_terminal(row, root, queue)
     gate = read(gate_path(root, row))
     if gate and gate.get("success") is True:
         if group:
@@ -321,9 +386,13 @@ def main():
             try:
                 queue = slurm_status()
                 active = sum(bool(row.get("current")) for row in state["families"].values())
-                allowance = submission_capacity(queue, cfg.get("max_submissions_per_tick", 2))
+                allowance = (cfg.get('max_submissions_per_tick', 2) if cfg.get('dispatch_spool') else
+                             submission_capacity(queue, cfg.get("max_submissions_per_tick", 2)))
                 for spec in cfg["families"]:
                     family = state["families"].setdefault(spec["class_id"], {"history": []})
+                    if restore_recovered_cycle(spec, family, root):
+                        active += 1
+                        save()
                     if not family.get("current") and spec.get("adopt_anchor") and not family.get("anchor_adopted"):
                         entry = spec["adopt_anchor"]
                         rows = [row for row in allocations(root) if row["jobid"] == str(entry["jobid"])]

@@ -5,6 +5,10 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
+
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
 def main():
@@ -18,6 +22,7 @@ def main():
     p.add_argument('--kcollect', type=int, default=2)
     p.add_argument('--dry-run', action='store_true')
     p.add_argument('--vast-gpu', choices=['RTX 4090','RTX 5090'])
+    p.add_argument('--dispatch-spool', action='store_true')
     a = p.parse_args()
     root, group, snapshot = (Path(x).resolve() for x in (a.root, a.group, a.snapshot))
     assert group.is_relative_to(root) and snapshot.is_relative_to(root/'code')
@@ -48,6 +53,17 @@ def main():
            '--sample-limit-s','2700','--time-s','5400','--customs','template' if a.template_customs else 'trunk']
     for name, value in env.items():
         cmd.extend(['--extra-env',name+'='+value])
+    if a.dispatch_spool:
+        assert not a.vast_gpu and not a.dry_run, 'spool owns backend routing and dry-run'
+        from scripts.campaign_20261110.controller_spool import enqueue_record
+        result = subprocess.run(cmd + ['--dry-run'], capture_output=True, text=True)
+        (group/'dry.txt').write_text(result.stdout + result.stderr)
+        assert result.returncode == 0, 'validation dry-run failed; inspect dry.txt'
+        record = {'directory': str(group), 'command': cmd, 'dry_run_passed': True}
+        enqueue_record(root, record, lambda: None, priority=25)
+        (group/'dispatch_intent.json').write_text(json.dumps(record, indent=2) + '\n')
+        print(json.dumps({'dispatch_intent': record['dispatch_intent'], 'dispatch_receipt': record['dispatch_receipt']}))
+        return
     process_env = None
     if a.vast_gpu:
         submitter = root/'vast/tool/vsubmit'
