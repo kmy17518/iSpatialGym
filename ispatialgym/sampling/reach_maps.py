@@ -167,11 +167,16 @@ class MapConfig:
     # live). None = the former acceptance (cuRobo's success alone); left out of key() while None (the maps built before keep their keys).
     # Set by ``contact_maps.contact_config`` for the axial_brace kind under ISPATIALGYM_AXIAL_BRACE_MAP_JOINT_MARGIN=1 only
     joint_margin_rad: Optional[float] = None
+    # i7-bracefine 2026-11-09 (owner A9 #24): a contact map's trunk columns - None = ``reach_bands.trunk_grid`` (the former columns);
+    # "phase2" = those plus Phase 2's own stance tilts per translate (``tabletop.tilt_scan``: N_TILT_SAMPLES from 0 to the torso_joint3 limit),
+    # so a manipulation stance reads a BUILT column (``contact_maps.trunk_columns``). Left out of key() while None (the maps built before keep
+    # their keys). Set by ``contact_maps.contact_config`` for the axial_brace kind under ISPATIALGYM_AXIAL_BRACE_MAP_PHASE2_TILTS=1 only
+    tilt_columns: Optional[str] = None
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
-        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang", "interior_place", "joint_margin_rad"):
+        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang", "interior_place", "joint_margin_rad", "tilt_columns"):
             if d.get(k) is None:
                 d.pop(k)
         return d
