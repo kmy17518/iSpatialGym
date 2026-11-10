@@ -818,6 +818,28 @@ class Disembedding(SamplerV2):
         res = float(self.g("tray_raster_m"))
         self.src_floor = TrayFloor.measure(self, src, self.top, res)
         self.dst_floor = TrayFloor.measure(self, dst, self.top, res)
+        if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+            from pathlib import Path
+            from scripts.campaign_20261110.contracts import write_json_atomic
+
+            def area_record(binding, hull_key):
+                obj = self.objects[binding.name]
+                quat = self.rest[hull_key]
+                area = CTG.polygon_area(self.world.footprint(self.hull[hull_key], (th.zeros(3), quat)))
+                return {"instance": binding.name, "category": binding.category, "model": binding.model,
+                        "area_m2": area, "scale": [float(v) for v in obj.scale],
+                        "rest_quat_xyzw": [float(v) for v in quat]}
+
+            profile = {"schema": "isg-native-tray-coverage-profile-v1", "template_id": self.ctx.template_id,
+                "source_template": self.ctx.out_dir, "bddl_sha256": self.template_meta["bddl_sha256"],
+                "target": area_record(self.bindings.one("target"), "target"),
+                "distractors": [area_record(b, b.name) for b in self.bindings.many("distractors")],
+                "source_floor_area_m2": self.src_floor.area(), "source_floor_cells": self.src_floor.n_cells,
+                "source_floor_resolution_m": self.src_floor.res, "fixed_layout": self.layout is not None,
+                "source": "native projected collision hull at measured rest and actual initialized scale"}
+            self.template_facts["campaign_coverage_profile"] = profile
+            write_json_atomic(Path(self.ctx.out_dir) / "campaign_coverage_profile.json", profile)
+            log.info("CAMPAIGN_COVERAGE_PROFILE %s", profile)
         # i7-split 2026-11-07: the support split's planes - the table top (a map hit registers it again for the policy) and both trays' inner
         # floors (split only: the policy does not police the trays) - so the trays' rims / walls stay obstacles wherever they are ignored
         SS.register_top(self, support, self.top, what="top")
