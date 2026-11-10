@@ -67,5 +67,16 @@ class DispatchTests(unittest.TestCase):
         row = D.find_allocation(self.root, D.input_identity(self.root, self.command))
         self.assertEqual(row['jobid'], '123')
 
+    def test_empty_index_is_validated_hashed_and_group_readable(self):
+        path = self.root / 'empty_eval_index.json'
+        path.write_text('{"schema":"isg-instance-index-v1","n":0,"instances":[]}')
+        path.chmod(0o600)
+        command = self.command + ['--extra-env', 'EVAL_INDEX=' + str(path)]
+        payload = json.loads(D.enqueue(self.root, 'index', command).read_text())
+        self.assertIn(str(path), payload['identity']['files'])
+        self.assertTrue(path.stat().st_mode & 0o040)
+        path.write_text('{"schema":"wrong"}')
+        with self.assertRaises(ValueError): D.enqueue(self.root, 'bad_index', command)
+
 
 if __name__ == '__main__': unittest.main()

@@ -68,6 +68,18 @@ def input_identity(root, command):
             require(path.is_relative_to(root), 'campaign input outside owned root')
             files[str(path)] = file_digest(path)
     require('ISPATIALGYM_CAMPAIGN_CONFIG' in env or 'ISPATIALGYM_CAMPAIGN_GOAL_QUEUE' in env, 'annotated config required')
+    if env.get('EVAL_INDEX'):
+        path = Path(env['EVAL_INDEX']).resolve()
+        require(path.is_relative_to(root) and path.is_file(), 'fresh evaluation index must be owned')
+        raw = json.loads(path.read_text())
+        require(raw.get('schema') == 'isg-instance-index-v1' and raw.get('instances') == [] and raw.get('n') == 0,
+                'campaign dispatcher requires a fresh empty evaluation index')
+        files[str(path)] = file_digest(path)
+    if env.get('TEMPLATE'):
+        template_dir = Path(env['TEMPLATE']).resolve()
+        if template_dir.is_relative_to(root):
+            for path in template_dir.glob('*.json'):
+                files[str(path)] = file_digest(path)
     if env.get('ISPATIALGYM_CAMPAIGN_GOAL_QUEUE'):
         queue = json.loads(Path(env['ISPATIALGYM_CAMPAIGN_GOAL_QUEUE']).read_text())
         for path, expected in [(queue['config_path'], queue['config_sha256'])] + [(entry['path'], entry['sha256']) for entry in queue['entries']]:
@@ -171,7 +183,8 @@ def publish_owned_outputs(root):
     for current, dirs, files in os.walk(directory, followlinks=False):
         for path in [Path(current)] + [Path(current) / name for name in files]:
             if path.is_symlink(): continue
-            stat = path.stat()
+            try: stat = path.stat()
+            except FileNotFoundError: continue
             if stat.st_uid != os.getuid(): continue
             target = stat.st_mode | (0o050 if path.is_dir() else 0o040)
             if target != stat.st_mode: os.chmod(path, target)
