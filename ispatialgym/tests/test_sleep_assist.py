@@ -15,7 +15,7 @@ from ispatialgym.oracle.executor import ExecutorConfig
 from ispatialgym.oracle.programs import expand
 from ispatialgym.tests.test_v2_oracle import _place_goal, iors_world, make_executor, success_eval
 
-ASSIST_ENV = ("ISG_SLEEP_ASSIST", "ISG_SLEEP_ASSIST_MODE", "ISG_SLEEP_ASSIST_WAKE_M", "ISG_SLEEP_ASSIST_MAX_KG")
+ASSIST_ENV = ("ISG_SLEEP_ASSIST", "ISG_SLEEP_ASSIST_MODE", "ISG_SLEEP_ASSIST_WAKE_M", "ISG_SLEEP_ASSIST_MAX_KG", SA.RESTART_ON_WAKE_ENV)
 PHYSICS_FLAGS = ("rigid_sleep_threshold", "rigid_solver_iterations", "sleep_assist", "sleep_assist_mode", "sleep_assist_max_mass",
                  "sleep_assist_wake_radius", "lean_step")
 
@@ -323,3 +323,65 @@ def test_no_box_is_computed_while_every_gripper_is_parked(world):
     robot.eef["right"] = th.tensor([0.0, 0.06, 1.0])
     sa.step(4)
     assert not apple.asleep and calls == [1]
+
+
+def test_restart_on_wake_is_off_by_default_a_physx_wake_is_re_slept_at_once(world):
+    """Today's rule (ISPATIALGYM_SLEEP_ASSIST_RESTART_ON_WAKE unset): the window keeps the asleep span's still poses, so a body PhysX woke
+    (a slow hand's contact) is re-slept on the next control step although it now moves 0.1 mm per step (the 5w.3(b) pressed sleeper)."""
+    assert SA.RESTART_ON_WAKE_DEFAULT == "0" and not SA.restart_on_wake()
+    robot, apple = Robot(), Body(world, "apple", [0, 0, 1])
+    sa = SA.SleepAssist(robot, {"apple": apple}, "s0", config=(5, 0.001, 0.003))
+    n = run(sa, 5)
+    assert apple.asleep and sa.sleeps == {"apple": [5]}
+    n = run(sa, 10, start=n)  # asleep: the window fills with still poses
+    apple.asleep = False  # PhysX wakes it (contact); it creeps 0.1 mm per step
+
+    def creep(s):
+        apple.pos = apple.pos + th.tensor([0.0001, 0.0, 0.0])
+
+    run(sa, 1, start=n, each=creep)
+    assert apple.asleep and sa.sleeps == {"apple": [5, n]}
+    assert "restart_on_wake" not in sa.report() and "wake_restarts" not in sa.report()
+
+
+def test_restart_on_wake_a_physx_wake_restarts_the_window(world, monkeypatch):
+    monkeypatch.setenv(SA.RESTART_ON_WAKE_ENV, "1")
+    robot, apple = Robot(), Body(world, "apple", [0, 0, 1])
+    sa = SA.SleepAssist(robot, {"apple": apple}, "s0", config=(5, 0.001, 0.003))
+    n = run(sa, 15)
+    assert apple.asleep and sa.sleeps == {"apple": [5]}
+    apple.asleep = False  # PhysX's wake
+    w = n
+
+    def creep(s):
+        apple.pos = apple.pos + th.tensor([0.0001, 0.0, 0.0])
+
+    n = run(sa, 4, start=n, each=creep)
+    assert not apple.asleep  # 4 poses since the wake: the window (5) is not full
+    sa.step(n)  # 5 poses spanning 0.4 mm < 1 mm: a real rest of the awake body -> asleep
+    assert apple.asleep and sa.sleeps == {"apple": [5, n]}
+    rep = sa.report()
+    assert rep["restart_on_wake"] is True and rep["wake_restarts"] == {"physx": {"apple": [w]}, "assist": {}}
+    assert rep["wake_restarts_n"] == {"physx": 1, "assist": 0}
+    apple.asleep = False  # woken again, now pushed 0.3 mm per step: the window never sees a rest
+    for s in range(n + 1, n + 20):
+        apple.pos = apple.pos + th.tensor([0.0003, 0.0, 0.0])
+        sa.step(s)
+    assert not apple.asleep and sa.sleeps == {"apple": [5, n]}
+
+
+def test_restart_on_wake_the_assists_own_wake_restarts_the_window_and_a_rollback_trims_the_record(world, monkeypatch):
+    monkeypatch.setenv(SA.RESTART_ON_WAKE_ENV, "1")
+    robot, apple = Robot(), Body(world, "apple", [0, 0, 1])
+    sa = SA.SleepAssist(robot, {"apple": apple}, "s0", config=(3, 0.001, 0.003))
+    n = run(sa, 6)
+    assert apple.asleep
+    robot.eef["right"] = th.tensor([0.0, 0.06, 1.0])  # a moving gripper 3 cm away: the assist wakes it
+    sa.step(n)
+    assert not apple.asleep and sa.restarts == {"physx": {}, "assist": {"apple": [n]}}
+    sa.step(n + 1)  # the gripper parks: today the full window re-sleeps it here; restarted, 2 poses < 3
+    assert not apple.asleep
+    sa.step(n + 2)
+    assert apple.asleep and apple.slept_calls == 2
+    sa.trim(n - 1)
+    assert sa.restarts == {"physx": {}, "assist": {}} and sa.was_asleep == {}

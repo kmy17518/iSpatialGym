@@ -1788,6 +1788,11 @@ class KitContactWorld:
                 "obj_v_max_after_motion": None if not after else round(max(r["v"] for r in after), 4),
                 "obj_w_max_after_motion": None if not after else round(max(r["w"] for r in after), 4),
                 "moved_total_m": round(float(np.linalg.norm(np.asarray(rows[-1]["p"]) - p0)), 5) if p0 is not None else None,
+                # i7-sleep (A8b): the press's asleep steps (touched or not), the assist's sleeps during the press, its wake restarts
+                "asleep_steps_press": sum(1 for r in tl if r["asleep"]),
+                "sa_sleeps_press": (rows[-1]["sa_sleeps"] - (rows[k0 - 1]["sa_sleeps"] if k0 else 0)) if tl else 0,
+                "restart_on_wake": SAM.restart_on_wake(),
+                "sa_wake_restarts_n": (cur["sa"].report().get("wake_restarts_n") if cur["sa"] is not None else None),
                 "error": err, "steps": len(rows)}
 
     def _axial_load(self, obj, entry, T0, pts, hinge, pusher, motions, step, sa, sw: Dict[str, bool]) -> Dict[str, Any]:
