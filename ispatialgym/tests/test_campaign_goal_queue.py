@@ -10,10 +10,14 @@ from ispatialgym.sampling.v2 import core
 from scripts.campaign_20261110.tests import test_goal_queue as fixtures
 
 
-@pytest.mark.parametrize("family", ["held", "pair"])
+@pytest.mark.parametrize("family", ["held", "pair", "attachment"])
 def test_two_groups_share_one_sampler_and_do_not_consume_attempts_when_full(tmp_path, monkeypatch, family):
     from scripts.campaign_20261110.tests.test_pair_goal_batches import pair_fixture
-    manifest, _, _ = (fixtures.fixture if family == "held" else pair_fixture)(tmp_path, monkeypatch)
+    if family == "attachment":
+        from scripts.campaign_20261110.tests.test_generic_goal_queue import generic_fixture
+        manifest, _, _ = generic_fixture(tmp_path, monkeypatch, "configuration_matching-attachment")
+    else:
+        manifest, _, _ = (fixtures.fixture if family == "held" else pair_fixture)(tmp_path, monkeypatch)
     monkeypatch.setattr(core, "fast_on", lambda *args: False)
     monkeypatch.setattr(core, "publish_instance", lambda path: True)
     calls = []

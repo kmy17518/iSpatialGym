@@ -158,7 +158,8 @@ def refresh(record, cfg, root, rows, queue):
             record.update(status="failed", reason="new_runtime_admission_has_no_successful_demo")
         return
     if read(gate).get("success") is not True:
-        record.update(status="failed", reason="new_runtime_admission_physics_replay_failed")
+        record.update(status="failed", reason="new_runtime_admission_physics_replay_failed",
+                      failed_gate={"path": str(gate), "sha256": file_digest(gate)})
         return
     held.claim_finished_groups(record, allocation, str(gate), cfg, root, job_terminal=True)
     require(record.get("groups"), "admission lacks a durable closed goal group")
@@ -176,6 +177,42 @@ def refresh(record, cfg, root, rows, queue):
         "existing_queues": [record["queue"]], "admission_review": {"path": str(proof_path), "sha256": file_digest(proof_path)}}
     append_seed(cfg["seed_catalog"], spec, cfg["campaign_id"])
     record.update(status="admitted", admitted_seed=spec["id"], admitted_at=time.time())
+
+
+def refreshable(record, root):
+    """A repaired replay must supply new successful evidence before re-audit."""
+    if record["status"] == "admitted":
+        return False
+    if record["status"] != "failed":
+        return True
+    if record.get("reason") != "new_runtime_admission_physics_replay_failed":
+        return False
+    allocation = record.get("allocation")
+    if not allocation:
+        return False
+    gate = root / "validation/open_loop" / allocation["key"] / allocation["jobid"] / "gate.json"
+    observed = observe_gate(gate)
+    return (observed is not None and observed[0] != record.get("failed_gate", {}).get("sha256")
+            and observed[1].get("success") is True)
+
+
+def observe_gate(path):
+    # The replay watcher archives a failed canonical gate before its strict
+    # retry. Losing that directory entry while scanning is not new evidence.
+    try:
+        return file_digest(path), read(path)
+    except FileNotFoundError:
+        return None
+
+
+def recent_gates(root):
+    rows = []
+    for path in (root / "validation/open_loop").glob("*/*/gate.json"):
+        try:
+            rows.append((path.stat().st_mtime, path))
+        except FileNotFoundError:
+            continue
+    return [path for _, path in sorted(rows, reverse=True)]
 
 
 def main():
@@ -200,7 +237,7 @@ def main():
                     record["status"] = "external_submission"
                     state["records"][identity] = record
             for record in state["records"].values():
-                if record["status"] in ("admitted", "failed"):
+                if not refreshable(record, root):
                     continue
                 try:
                     if record["status"] == "ready":
@@ -213,13 +250,16 @@ def main():
             pending = sum(r["status"] not in ("admitted", "failed") for r in state["records"].values())
             allowance = min(cfg.get("new_admissions_per_pass", 2), max(0, cfg.get("maximum_pending_admissions", 12) - pending))
             examined = 0
-            for gate in sorted((root / "validation/open_loop").glob("*/*/gate.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+            for gate in recent_gates(root):
                 if allowance <= 0 or examined >= 30:
                     break
-                sha = file_digest(gate)
+                observed = observe_gate(gate)
+                if observed is None:
+                    continue
+                sha, gate_data = observed
                 if state["checked_gates"].get(str(gate), {}).get("sha256") == sha:
                     continue
-                if read(gate).get("success") is not True:
+                if gate_data.get("success") is not True:
                     continue
                 examined += 1
                 try:

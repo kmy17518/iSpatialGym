@@ -72,6 +72,34 @@ def test_catalog_is_additive_and_changed_existing_seed_is_rejected(tmp_path):
         admission.append_seed(path, {**a, "key": "replaced"}, "campaign")
 
 
+def test_failed_replay_requires_changed_successful_gate_before_full_readmission(tmp_path):
+    path = tmp_path / "validation/open_loop/task/123/gate.json"
+    c.write_json_atomic(path, {"success": False, "reason": "replay startup permission error"})
+    record = {"status": "failed", "reason": "new_runtime_admission_physics_replay_failed",
+              "allocation": {"key": "task", "jobid": "123"},
+              "failed_gate": {"path": str(path), "sha256": c.file_digest(path)}}
+    assert not admission.refreshable(record, tmp_path)
+    c.write_json_atomic(path, {"success": False, "reason": "a new failed replay"})
+    assert not admission.refreshable(record, tmp_path)
+    c.write_json_atomic(path, {"success": True, "reason": "fresh physics replay passed"})
+    assert admission.refreshable(record, tmp_path)
+    assert record["status"] == "failed"  # The existing full refresh/audit still decides admission.
+    record["reason"] = "new_runtime_admission_has_no_successful_demo"
+    assert not admission.refreshable(record, tmp_path)
+
+
+def test_archiving_gate_during_admission_scan_does_not_stop_controller(tmp_path, monkeypatch):
+    path = tmp_path / "validation/open_loop/task/123/gate.json"
+    c.write_json_atomic(path, {"success": False})
+    assert admission.recent_gates(tmp_path) == [path]
+    def archive_during_hash(value):
+        Path(value).rename(Path(value).with_name("failed_gate.json"))
+        return c.file_digest(value)
+    monkeypatch.setattr(admission, "file_digest", archive_during_hash)
+    assert admission.observe_gate(path) is None
+    assert admission.recent_gates(tmp_path) == []
+
+
 def test_pending_admission_canary_reserves_class_capacity_before_catalog_admission(tmp_path):
     record = {"admission_id": "a", "status": "external_submission", "phase": "train", "prepared": {"group_ids": ["new"]},
               "decision": {"bucket": 0}}

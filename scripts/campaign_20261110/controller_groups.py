@@ -19,7 +19,7 @@ QUOTAS = {q.task: q for q in task_quotas()}
 
 
 def supports(task):
-    return (task in ("alignment-world_vertical", "alignment-axial", "disembedding")
+    return (task in ("alignment-world_vertical", "alignment-axial", "disembedding", "configuration_matching-attachment")
             or task.startswith("configuration_matching-articulation_")
             or task.startswith("inter_object_relation_satisfaction-")) and task in QUOTAS
 

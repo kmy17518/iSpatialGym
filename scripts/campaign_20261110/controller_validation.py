@@ -123,7 +123,7 @@ def publish_recovered_gate(entry, root):
     staged.unlink()
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--root',type=pathlib.Path,required=True);ap.add_argument('--snapshot',required=True);ap.add_argument('--interval',type=float,default=30);ap.add_argument('--once',action='store_true');ap.add_argument('--ledger',type=pathlib.Path,action='append');ap.add_argument('--scene-helper',type=pathlib.Path);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--root',type=pathlib.Path,required=True);ap.add_argument('--snapshot',required=True);ap.add_argument('--interval',type=float,default=30);ap.add_argument('--once',action='store_true');ap.add_argument('--ledger',type=pathlib.Path,action='append');ap.add_argument('--scene-helper',type=pathlib.Path);ap.add_argument('--dual-partition-replays',action='store_true');a=ap.parse_args()
     if a.scene_helper:
         a.scene_helper=a.scene_helper.resolve()
         if not a.scene_helper.is_relative_to(a.root/'code') or not a.scene_helper.is_file():raise ValueError('replay scene helper must be frozen inside this campaign')
@@ -137,6 +137,17 @@ def main():
         queue=subprocess.run(['squeue','-u','minyeong,shiyuc','-h','-o','%i|%T'],capture_output=True,text=True,timeout=30)
         if queue.returncode:time.sleep(a.interval);continue
         active=dict(x.split('|') for x in queue.stdout.splitlines() if '|' in x)
+        resources=['-A','vision','-p','svl','--exclude=svl9','--gres=gpu:titanrtx:1']
+        if a.dual_partition_replays:
+            try:
+                from scripts.campaign_20261110.replay_scheduling import dual_partition_resources
+                inventory=subprocess.check_output(['scontrol','show','nodes','-o'],text=True,timeout=30)
+                resources,proof=dual_partition_resources(inventory)
+                state['replay_resource_policy']={**proof,'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat()}
+                state.pop('replay_resource_probe_error',None)
+            except (ValueError,subprocess.SubprocessError) as error:
+                resources=None
+                state['replay_resource_probe_error']={'reason':str(error),'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat()}
         retry_requests=read(a.root/'validation/replay_retry_requests.json',{}).get('requests',{})
         for row in rows:
             jid=row['jobid'];job=pathlib.Path(row['job_dir']);entry=state['gates'].setdefault(jid,{'source_job_id':jid,'key':row['key'],'source_job_dir':str(job),'status':'waiting_for_demo'})
@@ -163,11 +174,14 @@ def main():
                     if not (job/'sampling.done').is_file():
                         entry['waiting_reason']='source_sampling_not_closed'
                         continue
+                    if resources is None:
+                        entry['waiting_reason']='replay_resource_inventory_unavailable'
+                        continue
                     entry.pop('waiting_reason',None)
                     out=pathlib.Path(entry.pop('retry_output')) if entry.get('retry_output') else a.root/'validation/open_loop'/row['key']/jid
                     out.mkdir(parents=True,exist_ok=True)
                     entry.update(status='submitting',output=str(out));atomic(statepath,state)
-                    cmd=['sbatch','--parsable','-A','vision','-p','svl','--exclude=svl9','--gres=gpu:titanrtx:1','-c','8','--mem=32G','--time=0-00:40:00','-J','isg261110_replay','--comment','campaign_20261110_replay_'+jid,'-o',str(a.root/'slurm/%x_%j.log'),str(a.root/'tools/infra_open_loop.sh'),str(job),row.get('code') or a.snapshot,str(out)]
+                    cmd=['sbatch','--parsable',*resources,'-c','8','--mem=32G','--time=0-00:40:00','-J','isg261110_replay','--comment','campaign_20261110_replay_'+jid,'-o',str(a.root/'slurm/%x_%j.log'),str(a.root/'tools/infra_open_loop.sh'),str(job),row.get('code') or a.snapshot,str(out)]
                     if a.scene_helper:cmd[1:1]=['--export=ALL,ISGF_REPLAY_SCENE_HELPER='+str(a.scene_helper)]
                     response=subprocess.run(cmd,capture_output=True,text=True,timeout=45)
                     if response.returncode:
