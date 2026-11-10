@@ -4629,6 +4629,51 @@ PUSH_NUDGE_STALL_STOP_ENV = "ISPATIALGYM_PUSH_NUDGE_STALL_STOP"
 PUSH_NUDGE_STALL_STOP_DEFAULT = "0"
 
 
+#: i7-measure 2026-11-10 (lead #90c): the base does not answer a slow command - over the 9 recorded stalled push nudges (under_large_01 / 02)
+#: a command of 0.002-0.012 m/s moved it 0.0000-0.0001 m/s (415 samples, none above 1 mm/s), 0.012-0.020 m/s 0.0004-0.0007 m/s (22, none),
+#: 0.020-0.030 m/s 0.002 m/s (91 % moving), >= 0.03 m/s 0.020 m/s (all moving). With ``ISPATIALGYM_PUSH_NUDGE_MIN_SPEED`` (m/s; "1" / "on" =
+#: :data:`PUSH_NUDGE_MIN_SPEED_DEFAULT_M_S`; default off) a push base nudge commands at least that translational speed (its direction kept) while
+#: the base is still more than its tolerance from the nudge goal; ``ISPATIALGYM_PUSH_NUDGE_STALL_STOP`` stays the safety exit
+PUSH_NUDGE_MIN_SPEED_ENV = "ISPATIALGYM_PUSH_NUDGE_MIN_SPEED"
+PUSH_NUDGE_MIN_SPEED_DEFAULT_M_S = 0.025
+
+
+def push_nudge_min_speed() -> Optional[float]:
+    """:data:`PUSH_NUDGE_MIN_SPEED_ENV` in m/s, None when off ("", "0", "off")."""
+    v = (os.environ.get(PUSH_NUDGE_MIN_SPEED_ENV) or "").strip().lower()
+    if v in ("", "0", "off", "false", "no"):
+        return None
+    if v in ("1", "on", "true", "yes"):
+        return PUSH_NUDGE_MIN_SPEED_DEFAULT_M_S
+    try:
+        f = float(v)
+    except ValueError:
+        return None
+    return f if f > 0.0 else None
+
+
+class _NudgeMinSpeed:
+    """:data:`PUSH_NUDGE_MIN_SPEED_ENV`: ``Motions.track_path``'s ``on_step`` (it runs after the tracker's command, before it is emitted) raising
+    the base's translational command to ``v_min`` (direction kept) while the base is more than ``tol`` from ``goal_xy``; never stops the base.
+    ``record``: the steps it raised."""
+
+    def __init__(self, motions: Motions, goal_xy, tol: float, v_min: float):
+        self.m, self.goal, self.tol, self.v_min = motions, C.as_tensor(goal_xy).reshape(-1)[:2].float(), float(tol), float(v_min)
+        self.record: Dict[str, Any] = {"v_min_m_s": round(self.v_min, 4), "raised_steps": 0}
+
+    def __call__(self) -> bool:
+        st = self.m.state
+        v = getattr(st, "base_vel", None)
+        if v is None:
+            return False
+        left = float(th.linalg.norm(C.as_tensor(self.m.base_pose2d()[:2]).float() - self.goal))
+        sp = float(th.linalg.norm(v[:2]))
+        if left > self.tol and 1e-9 < sp < self.v_min:
+            st.base_vel = th.tensor([float(v[0]) * self.v_min / sp, float(v[1]) * self.v_min / sp, float(v[2])], dtype=th.float32)
+            self.record["raised_steps"] += 1
+        return False
+
+
 def push_nudge_stall_stop_on() -> bool:
     return (os.environ.get(PUSH_NUDGE_STALL_STOP_ENV) or PUSH_NUDGE_STALL_STOP_DEFAULT).strip().lower() in ("1", "on", "true", "yes")
 
@@ -4675,22 +4720,31 @@ def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: fl
     hold = _NudgeBraceHold(motions, hold_arms, d, cfg, stop_when=stop_when, move=move, tol=tol) if hold_arms else None
     if hold is None and push_nudge_stall_stop_on():
         hold = _NudgeStall(motions, d, cfg, move, tol)
+    v_min = push_nudge_min_speed()
+    raise_ = _NudgeMinSpeed(motions, goal2d[:2], tol, v_min) if v_min is not None else None
     log.info("%s(%s): %.1f mm still missing with the arm at its reach boundary -> nudging the base %.1f mm along the push direction (tol %.0f mm), arm locked%s",
              label, obj, float(left) * 1000, move * 1000, tol * 1000, f"; the {'/'.join(hold_arms)} brace held in the world" if hold is not None else "")
     q = motions.robot.get_joint_positions()
     motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
     v = cfg.push_base_nudge_speed if speed is None else min(cfg.push_base_nudge_speed, float(speed))
     tcfg = replace(motions.cfg.base_tracker, v_max=(v, v, 0.2), pos_tol=tol)
+    on_step = hold
+    if raise_ is not None:
+        on_step = (lambda: bool(raise_()) or bool(hold())) if hold is not None else raise_  # the raise first, then the hold / stall check
     try:
-        yield from motions.track_path([goal2d], tracker_cfg=tcfg, on_step=hold)
+        yield from motions.track_path([goal2d], tracker_cfg=tcfg, on_step=on_step)
     except SkillError as e:  # a tracker time-out keeps what the nudge achieved
         log.warning("%s(%s): base nudge did not settle (%s); keeping what it achieved", label, obj, e.message)
         if hold is not None:
             hold.record["stop"] = "tracker_timeout"
+    if raise_ is not None and raise_.record["raised_steps"]:
+        log.info("%s(%s): PUSH_NUDGE_MIN_SPEED: the base command raised to %.3f m/s on %d steps", label, obj, raise_.v_min, raise_.record["raised_steps"])
     if hold is None:
-        return None
+        return None if raise_ is None else {"kind": "min_speed", "label": label, **raise_.record}
     if isinstance(hold, _NudgeStall):
         rec = dict(hold.record, label=label, stop=hold.record["stop"] or "nudge_goal")
+        if raise_ is not None:
+            rec["min_speed"] = dict(raise_.record)
         if rec["stop"] == "stalled":
             log.info("%s(%s): PUSH_NUDGE_STALL_STOP: the base stalled after %.1f mm of the %.1f mm nudge (tol %.0f mm, %d steps) -> stopped, keeping what it achieved",
                      label, obj, 1000 * float(rec.get("base_moved_m") or 0.0), 1000 * move, 1000 * tol, rec["steps"])
@@ -5746,7 +5800,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             hold_rec = yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push", speed=ctx.get("push_speed_m_s"),
                                               hold_arms=nudge_hold_arms, stop_when=_object_at_goal if nudge_hold_arms else None)
             if hold_rec is not None:
-                ctx.setdefault("push_nudge_stall" if hold_rec.get("kind") == "stall_stop" else "push_nudge_brace_hold", []).append(hold_rec)
+                ctx.setdefault("push_nudge_stall" if hold_rec.get("kind") in ("stall_stop", "min_speed") else "push_nudge_brace_hold", []).append(hold_rec)
             yield from _hold_until_still(motions, state, obj, cfg)
             end_pose = as_world_pose(state.eef_pose(arm))
             after_nudge, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
@@ -5786,7 +5840,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         hold_rec = yield from _base_nudge(motions, state, arm, obj, targets["direction"], final, cfg, f"re-nudge {rounds}", speed=ctx.get("push_speed_m_s"),
                                           hold_arms=nudge_hold_arms, stop_when=_object_at_goal if nudge_hold_arms else None)
         if hold_rec is not None:
-            ctx.setdefault("push_nudge_stall" if hold_rec.get("kind") == "stall_stop" else "push_nudge_brace_hold", []).append(hold_rec)
+            ctx.setdefault("push_nudge_stall" if hold_rec.get("kind") in ("stall_stop", "min_speed") else "push_nudge_brace_hold", []).append(hold_rec)
         yield from _hold_until_still(motions, state, obj, cfg)
         end_pose = as_world_pose(state.eef_pose(arm))
         back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])

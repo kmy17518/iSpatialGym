@@ -42,3 +42,27 @@ def test_a_stalled_base_stops_the_nudge(monkeypatch):
     monkeypatch.setattr(motions, "base_pose2d", lambda: pose)  # the base does not answer the command (the deadband the demos show)
     rec, n = _run(env, EX._base_nudge(motions, state, "right", "box", [1.0, 0.0, 0.0], 0.02, cfg, "push", speed=0.02))
     assert rec["stop"] == "stalled" and rec["steps"] == cfg.push_nudge_stall_steps and n < 30
+
+
+def test_min_speed_parsing(monkeypatch):
+    monkeypatch.delenv(EX.PUSH_NUDGE_MIN_SPEED_ENV, raising=False)
+    assert EX.push_nudge_min_speed() is None
+    for v, want in (("1", EX.PUSH_NUDGE_MIN_SPEED_DEFAULT_M_S), ("on", EX.PUSH_NUDGE_MIN_SPEED_DEFAULT_M_S), ("0.03", 0.03), ("0", None), ("off", None), ("x", None)):
+        monkeypatch.setenv(EX.PUSH_NUDGE_MIN_SPEED_ENV, v)
+        assert EX.push_nudge_min_speed() == want, v
+
+
+def test_min_speed_raises_the_slow_command_and_reaches_the_goal(monkeypatch):
+    # lead #90c: the tracker's command decays below the base's breakaway near the goal; the floor keeps it above until within tolerance
+    monkeypatch.delenv(EX.PUSH_NUDGE_STALL_STOP_ENV, raising=False)
+    cfg = EX.ExecuteConfig()
+    res = {}
+    for v in ("0", "0.025"):
+        monkeypatch.setenv(EX.PUSH_NUDGE_MIN_SPEED_ENV, v)
+        robot, env, motions, state = _world()
+        rec, n = _run(env, EX._base_nudge(motions, state, "right", "box", [1.0, 0.0, 0.0], 0.02, cfg, "push", speed=0.02))
+        res[v] = (rec, n, float(robot.pos[0]))
+    assert res["0"][0] is None
+    rec, n, x = res["0.025"]
+    assert rec["kind"] == "min_speed" and rec["raised_steps"] > 0 and n <= res["0"][1]
+    assert x == pytest.approx(0.02 + cfg.push_base_nudge_overshoot_m, abs=0.008)
