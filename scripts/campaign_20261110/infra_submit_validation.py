@@ -25,7 +25,8 @@ def main():
     assert hashlib.sha256((snapshot/'.snapshot_commit').read_bytes()).hexdigest() == config['validation_key']['code_sha256']
     assert not (group/'submit.txt').exists(), 'submission already attempted; reconcile ledger first'
     env = {'TEMPLATE':source['template_dir'],'EVAL_INDEX':str(group/'empty_eval_index.json'),
-           'ISPATIALGYM_CAMPAIGN_CONFIG':str(group/'campaign_config.json'),'ISGF_COLLECT_EXTRA':'--no-goal-override',
+           'ISPATIALGYM_CAMPAIGN_CONFIG':str(group/'campaign_config.json'),
+           'ISGF_COLLECT_EXTRA':'--no-goal-override' + (' --max-steps 6000' if config['template']['task'] == 'configuration_matching-block_design' else ''),
            'ISGF_SAMPLING_CACHE':str(root/'cache'/a.tag/a.key/str(a.index)),
            'ISGF_ASSET_CACHE':str(root/'asset_cache'),'ISGF_JB_NFS':str(root/'jobs'),'ISGF_PREDEMO_ROOT':str(root),
            'KIT_TPL_NFS_ROOT':str(root/'kit_templates'),'KIT_TEX_STORE':str(root/'kit_textures'),

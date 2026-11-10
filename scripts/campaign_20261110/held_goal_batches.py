@@ -44,10 +44,11 @@ def axis_angle(axis, degrees):
     return [v/norm*math.sin(half) for v in axis]+[math.cos(half)]
 
 
-def rotation_goal_proposals(anchor, count, *, seed, minimum_separation_deg=5):
+def rotation_goal_proposals(anchor, count, *, seed, minimum_separation_deg=5, maximum_anchor_offset_deg=20):
     """Native goal-angle region about a fresh reference pose, before new starts."""
     require(isinstance(count, int) and 1 <= count <= 100, "invalid batch goal count")
     require(minimum_separation_deg >= 5, "rotation goals need at least five degrees separation")
+    require(minimum_separation_deg < maximum_anchor_offset_deg <= 45, "invalid bounded goal neighborhood")
     summary, meta = anchor["summary"], anchor["template_meta"]
     goal = summary["goal_realised"]
     lo, hi = (float(v) for v in meta["init_orientation"]["goal_angle_range_deg"])
@@ -61,13 +62,24 @@ def rotation_goal_proposals(anchor, count, *, seed, minimum_separation_deg=5):
     for _ in range(count*1000):
         z, phi = rng.uniform(-1, 1), rng.uniform(-math.pi, math.pi)
         axis = [math.sqrt(1-z*z)*math.cos(phi), math.sqrt(1-z*z)*math.sin(phi), z]
-        angle = rng.uniform(lo, hi)
-        orientation = quaternion_product(axis_angle(axis, angle), reference)
+        offset = rng.uniform(minimum_separation_deg, maximum_anchor_offset_deg)
+        orientation = quaternion_product(axis_angle(axis, offset),goal["orientation"])
+        relative = quaternion_product(orientation,[-reference[0],-reference[1],-reference[2],reference[3]])
+        if relative[3] < 0:
+            relative = [-v for v in relative]
+        angle = math.degrees(2*math.acos(min(1,relative[3])))
+        if not lo <= angle <= hi:
+            continue
+        scale = math.sqrt(sum(v*v for v in relative[:3]))
+        if scale < 1e-10:
+            continue
+        native_axis = [v/scale for v in relative[:3]]
         distance = lambda q: math.degrees(2*math.acos(min(1, abs(sum(a*b for a,b in zip(q,orientation))))))
         if any(distance(q) < minimum_separation_deg for q in selected):
             continue
         proposals.append({"goal_pose": {"position": list(goal["position"]), "orientation": orientation},
-            "reference_orientation": reference, "axis_world": axis, "goal_angle_deg": angle,
+            "reference_orientation": reference, "axis_world": native_axis, "goal_angle_deg": angle,
+            "anchor_goal_offset_deg":offset,"maximum_anchor_offset_deg":maximum_anchor_offset_deg,
             "native_goal_angle_range_deg": [lo, hi], "minimum_separation_deg": minimum_separation_deg,
             "proposal_validation": "native_angle_region_only; full sampler frame/IK/path/physics still required"})
         selected.append(orientation)

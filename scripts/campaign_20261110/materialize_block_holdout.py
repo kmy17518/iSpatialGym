@@ -14,6 +14,7 @@ B1K=Path('/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600')
 sys.path[:0]=[str(ROOT),str(B1K/'bddl3')]
 from contracts import ObjectRef,Template,digest
 from readiness_catalog import ReadinessCatalog
+from ispatialgym.sampling.knowledge import synset_of_category
 from ispatialgym.sampling.v2.problem import GroundedProblem
 
 
@@ -45,7 +46,7 @@ def main():
     for obj in standard['objects']:
         data=copy.deepcopy(obj)
         if data['role']=='target':asset=block
-        elif data['semantic_kind']=='tray':asset=board
+        elif data['semantic_kind'] in {'tray','board'}:asset=board
         else:asset=None
         if asset:
             data.update(category=asset['category'],model=asset['model'],default_scale=asset['default_scale'],asset_sha256=asset['asset_sha256'],ready=True,readiness_source=asset['readiness_source'])
@@ -59,6 +60,8 @@ def main():
         key=data['category']+'/'+data['model']
         if data['semantic_kind']!='floor' and (key not in hashes['ready_assets'] or data['asset_sha256']!=hashes['ready_assets'][key]['asset_sha256']):
             raise ValueError('nonreserved or mismatched model hold: '+key)
+        synset='floor.n.01' if data['category']=='floors' else synset_of_category(data['category'])
+        if data['instance'].rsplit('_',1)[0]!=synset:raise ValueError('category/BDDL instance mismatch')
         refs.append(ObjectRef(**{**data,'default_scale':tuple(data['default_scale'])}))
     for role,asset in [('targets',block),('board',board)]:
         entry['roles'][role].update(representative=asset['model'],dataset=asset['dataset'],scale={asset['category']+'/'+asset['model']:asset['default_scale']})

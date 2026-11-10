@@ -33,6 +33,14 @@ def test_model_overflow_never_becomes_training_and_category_quota_is_task_wide()
     assert not any(row["split"] == "train" for row in accepted.values())
 
 
+def test_standard_camera_category_keeps_its_distinct_three_four_three_quota():
+    accepted={}
+    added,deferred=allocate_members(accepted,members("standardcat","eval_category"),class_id="camera_relocalization-standard",
+        training_room_caps={"scene/room":1000},eval_quotas={"eval_category":{"3":3,"5":4,"10":3}})
+    assert list(added.values())==["eval_category"]*10 and len(deferred)==5
+    assert [sum(row["bucket"]==b for row in accepted.values()) for b in ("3","5","10")]==[3,4,3]
+
+
 def test_training_honors_room_and_class_caps_and_accepts_only_held_in():
     accepted = {}
     added, deferred = allocate_members(accepted, members("train", "train", (1002, 0, 0)), class_id="hamper", training_room_caps={"scene/room": 2000})

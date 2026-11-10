@@ -56,6 +56,7 @@ def test_rotation_goal_region_is_native_normalized_and_precedes_fresh_starts(tmp
     assert len(proposals)==20 and proposals==b.rotation_goal_proposals(anchor,20,seed=5)
     for row in proposals:
         assert 30 <= row["goal_angle_deg"] <= 120
+        assert 5 <= row["anchor_goal_offset_deg"] <= 20
         assert sum(v*v for v in row["goal_pose"]["orientation"]) == pytest.approx(1)
         reconstructed=b.quaternion_product(b.axis_angle(row["axis_world"],row["goal_angle_deg"]),row["reference_orientation"])
         assert reconstructed==pytest.approx(row["goal_pose"]["orientation"])

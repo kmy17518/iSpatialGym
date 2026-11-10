@@ -54,6 +54,7 @@ for account,root in [('minyeong',campaign_root),('shiyuc',pathlib.Path('/vision/
 data_releases=[]
 for path in sorted(campaign_root.glob('v2_release_*/release_manifest.json')):
     try:
+        if (path.parent/'release_block.json').exists():continue
         release=json.loads(path.read_text())
         reader=campaign_root/'validation'/(path.parent.name+'_reader.txt')
         if reader.exists() and 'ERRORS 0' in reader.read_text().splitlines():
