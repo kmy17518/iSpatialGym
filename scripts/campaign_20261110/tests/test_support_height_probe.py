@@ -3,7 +3,7 @@ import math
 import pytest
 
 from scripts.campaign_20261110.contracts import ContractError
-from scripts.campaign_20261110.support_height_probe import corrected_root_height, overlap_depth
+from scripts.campaign_20261110.support_height_probe import corrected_root_height, overlap_depth, settle_support
 
 
 def test_bottom_correction_uses_actual_noncentral_geometry():
@@ -27,3 +27,20 @@ def test_invalid_scale_and_rotation_cannot_author_scene_variant():
         corrected_root_height([[0, 0, 0]], [0, 0, 0, 1], 1, 1.5)
     with pytest.raises(ContractError, match="normalized"):
         corrected_root_height([[0, 0, 0]], [0, 0, 0, 2], 1, 1.1)
+
+
+def test_kinematic_root_still_checks_child_motion_after_physics():
+    from types import SimpleNamespace
+
+    speed = [0]
+    child = SimpleNamespace(get_linear_velocity=lambda: [speed[0], 0, 0], get_angular_velocity=lambda: [0, 0, 0])
+    obj = SimpleNamespace(name="support", kinematic_only=True, links={"root": object(), "drawer": child})
+    calls = []
+    world = SimpleNamespace(scene=SimpleNamespace(objects=[obj]), STABLE_LIN_VEL=.05, STABLE_ANG_VEL=.5,
+                            settle=lambda entities, **kwargs: calls.append((entities, kwargs)))
+    assert settle_support(world, obj) is None
+    assert calls[0] == ([], {"steps": 90, "still": []})
+    speed[0] = .1
+    assert "drawer moving" in settle_support(world, obj)
+    obj.kinematic_only = False
+    assert settle_support(world, obj) is None and calls[-1][0] == [obj]

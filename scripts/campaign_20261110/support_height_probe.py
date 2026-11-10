@@ -39,6 +39,23 @@ def corrected_root_height(points, quaternion, root_z, factor):
     return float(root_z) + old_min - new_min
 
 
+def settle_support(world, obj, steps=90):
+    """Kinematic roots have no velocity API; still inspect dynamic child links."""
+    kinematic = bool(obj.kinematic_only)
+    error = world.settle([] if kinematic else [obj], steps=steps,
+                         still=[other for other in world.scene.objects if other.name != obj.name])
+    if error or not kinematic:
+        return error
+    for name, link in obj.links.items():
+        if not callable(getattr(link, "get_linear_velocity", None)):
+            continue
+        linear = math.sqrt(sum(float(v)**2 for v in link.get_linear_velocity()))
+        angular = math.sqrt(sum(float(v)**2 for v in link.get_angular_velocity()))
+        if linear > world.STABLE_LIN_VEL or angular > world.STABLE_ANG_VEL:
+            return f"{obj.name}/{name} moving (v={linear:.3f} m/s, w={angular:.3f} rad/s)"
+    return None
+
+
 def run(args):
     root, output = args.campaign_root.resolve(), args.output.resolve()
     require(output.is_relative_to(root) and output != root, "probe output must be inside the private campaign root")
@@ -117,7 +134,8 @@ def run(args):
                 blockers.append({"object": other.name, "depth_m": depth})
         report["conservative_overlap_blockers"] = blockers
         require(not blockers, "scaled support overlaps unmoved scene geometry")
-        error = world.settle([obj], steps=90, still=[o for o in world.scene.objects if o.name != name])
+        report["settling_mode"] = "kinematic_root_dynamic_child_checks" if obj.kinematic_only else "dynamic_object"
+        error = settle_support(world, obj, steps=90)
         require(error is None, f"scaled support did not settle: {error}")
         lo, hi = obj.aabb
         require(abs(float(lo[2])-bottom) <= 0.003, "scaled support bottom was not preserved")
