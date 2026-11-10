@@ -36,6 +36,7 @@ class PairGoalPlan:
     goal_cell: tuple | None = None
     place: tuple | None = None
     base_push: dict | None = None
+    placement_mode: str | None = None
 
     @property
     def orientation_required(self):
@@ -54,6 +55,8 @@ class PairGoalPlan:
             result["requested_place"] = as_pose(self.place)
         if self.base_push is not None:
             result["base_push"] = self.base_push
+        if self.placement_mode is not None:
+            result["placement_mode"] = self.placement_mode
         return result
 
     def verify_settled(self, target, partner, *, position_tol=.03, orientation_tol=.20, partner_position_tol=.005):
@@ -111,7 +114,11 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     _require(scale in ("small", "large") and relation in (RELATIONS if scale == "small" else ("ontop", "inside", "nextto", "touching"))
              and raw.get("task") == f"inter_object_relation_satisfaction-{relation}_{scale}_scale", "unsupported pair goal task")
     base_push = raw.get("base_push")
-    if scale == "large" and relation in ("nextto", "touching"):
+    placement_mode = raw.get("placement_mode")
+    if placement_mode is not None:
+        _require(scale == "large" and relation == "touching" and placement_mode in ("surface", "drop_push") and base_push is None,
+                 "unsupported pair placement mode")
+    if scale == "large" and relation in ("nextto", "touching") and placement_mode is None:
         _require(isinstance(base_push, dict) and isinstance(base_push.get("side"), str)
                  and base_push.get("face") in ("+x", "-x", "+y", "-y"), "large relation requires an audited base push")
         for key, length in (("direction", 3), ("side_inward", 2)):
@@ -142,9 +149,12 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     sha = raw.get("contract_template_sha256")
     _require(isinstance(sha, str) and len(sha) == 64 and all(c in "0123456789abcdef" for c in sha), "invalid contract hash")
     release, goal, partner = (pose(raw.get(k), k) for k in ("release_pose", "goal_pose", "partner_pose"))
-    place = pose(raw.get("place_pose"), "touching pre-push place") if relation == "touching" and scale == "small" else None
+    place = pose(raw.get("place_pose"), "touching pre-push place") if relation == "touching" and (scale == "small" or placement_mode == "drop_push") else None
     if place is not None:
         _require(pose_error(place, goal)[0] > .001, "touching place must precede its contact goal")
+    if placement_mode == "drop_push":
+        _require(math.dist(goal_cell, release[0][:2]) <= .001, "drop-push goal cell differs from its contact endpoint")
+        _require(pose_error((release[0], place[1]), release)[1] <= .05, "drop-push changes orientation after release")
     created, budget = float(raw.get("created_at", 0)), float(raw.get("budget_seconds", 0))
     _require(all(math.isfinite(x) for x in (created, budget, activated_at, now))
              and 0 < created <= activated_at <= now and budget > 0, "invalid time budget")
@@ -154,7 +164,7 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid group size")
     fingerprint = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     return PairGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, relation,
-                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push)
+                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push, placement_mode)
 
 
 def load_pair_plan(*, template_id, scene, rooms, relation, activated_at, expected_sha256=None, scale="small"):

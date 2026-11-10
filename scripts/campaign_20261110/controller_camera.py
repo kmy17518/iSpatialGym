@@ -106,6 +106,9 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
     from scripts.campaign_20261110.group_lane import check_reservations
     directory = Path(spec["inputs"]).resolve()
     require(directory.is_relative_to(root), "camera seed outside campaign")
+    require(all(file_digest(directory / name) == spec["seed_files_sha256"][name]
+                for name in ("ready_contract.json", "campaign_config.json", "submission.json")),
+            "camera seed files differ from the reviewed controller config")
     template = load_template_contract(directory / "ready_contract.json", spec["class_id"])
     config = read(directory / "campaign_config.json")
     require(config["campaign_id"] == cfg["campaign_id"] and config["validation_key"]["template_sha256"] == template.fingerprint,

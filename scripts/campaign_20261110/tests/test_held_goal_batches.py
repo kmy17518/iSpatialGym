@@ -78,11 +78,22 @@ def test_mental_batch_uses_same_validated_plan_consumer_and_separate_fresh_group
 
 
 def test_base_transform_preserves_relative_goal_and_world_quaternion():
-    proposal={"goal_pose":{"position":[2,3,1.2],"orientation":[0,0,0,1]}}
+    proposal={"goal_pose":{"position":[2,3,1.2],"orientation":[0,0,0,1]},
+              "axis_world":[1,0,0],"optical_axis_world":[1,0,0],"reference_orientation":[0,0,0,1]}
     moved=b.move_goal_with_base(proposal,[1,3,0],[10,20,math.pi/2])
     assert moved["goal_pose"]["position"]==pytest.approx([10,21,1.2])
     assert moved["goal_pose"]["orientation"]==pytest.approx([0,0,math.sqrt(.5),math.sqrt(.5)])
     assert moved["base_pose2d"]==[10,20,math.pi/2]
+    assert moved["axis_world"]==pytest.approx([0,1,0])
+    assert moved["optical_axis_world"]==pytest.approx([0,1,0])
+    assert moved["reference_orientation"]==pytest.approx(moved["goal_pose"]["orientation"])
+
+
+def test_projected_goal_segment_rejects_wall_and_diagonal_corner_cut():
+    free={(0,0),(1,0),(2,0)}
+    assert b.projected_goal_clear([0,0],[.2,0],free,.1)
+    assert not b.projected_goal_clear([0,0],[.3,0],free,.1)
+    assert not b.projected_goal_clear([0,0],[.1,.1],{(0,0),(1,1)},.1)
 
 
 def test_map_regions_produce_distinct_room_bases_and_reject_forged_cells(tmp_path):
@@ -100,6 +111,8 @@ def test_map_regions_produce_distinct_room_bases_and_reject_forged_cells(tmp_pat
         cv2.imwrite(str(layout/name),np.full((200,200),value,dtype=np.uint8))
     region=room_base_region(tmp_path/"data",scene,room)
     proposals=b.depth_goal_proposals(anchor,6,magnitude_range=[.05,.1],seed=7)
+    for row in proposals:
+        row["goal_pose"]["position"][:2]=[anchor["summary"]["base_pose2d"][0]+.25,anchor["summary"]["base_pose2d"][1]]
     varied=b.apply_base_region(proposals,anchor,region,seed=5)
     assert len({tuple(row["base_pose2d"][:2]) for row in varied})==6
     assert all(row["base_pose2d"][:2] in region["free_xy"] for row in varied)

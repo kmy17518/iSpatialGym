@@ -4667,12 +4667,21 @@ class IORSLarge(SamplerV2):
                 expected_sha256=getattr(self, "_campaign_pair_plan_sha", None))
             if (plan.target_name, plan.partner_name) != (self.tname, self.pname):
                 raise Reject("campaign_goal_plan", "large pair role bindings differ from template")
-            if self.push_under or (self.relation not in ("ontop", "inside") and plan.base_push is None):
+            if ((self.push_under and plan.placement_mode != "drop_push") or
+                    (self.relation not in ("ontop", "inside") and plan.base_push is None and plan.placement_mode not in ("surface", "drop_push"))):
                 raise Reject("campaign_goal_plan", "large relation lacks a supported goal adapter")
             if plan.base_push is not None:
                 from ispatialgym.sampling.v2.tasks.iors_large_nextto import NextToMode
                 if not isinstance(self, NextToMode):
                     raise Reject("campaign_goal_plan", "base-push plan requires the native base-push mode")
+            if plan.placement_mode == "surface":
+                from ispatialgym.sampling.v2.tasks.iors_large_touching import SurfaceTouchingMode
+                if not isinstance(self, SurfaceTouchingMode):
+                    raise Reject("campaign_goal_plan", "surface plan requires the native surface-touching mode")
+            if plan.placement_mode == "drop_push":
+                from ispatialgym.sampling.v2.tasks.iors_large_touching import TouchingMode
+                if self.relation_mode is not TouchingMode:
+                    raise Reject("campaign_goal_plan", "drop-push plan requires the native floor-touching mode")
             if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
                 raise Reject("campaign_group_complete", "large pair goal-group member limit reached")
             self._campaign_pair_plan_sha = plan.sha256
@@ -4697,7 +4706,7 @@ class IORSLarge(SamplerV2):
             raise Reject("campaign_partner_drift", f"large partner changed before starts: {dp:.6f} m / {dq:.6f} rad")
         # The anchor cell must still belong to this template's geometric candidate
         # set. Install it before B starts are drawn; C can then vary around it.
-        if plan.base_push is None:
+        if plan.base_push is None and plan.placement_mode != "drop_push":
             cells = self.place["cells"]
             if not len(cells) or float(th.linalg.norm(G.t(cells) - G.t(plan.goal_cell), dim=1).min()) > .001:
                 raise Reject("campaign_goal_cell", "fixed goal cell no longer belongs to the supported placement region")
@@ -6735,7 +6744,8 @@ class IORSLarge(SamplerV2):
             release_pose = (lambda xy, quat, eio=None: self.drop_pose_at(xy, quat)) if push else (lambda xy, quat, eio=None: self.goal_pose_at(xy, quat, eio))
             campaign_plan = getattr(self, "_campaign_pair_active", None)
             if campaign_plan is not None:
-                release_pose = lambda xy, quat, eio=None: tuple(G.t(v) for v in campaign_plan.release)
+                campaign_release = campaign_plan.place if campaign_plan.placement_mode == "drop_push" else campaign_plan.release
+                release_pose = lambda xy, quat, eio=None: tuple(G.t(v) for v in campaign_release)
             # A carried object keeps its yaw RELATIVE TO THE ROBOT (no re-grasp), so at C its world yaw is the init yaw plus
             # the base-yaw change B -> C: F_goal is screened at yaw + d_yaw and intersected with F_init by the init yaw
             # (``generation.carry_yaw = "world"`` restores the spec §5.6 wording "goal yaw = init world yaw", which holds
@@ -7000,8 +7010,8 @@ class IORSLarge(SamplerV2):
                     goal = release_pose(release_xy, goal_quat, g.pose)
                     if campaign_plan is not None:
                         goal_quat = goal[1]
-                        native = self.goal_pose_at(release_xy, goal_quat, g.pose)
-                        dp, dq = CPG.pose_error(native, campaign_plan.release)
+                        native = self.drop_pose_at(release_xy, goal_quat) if push else self.goal_pose_at(release_xy, goal_quat, g.pose)
+                        dp, dq = CPG.pose_error(native, campaign_release)
                         if dp > float(self.ikc.WITNESS_POS_TOL) or dq > float(self.ikc.WITNESS_ANG_TOL):
                             c_fails.append(f"fixed release differs from native geometry: {dp:.6f} m / {dq:.6f} rad")
                             continue

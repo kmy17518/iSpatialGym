@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -16,6 +17,7 @@ def main():
     p.add_argument('--bddl-root', type=Path)
     p.add_argument('--kcollect', type=int, default=2)
     p.add_argument('--dry-run', action='store_true')
+    p.add_argument('--vast-gpu', choices=['RTX 4090','RTX 5090'])
     a = p.parse_args()
     root, group, snapshot = (Path(x).resolve() for x in (a.root, a.group, a.snapshot))
     assert group.is_relative_to(root) and snapshot.is_relative_to(root/'code')
@@ -46,8 +48,14 @@ def main():
            '--sample-limit-s','2700','--time-s','5400','--customs','template' if a.template_customs else 'trunk']
     for name, value in env.items():
         cmd.extend(['--extra-env',name+'='+value])
+    process_env = None
+    if a.vast_gpu:
+        submitter = root/'vast/tool/vsubmit'
+        assert submitter.is_file(), 'campaign Vast submitter missing'
+        cmd = [str(submitter)] + cmd
+        process_env = dict(os.environ, VAST_GPU=a.vast_gpu, VAST_QUEUE_ROOT=str(root/'vast'))
     for dry in ([True] if a.dry_run else [True, False]):
-        result = subprocess.run(cmd+(['--dry-run'] if dry else []),capture_output=True,text=True)
+        result = subprocess.run(cmd+(['--dry-run'] if dry else []),capture_output=True,text=True,env=process_env)
         (group/('dry.txt' if dry else 'submit.txt')).write_text(result.stdout+result.stderr)
         if result.returncode:
             raise RuntimeError(result.stderr[-2000:])

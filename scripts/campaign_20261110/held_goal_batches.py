@@ -97,9 +97,29 @@ def move_goal_with_base(proposal, original_base, new_base):
     rotation = [0,0,math.sin(delta/2),math.cos(delta/2)]
     goal = proposal["goal_pose"]
     offset = rotate(rotation, [goal["position"][0]-old_x,goal["position"][1]-old_y,goal["position"][2]])
-    return {**proposal, "goal_pose": {"position": [x+offset[0],y+offset[1],offset[2]],
+    moved = {**proposal, "goal_pose": {"position": [x+offset[0],y+offset[1],offset[2]],
         "orientation": quaternion_product(rotation,goal["orientation"])}, "base_pose2d": [x,y,yaw],
         "source_base_pose2d": list(original_base)}
+    for name in ("axis_world", "optical_axis_world"):
+        if name in proposal:
+            moved[name] = rotate(rotation, proposal[name])
+    if "reference_orientation" in proposal:
+        moved["reference_orientation"] = quaternion_product(rotation, proposal["reference_orientation"])
+    return moved
+
+
+def projected_goal_clear(base, goal, free_cells, resolution, origin=(0, 0)):
+    """Conservative proposal filter; loaded-scene arm/object checks remain native."""
+    dx, dy = goal[0]-base[0], goal[1]-base[1]
+    steps = max(1, math.ceil(math.hypot(dx, dy)/(resolution/2)))
+    cells = [(round((base[0]+dx*i/steps-origin[0])/resolution), round((base[1]+dy*i/steps-origin[1])/resolution))
+             for i in range(steps+1)]
+    # Adjacent diagonal steps must not cut the corner of a blocked cell.
+    for before, after in zip(cells, cells[1:]):
+        if after not in free_cells or (before[0] != after[0] and before[1] != after[1]
+                and ((before[0],after[1]) not in free_cells or (after[0],before[1]) not in free_cells)):
+            return False
+    return cells[0] in free_cells
 
 
 def apply_base_region(proposals, anchor, region, *, seed):
@@ -118,10 +138,25 @@ def apply_base_region(proposals, anchor, region, *, seed):
             "base region lacks enough finite free cells")
     require(len({tuple(p) for p in points}) == len(points), "duplicate free cells in base region")
     rng = random.Random(seed)
-    chosen = rng.sample(points,len(proposals))
-    return [{**move_goal_with_base(proposal,anchor["summary"]["base_pose2d"],[*xy,rng.uniform(-math.pi,math.pi)]),
-             "base_region_sha256": digest(region), "base_region_validation": "room segmentation and eroded free cells; native collision/IK/path checks still required"}
-            for proposal,xy in zip(proposals,chosen)]
+    resolution = float(region["map_resolution_m"])
+    origin = points[0]
+    cells = {(round((x-origin[0])/resolution),round((y-origin[1])/resolution)) for x,y in points}
+    used, result = set(), []
+    for proposal in proposals:
+        for _ in range(max(1000, len(points)*10)):
+            xy = rng.choice(points)
+            if tuple(xy) in used:
+                continue
+            moved = move_goal_with_base(proposal,anchor["summary"]["base_pose2d"],[*xy,rng.uniform(-math.pi,math.pi)])
+            if not projected_goal_clear(xy, moved["goal_pose"]["position"], cells, resolution, origin):
+                continue
+            used.add(tuple(xy))
+            result.append({**moved,"base_region_sha256":digest(region),
+                "base_region_validation":"base and projected base-to-goal segment in eroded room free cells without corner cutting; native collision/IK/path checks still required"})
+            break
+        else:
+            raise ValueError("native room map cannot supply a new clear base-to-goal proposal")
+    return result
 
 
 def depth_goal_proposals(anchor, count, *, magnitude_range, seed, minimum_separation_m=.005):

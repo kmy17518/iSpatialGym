@@ -40,3 +40,60 @@ def test_large_push_author_uses_native_horizontal_endpoint_and_audited_side(tmp_
     anchor['template_meta']['template_facts']['nextto']['sides'] = []
     with pytest.raises(c.ContractError, match='partner side geometry'):
         g.prepare_group(**kwargs, group_id='bad', output=tmp_path / 'groups/bad')
+
+
+def test_surface_touching_author_keeps_release_and_settled_goal_separate(tmp_path):
+    job, ledger, _, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    target = template.objects[0]
+    partner = c.ObjectRef('hall_tree.n.01_1', 'partner', 'hall_tree', 'b', c.digest('partner'), ready=True, readiness_source='ready fixture')
+    template = replace(template, task='inter_object_relation_satisfaction-touching_large_scale', objects=(target, partner))
+    anchor['template_meta']['bindings'] = [{'name': target.instance, 'role': 'target'}, {'name': partner.instance, 'role': 'partner'}]
+    bindings = anchor['tro']['ispatialgym']['object_bindings']
+    bindings[target.instance]['scene_object_name'] = 'apple_a_0'
+    bindings[partner.instance] = {'category': partner.category, 'model': partner.model}
+    anchor['planned_start_poses'][partner.instance] = [[2, 2, 0], [0, 0, 0, 1]]
+    anchor['summary']['goal_check'] = {'settled_poses': {'apple_a_0': [[1, 2, .7], [0, 0, 0, 1]]}}
+    anchor['summary'].update(surface_touching={'goal_cell': [1, 2]}, goal_cell=[1, 2])
+    source = anchor['sources']['sidecar']
+    c.write_json_atomic(source['path'], {'grasps': [{'object': target.instance,
+        'place': {'position': [1.1, 2, .78], 'orientation': [0, 0, 0, 1]},
+        'eef_in_object': {'position': [.1, 0, 0], 'orientation': [0, 0, 0, 1]}}]})
+    source['sha256'] = c.file_digest(source['path'])
+    g.prepare_group(anchor=anchor, template=template, campaign_id='new', code_sha256=c.file_digest(code / '.snapshot_commit'),
+        physics_sha256=c.digest('physics'), data_sha256=c.digest('maps'), magnitude_range=[0, 1],
+        group_id='surface', output=tmp_path / 'groups/surface')
+    plan = g.read_json(tmp_path / 'groups/surface/goal_plan.json')
+    assert plan['placement_mode'] == 'surface'
+    assert plan['release_pose']['position'] == [1, 2, .78]
+    assert plan['goal_pose']['position'] == [1, 2, .7]
+    assert plan['goal_cell'] == [1, 2] and 'base_push' not in plan
+
+
+def test_drop_push_author_uses_audited_sidecar_place_and_native_contact_endpoint(tmp_path):
+    job, ledger, _, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    target = template.objects[0]
+    partner = c.ObjectRef('cabinet.n.01_1', 'partner', 'cabinet', 'b', c.digest('partner'), ready=True, readiness_source='ready fixture')
+    template = replace(template, task='inter_object_relation_satisfaction-touching_large_scale', objects=(target, partner))
+    anchor['template_meta']['bindings'] = [{'name': target.instance, 'role': 'target'}, {'name': partner.instance, 'role': 'partner'}]
+    bindings = anchor['tro']['ispatialgym']['object_bindings']
+    bindings[target.instance]['scene_object_name'] = 'apple_a_0'
+    bindings[partner.instance] = {'category': partner.category, 'model': partner.model}
+    anchor['planned_start_poses'][partner.instance] = [[2, 2, 0], [0, 0, 0, 1]]
+    anchor['planned_goal_poses'][target.instance] = [[1, 2, .003], [0, 0, 0, 1]]
+    anchor['summary']['goal_check'] = {'settled_poses': {'apple_a_0': [[1.002, 2, 0], [0, 0, 0, 1]]}}
+    anchor['summary'].update(push_touching={'goal_cell': [1, 2]}, goal_cell=[1, 2])
+    source = anchor['sources']['sidecar']
+    c.write_json_atomic(source['path'], {'grasps': [{'object': target.instance,
+        'place': {'position': [.9, 2, .03], 'orientation': [0, 0, 0, 1]},
+        'eef_in_object': {'position': [.1, 0, 0], 'orientation': [0, 0, 0, 1]}}]})
+    source['sha256'] = c.file_digest(source['path'])
+    g.prepare_group(anchor=anchor, template=template, campaign_id='new', code_sha256=c.file_digest(code / '.snapshot_commit'),
+        physics_sha256=c.digest('physics'), data_sha256=c.digest('maps'), magnitude_range=[0, 1],
+        group_id='floorpush', output=tmp_path / 'groups/floorpush')
+    plan = g.read_json(tmp_path / 'groups/floorpush/goal_plan.json')
+    assert plan['placement_mode'] == 'drop_push'
+    assert plan['place_pose']['position'] == [.8, 2, .03]
+    assert plan['release_pose']['position'] == [1, 2, .003]
+    assert plan['goal_pose']['position'] == [1.002, 2, 0]

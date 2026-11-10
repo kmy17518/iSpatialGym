@@ -4,6 +4,7 @@
 Produces runnable private customs/BDDL plus contract candidates, never releases.
 All object scales come from source template initialization, including floors.
 """
+import argparse
 import copy
 from dataclasses import asdict
 import hashlib
@@ -29,9 +30,19 @@ def file_sha(path):
 
 def main():
     inv = ROOT/'tmp/campaign_20261110/inventory'
-    out = ROOT/'tmp/campaign_20261110/room_materialized'
-    out.mkdir(parents=True, exist_ok=True)
-    reservations = json.loads((inv/'split_reservations.json').read_text())
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--out',type=Path,required=True)
+    p.add_argument('--reservations',type=Path,required=True)
+    p.add_argument('--generated-readiness',type=Path,required=True)
+    p.add_argument('--reserved-asset-hashes',type=Path,required=True)
+    a=p.parse_args()
+    out=a.out
+    if out.exists():raise ValueError('new immutable output directory required')
+    out.mkdir(parents=True)
+    reservations = json.loads(a.reservations.read_text())
+    asset_policy=json.loads(a.reserved_asset_hashes.read_text())
+    if asset_policy['reservation_sha256']!=file_sha(a.reservations):raise ValueError('reservation/hash policy mismatch')
+    excluded_hashes=set(asset_policy['reserved_asset_hashes'])
     excluded = set(reservations['train_exclude_models'])
     excluded_categories = set(reservations['train_exclude_categories'])
     excluded_rooms = {(r['scene'],r['room']) for r in reservations['category_holdout_rooms']}
@@ -41,7 +52,7 @@ def main():
     standards = json.loads((inv/'standard_contract_ready.json').read_text())['templates']
     customs_path = inv/'frozen_customs_f24ea424.json'
     originals = json.loads(customs_path.read_text())
-    generated_path=inv/'generated_project_readiness_r1.json'
+    generated_path=a.generated_readiness
     floating_jobs=[]
     if generated_path.is_file():
         generated=json.loads(generated_path.read_text())['objects']
@@ -134,13 +145,13 @@ def main():
         bddl_path.parent.mkdir(parents=True,exist_ok=True)
         bddl_path.write_text(rendered.text)
         entry['campaign_provenance'] = {'source_class':class_id,'source_customs_sha256':file_sha(customs_path),
-            'room_plan_sha256':file_sha(plan_path),'reservation_sha256':file_sha(inv/'split_reservations.json'),
+            'room_plan_sha256':file_sha(plan_path),'reservation_sha256':file_sha(a.reservations),
             'status':'geometry_and_demo_and_replay_required'}
         definitions[alias] = entry
         for anchor in plan['tasks'][task]:
             scene, room = anchor['scene'], anchor['room']
             if scene not in scene_cache:
-                path = B1K/'datasets/behavior-1k-assets/scenes'/scene/'json'/f'{scene}_best.json'
+                path = B1K/'datasets/2026-challenge-task-instances/scenes'/scene/'json'/f'{scene}_stable.json'
                 scene_cache[scene] = (json.loads(path.read_text())['objects_info']['init_info'],file_sha(path))
             scene_info, scene_sha = scene_cache[scene]
             # This is the native floor_of_room iteration order. Fresh metadata
@@ -153,6 +164,8 @@ def main():
             if not status['ready']:
                 blocked.append({'class_id':class_id,'scene':scene,'room':room,'reason':'floor readiness unresolved'});continue
             refs = [ObjectRef(**{**o,'default_scale':tuple(o['default_scale'])}) for o in standard['objects'] if o['semantic_kind']!='floor']
+            if any(o.asset_sha256 in excluded_hashes for o in refs if o.semantic_kind not in {'wall','floor'}):
+                raise ValueError('reserved asset hash in train role')
             refs.append(ObjectRef(instance='floor.n.01_1',role='support',category='floors',model=floor['model'],
                 default_scale=tuple(floor['scale']),asset_sha256=file_sha(B1K/'datasets/behavior-1k-assets/objects/floors'/floor['model']/'usd'/(floor['model']+'.encrypted.usd')),
                 semantic_kind='floor',ready=True,readiness_source=status['readiness_source']))
@@ -178,7 +191,7 @@ def main():
             gp.override_scene_room(anchor['scene'],anchor['room'])
             if gp.rooms(anchor['scene']) != [anchor['room']]:
                 raise ValueError('native room override did not narrow the room')
-    manifest = {'schema':'campaign-room-candidates-v1','reservation_sha256':file_sha(inv/'split_reservations.json'),
+    manifest = {'schema':'campaign-room-candidates-v1','reservation_sha256':file_sha(a.reservations),
                 'room_plan_sha256':file_sha(plan_path),'customs_sha256':file_sha(path),'jobs':jobs,'blocked':blocked,'production_released':0}
     (out/'validation_jobs.json').write_text(json.dumps(manifest,indent=2,sort_keys=True)+'\n')
     (out/'contract_candidates.json').write_text(json.dumps({'templates':templates},indent=2,sort_keys=True)+'\n')

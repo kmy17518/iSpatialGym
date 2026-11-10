@@ -384,7 +384,28 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             plan["goal_pose"] = {"position": changed_goal[0], "orientation": changed_goal[1]}
             plan["release_pose"] = {"position": changed_release[0], "orientation": changed_release[1]}
             plan["nextto_gap_proposal_m"] = gap
-        if scale == "large" and relation in ("nextto", "touching"):
+        if scale == "large" and relation == "touching" and (anchor["summary"].get("surface_touching") or anchor["summary"].get("push_touching")):
+            from ispatialgym.sampling.campaign_pair_goals import object_pose_from_grasp
+
+            require(file_digest(anchor["sources"]["sidecar"]["path"]) == anchor["sources"]["sidecar"]["sha256"],
+                    "surface touching anchor sidecar changed after audit")
+            sidecar = read_json(anchor["sources"]["sidecar"]["path"])
+            grasps = [row for row in sidecar.get("grasps", []) if row.get("object") == plan["target_name"]]
+            require(len(grasps) == 1 and grasps[0].get("place") and grasps[0].get("eef_in_object"),
+                    "surface touching anchor lacks its recorded release")
+            released = object_pose_from_grasp(grasps[0]["place"], grasps[0]["eef_in_object"])
+            if anchor["summary"].get("surface_touching"):
+                plan["release_pose"] = {"position": released[0], "orientation": released[1]}
+                plan["placement_mode"] = "surface"
+            else:
+                native_goal = anchor["planned_goal_poses"].get(plan["target_name"])
+                require(native_goal is not None and len(native_goal) == 2, "drop-push anchor lacks its native contact endpoint")
+                plan["release_pose"] = {"position": native_goal[0], "orientation": native_goal[1]}
+                plan["place_pose"] = {"position": released[0], "orientation": released[1]}
+                plan["placement_mode"] = "drop_push"
+            require(anchor["summary"].get("goal_cell") is not None, "surface touching anchor lacks fixed goal cell")
+            plan["goal_cell"] = anchor["summary"]["goal_cell"]
+        elif scale == "large" and relation in ("nextto", "touching"):
             from ispatialgym.sampling.campaign_pair_goals import vary_base_push_gap
 
             push = anchor["summary"].get("nextto", {})

@@ -24,18 +24,18 @@ def main():
     pending=all_reserved-ready
     rows={}
     for key in sorted(all_reserved):
-        if key in ready:
-            category,model=key.split('/')
-            path=(a.dataset_root/'objects'/category/model/'usd'/(model+'.encrypted.usd')).resolve()
-            rows[key]={'asset_sha256':sha(path),'path':str(path),'ready':True,
-                       'readiness_provenance':'Exact ready-only split reservation manifest; file existence does not grant readiness.'}
-        elif key in generated and generated[key]['ready']:
+        if key in generated and generated[key]['ready']:
             item=generated[key];path=Path(item['usd']).resolve()
             if sha(path)!=item['asset_sha256']:
                 raise ValueError(f'generated asset changed since admission: {key}')
             rows[key]={'asset_sha256':item['asset_sha256'],'path':str(path),'ready':True,
                        'readiness_provenance':item['readiness_source']}
             pending.discard(key)
+        elif key in ready:
+            category,model=key.split('/')
+            path=(a.dataset_root/'objects'/category/model/'usd'/(model+'.encrypted.usd')).resolve()
+            rows[key]={'asset_sha256':sha(path),'path':str(path),'ready':True,
+                       'readiness_provenance':'Exact ready-only split reservation manifest; file existence does not grant readiness.'}
     a.output.parent.mkdir(parents=True,exist_ok=True)
     a.output.write_text(json.dumps({'schema':'campaign-reserved-asset-hashes-v1','reservation_sha256':sha(a.reservations),
         'reserved_model_keys':sorted(all_reserved),'ready_assets':rows,'reserved_asset_hashes':sorted({r['asset_sha256'] for r in rows.values()}),

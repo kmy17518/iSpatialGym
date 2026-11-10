@@ -509,6 +509,12 @@ class TouchingMode:
                 continue
             stats["goal_free"] += 1
             c_d = touching_drop_xy(face, d2, half, extra)
+            plan = getattr(self, "_campaign_pair_active", None)
+            if plan is not None and plan.placement_mode == "drop_push":
+                fixed_gc = self.touching_goal_at(face, d2, G.t(plan.release[1]))
+                if (float(th.linalg.norm(fixed_gc-G.t(plan.goal_cell))) > .001 or
+                        float(th.linalg.norm(c_d-G.t(plan.place[0][:2]))) > .005):
+                    continue
             if not self._free_floor_cell(c_d, stats["drop_blocked"]):
                 continue
             stats["drop_free"] += 1
@@ -605,6 +611,12 @@ class TouchingMode:
         if face is None:
             return super()._push_under_chain(place, quat, drop_xy, goal_xy, d2)
         g = self.touching_goal_at(face, d2, quat)
+        plan = getattr(self, "_campaign_pair_active", None)
+        if plan is not None and plan.placement_mode == "drop_push":
+            if (G.quat_angle(G.t(quat), G.t(plan.release[1])) > .05 or
+                    float(th.linalg.norm(g-G.t(plan.goal_cell))) > .001 or
+                    float(th.linalg.norm(G.t(drop_xy)-G.t(plan.place[0][:2]))) > .005):
+                return None
         if float((g - th.as_tensor([float(drop_xy[0]), float(drop_xy[1])], dtype=th.float32)) @ unit_xy(d2)) < 0.01:
             return None  # at this yaw the target's front reaches the face from the drop cell: nothing to push
         span = self.blade_span_at(place, quat, drop_xy, g, d2)

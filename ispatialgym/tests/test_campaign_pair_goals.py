@@ -121,3 +121,30 @@ def test_touching_place_stays_fixed_and_rejects_an_incompatible_push_direction()
     s.top.polygon_supported = lambda *args, **kwargs: False
     with pytest.raises(Reject, match="leaves the support"):
         I.IORSSmall.place_pose_for(s, start, p.partner, stance)
+
+
+def test_floor_touching_fixed_chain_still_runs_native_solver_and_rejects_other_endpoints():
+    from dataclasses import replace
+    from ispatialgym.sampling.v2.tasks.iors_large_touching import TouchingMode
+    calls = []
+    class NativeChain:
+        def _push_under_chain(self, *args):
+            calls.append(args)
+            return {'native_checked': True}
+    class Sampler(TouchingMode, NativeChain):
+        pass
+    p = replace(plan('touching'), scale='large', placement_mode='drop_push',
+        release=((1., 2., .003), (0., 0., 0., 1.)), goal_cell=(1., 2.), place=((.8, 2., .03), (0., 0., 0., 1.)))
+    s = Sampler()
+    s._campaign_pair_active = p
+    s.touching_goal_at = lambda *args: th.tensor([1., 2.])
+    s.blade_span_at = lambda *args: None
+    s.gp = SimpleNamespace(gen=lambda key: None)
+    s.place = {}
+    s.seg_arm = 'right'
+    stance = SimpleNamespace(extras={'face_point': [1.2, 2.]}, base_pose2d=(0, 0, 0), translate=.1, tilt=0.)
+    result = s._push_under_chain(stance, th.tensor(p.release[1]), th.tensor([.8, 2.]), th.tensor([1., 2.]), th.tensor([1., 0.]))
+    assert result['native_checked'] and len(calls) == 1
+    assert s._push_under_chain(stance, th.tensor(p.release[1]), th.tensor([.7, 2.]), th.tensor([1., 2.]), th.tensor([1., 0.])) is None
+    assert s._push_under_chain(stance, th.tensor([0., 0., 1., 0.]), th.tensor([.8, 2.]), th.tensor([1., 2.]), th.tensor([1., 0.])) is None
+    assert len(calls) == 1

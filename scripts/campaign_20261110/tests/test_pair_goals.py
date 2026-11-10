@@ -110,3 +110,34 @@ def test_base_push_gap_moves_along_audited_partner_side():
         assert gap == pytest.approx(desired)
         assert changed[0] == pytest.approx([.6+.12-desired, -.2, .003])
         assert changed == release
+
+
+def test_large_surface_touching_requires_native_mode_and_goal_cell():
+    import pytest
+    raw = PairPlanTests().fixture('touching')
+    raw.update(task='inter_object_relation_satisfaction-touching_large_scale', placement_mode='surface')
+    kwargs = dict(template_id='t', scene='s', rooms=['r'], relation='touching', scale='large', activated_at=999, now=1000)
+    with pytest.raises(g.GoalPlanError, match='fixed cell'):
+        g.validate_pair_plan(raw, **kwargs)
+    raw['goal_cell'] = [0, 0]
+    p = g.validate_pair_plan(raw, **kwargs)
+    assert p.placement_mode == 'surface' and p.base_push is None and p.place is None
+    assert p.summary()['placement_mode'] == 'surface'
+    raw['placement_mode'] = 'lean'
+    with pytest.raises(g.GoalPlanError, match='unsupported pair placement mode'):
+        g.validate_pair_plan(raw, **kwargs)
+
+
+def test_drop_push_pins_pre_push_place_and_contact_endpoint_separately():
+    import pytest
+    raw = PairPlanTests().fixture('touching')
+    raw.update(task='inter_object_relation_satisfaction-touching_large_scale', placement_mode='drop_push', goal_cell=[0, 0])
+    kwargs = dict(template_id='t', scene='s', rooms=['r'], relation='touching', scale='large', activated_at=999, now=1000)
+    with pytest.raises(g.GoalPlanError, match='pre-push place'):
+        g.validate_pair_plan(raw, **kwargs)
+    raw['place_pose'] = {'position': [0, -.15, .85], 'orientation': [0, 0, 0, 1]}
+    p = g.validate_pair_plan(raw, **kwargs)
+    assert p.place[0] == (0, -.15, .85) and p.release[0] == (0, 0, .81)
+    raw['goal_cell'] = [.02, 0]
+    with pytest.raises(g.GoalPlanError, match='contact endpoint'):
+        g.validate_pair_plan(raw, **kwargs)

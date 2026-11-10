@@ -21,6 +21,8 @@ def main():
     p.add_argument('--reservations', type=Path, required=True)
     p.add_argument('--asset-hashes', type=Path, required=True)
     p.add_argument('--category-proposal', type=Path)
+    p.add_argument('--candidate-manifest', type=Path)
+    p.add_argument('--reserved-candidate-manifest', type=Path)
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     out = a.output.resolve()
@@ -33,7 +35,33 @@ def main():
     families = {'mental_rotation', 'object_scaling', 'camera_relocalization-obstructed'}
     rows = []
     proposals = reservations['model_holdout_templates']
-    if a.category_proposal:
+    if sum(bool(x) for x in (a.category_proposal,a.candidate_manifest,a.reserved_candidate_manifest))>1:raise ValueError('one candidate scope at a time')
+    if a.reserved_candidate_manifest:
+        candidate_doc=json.loads(a.reserved_candidate_manifest.read_text())
+        if candidate_doc['reservation_sha256']!=sha(a.reservations):raise ValueError('candidate reservation mismatch')
+        for row in candidate_doc['objects']:
+            key=row['category']+'/'+row['model']; evidence=hashes['ready_assets'][key]
+            if key not in reservations['train_exclude_models'] or row['asset_sha256']!=evidence['asset_sha256']:
+                raise ValueError('reserved candidate identity mismatch')
+            if not row['ready'] or sha(Path(row['asset_path']))!=row['asset_sha256']:raise ValueError('unready or changed reserved candidate')
+            if row.get('scene_default_scale') is not None:
+                source=Path(row['scene_default_scale_source']['path'])
+                if sha(source)!=row['scene_default_scale_source']['sha256']:raise ValueError('scene-scale source changed')
+                actual=json.loads(source.read_text())['objects_info']['init_info'][row['scene_default_scale_source']['object']]['args']
+                if actual['category']+'/'+actual['model']!=key or actual['scale']!=row['scene_default_scale']:raise ValueError('scene-scale source does not match candidate')
+            rows.append(row)
+        proposals=[];report_scope='reserved_supports'
+    elif a.candidate_manifest:
+        candidate_doc=json.loads(a.candidate_manifest.read_text())
+        if candidate_doc['reservation_sha256']!=sha(a.reservations):raise ValueError('candidate reservation mismatch')
+        for row in candidate_doc['objects']:
+            key=row['category']+'/'+row['model']
+            if key in reservations['train_exclude_models'] or row['category'] in reservations['train_exclude_categories'] or row['asset_sha256'] in hashes['reserved_asset_hashes']:
+                raise ValueError('train candidate leaks reserved model/category/hash')
+            if not row['ready'] or sha(Path(row['asset_path']))!=row['asset_sha256']:raise ValueError('unready or changed train candidate')
+            rows.append(row)
+        proposals=[];report_scope='train_extra_rooms'
+    elif a.category_proposal:
         proposals=[]
         for template in json.loads(a.category_proposal.read_text())['templates']:
             if template['task'] not in families:continue
@@ -53,7 +81,8 @@ def main():
                 raise ValueError('unready or changed reserved object: ' + key)
             rows.append({**role, 'class_id': template['class_id'], 'task': template['task'],
                          'asset_sha256': evidence['asset_sha256'], 'asset_path': evidence['path']})
-    if len(rows) != (3 if a.category_proposal else 29):
+    expected_count=len(candidate_doc['objects']) if a.reserved_candidate_manifest else (64 if a.candidate_manifest else (3 if a.category_proposal else 29))
+    if not rows or len(rows) != expected_count:
         raise ValueError('unexpected number of frozen room-family reservations')
     out.mkdir(parents=True)
     report = {'schema': 'campaign-native-defaults-v1', 'reservation_sha256': sha(a.reservations),
@@ -79,9 +108,11 @@ def main():
         og.sim.stop()
         objects = []
         for row in rows:
-            # Omitting scale is deliberate: record the provider/runtime default.
+            # Scene roles retain the exact stable-scene initialization scale.
+            # Sampleable roles omit scale to observe the provider/runtime default.
             obj = DatasetObject(name='reserved_' + row['model'], category=row['category'], model=row['model'],
-                                dataset_name='behavior-1k-assets')
+                                dataset_name=row.get('dataset','behavior-1k-assets'),
+                                **({'scale':row['scene_default_scale']} if row.get('scene_default_scale') is not None else {}))
             env.scene.add_object(obj)
             objects.append(obj)
         og.sim.play()
@@ -94,8 +125,12 @@ def main():
             if not collision_count:
                 raise ValueError('no collision geometry: ' + row['model'])
             result = {**row, 'default_scale': obj.scale.tolist(), 'native_extent': (hi-lo).tolist(),
-                      'collision_meshes': collision_count, 'dataset': 'behavior-1k-assets',
-                      'default_scale_provenance': 'Native DatasetObject with scale omitted; observed initialized object.scale',
+                      'collision_meshes': collision_count, 'dataset': row.get('dataset','behavior-1k-assets'),
+                      'default_scale_provenance': ('Exact actual stable-scene init_info scale, checked against source hash; observed initialized object.scale' if row.get('scene_default_scale') is not None else 'Native DatasetObject with scale omitted; observed initialized object.scale'),
+                      'joint_positions': obj.get_joint_positions().tolist(),
+                      'joints': {name:{'name':joint.name,'type':str(joint.joint_type),
+                                       'lower_limit':float(joint.lower_limit),'upper_limit':float(joint.upper_limit)}
+                                 for name,joint in obj.joints.items()},
                       'images': []}
             centre = ((hi + lo) * .5).cpu().numpy()
             radius = float(th.max(hi - lo)) * 1.7 + .1
@@ -115,15 +150,18 @@ def main():
                 result['images'].append({'path': str(path), 'sha256': sha(path)})
             report['objects'].append(result)
             (out / 'default_geometry.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
-        for task in sorted(families):
+        for task in sorted({r['task'] for r in rows}):
             subset = [r for r in report['objects'] if r['task'] == task]
-            sheet = Image.new('RGB', (3 * 256, len(subset) * 280), 'white')
-            draw = ImageDraw.Draw(sheet)
-            for i, row in enumerate(subset):
-                draw.text((3, i*280+3), row['category'] + '/' + row['model'], fill='black')
-                for j, frame in enumerate(row['images']):
-                    sheet.paste(Image.open(frame['path']), (j*256, i*280+24))
-            path = out / (task + '_review.png'); sheet.save(path)
+            for start in range(0,len(subset),10):
+                page=subset[start:start+10]
+                sheet = Image.new('RGB', (3 * 256, len(page) * 280), 'white')
+                draw = ImageDraw.Draw(sheet)
+                for i, row in enumerate(page):
+                    draw.text((3, i*280+3), row['category'] + '/' + row['model'], fill='black')
+                    for j, frame in enumerate(row['images']):
+                        sheet.paste(Image.open(frame['path']), (j*256, i*280+24))
+                suffix='' if len(subset)<=10 else '_'+str(start//10).zfill(2)
+                path = out / (task + '_review'+suffix+'.png'); sheet.save(path)
         report['status'] = 'native_defaults_and_geometry_recorded'
     except BaseException as exc:
         report.update(status='failed', error=str(exc), traceback=traceback.format_exc())
