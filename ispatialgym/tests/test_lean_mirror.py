@@ -27,9 +27,9 @@ def _job(side="right", deg=20.0):
 
 def test_the_body_map_is_a_reflection_of_the_book_through_its_thickness_plane():
     B = LN.mirror_body_map(L20_REST, LN.lean_quat(LN.xyzw(BASE_WXYZ), LN.LeanSpec(20.0, "right")))
-    assert np.linalg.det(B) == pytest.approx(-1.0, abs=1e-6)
-    assert np.allclose(B, np.diag([1.0, 1.0, -1.0]), atol=0.02)
-    assert LN.mirror_symmetry_error(BOX, B) < LN.MIRROR_SYMMETRY_TOL_M  # 1.1 mm: the measured 20.55 deg source vs the design 20 deg destination
+    assert np.linalg.det(B) == pytest.approx(-1.0, abs=1e-6) and np.allclose(B @ B, np.eye(3), atol=1e-9)  # a pure reflection
+    assert np.allclose(B, np.diag([1.0, 1.0, -1.0]), atol=1e-6)  # the book's thickness plane (the measured 20.55 vs design 20 deg projected out)
+    assert LN.mirror_symmetry_error(BOX, B) < 1e-9
 
 
 def test_the_mirrored_hand_is_the_mirror_of_the_world_hand():
@@ -39,8 +39,8 @@ def test_the_mirrored_hand_is_the_mirror_of_the_world_hand():
     Rl, Rr = Rot.from_quat(L20_REST).as_matrix(), Rot.from_quat(dst).as_matrix()
     Wl = Rl @ Rot.from_quat(SIDE_9["orientation_xyzw"]).as_matrix()
     Wr = Rr @ Rot.from_quat(g["quat_xyzw"]).as_matrix()
-    assert np.allclose(Wr, LN.MIRROR @ Wl @ LN.MIRROR, atol=1e-5)  # the right arm's mirrored eef frame
-    assert np.allclose(Rr @ np.array(g["position"]), LN.MIRROR @ (Rl @ np.array(SIDE_9["position"])), atol=1e-6)
+    assert np.allclose(Wr, LN.MIRROR @ Wl @ LN.MIRROR, atol=0.02)  # the right arm's mirrored eef frame (up to the 0.55 deg settle residual)
+    assert np.allclose(Rr @ np.array(g["position"]), LN.MIRROR @ (Rl @ np.array(SIDE_9["position"])), atol=1e-3)
     assert np.linalg.det(Rot.from_quat(g["quat_xyzw"]).as_matrix()) == pytest.approx(1.0)
 
 

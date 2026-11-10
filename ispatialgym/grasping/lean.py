@@ -383,14 +383,27 @@ def manifest(keys: Sequence[str], degs: Sequence[float], side: str, board: Board
 MIRROR = np.diag([1.0, -1.0, 1.0])
 #: the largest hull asymmetry (m: a reflected vertex's distance to the nearest hull vertex) the transfer accepts
 MIRROR_SYMMETRY_TOL_M = 0.002
+#: a reflection plane within this of a body-frame plane is that plane (deg; the settle's residual lean tilts it by half the residual)
+MIRROR_AXIS_SNAP_DEG = 3.0
 
 
 def mirror_body_map(src_rest_xyzw, dst_rest_xyzw) -> np.ndarray:
-    """``B = R_dst^T M R_src``: the body-frame reflection that carries the source rest's object onto the destination rest's mirror."""
+    """``B = R_dst^T M R_src``: the body-frame map that carries the source rest's object onto the destination rest's mirror, projected onto
+    the nearest pure reflection ``I - 2 n n^T`` (n = its eigenvector of eigenvalue -1): the destination's design rest differs from the
+    source's measured one by the settle's fraction of a degree (20.55 measured vs 20 requested), which is no part of the mirror; a normal
+    within :data:`MIRROR_AXIS_SNAP_DEG` of a body axis is snapped to it."""
     from scipy.spatial.transform import Rotation as Rot
 
     Rs, Rd = Rot.from_quat(np.asarray(src_rest_xyzw, dtype=float)).as_matrix(), Rot.from_quat(np.asarray(dst_rest_xyzw, dtype=float)).as_matrix()
-    return Rd.T @ MIRROR @ Rs
+    B = Rd.T @ MIRROR @ Rs
+    w, v = np.linalg.eig(B)
+    k = int(np.argmin(np.abs(w - (-1.0))))
+    n = np.real(v[:, k])
+    n = n / np.linalg.norm(n)
+    i = int(np.argmax(np.abs(n)))
+    if math.degrees(math.acos(min(1.0, abs(float(n[i]))))) <= MIRROR_AXIS_SNAP_DEG:
+        n = np.eye(3)[i]  # the object's own symmetry plane (its body axes are the export's principal frame)
+    return np.eye(3) - 2.0 * np.outer(n, n)
 
 
 def mirror_symmetry_error(vertices, B) -> float:
