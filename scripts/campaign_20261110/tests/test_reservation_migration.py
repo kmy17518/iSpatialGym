@@ -91,3 +91,49 @@ def test_live_input_audit_runs_under_all_authority_locks_before_publication(tmp_
     assert not (tmp_path/"dataset/reservation_migration_pending.json").exists()
     result=m.migrate(**args,additional_audit=lambda records,templates:{"accepted":len(records),"queued_hits":[],"audit_sha256":"a"*64})
     assert result["accepted_audit"]["additional_use_audit"]["accepted"]==2
+
+
+def category_setup(root,category='pool_table'):
+    args,old,new,camera=setup(root,added=category+'/new')
+    new={**new,'model_holdout_models':[], 'category_holdout_models':[category+'/new'],
+         'category_holdout_categories':sorted(set(old['category_holdout_categories'])|{category}),
+         'train_exclude_categories':sorted(set(old.get('train_exclude_categories',old['category_holdout_categories']))|{category})}
+    c.write_json_atomic(args['new_reservations'],new)
+    hashes=m.read(args['new_asset_hashes']);hashes['reservation_sha256']=c.file_digest(args['new_reservations'])
+    c.write_json_atomic(args['new_asset_hashes'],hashes)
+    audit=m.read(args['source_audit']);audit.update(new_reservation_sha256=c.file_digest(args['new_reservations']),added_categories=[category])
+    c.write_json_atomic(args['source_audit'],audit)
+    return args,old,new,camera
+
+
+def test_unused_category_extension_requires_explicit_scope_and_locked_use_audit(tmp_path):
+    args,old,new,camera=category_setup(tmp_path)
+    with pytest.raises(c.ContractError,match='fixed category_holdout_categories'):
+        m.migrate(**args)
+    with pytest.raises(c.ContractError,match='locked live-input'):
+        m.migrate(**args,allow_category_extension=True)
+    result=m.migrate(**args,allow_category_extension=True,additional_audit=lambda records,templates:{'category_hits':[],'authored_count':7})
+    assert result['status']=='committed'
+    assert result['additions']['category_holdout_categories']==['pool_table']
+    assert p.active_policy(tmp_path)[1]==new
+
+
+def test_category_already_used_by_accepted_members_is_rejected_before_publication(tmp_path):
+    args,_,_,camera=category_setup(tmp_path,category='apple')
+    before={path:c.file_digest(path) for path in (args['state_path'],camera)}
+    with pytest.raises(c.ContractError,match='held-out category in held-in'):
+        m.migrate(**args,allow_category_extension=True,additional_audit=lambda *a:{'category_hits':[]})
+    assert {path:c.file_digest(path) for path in before}==before
+    assert not (tmp_path/'dataset/reservation_migration_pending.json').exists()
+
+
+def test_category_extension_cannot_remove_prior_categories_or_overlap_model_holdout(tmp_path):
+    args,old,new,_=category_setup(tmp_path)
+    old_hashes,new_hashes=m.read(args['old_asset_hashes']),m.read(args['new_asset_hashes'])
+    with pytest.raises(c.ContractError,match='identical held-out additions'):
+        m.monotonic_extension(old,{**new,'train_exclude_categories':[]},old_hashes,new_hashes,allow_category_extension=True)
+    with pytest.raises(c.ContractError,match='overlaps the model holdout'):
+        m.monotonic_extension(old,{**new,'model_holdout_models':['pool_table/another']},old_hashes,new_hashes,allow_category_extension=True)
+    modified_old={**old,'category_holdout_categories':['old_category']}
+    with pytest.raises(c.ContractError,match='removed held-out categories'):
+        m.monotonic_extension(modified_old,new,old_hashes,new_hashes,allow_category_extension=True)

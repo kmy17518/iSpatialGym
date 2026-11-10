@@ -56,10 +56,10 @@ def source_proof(gate_path, *, root, started_at, campaign_id, permitted_split=No
     block = raw.get("campaign")
     require(block is not None, "unannotated anchor cannot admit a generic training seed")
     validate_campaign_block(block, object_bindings=raw["object_bindings"])
-    require(permitted_split in (None, "eval_model"), "unsupported explicit source-proof split")
-    allowed_splits = ("eval_model",) if permitted_split == "eval_model" else ("train", "eval_standard")
+    require(permitted_split in (None, "eval_model", "eval_category"), "unsupported explicit source-proof split")
+    allowed_splits = (permitted_split,) if permitted_split else ("train", "eval_standard")
     require(block["campaign_id"] == campaign_id and block["split"] in allowed_splits, "anchor outside permitted split; heldout anchor cannot train")
-    require(groups.supports(block["task"]) or (permitted_split == "eval_model" and block["task"] in held.RANGES),
+    require(groups.supports(block["task"]) or (permitted_split and block["task"] in held.RANGES),
             "anchor task has no generic queue adapter")
     gid = block.get("goal_group_id")
     require(not gid or not (root / "groups" / gid / "release_block.json").exists(), "source group is release blocked")
@@ -101,7 +101,7 @@ def source_proof(gate_path, *, root, started_at, campaign_id, permitted_split=No
 
 
 def admission_id(template, snapshot, perturbations, split="train"):
-    require(split in ("train", "eval_standard", "eval_model"), "invalid admission split")
+    require(split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid admission split")
     identity = {"task": template.task, "class_id": template.class_id, "physical": physical_template(template),
                    "definition": template.definition_sha256, "runtime_bddl": template.scene_setup.get("runtime_bddl_sha256"),
                    "binding_pool": template.scene_setup.get("binding_pool"),
@@ -128,11 +128,14 @@ def scoped_template(template, cfg):
                 and len(classes) == len(set(classes)), "invalid admission class ownership")
         require(template.class_id in classes, "class owned by another standard lane")
     split = cfg.get("admission_split", "train")
-    require(split in ("train", "eval_standard", "eval_model"), "invalid admission split")
-    if split in ("eval_standard", "eval_model"):
+    require(split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid admission split")
+    if split in ("eval_standard", "eval_model", "eval_category"):
         if split == "eval_model":
             require(classes is not None, "model admission requires explicit class ownership")
             require(template.split == split, "model admission requires a model evaluation source")
+        elif split == "eval_category":
+            require(cfg.get('admitted_tasks') is not None, 'category admission requires explicit task ownership')
+            require(template.split == split, 'category admission requires a category evaluation source')
         else:
             require(template.split == split, "standard admission requires a standard evaluation source")
         return template
@@ -149,14 +152,16 @@ def admission_decision(template, counts, cfg):
 
 
 def model_class_pin(template, state, cfg, *, commit=False):
-    """One held-model conceptual template per owned class; pool count variants may coexist."""
-    if cfg.get("admission_split") != "eval_model":
+    """One conceptual model template per class or category template per task."""
+    split = cfg.get('admission_split')
+    if split not in ('eval_model', 'eval_category'):
         return
     identity = conceptual_template(template)
-    pins = state.setdefault("model_class_pins", {})
-    require(pins.get(template.class_id, identity) == identity, "model class already pinned to another conceptual template")
+    pins = state.setdefault("model_class_pins" if split == 'eval_model' else 'category_task_pins', {})
+    scope = template.class_id if split == 'eval_model' else template.task
+    require(pins.get(scope, identity) == identity, "held-out scope already pinned to another conceptual template")
     if commit:
-        pins[template.class_id] = identity
+        pins[scope] = identity
 
 
 def group_budget(cfg, task):
@@ -166,7 +171,7 @@ def group_budget(cfg, task):
 
 
 def source_release(template, env, cfg):
-    if template.split != "eval_model":
+    if template.split not in ("eval_model", "eval_category"):
         return cfg["v2_root"]
     require(all(env.get(key) for key in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS")),
             "model source has no exact native grasp/map release")
@@ -364,7 +369,7 @@ def main():
                 examined += 1
                 try:
                     proof = source_proof(gate, root=root, started_at=cfg["started_at"], campaign_id=cfg["campaign_id"],
-                        permitted_split="eval_model" if cfg.get("admission_split") == "eval_model" else None)
+                        permitted_split=cfg['admission_split'] if cfg.get("admission_split") in ('eval_model', 'eval_category') else None)
                     template = held.template_from(proof["template"])
                     scoped_template(template, cfg)
                     model_class_pin(template, state, cfg)

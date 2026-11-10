@@ -306,14 +306,16 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
         require(actual == seed_config["validation_key"], "adopted queue differs from seed key")
         records.append({"queue": path, "prepared": prepared, "validation_key": actual, "phase": template.split,
                         "index": submission["index"], "count": prepared["candidate_instances"], "status": "external_submission",
-                        **({"decision": submission["decision"]} if adapter is not None else {})})
+                        **({"decision": submission["decision"], "command": submission['command']}
+                           if adapter is not None else {})})
     for record in records:
         from scripts.campaign_20261110.controller_migration import controller_check
         controller_check(root,record,state,cfg,queue,save,family='held')
         if record["status"] == "complete":
             record_runtime_failure(record, state)
             continue
-        allocation = record.get("allocation") or reconcile(rows, key=spec["class_id"], index=record["index"],
+        routing_key = record['command'][3] if record.get('command') else spec['class_id']
+        allocation = record.get("allocation") or reconcile(rows, key=routing_key, index=record["index"],
             count=record["count"], snapshot=spec["snapshot"], tag="goal_groups")
         if allocation is None:
             if state.get("runtime_failure") is not None:
@@ -334,7 +336,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
             return 1
         record["allocation"] = allocation
         if record.get("needs_new_gate"):
-            gate = root / "validation/open_loop" / spec["class_id"] / allocation["jobid"] / "gate.json"
+            gate = root / "validation/open_loop" / allocation['key'] / allocation["jobid"] / "gate.json"
             if gate.exists() and read(gate).get("success") is True:
                 gates[record["phase"]] = str(gate)
         is_terminal = job_terminal(allocation, root, queue)

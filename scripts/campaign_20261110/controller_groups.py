@@ -223,11 +223,15 @@ def load_seeds(cfg, state):
         config = read(config_path)
         template = held.template_from(config["template"])
         phase = cfg.get("admission_split", "train")
-        require(phase in ("train", "eval_standard", "eval_model") and supports(template.task)
+        require(phase in ("train", "eval_standard", "eval_model", "eval_category") and supports(template.task)
                 and template.split == phase and template.class_id == spec["class_id"], "invalid admitted task/split")
         if phase == "eval_model":
             require(cfg.get("admitted_classes") and spec.get("mode") == "eval_then_train",
                     "model refill lacks explicit ownership or evaluation policy")
+        if phase == 'eval_category':
+            require(cfg.get('admitted_tasks') and template.task in cfg['admitted_tasks']
+                    and spec.get('mode') == 'eval_then_train',
+                    'category refill lacks explicit task ownership or evaluation policy')
         if cfg.get("admitted_classes") is not None:
             require(template.class_id in cfg["admitted_classes"], "admitted class outside controller ownership")
         require(file_digest(Path(spec["snapshot"]) / ".snapshot_commit") == config["validation_key"]["code_sha256"], "admitted runtime key changed")

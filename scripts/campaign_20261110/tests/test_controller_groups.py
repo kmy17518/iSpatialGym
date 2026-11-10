@@ -69,3 +69,27 @@ def test_fresh_alignment_anchor_confirms_frozen_policy_without_rekeying(tmp_path
     assert confirmed is first and confirmed.fingerprint == first.fingerprint
     with pytest.raises(ContractError, match="policy changed"):
         with_alignment_buckets(first, [10, 25], source={"field": "range", "sha256": "c" * 64})
+
+
+def test_category_queue_reconciles_canonical_submit_key_without_changing_category_class(tmp_path, monkeypatch):
+    from dataclasses import asdict, replace
+    from scripts.campaign_20261110 import controller_held as held, controller_migration, contracts as c
+    from scripts.campaign_20261110.tests.test_goal_groups import GoalGroupControllerTests
+    _, _, _, original, _ = GoalGroupControllerTests().fixture(tmp_path)
+    template = replace(original, task='inter_object_relation_satisfaction-ontop_small_scale',
+                       class_id='inter_object_relation_satisfaction-ontop_small_scale-rubber_eraser-notepad', split='eval_category')
+    config = tmp_path/'category_config.json'; gate = tmp_path/'gate.json'
+    c.write_json_atomic(config, {'template': asdict(template), 'validation_key': {}})
+    c.write_json_atomic(gate, {'success': True})
+    key = 'inter_object_relation_satisfaction-ontop_small_scale_01'
+    record = {'queue': 'queue', 'phase': 'eval_category', 'status': 'external_submission',
+              'command': ['python', 'submit_fast.py', 'submit', key, '3'], 'index': 100, 'count': 3}
+    spec = {'class_id': template.class_id, 'seed_config': str(config), 'seed_config_sha256': c.file_digest(config),
+            'source_gate': str(gate), 'source_gate_sha256': c.file_digest(gate), 'snapshot': '/snapshot'}
+    observed = []
+    monkeypatch.setattr(controller_migration, 'controller_check', lambda *args, **kwargs: None)
+    monkeypatch.setattr(held, 'reconcile', lambda rows, **kwargs: observed.append(kwargs) or None)
+    state = {'queues': [record]}
+    assert held.advance(spec, state, {}, tmp_path, [], {}, 1, lambda: None,
+                        adapter=SimpleNamespace(supports=lambda task: True)) == 0
+    assert observed[0]['key'] == key and spec['class_id'] == template.class_id

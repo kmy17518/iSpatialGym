@@ -131,6 +131,28 @@ def test_model_admission_never_converts_source_or_falls_back_to_training(tmp_pat
                                   "configuration_matching-block_design") == 9000
 
 
+def test_category_admission_requires_its_own_proof_and_one_template_per_task(tmp_path, monkeypatch):
+    f, template, _ = anchor_fixture(tmp_path, monkeypatch, split='eval_category')
+    cfg = {'admission_split': 'eval_category', 'admitted_tasks': [template.task]}
+    assert admission.scoped_template(template, cfg) is template
+    proof = admission.source_proof(f.gate, root=tmp_path, started_at=f.since, campaign_id='campaign', permitted_split='eval_category')
+    assert proof['template']['split'] == 'eval_category'
+    for split in (None, 'eval_model'):
+        with pytest.raises(c.ContractError, match='permitted split'):
+            admission.source_proof(f.gate, root=tmp_path, started_at=f.since, campaign_id='campaign', permitted_split=split)
+    with pytest.raises(c.ContractError, match='explicit task ownership'):
+        admission.scoped_template(template, {'admission_split': 'eval_category'})
+    with pytest.raises(c.ContractError, match='category evaluation source'):
+        admission.scoped_template(replace(template, split='eval_model'), cfg)
+    state = {}; admission.model_class_pin(template, state, cfg, commit=True)
+    changed = replace(template, class_id='another_category_class', objects=(replace(template.objects[0], model='different', asset_sha256=c.digest('different')),))
+    with pytest.raises(c.ContractError, match='another conceptual template'):
+        admission.model_class_pin(changed, state, cfg)
+    assert admission.admission_id(template, tmp_path/'code/snapshot', {}, 'eval_category') != admission.admission_id(template, tmp_path/'code/snapshot', {}, 'eval_model')
+    counts = {'evaluation': {0: 4}, 'train_buckets': {}, 'class_remaining': 1000, 'task_remaining': 1000}
+    assert groups.next_work(template, counts) is None
+
+
 def test_author_upgrade_reopens_only_the_fixed_gap_and_retains_previous_evidence():
     previous = {"sha256": "a"*64, "reason": next(iter(admission.FIXED_AUTHOR_GAPS)), "observed_at": 123}
     state = {"checked_gates": {"tray": dict(previous), "other": {"sha256": "b"*64, "reason": "replay QA missing"}}}

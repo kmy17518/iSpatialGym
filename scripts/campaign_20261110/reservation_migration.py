@@ -21,17 +21,29 @@ def read(path):
     return json.loads(Path(path).read_text())
 
 
-def monotonic_extension(old,new,old_hashes,new_hashes):
+def monotonic_extension(old,new,old_hashes,new_hashes,*,allow_category_extension=False):
     """A reservation can grow; existing models, category rules and rooms stay fixed."""
     additions={}
     for key in ("model_holdout_models","category_holdout_models","train_exclude_models"):
         before,after=set(old[key]),set(new[key])
         require(before <= after,f"reservation migration removed {key}")
         additions[key]=sorted(after-before)
-    for key in ("category_holdout_categories","category_holdout_rooms","pending_custom_hard_reservations_not_ready"):
+    for key in ("category_holdout_rooms","pending_custom_hard_reservations_not_ready"):
         require(digest(old[key])==digest(new[key]),f"reservation migration changed fixed {key}")
-    if "train_exclude_categories" in old:
-        require(set(old["train_exclude_categories"])==set(new["train_exclude_categories"]),"category exclusions changed")
+    before_categories,after_categories=set(old["category_holdout_categories"]),set(new["category_holdout_categories"])
+    require(before_categories<=after_categories,"reservation migration removed held-out categories")
+    category_additions=after_categories-before_categories
+    require(allow_category_extension or not category_additions,"reservation migration changed fixed category_holdout_categories")
+    before_exclusions=set(old.get("train_exclude_categories",before_categories))
+    after_exclusions=set(new.get("train_exclude_categories",after_categories))
+    require(before_exclusions<=after_exclusions and after_exclusions-before_exclusions==category_additions,
+            "category exclusions changed without identical held-out additions")
+    if category_additions:
+        require(category_additions <= {key.split('/',1)[0] for key in additions['category_holdout_models']},
+                "new held-out category lacks a newly reserved model")
+        require(not category_additions & {key.split('/',1)[0] for key in new['model_holdout_models']},
+                "new category overlaps the model holdout pool")
+    additions['category_holdout_categories']=sorted(category_additions)
     require(set(new["model_holdout_models"]).isdisjoint(new["category_holdout_models"]),"holdout pools overlap")
     added_held=set(additions["model_holdout_models"])|set(additions["category_holdout_models"])
     require(added_held and set(additions["train_exclude_models"])==added_held,"extension must reserve every added heldout model and nothing else")
@@ -91,14 +103,14 @@ def _durable_json(path,data):
         local=Path(tmp)/"record.json";write_json_atomic(local,data);durable_atomic_copy(local,path)
 
 
-def migrate(*,root,migration_id,old_reservations,new_reservations,old_asset_hashes,new_asset_hashes,source_audit,state_path=None,additional_audit=None):
+def migrate(*,root,migration_id,old_reservations,new_reservations,old_asset_hashes,new_asset_hashes,source_audit,state_path=None,additional_audit=None,allow_category_extension=False):
     root=Path(root).resolve()
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*",migration_id),"unsafe migration ID")
     paths=[Path(p).resolve() for p in (old_reservations,new_reservations,old_asset_hashes,new_asset_hashes,source_audit)]
     require(all(p.is_relative_to(root) and p.is_file() for p in paths),"migration sources must be immutable campaign files")
     old,new,old_hashes,new_hashes=map(read,paths[:4])
     require(old_hashes["reservation_sha256"]==file_digest(paths[0]) and new_hashes["reservation_sha256"]==file_digest(paths[1]),"reservation source bytes differ from asset audit")
-    additions=monotonic_extension(old,new,old_hashes,new_hashes)
+    additions=monotonic_extension(old,new,old_hashes,new_hashes,allow_category_extension=allow_category_extension)
     source=read(paths[4])
     added=set(additions["model_holdout_models"])|set(additions["category_holdout_models"])
     require(source.get("old_reservation_sha256")==file_digest(paths[0]) and source.get("new_reservation_sha256")==file_digest(paths[1]),
@@ -106,6 +118,10 @@ def migrate(*,root,migration_id,old_reservations,new_reservations,old_asset_hash
     require(set(source.get("added_model_keys",[]))==added and source.get("reason"),"extension source audit differs from added models")
     require(source.get("added_asset_sha256")=={key:new_hashes["ready_assets"][key]["asset_sha256"] for key in sorted(added)},
             "extension source audit differs from new ready asset bytes")
+    if additions['category_holdout_categories']:
+        require(additional_audit is not None,"category extension requires a locked live-input use audit")
+        require(sorted(source.get('added_categories',[]))==additions['category_holdout_categories'],
+                "extension source audit differs from newly held-out categories")
     old_digest,new_digest=policy_digest(old),policy_digest(new)
     state_path=Path(state_path or root/"dataset/allocations.sqlite").resolve()
     require(state_path.is_relative_to(root) and state_path.is_file(),"missing campaign allocation DB")
