@@ -78,3 +78,35 @@ def test_large_pair_schema_rejects_missing_cell_and_preserves_inside_orientation
     assert p.orientation_required and p.goal_cell == (0., 0.)
     with pytest.raises(g.GoalPlanError, match="target drifted"):
         p.verify_settled((p.goal[0], [1, 0, 0, 0]), p.partner)
+
+
+def test_large_base_push_requires_geometry_and_middle_eighty_percent():
+    import pytest
+    raw = PairPlanTests().fixture('nextto')
+    raw['task'] = 'inter_object_relation_satisfaction-nextto_large_scale'
+    kwargs = dict(template_id='t', scene='s', rooms=['r'], relation='nextto', scale='large', activated_at=999, now=1000)
+    with pytest.raises(g.GoalPlanError, match='audited base push'):
+        g.validate_pair_plan(raw, **kwargs)
+    raw['base_push'] = dict(side='-x', face='-x', direction=[1, 0, 0], side_inward=[1, 0], goal_gap_m=.1, nextto_bound_m=.2)
+    p = g.validate_pair_plan(raw, **kwargs)
+    assert p.goal_cell is None and p.summary()['base_push'] == raw['base_push']
+    raw['base_push']['goal_gap_m'] = .195
+    with pytest.raises(g.GoalPlanError, match='middle eighty percent'):
+        g.validate_pair_plan(raw, **kwargs)
+    raw['base_push']['goal_gap_m'] = .1
+    raw['base_push']['direction'] = [1, 0, .1]
+    with pytest.raises(g.GoalPlanError, match='direction'):
+        g.validate_pair_plan(raw, **kwargs)
+    raw['base_push']['direction'] = [1, 0, 0]
+    raw['task'] = 'inter_object_relation_satisfaction-touching_large_scale'
+    assert g.validate_pair_plan(raw, **{**kwargs, 'relation': 'touching'}).place is None
+
+
+def test_base_push_gap_moves_along_audited_partner_side():
+    import pytest
+    goal = ([.6, -.2, .003], [0, 0, 0, 1])
+    for fraction, desired in ((0, .02), (.5, .1), (1, .18)):
+        changed, release, gap = g.vary_base_push_gap(goal, goal, inward=[1, 0], gap_max=.2, observed_gap=.12, fraction=fraction)
+        assert gap == pytest.approx(desired)
+        assert changed[0] == pytest.approx([.6+.12-desired, -.2, .003])
+        assert changed == release

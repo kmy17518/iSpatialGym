@@ -35,6 +35,7 @@ class PairGoalPlan:
     scale: str = "small"
     goal_cell: tuple | None = None
     place: tuple | None = None
+    base_push: dict | None = None
 
     @property
     def orientation_required(self):
@@ -51,6 +52,8 @@ class PairGoalPlan:
                 "phase": "planned_before_start", "target_orientation_required": self.orientation_required, "scale": self.scale}
         if self.place is not None:
             result["requested_place"] = as_pose(self.place)
+        if self.base_push is not None:
+            result["base_push"] = self.base_push
         return result
 
     def verify_settled(self, target, partner, *, position_tol=.03, orientation_tol=.20, partner_position_tol=.005):
@@ -89,13 +92,44 @@ def object_pose_from_grasp(place, eef_in_object):
     return tuple(pp[i]-offset[i] for i in range(3)), oq
 
 
+def vary_base_push_gap(goal, release, *, inward, gap_max, observed_gap, fraction):
+    """Choose a large next-to goal on the audited partner side before drawing starts."""
+    _require(len(inward) == 2 and all(math.isfinite(float(v)) for v in inward)
+             and abs(math.hypot(*inward)-1) < 1e-4, "invalid partner side normal")
+    _require(all(math.isfinite(float(v)) for v in (gap_max, observed_gap, fraction))
+             and gap_max > 0 and 0 <= observed_gap < gap_max and 0 <= fraction <= 1, "invalid base-push gap proposal")
+    desired = (.1 + .8 * fraction) * gap_max
+    shift = observed_gap - desired
+    def shifted(value):
+        return ([float(value[0][i]) + (inward[i]*shift if i < 2 else 0) for i in range(3)], list(value[1]))
+    return shifted(goal), shifted(release), desired
+
+
 def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at, now=None, scale="small"):
     now = time.time() if now is None else now
     _require(isinstance(raw, dict) and raw.get("schema") == SCHEMA, "invalid pair goal schema")
-    _require(scale in ("small", "large") and relation in (RELATIONS if scale == "small" else ("ontop", "inside"))
+    _require(scale in ("small", "large") and relation in (RELATIONS if scale == "small" else ("ontop", "inside", "nextto", "touching"))
              and raw.get("task") == f"inter_object_relation_satisfaction-{relation}_{scale}_scale", "unsupported pair goal task")
+    base_push = raw.get("base_push")
+    if scale == "large" and relation in ("nextto", "touching"):
+        _require(isinstance(base_push, dict) and isinstance(base_push.get("side"), str)
+                 and base_push.get("face") in ("+x", "-x", "+y", "-y"), "large relation requires an audited base push")
+        for key, length in (("direction", 3), ("side_inward", 2)):
+            v = base_push.get(key)
+            _require(isinstance(v, (list, tuple)) and len(v) == length
+                     and all(isinstance(x, (int, float)) and math.isfinite(x) for x in v)
+                     and abs(math.sqrt(sum(x*x for x in v))-1) < 1e-4, f"invalid base push {key}")
+        _require(abs(base_push["direction"][2]) < 1e-6, "base push must be horizontal")
+        _require(all(isinstance(base_push.get(k), (int, float)) and math.isfinite(base_push[k])
+                     for k in ("goal_gap_m", "nextto_bound_m")) and base_push["nextto_bound_m"] > 0,
+                 "base push lacks measured gap bounds")
+        if relation == "nextto":
+            _require(.1-1e-6 <= base_push["goal_gap_m"]/base_push["nextto_bound_m"] <= .9+1e-6,
+                     "base push goal gap must be in middle eighty percent")
+    else:
+        _require(base_push is None, "base push descriptor on a non-push task")
     goal_cell = raw.get("goal_cell")
-    if scale == "large":
+    if scale == "large" and base_push is None:
         _require(isinstance(goal_cell, (list, tuple)) and len(goal_cell) == 2
                  and all(isinstance(v, (int, float)) and math.isfinite(v) for v in goal_cell), "large pair goal requires fixed cell")
         goal_cell = tuple(float(v) for v in goal_cell)
@@ -108,7 +142,7 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     sha = raw.get("contract_template_sha256")
     _require(isinstance(sha, str) and len(sha) == 64 and all(c in "0123456789abcdef" for c in sha), "invalid contract hash")
     release, goal, partner = (pose(raw.get(k), k) for k in ("release_pose", "goal_pose", "partner_pose"))
-    place = pose(raw.get("place_pose"), "touching pre-push place") if relation == "touching" else None
+    place = pose(raw.get("place_pose"), "touching pre-push place") if relation == "touching" and scale == "small" else None
     if place is not None:
         _require(pose_error(place, goal)[0] > .001, "touching place must precede its contact goal")
     created, budget = float(raw.get("created_at", 0)), float(raw.get("budget_seconds", 0))
@@ -120,7 +154,7 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid group size")
     fingerprint = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     return PairGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, relation,
-                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place)
+                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push)
 
 
 def load_pair_plan(*, template_id, scene, rooms, relation, activated_at, expected_sha256=None, scale="small"):

@@ -245,7 +245,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                   magnitude_range, budget_seconds: float = 900, max_members: int = 3):
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", group_id), "group id must be a safe path component")
     pair_tasks = {f"inter_object_relation_satisfaction-{relation}_{scale}_scale": (relation, scale)
-                  for scale, relations in (("small", PAIR_RELATIONS), ("large", ("ontop", "inside"))) for relation in relations}
+                  for scale, relations in (("small", PAIR_RELATIONS), ("large", ("ontop", "inside", "nextto", "touching"))) for relation in relations}
     joint_task = template.task.startswith("configuration_matching-articulation_")
     block_task = template.task == "configuration_matching-block_design"
     require(block_task or joint_task or template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "alignment-axial", "disembedding", "configuration_matching-attachment") or template.task in pair_tasks,
@@ -362,7 +362,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["release_pose"] = plan["goal_pose"]
         plan["goal_pose"] = {"position": target[0], "orientation": target[1]}
         plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
-        if relation == "touching":
+        if relation == "touching" and scale == "small":
             from ispatialgym.sampling.campaign_pair_goals import object_pose_from_grasp
 
             require(file_digest(anchor["sources"]["sidecar"]["path"]) == anchor["sources"]["sidecar"]["sha256"],
@@ -373,7 +373,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                     "touching anchor lacks one verified pre-push grasp/place")
             placed = object_pose_from_grasp(grasps[0]["place"], grasps[0]["eef_in_object"])
             plan["place_pose"] = {"position": placed[0], "orientation": placed[1]}
-        if relation == "nextto":
+        if relation == "nextto" and scale == "small":
             summary = anchor["summary"]
             require("nextto_gap_m" in summary and "g_NT" in summary.get("pair", {}), "nextto anchor lacks measured gap range")
             base = summary.get("manipulation_stance", {}).get("base_pose2d")
@@ -384,7 +384,27 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             plan["goal_pose"] = {"position": changed_goal[0], "orientation": changed_goal[1]}
             plan["release_pose"] = {"position": changed_release[0], "orientation": changed_release[1]}
             plan["nextto_gap_proposal_m"] = gap
-        if scale == "large":
+        if scale == "large" and relation in ("nextto", "touching"):
+            from ispatialgym.sampling.campaign_pair_goals import vary_base_push_gap
+
+            push = anchor["summary"].get("nextto", {})
+            sides = tm.get("template_facts", {}).get("nextto", {}).get("sides", [])
+            matching = [row for row in sides if row["name"] == push.get("side")]
+            require(len(matching) == 1 and push.get("direction") and push.get("face"),
+                    "large push anchor lacks audited push and partner side geometry")
+            require(push.get("goal_pose") and len(push["goal_pose"]) == 2, "large push anchor lacks its native horizontal endpoint")
+            plan["release_pose"] = {"position": push["goal_pose"][0], "orientation": push["goal_pose"][1]}
+            plan["base_push"] = {key: push[key] for key in ("side", "face", "direction", "goal_gap_m", "nextto_bound_m")}
+            plan["base_push"]["side_inward"] = matching[0]["inward"]
+            if relation == "nextto":
+                changed_goal, changed_release, gap = vary_base_push_gap(target,
+                    push["goal_pose"], inward=matching[0]["inward"],
+                    gap_max=push["nextto_bound_m"], observed_gap=push["goal_gap_m"],
+                    fraction=int(digest({"group": group_id, "anchor": anchor["instance_id"]})[:16], 16) / (2 ** 64 - 1))
+                plan["goal_pose"] = {"position": changed_goal[0], "orientation": changed_goal[1]}
+                plan["release_pose"] = {"position": changed_release[0], "orientation": changed_release[1]}
+                plan["base_push"]["goal_gap_m"] = gap
+        elif scale == "large":
             require(anchor["summary"].get("goal_cell") is not None, "large pair anchor lacks fixed goal cell")
             plan["goal_cell"] = anchor["summary"]["goal_cell"]
         plan["schema"] = PAIR_SCHEMA

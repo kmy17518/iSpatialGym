@@ -4667,8 +4667,12 @@ class IORSLarge(SamplerV2):
                 expected_sha256=getattr(self, "_campaign_pair_plan_sha", None))
             if (plan.target_name, plan.partner_name) != (self.tname, self.pname):
                 raise Reject("campaign_goal_plan", "large pair role bindings differ from template")
-            if self.relation not in ("ontop", "inside") or self.push_under:
-                raise Reject("campaign_goal_plan", "large push/nextto/touching goal adapter is pending")
+            if self.push_under or (self.relation not in ("ontop", "inside") and plan.base_push is None):
+                raise Reject("campaign_goal_plan", "large relation lacks a supported goal adapter")
+            if plan.base_push is not None:
+                from ispatialgym.sampling.v2.tasks.iors_large_nextto import NextToMode
+                if not isinstance(self, NextToMode):
+                    raise Reject("campaign_goal_plan", "base-push plan requires the native base-push mode")
             if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
                 raise Reject("campaign_group_complete", "large pair goal-group member limit reached")
             self._campaign_pair_plan_sha = plan.sha256
@@ -4693,10 +4697,11 @@ class IORSLarge(SamplerV2):
             raise Reject("campaign_partner_drift", f"large partner changed before starts: {dp:.6f} m / {dq:.6f} rad")
         # The anchor cell must still belong to this template's geometric candidate
         # set. Install it before B starts are drawn; C can then vary around it.
-        cells = self.place["cells"]
-        if not len(cells) or float(th.linalg.norm(G.t(cells) - G.t(plan.goal_cell), dim=1).min()) > .001:
-            raise Reject("campaign_goal_cell", "fixed goal cell no longer belongs to the supported placement region")
-        self.place["cells"] = G.t([plan.goal_cell])
+        if plan.base_push is None:
+            cells = self.place["cells"]
+            if not len(cells) or float(th.linalg.norm(G.t(cells) - G.t(plan.goal_cell), dim=1).min()) > .001:
+                raise Reject("campaign_goal_cell", "fixed goal cell no longer belongs to the supported placement region")
+            self.place["cells"] = G.t([plan.goal_cell])
         self._campaign_latest_proposal = {"group_id": plan.group_id, "start_poses": {},
             "goal_poses": {self.tname: _jsonable(plan.goal), self.pname: _jsonable(plan.partner)}}
 

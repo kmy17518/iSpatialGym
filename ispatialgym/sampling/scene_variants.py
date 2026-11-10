@@ -313,9 +313,48 @@ def patch_trav_map_from_meta(scene, template_meta: dict) -> int:
     """Apply the traversability patch recorded in ``template_meta['scene_variant']`` (no-op when absent)."""
     sv = template_meta.get("scene_variant") or {}
     fps = sv.get("freed_footprints")
-    if not fps:
-        return 0
-    return patch_trav_map(scene, fps)
+    freed = patch_trav_map(scene, fps) if fps else 0
+    # A campaign-inserted support is fixed scene geometry. Include its footprint
+    # in the template map before loaders snapshot that map for instance reuse.
+    added = sv.get("campaign_added_support")
+    if added:
+        block_campaign_support(scene, added)
+    return freed
+
+
+def block_campaign_support(scene, metadata: dict) -> int:
+    """Block one explicitly recorded campaign support after checking its identity.
+
+    Historical scenes without campaign metadata never call this hook. The
+    sampler, scalar loader, vector loader, and validator use the same template
+    patch entry point, so this static obstacle survives instance map resets.
+    """
+    name = metadata.get("name")
+    obj = scene.object_registry("name", name)
+    if obj is None or metadata.get("model_key") != f"{obj.category}/{obj.model}":
+        raise ValueError("campaign support is absent or has a different model")
+    scale = metadata.get("default_scale", [])
+    if len(scale) != 3 or any(abs(float(a)-float(b)) > 1e-6 for a,b in zip(obj.scale, scale)):
+        raise ValueError("campaign support default scale mismatch")
+    fps = metadata.get("blocked_footprints") or {}
+    polygons = fps.get("block") or []
+    if fps.get("free") or len(polygons) != 1 or len(polygons[0]) != 4:
+        raise ValueError("campaign support must provide one blocking quadrilateral")
+    if any(len(p) != 2 or not all(math.isfinite(float(v)) for v in p) for p in polygons[0]):
+        raise ValueError("invalid campaign support footprint")
+    turns = []
+    for i in range(4):
+        a, b, c = [polygons[0][(i+j) % 4] for j in range(3)]
+        turns.append((float(b[0])-float(a[0]))*(float(c[1])-float(b[1])) -
+                     (float(b[1])-float(a[1]))*(float(c[0])-float(b[0])))
+    if not (all(t > 1e-8 for t in turns) or all(t < -1e-8 for t in turns)):
+        raise ValueError("campaign support footprint must be convex and consistently ordered")
+    lo, hi = obj.aabb
+    bounds = [[min(float(p[k]) for p in polygons[0]), max(float(p[k]) for p in polygons[0])] for k in range(2)]
+    if any(bounds[k][0] > float(lo[k])+1e-5 or bounds[k][1] < float(hi[k])-1e-5 or
+           float(lo[k])-bounds[k][0] > 0.1 or bounds[k][1]-float(hi[k]) > 0.1 for k in range(2)):
+        raise ValueError("campaign support footprint does not bound its live geometry")
+    return block_trav_map(scene, fps)
 
 
 # ----------------------------------------------------------------------------------------------------------------

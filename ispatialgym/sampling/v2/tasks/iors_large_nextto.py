@@ -809,6 +809,19 @@ def count(stats: Dict[str, int], key: str) -> None:
 
 def goal_candidates(s, rng: np.random.Generator) -> List[Dict[str, Any]]:
     """Goal draws: (side, push angle, face, lateral) shuffled, the faces across the longer extent first within a draw."""
+    plan = getattr(s, "_campaign_pair_active", None)
+    if plan is not None:
+        push = plan.base_push
+        sides = [edge for edge in s.place["edges"] if edge.name == push["side"]]
+        if len(sides) != 1 or float(th.linalg.norm(sides[0].inward.float()-th.tensor(push["side_inward"]))) > .001:
+            raise Reject("campaign_goal_geometry", "fixed push partner side changed")
+        side = sides[0]
+        direction = th.tensor(push["direction"][:2])
+        angle = math.degrees(C.wrap_angle(math.atan2(float(direction[1]), float(direction[0]))-side.yaw))
+        if not any(abs(angle-float(a)) < .01 for a in knob(s, "push_angles_deg")):
+            raise Reject("campaign_goal_geometry", "fixed push direction is outside the native angle set")
+        # Retry starts and contacts for this one goal; never draw a second goal.
+        return [{"side": side, "angle": angle, "lateral": 0., "faces": [push["face"]]}] * int(knob(s, "goal_tries"))
     lo, hi = s.place["local_lo"], s.place["local_hi"]
     angles = [float(a) for a in knob(s, "push_angles_deg")]
     faces = face_order(lo, hi)
@@ -829,6 +842,10 @@ def goal_candidates(s, rng: np.random.Generator) -> List[Dict[str, Any]]:
 def sample_instance(s, rng: np.random.Generator) -> Draft:
     """One nextto draw (module docstring); the target is put back where it was afterwards (``apply_draft`` places it)."""
     from ispatialgym.sampling.v2.tasks.iors_large import ATTEMPT_BUDGET_S
+    from ispatialgym.sampling import campaign_pair_goals as CPG
+
+    if os.environ.get(CPG.ENV):
+        s.campaign_pin_goal()
 
     s._attempt_t0 = time.time()
     s._deadline = s._attempt_t0 + float(s.num("attempt_budget_s", ATTEMPT_BUDGET_S))
@@ -854,6 +871,9 @@ def _draw(s, rng: np.random.Generator) -> Draft:
         if tries >= int(knob(s, "goal_tries")):
             break
         s._check_deadline(f"nextto goal candidate {tries + 1}")
+        plan = getattr(s, "_campaign_pair_active", None)
+        if plan is not None:
+            s.campaign_group_remaining_s()
         side, ang = cand["side"], cand["angle"]
         d2 = push_direction(side, ang)
         for face in cand["faces"]:
@@ -864,7 +884,21 @@ def _draw(s, rng: np.random.Generator) -> Draft:
             bound = nextto_bound(*world_aabb(lo, hi, (0.0, 0.0), yaw, s.floor_z), plo, phi)
             gap = goal_gap(s, bound)
             goal_xy = goal_root_xy(side, lo, hi, yaw, gap, cand["lateral"])
-            polys = partner_sections(s)
+            if plan is not None:
+                from ispatialgym.sampling.campaign_pair_goals import pose_error
+
+                goal_xy = th.tensor(plan.release[0][:2])
+                dp, dq = pose_error(target_pose(s, goal_xy, yaw), plan.release)
+                if dp > .005 or dq > .05:
+                    raise Reject("campaign_goal_geometry", f"fixed push goal is not floor-resting with its native face/yaw: {dp:.6f} m / {dq:.6f} rad")
+                gap = float(plan.base_push["goal_gap_m"])
+                if abs(bound-float(plan.base_push["nextto_bound_m"])) > .001:
+                    raise Reject("campaign_goal_geometry", "fixed push predicate bound changed")
+                if push_relation(s) == "nextto":
+                    actual_gap = aabb_gap(*world_aabb(lo, hi, goal_xy, yaw, s.floor_z), plo, phi)
+                    if abs(actual_gap-gap) > .005 or not .1*bound-.001 <= actual_gap <= .9*bound+.001:
+                        raise Reject("campaign_goal_geometry", "fixed push goal left its selected next-to gap")
+            polys = partner_sections(s) if plan is None else None
             if polys is not None:
                 adv = advance_to_surface(lo, hi, goal_xy, yaw, d2, polys, gap, float(knob(s, "touching_advance_max_m")))
                 if adv is None:
@@ -906,6 +940,8 @@ def _draw(s, rng: np.random.Generator) -> Draft:
                 errors.append(f"side {side.name} face {face}: NextTo false at the goal (gap {gap:.3f} m, bound {bound:.3f} m)")
                 continue
             init_pose = target_pose(s, init_xy, yaw)
+            if plan is not None:
+                s._campaign_latest_proposal["start_poses"] = {s.tname: _jsonable(init_pose)}
             put(s, init_pose)
             s.kit.sync_world()
             try:
@@ -918,6 +954,14 @@ def _draw(s, rng: np.random.Generator) -> Draft:
                 s.sidecar.reset_instance()
                 continue
             d.summary["nextto"]["draw_stats"] = dict(stats)
+            if plan is not None:
+                d.summary["campaign_goal_group"] = plan.summary()
+                push = s.sidecar.contacts["push"]
+                d.summary["campaign_goal_group"]["requested_start"] = {
+                    "target": _jsonable(init_pose), "arm": push.arm,
+                    "contact_in_object": push.extras["contact_in_object"],
+                    "second_hand": push.extras.get("second_hand"), "face": face}
+                s._campaign_latest_proposal["start_poses"] = {s.tname: _jsonable(init_pose)}
             return d
     s.template_facts.setdefault("nextto_draw_stats", []).append(dict(stats))
     if (getattr(s, "template_facts", None) or {}).get("nextto_reach_margins"):
@@ -1389,10 +1433,20 @@ def goal_pose_of(draft: Draft, tname: str) -> G.Pose:
 def goal(s, draft: Draft) -> None:
     tname = s.tname
     g = goal_pose_of(draft, tname)
+    plan = getattr(s, "_campaign_pair_active", None)
+    if plan is not None:
+        from ispatialgym.sampling.campaign_pair_goals import pose_error
+
+        dp, dq = pose_error(g, plan.release)
+        if dp > .005 or dq > .05:
+            raise Reject("campaign_start_drift", f"settled push start moved its fixed endpoint {dp:.6f} m / {dq:.6f} rad")
+        g = tuple(G.t(v) for v in plan.release)
     draft.goal_poses[tname] = g
     draft.pose_targets[tname] = full_pose_target(g[0], g[1], s.tol("position", 0.15), s.tol("orientation", 0.35))
     end = s.sidecar.stance(END_STANCE)
     s.sidecar.set_goal(end.base_pose2d, end.translate, end.tilt, arms="same")
+    if plan is not None:
+        s.campaign_verify_pair(draft)
 
 
 def after_settle(s, draft: Draft) -> None:
