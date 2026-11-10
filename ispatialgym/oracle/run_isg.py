@@ -1572,6 +1572,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         # run_isg_vec's physics (oracle.sleep_assist; ISG_VEC_LEAN_STEP): what this run used, for the demo's provenance
         assist = {"config": os.environ.get("ISG_SLEEP_ASSIST"), "mode": SA.sleep_assist_mode(), "max_mass_kg": SA.sleep_assist_max_mass(),
                   "wake_radius_m": SA.sleep_assist_wake_radius()}
+        if SA.restart_on_wake():  # i7-sleep (A8b): recorded only when on
+            assist["restart_on_wake"] = True
         meta["driver_physics"] = {"rigid_overrides": dict(loader.physics_overrides), "sleep_assist": assist if SA.sleep_assist_config() is not None else None,
                                   "lean_step": os.environ.get("ISG_VEC_LEAN_STEP") == "1"}
         meta["record_view"] = list(args.record_view)

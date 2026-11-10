@@ -6364,6 +6364,58 @@ Only the customs starts had maps, so a drawn start would have rejected `missing_
 - **Braces.** Map-feasible live braces solved: old 0/117, new 0/78. Braces in the demos: old 5, new 4. Every one came from a class the map did not call feasible. axial_05's failures were push-only demos in both arms (not where the maps acted).
 - **Verdict: accept push-only.** The layer is not handed for consolidation, and the switch stays off.
 
+## The sleep assist's rest window on a wake, and the physics freeze (branch `i7-sleep`, owner A8b, 2026-11-09)
+
+**The owner's decision (A8b).** Decide the sleep-assist rule now with an A/B, then freeze the physics before the final collection.
+- **Arm.** The assist's rest window restarts whenever PhysX wakes an object, versus today's rule.
+- **Flip rule.** Flip only if yield, GPU-h per ok, drift and the kick rate are all no worse, and the scripted slow-approach test shows the
+  pressed object awake.
+
+**Built: `ISPATIALGYM_SLEEP_ASSIST_RESTART_ON_WAKE`, default `"0"` (7cdf1691).**
+- **Where it lives.** `oracle/sleep_assist.py: SleepAssist`, the one class of `run_isg` (demos), `run_isg_vec` (replay, policy eval) and the
+  offline validators.
+- **What `"1"` does.** It restarts an object's rest window at every wake:
+  - PhysX's own wake: asleep at the last control step, awake now;
+  - the assist's proactive wake. I included it on the same rationale and split it by counter.
+- **Record when on.** `meta.sleep_assist.restart_on_wake`, `wake_restarts{physx,assist}` and `wake_restarts_n`, plus
+  `driver_physics.sleep_assist.restart_on_wake`.
+- **Probe additions.** The probe (`validate_contacts probe`) also reports `asleep_steps_press`, `sa_sleeps_press` and `sa_wake_restarts_n`.
+- **Checks.** Tests: test_sleep_assist.py, 18 passed. Suite = the base, the same 21 ids.
+
+**Scripted test.**
+- **Setup.** `$OFH/sleep_20261109/probe.sh` and `probe_tab.txt`: the real left arm pressed 15 mm into a sleeping touch partner.
+  - Objects: box_of_tissues ntbrtz, box_of_cereal dkhgxn, bottle_of_detergent gkpmii.
+  - Conditions: assist, assist_marked, native, awake. Hand speeds: 0.1, 0.2, 0.3 and 1.17 mm/step.
+- **At 0.2 mm/step the arm keeps the pressed object awake.** Asleep-while-touched steps drop from 73–79 to 4–7 on all three objects.
+- **At 0.1 mm/step it does not: 6 / 6 probes stay asleep while pressed in both arms.** On it is 89–124 steps at up to 13.6 N; off it is
+  88–128.
+  - Why, from the tissue-box timeline:
+    - PhysX wakes the box at k 542, with the hand 2.16 cm from it, and the window restarts.
+    - The finger load first exceeds 0.05 N at k 567.
+    - The assist re-sleeps the box at k 571, 30 steps after the wake. Net motion is 0.54 mm < 1 mm, and its Touching(robot) gate does not
+      see the fingertip contact.
+    - PhysX does not wake it again. The pair was already in contact.
+- **Motion outcome.** In every probe of both arms the object moves as far as the awake control (8.4–9.8 mm), with no kick.
+
+**A/B.**
+- **Setup.** N 4 at the int2 indices, trunk_7cdf1691, svl titanrtx, v2maps_int2 v2only, an empty cache per alias x arm.
+  - Tags `sleep_off` / `sleep_on`. Record `$OFH/sleep_20261109`: `tab_i_final.txt`, `mine.py` / `tab.py`, `mine_tab_final.txt`.
+- **Totals.** off 129 / 19 / 15 at 0.619 GPU-h per ok, on 128 / 19 / 14 at 0.655.
+  - touching_02 48/4/4 both; touching_04 23/4/3 both; under_large_03 39/3/1 both; attachment_02 7/4/4 both.
+  - under_large_01 12/4/3 vs 11/4/2. Its 360003 is a different instance in each arm: the samplers diverged at attempt 1 on a
+    timing-dependent rejection. The on-arm failure there was a base collision with a desk during navigate.
+  - The other 18 demos have the same outcome per index.
+- **Where the switch acted.** 84 PhysX-wake and 9 assist-wake restarts. Assist sleeps fell from 3.9 to 0.7 per demo. PhysX's own sleep (about
+  12 steps at 0.005) now comes first after a wake.
+- **Drift.** Resting free objects, both hands > 0.20 m, 30 settle steps excluded: max 0.42 vs 0.40 mm, none over 1 mm in either arm.
+  Tail max 0.000 vs 0.006 mm. Unexplained jumps 0 / 0.
+- **Kick rate (5w.3 definition).** 0 / 27 vs 0 / 4 first motions.
+
+**Decision: keep today's rule; the default is NOT flipped.**
+- The scripted criterion fails at 0.1 mm/step. Yield and GPU-h are equal per paired instance. Drift and kicks are equal.
+- The open fix for the slowest case is the other proposal: count a slow hand inside the wake radius as "near". That needs the owner.
+- Physics freeze: `tmp/outputs/physics_freeze_20261109.md`, with every physics setting and switch of the final collection.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

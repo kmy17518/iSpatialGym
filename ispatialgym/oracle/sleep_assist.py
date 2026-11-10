@@ -28,6 +28,19 @@ SLEEP_ASSIST_MODE = "sleep"
 SLEEP_ASSIST_MAX_KG = 5.0
 SLEEP_ASSIST_WAKE_M = 0.05
 
+#: i7-sleep (owner 2026-11-09 A8b): "1" restarts an object's rest window whenever it wakes - PhysX's own wake (a contact, a joint, a
+#: teleport: asleep at the last control step, awake now) and the assist's proactive wake. Default "0" = today's rule: the window keeps
+#: the still poses of the asleep span, so a body PhysX woke under a hand slower than 0.3 mm / step is re-slept at once and stays asleep
+#: while pressed (5w.3(b) probe: 73-124 steps at 1.6-15 N). One class for run_isg (demos), run_isg_vec (replay, policy eval) and the
+#: offline validators: every one of them reads the same switch.
+RESTART_ON_WAKE_ENV = "ISPATIALGYM_SLEEP_ASSIST_RESTART_ON_WAKE"
+RESTART_ON_WAKE_DEFAULT = "0"
+
+
+def restart_on_wake() -> bool:
+    """:data:`RESTART_ON_WAKE_ENV` is "1" (default :data:`RESTART_ON_WAKE_DEFAULT`)."""
+    return (os.environ.get(RESTART_ON_WAKE_ENV) or RESTART_ON_WAKE_DEFAULT).strip() == "1"
+
 
 def add_arguments(g) -> None:
     """The rigid-body / sleep-assist flags of both drivers on the argparse group (or parser) ``g``."""
@@ -217,6 +230,11 @@ class SleepAssist:
         self.mode = sleep_assist_mode()
         self.wake_m = sleep_assist_wake_radius()
         self.max_kg = sleep_assist_max_mass()
+        #: RESTART_ON_WAKE (i7-sleep): the window restarts on every wake; per object the steps of PhysX's wakes and the assist's wakes
+        #: that restarted it, and the last control step's asleep flag (a PhysX wake = asleep then, awake now)
+        self.restart_on_wake = restart_on_wake()
+        self.was_asleep: Dict[str, bool] = {}
+        self.restarts: Dict[str, Dict[str, List[int]]] = {"physx": {}, "assist": {}}
         self.eef_prev: Dict[str, Any] = {}
         self.eef_speed: Dict[str, float] = {}
         self.slept: Dict[str, bool] = {}
@@ -283,12 +301,13 @@ class SleepAssist:
         rest window restarts and the end effectors' speeds are measured anew. An object the assist put to sleep at or before ``step`` and
         did not wake since is still the assist's to wake when a gripper approaches."""
         step = int(step)
-        for events in (self.sleeps, self.wakes):
+        for events in (self.sleeps, self.wakes, self.restarts["physx"], self.restarts["assist"]):
             for inst in list(events):
                 events[inst] = [s for s in events[inst] if s <= step]
                 if not events[inst]:
                     del events[inst]
         self.hist.clear()
+        self.was_asleep.clear()
         self.eef_prev.clear()
         self.eef_speed.clear()
         self.slept = {inst: True for inst, s in self.sleeps.items() if self.mode == "sleep" and s[-1] > max(self.wakes.get(inst) or [-1])}
@@ -300,6 +319,10 @@ class SleepAssist:
                "wake_radius_m": self.wake_m, "max_mass_kg": self.max_kg, "wakes": {k: v[:50] for k, v in self.wakes.items()},
                "sleeps" if self.mode == "sleep" else "clamp_run_steps": {k: v[:50] for k, v in self.sleeps.items()},
                "clamped_steps": dict(self.clamped), "free_objects": [k for k, v in self.free.items() if v]}
+        if self.restart_on_wake:  # the switch's record only when it is on (off: the report as before)
+            out["restart_on_wake"] = True
+            out["wake_restarts"] = {k: {i: v[:50] for i, v in d.items()} for k, d in self.restarts.items()}
+            out["wake_restarts_n"] = {k: sum(len(v) for v in d.values()) for k, d in self.restarts.items()}
         if self.rollbacks:
             out["rollbacks"] = self.rollbacks[:50]  # run_isg: the checkpoint steps the executor rolled back to (events after them trimmed)
         if self.n_steps:
@@ -368,6 +391,13 @@ class SleepAssist:
             except Exception:  # noqa: BLE001
                 asleep = False
             lap("asleep")
+            if self.restart_on_wake:
+                if self.was_asleep.get(inst) and not asleep:
+                    # PhysX woke it since the last control step: the rest window restarts at this pose (the asleep span's still poses
+                    # are not a rest of the awake body; today they let the assist re-sleep it at once)
+                    del hist[:-1]
+                    self.restarts["physx"].setdefault(inst, []).append(step)
+                self.was_asleep[inst] = bool(asleep)
             # proactive wake: a gripper approaching a slept object wakes it before the contact (sleep mode). The box test runs only
             # where its answer decides something: an object the assist slept (here), an object about to be slept (below)
             sleep_mode = self.mode == "sleep" and self.wake_m > 0
@@ -379,6 +409,10 @@ class SleepAssist:
                         obj.wake()
                         self.slept[inst] = False
                         self.wakes.setdefault(inst, []).append(step)
+                        if self.restart_on_wake:  # the assist's own wake restarts the window too
+                            del hist[:-1]
+                            self.was_asleep[inst] = False
+                            self.restarts["assist"].setdefault(inst, []).append(step)
                         if len(self.wakes[inst]) <= 3:
                             print(f"SLEEP_ASSIST {self.name} step {step}: {inst} woken (a moving gripper {dmin * 100:.1f} cm from its box, radius {self.wake_m * 100:.0f} cm)", flush=True)
                     except Exception as ex:  # noqa: BLE001
@@ -463,6 +497,8 @@ class SleepAssist:
                 if self.mode == "sleep":
                     obj.sleep()
                     self.slept[inst] = True
+                    if self.restart_on_wake:  # asleep from now: an awake reading at the next step is PhysX's wake
+                        self.was_asleep[inst] = True
                     self.sleeps.setdefault(inst, []).append(step)
                     if len(self.sleeps[inst]) <= 3:
                         print(f"SLEEP_ASSIST {self.name} step {step}: {inst} put to sleep (net motion over {W} steps {dp * 1000:.2f} mm / {dq * 1000:.2f} mrad)", flush=True)
