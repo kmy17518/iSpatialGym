@@ -6614,6 +6614,16 @@ run's first attempt failed `[place_unreachable]` (joint limit at the goal check)
 the success measure are unchanged; every plate in (b) rests 7-12 deg tilted on the basin walls, within the rule. No defaults flipped (no new
 behaviour: customs, an interior spec, a v2 library entry and maps only).
 
+### r4: the far-side arm and the hand-hull fallback for the 15 deg rest (owner item 3, 2026-11-10)
+
+- **`ISPATIALGYM_SHELF_OTHER_ARM` (321981ab, default off):** with the board draw, the arm is drawn among the near and the far one where the
+  far arm's interior map serves; every check and the place / retreat records follow the drawn arm; no rule changed. kmuacd drawn, 2 seeds:
+  off 274 / 6 / 6 (0.21-0.23 GPU-h per ok), on 517 / 4 / 4 (0.57-0.68). Right board: 0 writes with either arm; the left arm on the right
+  board (260 attempts) fails at the start cell, the pre-grasp IK, the 1.6 rad transit rule (1.63-4.12 rad) and joint limits.
+- **`ISPATIALGYM_WITNESS_HULL_FALLBACK` on the left board with lean_left_15 (3 seeds):** off 165 / 12 / 12 (0.092 per ok), on 165 / 12 / 12
+  (0.098); the fallback passes 169 hand judgements and moves ~14 lean_left_15 attempts past the grasp, which then fail the tip release's
+  place (descent IK, joint 2 at its limit); lean_left_15 still writes 0. Not a default (the owner's call).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
