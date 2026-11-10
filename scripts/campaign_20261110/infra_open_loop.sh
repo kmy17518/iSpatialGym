@@ -14,6 +14,13 @@ export KIT_TEX_STORE="$ISGF_ROOT/kit_textures"
 export ISGF_JB_NFS="$ISGF_ROOT/jobs/replay"
 export ISGF_EXP_PATH="$ISGF_ROOT/isaacsim_overlay/apps"
 export EXP_PATH="$ISGF_EXP_PATH"
+if [ "${ISGF_REPLAY_BACKEND:-}" = vast ]; then
+    # Same image-native app selection and exact-key private warm caches used by
+    # validated Vast collection. Cluster account overlays are not transported.
+    export KIT_TPL_NFS_ROOT=/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/kit_templates
+    export KIT_TEX_STORE=/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/kit_textures
+    unset ISGF_EXP_PATH EXP_PATH
+fi
 source "$SNAPSHOT/scripts/trainfast/env_fast.sh"
 set -a
 source <(grep -E '^(ISPATIALGYM|ISG)_[A-Z0-9_]*=' "$JOBDIR/job.env")

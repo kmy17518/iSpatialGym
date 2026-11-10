@@ -31,6 +31,7 @@ import tarfile
 import time
 import uuid
 from collections import Counter
+from pathlib import Path
 
 import boto3
 import botocore
@@ -84,6 +85,7 @@ STORES = ("/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/reach_band
 #: job.env keys that are not inputs of job_fast.sh (or are shipped otherwise)
 SKIP_KEYS = {"ISGE_CODE", "ISGF_SCRIPTS", "ISGF_ROOT", "COUNTED_RUN", "COUNTED_SNAPSHOT", "ISGF_PREDEMO_ROOT", "ISGF_SAMPLING_CACHE",
              "ISGF_ASSET_CACHE", "ISGF_JB_NFS", "KIT_TPL_NFS_ROOT", "KIT_TEX_STORE", "ISGF_EXP_PATH", "EXP_PATH",
+             "ISGF_REPLAY_SOURCE_JOB", "ISGF_REPLAY_SOURCE_SNAPSHOT", "ISGF_REPLAY_HELPER_SNAPSHOT",
              "ISPATIALGYM_SAMPLING_CACHE", "ISPATIALGYM_CACHE_DIR", "ISPATIALGYM_HELD_HOLD_CACHE"}
 PATH_MAX_BYTES = 3 * 2**30
 DEFAULT_CONFIG = {"gpus": ["RTX 4090"], "default_gpu": "RTX 4090", "max_instances": 1, "budget_usd": 300.0, "max_dph_gpu": 1.5,
@@ -304,13 +306,19 @@ def stage(s3, rec, state):
     index's instances, the prebuild candidates, camera relocalization's earlier train instances) and the code archives. -> spec."""
     jd = rec["job_dir"]
     env = read_env(jd)
-    if env.get("ISGF_JB_NFS", "").startswith(SY) or env.get("ISPATIALGYM_FAST_BAND_SHARE", "0") == "1":
-        raise RuntimeError("shiyuc-mode / band-sharing jobs stay on the cluster")
-    prepare_environment(jd, OFH)
-    prepare_cache_environment(jd, OFH)
-    prepare_queue(jd, env, OFH)
-    env = read_env(jd)
-    pool_inputs = prepare_pools(jd, env, OFH)
+    replay = rec.get('job_kind') == 'physics_replay'
+    if replay:
+        # Replay transports immutable source artifacts, not a fresh sampler
+        # queue. The dedicated wrapper sets private image-native caches.
+        pool_inputs = []
+    else:
+        if env.get("ISGF_JB_NFS", "").startswith(SY) or env.get("ISPATIALGYM_FAST_BAND_SHARE", "0") == "1":
+            raise RuntimeError("shiyuc-mode / band-sharing jobs stay on the cluster")
+        prepare_environment(jd, OFH)
+        prepare_cache_environment(jd, OFH)
+        prepare_queue(jd, env, OFH)
+        env = read_env(jd)
+        pool_inputs = prepare_pools(jd, env, OFH)
     code = os.path.abspath(env["ISGE_CODE"])
     b1k = os.path.dirname(os.path.realpath(os.path.join(code, "Behavior-1K", "OmniGibson")))
     # tools the job scripts call that the image lacks (rsync: kit_appdata.sh, job_fast.sh's collector app-data copies and prebuild dir)
@@ -320,6 +328,13 @@ def stage(s3, rec, state):
     shipped = [code, b1k] + list(STORES) + list(CACHES) + list(NOT_SHIPPED)
     L = Lister(shipped)
     L.add_tree(jd)
+    if replay:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+        from scripts.campaign_20261110.vast_replay import transport_inputs, sha as replay_sha
+        if replay_sha(Path(jd)/'replay_inputs.json') != rec.get('replay_inputs_sha256'):
+            raise ValueError('replay transport manifest changed after enqueue')
+        for path in transport_inputs(jd, OFH):
+            L.add_tree(path, skip_runs=True)
     for path in pool_inputs:
         L.add_file(path)
     scripts = env.get("ISGF_SCRIPTS") or os.path.join(F, "scripts")
@@ -836,7 +851,10 @@ def tick(c, s3, state):
             attempt_evidence = retain_attempt(os.path.join(VJ,'state','attempts'),s,d)
             # a job that made no sampling attempt at all (inputs failed, Kit died at its first frame, ...) runs once more on another
             # instance before its result counts; the instance is kept (a code error fails everywhere: the second result is synced)
-            host_fail = (not d.get("attempts")) and not s.get("zero_retried") and s["tries"] < C["retries"]
+            # Replay has no sampling-attempt denominator. Its genuine native
+            # gate (including a failed replay) must be synced without guessing
+            # that a missing sampler counter means a launch failure.
+            host_fail = (s.get('job_kind') != 'physics_replay' and not d.get("attempts")) and not s.get("zero_retried") and s["tries"] < C["retries"]
             if host_fail:
                 s["history"].append({"instance": s.get("instance"), "rc": d.get("rc"), "error": d.get("error"), "time": t, "zero_attempts": True,
                                      'attempt_evidence':attempt_evidence,'assigned_unix':s.get('assigned'),'done':d})
