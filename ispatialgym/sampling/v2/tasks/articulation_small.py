@@ -67,13 +67,18 @@ ATTEMPT_BUDGET_S = 300.0  # per instance attempt (brace search over the manipula
 PAIR_ORDER_STREAM = 0xA5A1
 
 
-def draw_angles_on() -> bool:
+def draw_angles_on(s: Any = None) -> bool:
     """i7-artsmall (owner 2026-11-09, "draw both joint angles per attempt, as articulation_large does"): ``ISPATIALGYM_ARTSMALL_DRAW_ANGLES=1``
     makes each attempt draw its (q_init, q_goal) uniformly over the stable set S - open: closed -> s, close: s -> closed - instead of the
     template's one pair (open: ``default_rng(base_seed).choice(S)``; push-close: ``close_init_fraction`` of the range, the owner's 2026-09-19
     22:59 start, which this replaces for the drawn start; free close: min(S)). Every value the template computed from its pair is per pair:
     the required waypoints / ``passive_from`` (probed once per pair in the template), H_max / w_a at q_init, the band (the prefix map of the
-    pair's q_start / travel) and the start search (rerun per attempt for the drawn pair). Default off = the template's pair."""
+    pair's q_start / travel) and the start search (rerun per attempt for the drawn pair). Default off = the template's pair.
+    Per alias: the customs ``generation.draw_angles`` (true / false) of sampler ``s`` wins over the switch (a scoped default)."""
+    if s is not None:
+        v = s.gen("draw_angles", None)
+        if v is not None:
+            return bool(v)
     return os.environ.get("ISPATIALGYM_ARTSMALL_DRAW_ANGLES", "0") == "1"
 
 
@@ -503,7 +508,7 @@ class ArticulationSmall(SamplerV2):
             # limit: the hinged jar's stable set was {2.618} in the 22:26 / 23:14 runs; the facing rule turns the hinge toward
             # the robot for close so that the open lid's handle is on the robot's side, see _facing_local)
             self.q_init, self.q_goal = float(min(self.stable)), self.lower
-        if draw_angles_on():
+        if draw_angles_on(self):
             self._template_with_drawn_angles(target)  # i7-artsmall: (q_init, q_goal) per attempt from the per-pair template work
             return
         self.required, self.passive_from = self._required_waypoints(target)

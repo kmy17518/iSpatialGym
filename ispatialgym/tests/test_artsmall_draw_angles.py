@@ -25,6 +25,13 @@ def test_switch_default_off(monkeypatch):
     assert not AS.draw_angles_on()
     monkeypatch.setenv("ISPATIALGYM_ARTSMALL_DRAW_ANGLES", "1")
     assert AS.draw_angles_on()
+    # the customs generation.draw_angles of an alias wins over the switch
+    off_alias = type("S", (), {"gen": lambda self, k, d=None: False if k == "draw_angles" else d})()
+    plain = type("S", (), {"gen": lambda self, k, d=None: d})()
+    assert not AS.draw_angles_on(off_alias) and AS.draw_angles_on(plain)
+    monkeypatch.setenv("ISPATIALGYM_ARTSMALL_DRAW_ANGLES", "0")
+    on_alias = type("S", (), {"gen": lambda self, k, d=None: True if k == "draw_angles" else d})()
+    assert AS.draw_angles_on(on_alias) and not AS.draw_angles_on(plain)
 
 
 def test_angle_pairs():
