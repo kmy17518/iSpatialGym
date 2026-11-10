@@ -951,6 +951,8 @@ def connect(s, init: Stance, manip: Stance, path_max_m: float = PATH_MAX_M, carr
                                                     bx, by, yaw) for tr, ti in sweep])
                 if not bool(s.kit.collision_free(qs, margin=COLLISION_MARGIN).all()):
                     why.append(f"s_T {s_T:.2f}: trunk sweep collides")
+                    if os.environ.get("ISPATIALGYM_SHELF_DRAW_DIAG", "") == "1" and callable(getattr(s, "shelf_sweep_diag", None)):
+                        s.shelf_sweep_diag(qs, (bx, by, yaw), s_T, manip)  # i7-t03both: log only
                     continue
             if back > 0:  # (b) the drive-in s_T → s at the arriving trunk and arms
                 drive = NAV.stride_poses([(bx, by, yaw), (x0, y0, yaw)], NAV.STRIDE_M)
@@ -981,6 +983,8 @@ def connect(s, init: Stance, manip: Stance, path_max_m: float = PATH_MAX_M, carr
         except NAV.NavigationError as e:
             why.append(f"s_T {s_T:.2f}: {e.reason}")
             path_err = e
+            if os.environ.get("ISPATIALGYM_SHELF_DRAW_DIAG", "") == "1" and callable(getattr(s, "shelf_path_diag", None)):
+                s.shelf_path_diag(init, back_stance, s_T, str(e))  # i7-t03both: log only
             continue
         s.sidecar.add_path(path)
         tr = Transition(init.name, manip.name, s_T, trunk_from=tf, trunk_to=tt, n_samples=0 if same_trunk else NAV.TRANSITION_SAMPLES)

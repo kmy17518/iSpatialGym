@@ -582,6 +582,8 @@ def grasp_at_pose(s, manip: Stance, pose: Pose, grasps: Sequence[Any], ignore_fo
             reasons.append(f"{getattr(g, 'name', '?')}: {why}"[:160])
             continue
         return rec
+    if os.environ.get("ISPATIALGYM_SHELF_DRAW_DIAG", "") == "1" and callable(getattr(s, "shelf_grasp_diag", None)):
+        s.shelf_grasp_diag(manip, pose, grasps, arm, reasons, exact_kw)  # i7-t03both: log only
     _reject("grasp_unreachable", f"no library grasp reaches the fixed start pose from {manip.name}: {reasons[:4]}")
 
 
