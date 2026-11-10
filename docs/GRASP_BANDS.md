@@ -6160,6 +6160,43 @@ cost gap between int2_14 and fp_def therefore comes from the per-attempt start d
 from the v2 root (the briefcase glib and maps are byte-identical) or from other code. The demo failures (not_reached, pause, plan_failed,
 symbolic_only, arm_stutter) are the briefcase's own push problem (#72, owner).
 
+## The eval-measure change: the lying briefcase and free yaw for round objects (branch `i7-measure`, owner A2 + A4, 2026-11-09)
+
+The owner decided two success-measure changes on 2026-11-09 (`tmp/outputs/owner_review_20261109.md` A2 option (b), A4) and asked for them
+to ship together, so that scores change once. Both are behind switches that are default OFF, and **they are flipped together in one
+commit** (the eval-measure commit). The success measure is the one the demo QA, replay and policy eval all read (`pose_reached` through
+`eval.tro.apply_targets_to_scope`).
+
+**A2: `ISPATIALGYM_BRIEFCASE_LYING` (iors_large).** under_large_02's briefcase (lwbctq) stands on its 0.12 x 0.33 edge, 0.27 m tall. In the
+floor push its yaw grows within a stroke, the hand meets the end face's corner and it topples (84-93 deg; DECISIONS #60 / #72), so 1 demo
+in 4 is kept. The switch acts only where the customs set `generation.push_under_goal_rest = "lying"` (under_large_02's
+`...briefcase-desk_mdhelw_0-floor_pitched` alone) and the push is the pitched hand's. There it builds the three parts the owner named:
+- **the 90 deg tilt in the hand**: at stance C the carried object is turned onto its largest face (`lying_rest`: the thinnest object axis
+  to the vertical). The F_goal screen at the drop cell, the attached drop IK, the carry leg tracked to the tilted pre-place, the push chain
+  and the drop record all use `IORSLarge.c_quat`. The pick at B is unchanged: the briefcase still starts standing;
+- **the lying goal orientation**: `summary.goal_quat`, which becomes the TRO pose target, is the lying orientation at the carried yaw
+  (`summary.goal_rest = "lying"`). The task therefore asks for the briefcase lying flat under the desk;
+- **the contact rule of the pitched hand**: lying, the centre of mass is 0.06 m up and the fingertips 0.08 m, so today's rule (the leading
+  edge below the centre of mass) refuses every turn. The lying rule (`push_contact_cap`) keeps the edge on the back face (2 cm below the
+  top) and below the no-tip bound 0.75 x (centre of mass to the front bottom edge along the push) / 0.8. For the lying briefcase the back
+  face binds (0.10 m).
+
+Kit counters: `briefcase_lying.rest` / `.release` / `.contact_cap` / `.coupled`.
+
+**A4: `ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC` (eval.round_symmetry).** The measure gated a round object's yaw: under_large_03's trash can
+(trash_can/jlawet) ended `symbolic_only` after turning 0.22 rad in the push. The QA's `placed_orientation` already called that yaw free, but
+through its push-under rule (any pushed object, round or not), not through a symmetry notion. Its only symmetry notion is the cylinder table
+`assets/icl/revolution_axes.json` (the ICL symmetry survey's body-of-revolution tags about the long axis), and that table lacks the can
+(0.28 x 0.28 x 0.28: no long axis). One notion now serves both, and both read it only with the switch on:
+- the table `assets/icl/round_axes.json` (`scripts/symmetry/revolution_axes.py --rule round`): the same survey tags and lists without the
+  long-axis rule. It has 433 models: the 253 cylinders with the same axes, plus round cans, plates, bowls, lids, caps and the like;
+- the measure: a pose target whose object is in the table gets the continuous rotation about that axis added to its
+  `orientation_equivalences`. This is the survey's own enumeration, 72 rotations at 5 deg, so a pure turn leaves at most 0.044 rad. It is
+  composed with the target's recorded equivalences. The TRO file is not changed;
+- the QA: `Executor.revolution_axis_of` reads the same table.
+
+Kit counts `round_symmetry.COUNTS`; `meta.success_yaw_free` per demo.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
