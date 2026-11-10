@@ -27,6 +27,29 @@ def test_added_support_is_blocked_after_freed_chair_cells(monkeypatch):
     assert calls==["free","block"]
 
 
+def test_added_context_list_blocks_every_verified_identity(monkeypatch):
+    calls=[]
+    monkeypatch.setattr(SV,"_campaign_support_footprints",lambda scene,row:row)
+    monkeypatch.setattr(SV,"block_trav_map",lambda scene,row:calls.append(row["name"]) or 3)
+    meta={"campaign_added_support":{"name":"table"},"campaign_added_context_objects":[{"name":"armchair"},{"name":"footstool"}]}
+    assert SV.block_campaign_context(None,meta)==9
+    assert calls==["table","armchair","footstool"]
+
+
+@pytest.mark.parametrize("extra",[{"name":"not_a_list"},["not_an_identity"],[{"name":"table"}]])
+def test_invalid_context_list_fails_before_map_mutation(monkeypatch,extra):
+    monkeypatch.setattr(SV,"block_trav_map",lambda *_:pytest.fail("bad context reached map mutation"))
+    with pytest.raises(ValueError):
+        SV.block_campaign_context(None,{"campaign_added_support":{"name":"table"},"campaign_added_context_objects":extra})
+
+
+def test_later_invalid_identity_does_not_partially_mutate_map(monkeypatch):
+    scene,metadata=fixture()
+    monkeypatch.setattr(SV,"block_trav_map",lambda *_:pytest.fail("map mutated before every identity was checked"))
+    with pytest.raises(ValueError):
+        SV.block_campaign_context(scene,{"campaign_added_support":metadata,"campaign_added_context_objects":[{**metadata,"name":"absent"}]})
+
+
 @pytest.mark.parametrize("change",["missing_object","wrong_model","wrong_scale","undersized_footprint","oversized_footprint","crossed_footprint","nonfinite"])
 def test_invalid_support_metadata_cannot_silently_change_map(monkeypatch,change):
     scene,metadata=fixture()

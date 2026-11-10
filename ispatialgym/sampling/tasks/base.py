@@ -180,8 +180,9 @@ class TaskSampler:
                "freed_footprints": sv.get("freed_footprints")}
         if sv.get("moved_objects"):
             out["moved_objects"] = sv["moved_objects"]
-        if sv.get("campaign_added_support"):
-            out["campaign_added_support"] = sv["campaign_added_support"]
+        for key in ("campaign_added_support", "campaign_added_context_objects"):
+            if sv.get(key):
+                out[key] = sv[key]
         return out
 
     def init_arms(self) -> str:

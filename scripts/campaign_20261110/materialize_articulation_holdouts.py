@@ -13,6 +13,7 @@ B1K=Path('/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600')
 sys.path[:0]=[str(ROOT),str(B1K/'bddl3')]
 from contracts import ObjectRef,Template,digest
 from readiness_catalog import ReadinessCatalog
+from ispatialgym.grasping.artic_motions import motion_kind
 from ispatialgym.sampling.bddl_from_iddl import RoleGrounding,render
 from ispatialgym.sampling.iddl import parse_file
 from ispatialgym.sampling.knowledge import synset_of_category
@@ -25,10 +26,18 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for arg in ('defaults','visual-review','reservations','reserved-asset-hashes','out'):p.add_argument('--'+arg,type=Path,required=True)
+    p.add_argument('--measurement-reservations',type=Path)
+    p.add_argument('--classes',nargs='+')
     a=p.parse_args()
     if a.out.exists():raise ValueError('new immutable output required')
     inv=ROOT/'tmp/campaign_20261110/inventory';policy=json.loads(a.reservations.read_text());hashes=json.loads(a.reserved_asset_hashes.read_text());doc=json.loads(a.defaults.read_text());review=json.loads(a.visual_review.read_text())
-    if hashes['reservation_sha256']!=sha(a.reservations) or doc['reservation_sha256']!=sha(a.reservations) or doc['status']!='native_defaults_and_geometry_recorded':raise ValueError('measured defaults/policy mismatch')
+    measurement_policy=a.measurement_reservations or a.reservations
+    if hashes['reservation_sha256']!=sha(a.reservations) or doc['reservation_sha256']!=sha(measurement_policy) or doc['status']!='native_defaults_and_geometry_recorded':raise ValueError('measured defaults/policy mismatch')
+    previous=json.loads(measurement_policy.read_text())
+    for field in ('model_holdout_models','category_holdout_models','train_exclude_models'):
+        if not set(previous[field])<=set(policy[field]):raise ValueError('measurement policy is not an ancestor')
+    for field in ('category_holdout_categories','category_holdout_rooms','train_exclude_categories'):
+        if previous[field]!=policy[field]:raise ValueError('category/room policy changed since measurement')
     if review['default_geometry_sha256']!=sha(a.defaults):raise ValueError('visual evidence mismatch')
     measured={r['category']+'/'+r['model']:r for r in doc['objects']};records={r['key']:r for r in json.loads((inv/'cluster_templates_with_scales.json').read_text())['records']};source=inv/'frozen_customs_f24ea424.json';originals=json.loads(source.read_text())
     readiness=ReadinessCatalog(B1K/'bddl3/bddl/generated_data');definitions={};jobs=[];templates=[];requests=[];blocked=[];a.out.mkdir(parents=True)
@@ -36,8 +45,9 @@ def main():
     for proposal in policy['model_holdout_templates']:
         if 'articulation' not in proposal['task']:continue
         cls,task=proposal['class_id'],proposal['task'];chosen=next(x for x in proposal['roles'] if x['role']=='target');key=chosen['category']+'/'+chosen['model'];row=measured.get(key)
+        if a.classes and cls not in a.classes:continue
         if row is None or review['objects'][key]['status']!='passed':blocked.append({'class_id':cls,'model_key':key,'reason':'model default geometry/review blocked'});continue
-        category,model=row['category'],row['model'];joint=selected_joint[category]
+        category,model=row['category'],row['model'];joint=chosen.get('native_joint') or selected_joint[category]
         if joint not in row['joints'] or row['joints'][joint]['lower_limit']>=row['joints'][joint]['upper_limit']:raise ValueError('selected native joint invalid')
         large='large_scale' in task;entry=copy.deepcopy(originals[records[cls]['row']['alias']]);iddl=parse_file(str(ROOT/'ispatialgym/assets/iddl'/entry['iddl']))
         scene,room=(row['scene'],row['room']) if large else ('Rs_int','living_room_0')
@@ -45,6 +55,13 @@ def main():
         name=row['scene_default_scale_source']['object'] if large else None;role_key=scene+'/'+name if large else key
         spec=entry['roles']['target'];spec.update(joint={role_key:joint},handle_key={role_key:category+'__'+model});spec.pop('handle_row',None)
         if not large:spec.update(representative=model,dataset='behavior-1k-assets',scale={key:row['default_scale']})
+        if not large:entry['roles']['support']['category']='breakfast_table'
+        # The compact replacement carton has one hinge. The two-flap source's
+        # preparatory joint and drives refer to absent cdmmwy-specific joints.
+        # Use the established one-hinge opening program with unchanged tolerances.
+        if category=='carton' and '_open_' in task and len(row['joints'])==1:
+            source_class='configuration_matching-articulation_open_small_scale_01'
+            entry['generation']=copy.deepcopy(originals[records[source_class]['row']['alias']]['generation'])
         bindings={'floor':{'room':room}};whitelist={}
         if large:bindings['target']=[name]
         else:
@@ -56,7 +73,8 @@ def main():
             if k.startswith('_') or k=='remove_objects':entry['generation'].pop(k)
         entry['generation'].update(templates_max=1,instances_per_template=1)
         entry['roles']={r:entry['roles'][r] for r in iddl.roles if r in entry['roles']}|{r:s for r,s in entry['roles'].items() if r not in iddl.roles}
-        alias=records[cls]['row']['alias'];did=27000+len(definitions);entry['definition_id']=did;groundings={}
+        alias=records[cls]['row']['alias'] if large else iddl.variant_template.format(target=category,support='breakfast_table')
+        did=27000+len(definitions);entry['definition_id']=did;groundings={}
         for role in iddl.roles:
             if role=='floor':groundings[role]=RoleGrounding(role,'scene',same_as='floor')
             else:
@@ -76,8 +94,9 @@ def main():
         entry['campaign_provenance']={'reservation_sha256':sha(a.reservations),'native_defaults_sha256':sha(a.defaults),'visual_review_sha256':sha(a.visual_review),'source_customs_sha256':sha(source),'native_scene_sha256':sha(sp),'status':'candidate_only'};definitions[alias]=entry
         template=Template(template_id='held_model__'+cls,task=task,class_id=cls,split='eval_model',scene=scene,room=room,objects=tuple(refs),definition_sha256=digest({'entry':entry,'bddl_sha256':sha(bddl)}),scene_setup={'task_rooms':[room],'inst_to_name':names,'runtime_bddl_sha256':sha(bddl),'customs_alias':alias,'native_scene_sha256':sha(sp),'native_joint':row['joints'][joint],'release_status':'candidate_only','fresh_metadata_binding_check':'required','fresh_demo':'pending','fresh_replay':'pending','perturbations':False})
         templates.append({**asdict(template),'fingerprint':template.fingerprint})
-        jobs.append({'candidate_id':template.template_id,'class_id':cls,'task':task,'alias':alias,'scene':scene,'room':room,'split':'eval_model','template_fingerprint':template.fingerprint,'production_released':False,'status':'requires_exact_native_handle_motion_and_prefix_maps','sample_argv':['python','-m','ispatialgym.sampling.sample_isg','--variant',alias,'--customs','${MATERIALIZED}/candidate_customs.json','--bddl-root','${MATERIALIZED}/bddl','--scene',scene,'--templates','1','--instances-per-template','1','--max-attempts','3','--seed','20261110','--no-write-back','--out','${CAMPAIGN_OUT}/validation/'+cls]})
-        requests.append({'class_id':cls,'category':category,'model':model,'scale':row['default_scale'],'asset_sha256':row['asset_sha256'],'joint':joint,'native_joint':row['joints'][joint],'handle_key':category+'__'+model,'scene':scene,'room':room,'scene_object':name,'scene_root_state':state['state']['registry']['object_registry'][name]['root_link'] if large else None,'support_height_key':None if large else '0.7588','operation':'pull_open' if '_open_' in task else 'push_close','direction':'open' if '_open_' in task else 'close','generation':entry['generation'],'status':'dependency_request_not_validated'})
+        jobs.append({'candidate_id':template.template_id,'class_id':cls,'task':task,'alias':alias,'scene':scene,'room':room,'split':'eval_model','template_fingerprint':template.fingerprint,'production_released':False,'status':'requires_native_scene_handle_geometry' if large else 'requires_exact_native_handle_motion_and_prefix_maps','sample_argv':['python','-m','ispatialgym.sampling.sample_isg','--variant',alias,'--customs','${MATERIALIZED}/candidate_customs.json','--bddl-root','${MATERIALIZED}/bddl','--scene',scene,'--templates','1','--instances-per-template','1','--max-attempts','3','--seed','20261110','--no-write-back','--out','${CAMPAIGN_OUT}/validation/'+cls]})
+        direction='open' if '_open_' in task else 'close'
+        requests.append({'class_id':cls,'alias':alias,'category':category,'model':model,'scale':row['default_scale'],'asset_sha256':row['asset_sha256'],'joint':joint,'native_joint':row['joints'][joint],'handle_key':category+'__'+model,'scene':scene,'room':room,'scene_object':name,'scene_root_state':state['state']['registry']['object_registry'][name]['root_link'] if large else None,'support_height_key':None if large else '0.7588','operation':None if large else motion_kind(entry['generation'],direction),'pipeline':'scene_handle_kinematics' if large else 'small_articulation_motion_prefix','direction':direction,'generation':entry['generation'],'status':'dependency_request_not_validated'})
     custom=a.out/'candidate_customs.json';custom.write_text(json.dumps(definitions,indent=2)+'\n')
     for job in jobs:
         gp=GroundedProblem.load(job['alias'],str(custom),str(a.out/'bddl'))

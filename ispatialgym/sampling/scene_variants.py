@@ -316,10 +316,23 @@ def patch_trav_map_from_meta(scene, template_meta: dict) -> int:
     freed = patch_trav_map(scene, fps) if fps else 0
     # A campaign-inserted support is fixed scene geometry. Include its footprint
     # in the template map before loaders snapshot that map for instance reuse.
-    added = sv.get("campaign_added_support")
-    if added:
-        block_campaign_support(scene, added)
+    block_campaign_context(scene, sv)
     return freed
+
+
+def block_campaign_context(scene, metadata: dict) -> int:
+    """Check and block the campaign support plus optional added context objects."""
+    rows = []
+    if metadata.get("campaign_added_support"):
+        rows.append(metadata["campaign_added_support"])
+    extra = metadata.get("campaign_added_context_objects", [])
+    if not isinstance(extra, list) or any(not isinstance(row, dict) for row in extra):
+        raise ValueError("campaign context objects must be a list of identity records")
+    rows.extend(extra)
+    if len({row.get("name") for row in rows}) != len(rows):
+        raise ValueError("campaign context object names must be unique")
+    footprints = [_campaign_support_footprints(scene, row) for row in rows]
+    return sum(block_trav_map(scene, fps) for fps in footprints)
 
 
 def block_campaign_support(scene, metadata: dict) -> int:
@@ -329,6 +342,11 @@ def block_campaign_support(scene, metadata: dict) -> int:
     sampler, scalar loader, vector loader, and validator use the same template
     patch entry point, so this static obstacle survives instance map resets.
     """
+    return block_trav_map(scene, _campaign_support_footprints(scene, metadata))
+
+
+def _campaign_support_footprints(scene, metadata: dict) -> dict:
+    """Validate all identity and footprint fields before mutating a map."""
     name = metadata.get("name")
     obj = scene.object_registry("name", name)
     if obj is None or metadata.get("model_key") != f"{obj.category}/{obj.model}":
@@ -354,7 +372,7 @@ def block_campaign_support(scene, metadata: dict) -> int:
     if any(bounds[k][0] > float(lo[k])+1e-5 or bounds[k][1] < float(hi[k])-1e-5 or
            float(lo[k])-bounds[k][0] > 0.1 or bounds[k][1]-float(hi[k]) > 0.1 for k in range(2)):
         raise ValueError("campaign support footprint does not bound its live geometry")
-    return block_trav_map(scene, fps)
+    return fps
 
 
 # ----------------------------------------------------------------------------------------------------------------

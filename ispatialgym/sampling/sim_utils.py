@@ -178,10 +178,11 @@ class SimWorld:
         self.stable_path = self.scene_variant.get("path") or stable_scene_path(scene_model)
         with open(self.stable_path) as f:
             self.stable_scene = json.load(f)
-        campaign_support = ((self.stable_scene.get("metadata") or {}).get("ispatialgym") or {}).get("campaign_added_support")
-        if campaign_support:
-            self.scene_variant = {**self.scene_variant, "path": self.stable_path,
-                                  "campaign_added_support": copy.deepcopy(campaign_support)}
+        campaign_meta = (self.stable_scene.get("metadata") or {}).get("ispatialgym") or {}
+        for key in ("campaign_added_support", "campaign_added_context_objects"):
+            if campaign_meta.get(key):
+                self.scene_variant = {**self.scene_variant, "path": self.stable_path,
+                                      key: copy.deepcopy(campaign_meta[key])}
         cfg = {
             "env": {"action_frequency": 30, "physics_frequency": 120},
             "scene": {
@@ -245,11 +246,11 @@ class SimWorld:
 
             n_freed = patch_trav_map(self.scene, self.scene_variant["freed_footprints"])
             log.info("traversability map patched for the scene variant: %d cells freed", n_freed)
-        if self.scene_variant.get("campaign_added_support"):
-            from ispatialgym.sampling.scene_variants import block_campaign_support
+        if self.scene_variant.get("campaign_added_support") or self.scene_variant.get("campaign_added_context_objects"):
+            from ispatialgym.sampling.scene_variants import block_campaign_context
 
-            n_blocked = block_campaign_support(self.scene, self.scene_variant["campaign_added_support"])
-            log.info("traversability map patched for campaign support: %d cells blocked", n_blocked)
+            n_blocked = block_campaign_context(self.scene, self.scene_variant)
+            log.info("traversability map patched for campaign context: %d cells blocked", n_blocked)
         #: the simulation state right after the environment's last rendering step: what the render side (Fabric transforms:
         #: ``aabb``, ``collision_boundary_points_world``, the collision-mesh poses cuRobo reads) keeps showing while only
         #: physics steps follow (``park_robot``'s five). A process that reuses this world for several independent
@@ -1324,8 +1325,9 @@ class SimWorld:
             scene_b = json.load(f)
         merged = merge_scene_files(copy.deepcopy(self.stable_scene), scene_b, keep_robot_from="b")
         variant_meta = (self.stable_scene.get("metadata") or {}).get("ispatialgym") or {}
-        if variant_meta.get("campaign_added_support"):
-            merged.setdefault("metadata", {}).setdefault("ispatialgym", {})["campaign_added_support"] = copy.deepcopy(variant_meta["campaign_added_support"])
+        for key in ("campaign_added_support", "campaign_added_context_objects"):
+            if variant_meta.get(key):
+                merged.setdefault("metadata", {}).setdefault("ispatialgym", {})[key] = copy.deepcopy(variant_meta[key])
         if variant_meta.get("moved_objects"):
             # the scene variant's objects parked outside the scene, each with its pose in the source scene file (owner 2026-10-11)
             isg = merged.setdefault("metadata", {}).setdefault("ispatialgym", {})
