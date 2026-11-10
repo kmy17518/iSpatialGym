@@ -10,6 +10,30 @@ import shutil
 QUEUE_ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
 
 
+def assignment_plan(queued, live, heartbeats, created, assigned_to, timestamp):
+    """Reserve each queued job once against compatible, ready worker slots."""
+    remaining = list(queued)
+    planned = []
+    for instance, worker in live.items():
+        heartbeat = heartbeats.get(instance) or {}
+        if heartbeat.get('phase') not in ('ready', 'run'):
+            continue
+        free = int(heartbeat.get('slots') or 0) - len(assigned_to.get(instance, []))
+        creation = created.get(instance) or {}
+        lifetime = float(creation.get('max_lifetime_s', 21600)) - (timestamp - float(creation.get('time', timestamp)))
+        for job in list(remaining):
+            if free <= 0:
+                break
+            if lifetime < float(job.get('time_s', 0)) + 900:
+                continue
+            if (job.get('gpu') and job['gpu'] != worker.get('gpu_name')) or job.get('avoid') == instance:
+                continue
+            planned.append((instance, worker, job))
+            remaining.remove(job)
+            free -= 1
+    return planned, remaining
+
+
 def dispatch_order(states, config):
     allowed = config.get("dispatch_job_ids")
     allowed = None if allowed is None else {str(jid) for jid in allowed}

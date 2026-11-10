@@ -17,6 +17,7 @@ with account variable name, instance, offer, machine, $/h); per-job rows $VJ/led
 """
 import argparse
 import configparser
+import concurrent.futures
 import glob
 import json
 
@@ -36,10 +37,10 @@ from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
-    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes
+    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan
     from .bounded_process import run_bounded
 except ImportError:
-    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes
+    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan
     from bounded_process import run_bounded
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -252,7 +253,7 @@ def ensure_code(s3, d, state):
     if key in state.setdefault("code", {}) or r2_exists(s3, key):
         state["code"][key] = True
         return key
-    lst = os.path.join(VJ, "bundle", f"code_{os.path.basename(d)}.txt")
+    lst = os.path.join(VJ, "bundle", f"code_{os.path.basename(d)}_{uuid.uuid4().hex[:12]}.txt")
     L = Lister([])
     for dd, dns, fns in os.walk(d):
         dns[:] = [x for x in dns if x not in ("__pycache__", ".pytest_cache")]
@@ -267,6 +268,7 @@ def ensure_code(s3, d, state):
     L.write(lst)
     t = now()
     tar_put(lst, key)
+    os.replace(lst, os.path.join(VJ, "bundle", f"code_{os.path.basename(d)}.txt"))
     log(f"CODE {key} ({len(L.items)} entries, {now() - t:.0f} s)")
     state["code"][key] = True
     return key
@@ -700,10 +702,11 @@ def rental_needs(queued, live, hbs, created, assigned_to, config, timestamp):
 
 def coordinator_progress(phase, **fields):
     path = os.path.join(VJ, "coordinator_progress.json")
-    with open(path + ".tmp", "w") as stream:
+    temporary = path + "." + uuid.uuid4().hex + ".tmp"
+    with open(temporary, "w") as stream:
         json.dump({"observed_at_unix": now(), "coordinator_job_id": os.environ.get("SLURM_JOB_ID"),
                    "phase": phase, **fields}, stream, indent=2)
-    os.replace(path + ".tmp", path)
+    os.replace(temporary, path)
 
 
 def stage_bounded(rec, C):
@@ -730,7 +733,7 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
                          "worker_phase":(hbs.get(iid) or {}).get('phase'),
                          "heartbeat_age_seconds":t-hbs[iid]['time'] if (hbs.get(iid) or {}).get('time') else None,
                          "assigned_jobs":assigned_to.get(iid,[])} for iid,i in live.items()]
-    metrics = {"observed_at_unix": t, "coordinator_phase": phase, "account_listing_complete": list_ok, "running_gpus": sum(int(i.get("num_gpus") or 1) for i in live.values() if i.get("actual_status") == "running") if list_ok else None,
+    metrics = {"observed_at_unix": t, "assignments_observed_at_unix": now(), "coordinator_phase": phase, "account_listing_complete": list_ok, "running_gpus": sum(int(i.get("num_gpus") or 1) for i in live.values() if i.get("actual_status") == "running") if list_ok else None,
                "instances": instance_metrics,
                "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='boot') if list_ok else None,
                "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] in ('ready','run')) if list_ok else None,
@@ -831,38 +834,30 @@ def tick(c, s3, state):
     for s in states.values():
         if s["status"] == "assigned":
             assigned_to.setdefault(s["instance"], []).append(s["id"])
-    for iid, i in live.items():
-        hb = hbs.get(iid) or {}
-        if hb.get("phase") not in ("ready", "run"):
-            continue
-        free = int(hb.get("slots") or 0) - len(assigned_to.get(iid, []))
-        gpu = i.get("gpu_name")
-        for s in list(queued):
-            if free <= 0:
-                break
-            remaining_life = float((created.get(iid) or {}).get("max_lifetime_s",21600)) - (t-float((created.get(iid) or {}).get("time",t)))
-            if remaining_life < float(s.get("time_s",0)) + 900:
-                continue
-            if (s.get("gpu") and s["gpu"] != gpu) or s.get("avoid") == iid:
-                continue
+    planned, queued = assignment_plan(queued, live, hbs, created, assigned_to, t)
+    concurrency = min(8, max(1, int(C.get("staging_parallelism", 4))))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
+        futures = {pool.submit(stage_bounded, record, C): (iid, worker, record)
+                   for iid, worker, record in planned}
+        for future in concurrent.futures.as_completed(futures):
+            iid, i, s = futures[future]
             try:
-                spec = stage_bounded(s, C)
+                spec = future.result()
             except Exception as e:  # noqa: BLE001
                 log(f"STAGE_FAILED {s['id']}: {e!r}")
                 s.update(status="failed", error=f"stage: {e!r}")
                 save_state(s)
-                queued.remove(s)
                 continue
             ev = created.get(iid) or {}
             spec.update({"label": i.get("label"), "machine_id": i.get("machine_id"), "account": i.get("_key_name"), "dph": i.get("dph_total")})
             r2_put(s3, f"assign/{iid}/{s['id']}.json", json.dumps(spec))
             s.update(status="assigned", instance=iid, account=i.get("_key_name"), machine_id=i.get("machine_id"), dph=i.get("dph_total"),
-                     tries=s["tries"] + 1, assigned=t, gpu_actual=gpu, inputs=spec["inputs"])
+                     tries=s["tries"] + 1, assigned=now(), gpu_actual=i.get("gpu_name"), inputs=spec["inputs"])
             save_state(s)
             assigned_to.setdefault(iid, []).append(s["id"])
-            queued.remove(s)
-            free -= 1
-            log(f"ASSIGN {s['id']} {s['name']} -> {iid} ({gpu}, {SHORT.get(ev.get('account'), '?')})")
+            log(f"ASSIGN {s['id']} {s['name']} -> {iid} ({i.get('gpu_name')}, {SHORT.get(ev.get('account'), '?')})")
+            publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed_observed,
+                            sum(float(i.get("dph_total") or 0) for i in live.values()), "dispatching")
 
     # 4. destroy: failed / stuck / idle instances, any instance over the price limit
     pending = len(queued)

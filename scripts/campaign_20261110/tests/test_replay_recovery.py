@@ -1,10 +1,68 @@
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
 from scripts.campaign_20261110.controller_validation import apply_retry_request, publish_recovered_gate
 
 class ReplayRecoveryTests(unittest.TestCase):
+    def metadata_fixture(self, root):
+        folder,entry,request=self.fixture(root)
+        job=root/'out/fresh';job.mkdir(parents=True)
+        (job/'sampling.done').touch()
+        metadata=job/'template_meta.json';metadata.write_text('{"closed":true}')
+        audit=root/'preflight.json';audit.write_text('{"strict_preflight":"passed"}')
+        log=folder/'scene_verify.log';log.write_text('ValueError: source template metadata changed')
+        gate={'success':False,'replay_rc':5,'replay_mode':'physics_action_open_loop',
+              'source_job':str(job),'result':{'success':True,'qa_hard':[],'goal_override':None}}
+        path=folder/'gate.json';path.write_text(json.dumps(gate))
+        sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+        entry.update(status='replay_failed',source_job_dir=str(job),gate=gate)
+        request.update(failure_kind='mutable_source_metadata',expected_failed_gate_sha256=sha(path),
+            scene_verify_log_sha256=sha(log),source_metadata=str(metadata),source_metadata_sha256=sha(metadata),
+            preflight_audit=str(audit),preflight_audit_sha256=sha(audit))
+        return folder,entry,request
+
+    def test_metadata_race_preserves_failed_bytes_and_still_requires_new_success(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);folder,entry,request=self.metadata_fixture(root)
+            old=(folder/'gate.json').read_bytes()
+            self.assertTrue(apply_retry_request(entry,request,root,{}))
+            self.assertEqual((folder/'failed_gate_before_02.json').read_bytes(),old)
+            self.assertFalse((folder/'gate.json').exists())
+            out=Path(entry.pop('retry_output'));out.mkdir()
+            entry.update(output=str(out),replay_job_id='789',gate={'success':False})
+            (out/'gate.json').write_text('{"success":false}')
+            publish_recovered_gate(entry,root)
+            self.assertFalse((folder/'gate.json').exists())
+            entry['gate']={'success':True};(out/'gate.json').write_text('{"success":true}')
+            publish_recovered_gate(entry,root)
+            self.assertEqual((folder/'failed_gate_before_02.json').read_bytes(),old)
+            self.assertEqual(json.loads((folder/'gate.json').read_text()),{'success':True})
+
+    def test_metadata_retry_rejects_changed_hash_live_source_or_physics_failure(self):
+        for failure in ('hash','live','physics'):
+            with self.subTest(failure=failure),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);folder,entry,request=self.metadata_fixture(root)
+                active={}
+                if failure=='hash':request['expected_failed_gate_sha256']='0'*64
+                if failure=='live':active={'123':'RUNNING'}
+                if failure=='physics':
+                    gate=json.loads((folder/'gate.json').read_text());gate['result']['success']=False
+                    (folder/'gate.json').write_text(json.dumps(gate))
+                    request['expected_failed_gate_sha256']=hashlib.sha256((folder/'gate.json').read_bytes()).hexdigest()
+                with self.assertRaises(ValueError):apply_retry_request(entry,request,root,active)
+                self.assertTrue((folder/'gate.json').exists())
+                self.assertFalse((folder/'failed_gate_before_02.json').exists())
+
+    def test_metadata_archive_is_reconciled_after_interruption_before_state_save(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);folder,entry,request=self.metadata_fixture(root)
+            old_entry=dict(entry)
+            apply_retry_request(entry,request,root,{})
+            self.assertTrue(apply_retry_request(old_entry,request,root,{}))
+            self.assertEqual(len(old_entry['attempt_history']),1)
+
     def fixture(self, root):
         folder=root/'validation/open_loop/class/123'
         folder.mkdir(parents=True)

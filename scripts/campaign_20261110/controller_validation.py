@@ -8,20 +8,69 @@ def read(path,default):
     try:return json.loads(path.read_text())
     except (OSError,ValueError):return default
 
+def archive_metadata_race_gate(entry, request, root, active):
+    """Preserve an explicitly diagnosed metadata race before a new strict replay.
+
+    This never promotes the old successful simulation result: a new complete
+    action replay and scene-identity verification must still pass.
+    """
+    folder=root/'validation/open_loop'/entry['key']/entry['source_job_id']
+    canonical=folder/'gate.json'
+    archived=folder/('failed_gate_before_'+request['request_id']+'.json')
+    source=canonical if canonical.exists() else archived
+    body=source.read_bytes()
+    sha=lambda path:hashlib.sha256(path.read_bytes()).hexdigest()
+    if hashlib.sha256(body).hexdigest()!=request.get('expected_failed_gate_sha256'):
+        raise ValueError('failed gate hash differs from diagnosed evidence')
+    gate=json.loads(body);result=gate.get('result',{})
+    if not (gate.get('success') is False and gate.get('replay_rc')==5
+            and gate.get('replay_mode')=='physics_action_open_loop' and result.get('success') is True
+            and result.get('qa_hard')==[] and result.get('goal_override') is None):
+        raise ValueError('failed gate is not the diagnosed post-replay metadata failure')
+    log=folder/'scene_verify.log'
+    if sha(log)!=request.get('scene_verify_log_sha256') or 'source template metadata changed' not in log.read_text():
+        raise ValueError('metadata race diagnosis changed')
+    job=pathlib.Path(entry['source_job_dir']).resolve()
+    if not job.is_relative_to(root/'out') or pathlib.Path(gate['source_job']).resolve()!=job:
+        raise ValueError('metadata retry source job differs')
+    vast=read(root/'vast/state/jobs'/(entry['source_job_id']+'.json'),{})
+    if entry['source_job_id'] in active or not (job/'sampling.done').is_file() or (vast and vast.get('status')!='synced'):
+        raise ValueError('metadata retry requires closed source sampling and collection')
+    metadata=pathlib.Path(request['source_metadata']).resolve()
+    if not metadata.is_relative_to(job) or sha(metadata)!=request.get('source_metadata_sha256'):
+        raise ValueError('closed source metadata changed')
+    audit=pathlib.Path(request['preflight_audit']).resolve()
+    if not audit.is_relative_to(root) or sha(audit)!=request.get('preflight_audit_sha256'):
+        raise ValueError('strict replay preflight audit changed')
+    if archived.exists():
+        if archived.read_bytes()!=body:raise ValueError('archived failed gate differs')
+    else:
+        os.link(canonical,archived)
+    # The failed bytes retain their immutable archive. After an interruption the
+    # same exact request reconciles that archive; it never authorizes two jobs.
+    if canonical.exists():canonical.unlink()
+    return {'path':str(archived),'sha256':hashlib.sha256(body).hexdigest()}
+
 def apply_retry_request(entry, request, root, active):
     """Explicitly retry a terminal launcher failure without replacing its evidence."""
     if not request or request.get('request_id') in entry.get('applied_retry_requests', []):return False
     token=request.get('request_id','')
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*',token):raise ValueError('unsafe retry request id')
-    if entry['status'] not in ('replay_missing','submit_failed'):return False
+    metadata_retry=entry['status']=='replay_failed' and request.get('failure_kind')=='mutable_source_metadata'
+    if entry['status'] not in ('replay_missing','submit_failed') and not metadata_retry:return False
     if entry.get('replay_job_id') in active:return False
     if request.get('expected_replay_job_id') != entry.get('replay_job_id'):raise ValueError('retry replay identity differs')
     if not request.get('reason'):raise ValueError('retry requires a recorded diagnosis')
     canonical=root/'validation/open_loop'/entry['key']/entry['source_job_id']
-    if (canonical/'gate.json').exists():raise ValueError('retry cannot replace an existing canonical gate')
     output=canonical/('attempt_'+token)
     if output.exists():raise ValueError('retry output already exists; reconcile before another submission')
+    if metadata_retry:
+        archived=archive_metadata_race_gate(entry,request,root,active)
+    elif (canonical/'gate.json').exists():
+        raise ValueError('retry cannot replace an existing canonical gate')
+    else:archived=None
     history={k:v for k,v in entry.items() if k not in ('attempt_history','applied_retry_requests')}
+    if archived:history['archived_failed_gate']=archived
     entry.setdefault('attempt_history',[]).append(history)
     entry.setdefault('applied_retry_requests',[]).append(token)
     entry.update(status='waiting_for_demo',retry_output=str(output),retry_request=request)
@@ -85,6 +134,13 @@ def main():
                 entry['status']='waiting_for_demo'
             if entry['status']=='waiting_for_demo':
                 if successes:
+                    # Sampling may rewrite template metadata after the first
+                    # demo finishes. Replaying before its durable close marker
+                    # can invalidate scene identity mid-replay.
+                    if not (job/'sampling.done').is_file():
+                        entry['waiting_reason']='source_sampling_not_closed'
+                        continue
+                    entry.pop('waiting_reason',None)
                     out=pathlib.Path(entry.pop('retry_output')) if entry.get('retry_output') else a.root/'validation/open_loop'/row['key']/jid
                     out.mkdir(parents=True,exist_ok=True)
                     entry.update(status='submitting',output=str(out));atomic(statepath,state)

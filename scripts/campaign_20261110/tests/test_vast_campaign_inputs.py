@@ -3,10 +3,26 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, sha, QUEUE_ENV
+from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, sha, QUEUE_ENV
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_parallel_plan_reserves_each_job_once_and_respects_worker_constraints(self):
+        jobs = [{'id':str(i), 'gpu':'RTX 5090', 'time_s':1800} for i in range(5)]
+        jobs[0]['avoid'] = 'ready'
+        live = {name:{'gpu_name':gpu} for name,gpu in [('ready','RTX 5090'),('busy','RTX 5090'),
+                ('boot','RTX 5090'),('old','RTX 5090'),('other','RTX 4090')]}
+        heartbeats = {name:{'phase':'ready','slots':1} for name in live}
+        heartbeats['boot']['phase'] = 'boot'
+        created = {'old':{'time':0, 'max_lifetime_s':3000}}
+        planned, remaining = assignment_plan(jobs, live, heartbeats, created, {'busy':['existing']}, 1000)
+        self.assertEqual([(worker, job['id']) for worker,_,job in planned], [('ready','1')])
+        self.assertEqual([job['id'] for job in remaining], ['0','2','3','4'])
+        heartbeats['busy']['slots'] = 3
+        planned, remaining = assignment_plan(jobs, live, heartbeats, created, {'busy':['existing']}, 1000)
+        self.assertEqual([job['id'] for _,_,job in planned], ['1','0','2'])
+        self.assertEqual([job['id'] for job in remaining], ['3','4'])
+
     def test_actual_scene_overrides_historical_counted_alias(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); config = root / 'config.json'
