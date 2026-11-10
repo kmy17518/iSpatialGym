@@ -59,6 +59,28 @@ def test_training_bucket_selection_remains_a_preference():
     assert proposal["phase"] == "train" and proposal["bucket"] == 1
 
 
+@pytest.mark.parametrize("family", ["held", "generic"])
+def test_unbucketed_soft_training_counts_remain_serializable_and_consume_capacity(tmp_path, monkeypatch, family):
+    import json
+    import sqlite3
+    from scripts.campaign_20261110 import controller_held, controller_groups, group_lane
+    from scripts.campaign_20261110.contracts import canonical_json
+
+    path = tmp_path / "dataset/allocations.sqlite"; path.parent.mkdir()
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE members (split, task, class_id, bucket, record)")
+        for bucket in (None, 0):
+            record = {"class_id": "apple", "bucket": bucket, "room": "scene/room"}
+            db.execute("INSERT INTO members VALUES (?,?,?,?,?)", ("train", "object_scaling", "apple", bucket, json.dumps(record)))
+    template = SimpleNamespace(task="object_scaling", class_id="apple", split="train", scene="scene", room="room")
+    monkeypatch.setattr(group_lane, "training_room_policy", lambda *args: {"caps": {"scene/room": 100}})
+    counts = (controller_held.read_counts(tmp_path, template, [], {}) if family == "held"
+              else controller_groups.read_counts(tmp_path, template))
+    assert counts["train_buckets"] == {0: 1} and counts["train_unbucketed"] == 1
+    assert counts["class_remaining"] == 998 and counts["evaluation_unbucketed"] == 1
+    canonical_json({"counts": counts})  # Controller state publication must not crash on soft-bucket nulls.
+
+
 def test_closure_uses_job_local_queue_and_rejects_wrong_event_hash(tmp_path, monkeypatch):
     import json
     from ispatialgym.sampling import campaign_goal_queue as queue

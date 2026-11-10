@@ -21,6 +21,7 @@ def merge(root, previous, inputs, destination):
     (destination/'release_block.json').write_text('{"reason":"native reader verification pending"}\n')
     before = json.loads((previous/'release_manifest.json').read_text())
     transfer = json.loads((inputs/'transfer_manifest.json').read_text())
+    transfer_key = sha(inputs/'transfer_manifest.json')[:16]
     copied = {}
     def copy(path, relative, expected):
         path = Path(path); target = destination/relative
@@ -32,8 +33,13 @@ def merge(root, previous, inputs, destination):
             with target.open('xb') as stream: stream.write(data)
         copied[relative] = expected
     for relative, expected in before['files'].items(): copy(previous/relative,relative,expected)
-    for row in transfer['files']: copy(inputs/row['destination'],row['destination'],row['sha256'])
-    copy(inputs/'transfer_manifest.json','tabletop_transfer_audit.json',sha(inputs/'transfer_manifest.json'))
+    for row in transfer['files']:
+        relative = row['destination']
+        if relative.startswith('evidence/'):
+            relative = 'evidence/' + transfer_key + '/' + relative.removeprefix('evidence/')
+        copy(inputs/row['destination'],relative,row['sha256'])
+    transfer_audit = 'tabletop_transfer_audit_' + transfer_key + '.json'
+    copy(inputs/'transfer_manifest.json',transfer_audit,sha(inputs/'transfer_manifest.json'))
     anchors = json.loads((destination/'anchors.json').read_text())
     by_key = {a['key']:a for a in anchors['anchors']}
     for row in transfer['maps']:
@@ -66,11 +72,13 @@ def merge(root, previous, inputs, destination):
     audit={'native_reader_errors':0,'libraries':transfer['libraries'],'positive_maps':len(checked),'checked':checked,
            'source_transfer_sha256':sha(inputs/'transfer_manifest.json'),'source_permissions_unchanged':True,
            'task_geometry_demo_replay_still_required':True}
-    (destination/'tabletop_reader_audit.json').write_text(json.dumps(audit,indent=2)+'\n')
-    copied['tabletop_reader_audit.json']=sha(destination/'tabletop_reader_audit.json')
+    audit_name = 'tabletop_reader_audit_' + transfer_key + '.json'
+    (destination/audit_name).write_text(json.dumps(audit,indent=2)+'\n')
+    copied[audit_name]=sha(destination/audit_name)
     manifest={**before,'created_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
               'previous_release':str(previous),'new_tabletop_libraries':transfer['libraries'],
-              'new_tabletop_maps':len(checked),'files':copied}
+              'new_tabletop_maps':len(checked),'new_tabletop_reader_audit':audit_name,
+              'new_tabletop_transfer_audit':transfer_audit,'files':copied}
     (destination/'release_manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     (destination/'release_block.json').unlink()
     (root/'validation'/(destination.name+'_reader.txt')).write_text('Native library/alias/exact scale/anchor/map reader\nERRORS 0\n')

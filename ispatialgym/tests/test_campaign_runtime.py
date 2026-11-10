@@ -98,6 +98,54 @@ def test_unapplied_scene_or_light_metadata_is_rejected():
         runtime.verify_loaded(meta, {"target": SimpleNamespace(scale=[0.9, 0.9, 2.25])})
 
 
+def test_native_attempt_journal_preserves_interrupted_draw_and_early_group_identity(tmp_path, monkeypatch):
+    template, p, key = fixture()
+    config = {"campaign_id": "fresh", "template": asdict(template), "perturbations": asdict(p),
+              "validation_key": asdict(key), "split": "train"}
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(config))
+    plan = {"campaign_id": "fresh", "split": "train", "task": template.task,
+            "contract_template_sha256": key.template_sha256, "group_id": "g1"}
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(json.dumps(plan))
+    monkeypatch.setenv("ISPATIALGYM_CAMPAIGN_CONFIG", str(path))
+    monkeypatch.setenv("ISPATIALGYM_CAMPAIGN_GOAL_PLAN", str(plan_path))
+    monkeypatch.delenv("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE", raising=False)
+    sampler = SimpleNamespace(ctx=SimpleNamespace(out_dir=str(tmp_path)))
+    journal = tmp_path / "campaign_attempts.jsonl"
+    runtime.attempt_finished(sampler, outcome="rejected", phase="sample", reason="campaign_group_timeout")
+    assert not journal.exists()  # Pure pre-draw transitions have no native attempt.
+    runtime.attempt_started(sampler, index=5, attempt=0, seed=7)
+    started = json.loads(journal.read_text())
+    assert started["goal_group_id"] == "g1" and started["validation_key"] == asdict(key)
+    assert started["config_sha256"] == runtime.file_digest(path)
+    # A stopped process at this point leaves a durable started row, not an invented failure/success.
+    assert started["event"] == "started" and "outcome" not in started
+    error = SimpleNamespace(reason="no_stance", details={})
+    runtime.record_failure(sampler, None, index=5, attempt=0, seed=7, phase="sample", error=error)
+    failure = json.loads((tmp_path / "campaign_sampling_failures.jsonl").read_text())
+    assert failure["goal_group_id"] == "g1" and failure["native_attempt_id"] == started["attempt_id"]
+    runtime.attempt_finished(sampler, outcome="rejected", phase="sample", reason="no_stance")
+    rows = [json.loads(line) for line in journal.read_text().splitlines()]
+    assert [r["event"] for r in rows] == ["started", "finished"]
+    assert rows[1]["attempt_id"] == started["attempt_id"] and rows[1]["outcome"] == "rejected"
+    runtime.attempt_started(sampler, index=5, attempt=1, seed=8)
+    assert json.loads(journal.read_text().splitlines()[-1])["attempt_id"] != started["attempt_id"]
+
+
+def test_unactivated_queue_cannot_claim_a_group_attempt(tmp_path, monkeypatch):
+    template, p, key = fixture()
+    config = {"campaign_id": "fresh", "template": asdict(template), "perturbations": asdict(p),
+              "validation_key": asdict(key), "split": "train"}
+    path = tmp_path / "config.json"; path.write_text(json.dumps(config))
+    monkeypatch.setenv("ISPATIALGYM_CAMPAIGN_CONFIG", str(path))
+    monkeypatch.setenv("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE", str(tmp_path / "authored_queue.json"))
+    sampler = SimpleNamespace(ctx=SimpleNamespace(out_dir=str(tmp_path)))
+    with pytest.raises(ContractError, match="activated queue"):
+        runtime.attempt_started(sampler, index=5, attempt=0, seed=7)
+    assert not (tmp_path / "campaign_attempts.jsonl").exists()
+
+
 def test_full_training_buckets_remain_eligible_when_another_is_underfilled():
     class CaptureRNG:
         def choice(self, count, p):

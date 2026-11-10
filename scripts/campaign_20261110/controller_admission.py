@@ -1,6 +1,8 @@
 """Validate new-runtime training seeds, then admit them to bounded group refill."""
 from __future__ import annotations
 
+from scripts.campaign_20261110 import controller_lifecycle as lifecycle
+
 import argparse
 from dataclasses import asdict, replace
 import datetime
@@ -284,10 +286,11 @@ def main():
     require(Path(cfg["snapshot"]).resolve().is_relative_to(root / "code"), "admission runtime outside owned snapshots")
     require(1 <= cfg.get("new_admissions_per_pass", 2) <= 12 and 1 <= cfg.get("maximum_pending_admissions", 12) <= 32,
             "invalid admission concurrency limits")
-    while time.time() < cfg["stop_at"]:
+    while lifecycle.continue_running(cfg):
         with atomic_directory_lock(path.with_suffix(".lockdir")):
             state = read(path, {"config_sha256": digest(cfg), "records": {}, "checked_gates": {}})
             require(state["config_sha256"] == digest(cfg), "admission controller config changed")
+            lifecycle.record_policy(cfg, state)
             reconcile_author_gaps(state)
             save = lambda: write_json_atomic(path, state)
             rows, queue = allocations(root), slurm_status()

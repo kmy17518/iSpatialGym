@@ -8,6 +8,8 @@ import shutil
 
 
 QUEUE_ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
+QUEUE_SCHEMAS = ('isg-held-goal-queue-v1','isg-pair-goal-queue-v1','isg-surface-goal-queue-v1',
+                 'isg-tray-goal-queue-v1','isg-joint-goal-queue-v1','isg-attachment-goal-queue-v1')
 
 
 def compatible_gpus(requested, config):
@@ -161,7 +163,15 @@ def runtime_scenes(env, root):
         require(queue.is_relative_to(root), 'scene queue outside owned root')
         raw = json.loads(queue.read_text())
         config_path = str(checked(raw['config_path'], root, raw['config_sha256']))
-    source_scene = Path(env['TEMPLATE']).name.split('__', 1)[0]
+    template = Path(env['TEMPLATE']).resolve()
+    source_scene = template.name.split('__',1)[0]
+    metadata = template/'template_meta.json'
+    if metadata.is_file():
+        observed_scene = json.loads(metadata.read_text()).get('scene')
+        require(isinstance(observed_scene,str), 'native source metadata lacks scene')
+        if '__' in template.name:
+            require(observed_scene == source_scene, 'native source metadata and conventional scene directory differ')
+        source_scene = observed_scene
     if config_path:
         config_path = Path(config_path).resolve()
         require(config_path.is_relative_to(root), 'scene config outside owned root')
@@ -231,7 +241,7 @@ def prepare_queue(job_dir, env, root):
     require(source.is_relative_to(root / "queues") or source.is_relative_to(job / "campaign_inputs"),
             "queue path outside authored or staged queue roots")
     raw = json.loads(source.read_text())
-    require(raw.get("schema") in ("isg-held-goal-queue-v1", "isg-pair-goal-queue-v1", "isg-surface-goal-queue-v1") and raw.get("entries"), "invalid campaign goal queue")
+    require(raw.get('schema') in QUEUE_SCHEMAS and raw.get('entries'), 'invalid campaign goal queue')
     inputs = [(checked(raw["config_path"], root, raw["config_sha256"]), "campaign_config.json")]
     ids = set()
     for entry in raw["entries"]:

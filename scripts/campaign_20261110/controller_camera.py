@@ -2,6 +2,8 @@
 """Claim reviewed camera jobs and continue bounded batches under exact replay keys."""
 from __future__ import annotations
 
+from scripts.campaign_20261110 import controller_lifecycle as lifecycle
+
 import argparse
 from collections import Counter
 from pathlib import Path
@@ -315,10 +317,11 @@ def main():
     root, path = Path(cfg["root"]).resolve(), Path(args.state).resolve()
     require(path.is_relative_to(root), "controller state outside campaign")
     path.parent.mkdir(parents=True, exist_ok=True)
-    while time.time() < cfg["stop_at"]:
+    while lifecycle.continue_running(cfg):
         with atomic_directory_lock(path.with_suffix(".lockdir")):
             state = read(path, {"config_sha256": original_config_hash, "seeds": {}})
             require(state["config_sha256"] == original_config_hash, "camera controller config changed")
+            lifecycle.record_policy(cfg, state)
             state['operational_limits']={key:cfg.get(key,default) for key,default in (('maximum_inflight_per_seed',1),('maximum_new_jobs_per_pass',3))}
             state['operational_limits']['dispatch_spool']=bool(cfg.get('dispatch_spool'))
             state['operational_limits']['dispatch_backends']=cfg.get('dispatch_backends')
@@ -339,7 +342,7 @@ def main():
             save()
         if args.once:
             break
-        time.sleep(min(60, max(1, cfg["stop_at"] - time.time())))
+        time.sleep(lifecycle.sleep_seconds(cfg))
 
 
 if __name__ == "__main__":

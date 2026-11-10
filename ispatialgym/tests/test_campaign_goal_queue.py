@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from ispatialgym.sampling import campaign_goal_queue as queue
+from ispatialgym.sampling import campaign_runtime as runtime
 from ispatialgym.sampling.v2 import core
 from scripts.campaign_20261110.tests import test_goal_queue as fixtures
 
@@ -20,8 +21,12 @@ def test_two_groups_share_one_sampler_and_do_not_consume_attempts_when_full(tmp_
         manifest, _, _ = (fixtures.fixture if family == "held" else pair_fixture)(tmp_path, monkeypatch)
     monkeypatch.setattr(core, "fast_on", lambda *args: False)
     monkeypatch.setattr(core, "publish_instance", lambda path: True)
+    config = json.loads((tmp_path / "config.json").read_text())
+    monkeypatch.setattr(runtime, "configuration", lambda: (config,
+        SimpleNamespace(task=config["template"]["task"], class_id="fixture"), None,
+        SimpleNamespace(template_sha256=config["validation_key"]["template_sha256"])))
     calls = []
-    sampler = SimpleNamespace(ctx=SimpleNamespace(base_seed=9), gp=SimpleNamespace(variant="held"), objects={},
+    sampler = SimpleNamespace(ctx=SimpleNamespace(base_seed=9, out_dir=str(tmp_path)), gp=SimpleNamespace(variant="held"), objects={},
         world=SimpleNamespace(reset_scene_objects=lambda *args,**kwargs: 0),
         kit=SimpleNamespace(stats_snapshot=lambda:{},stats_delta=lambda a,b:{}),
         ikc=SimpleNamespace(solutions={}), counters={}, template_paths=("template",), template_meta={}, instance_seeds=[])
@@ -36,6 +41,8 @@ def test_two_groups_share_one_sampler_and_do_not_consume_attempts_when_full(tmp_
     goals=[]
     def sample(rng):
         plan=json.load(open(os.environ[queue.PLAN_ENV]))
+        attempt_rows = [json.loads(line) for line in (tmp_path / "campaign_attempts.jsonl").read_text().splitlines()]
+        assert attempt_rows[-1]["event"] == "started" and attempt_rows[-1]["goal_group_id"] == plan["group_id"]
         goals.append((plan["group_id"],plan["goal_pose"]))
         return SimpleNamespace(summary={})
     def write(draft,index,seed):
@@ -50,3 +57,7 @@ def test_two_groups_share_one_sampler_and_do_not_consume_attempts_when_full(tmp_
     assert sampler.template_meta["n_written"]==6
     closed=[json.loads(line) for line in manifest.with_suffix(".events.jsonl").read_text().splitlines() if json.loads(line)["event"]=="closed"]
     assert [(row["group_id"],row["written"]) for row in closed] == [("g0",3),("g1",3)]
+    events = [json.loads(line) for line in (tmp_path / "campaign_attempts.jsonl").read_text().splitlines()]
+    assert [row["event"] for row in events] == ["started", "finished"] * 6
+    assert [row["goal_group_id"] for row in events[::2]] == ["g0"] * 3 + ["g1"] * 3
+    assert all(row["outcome"] == "written" for row in events[1::2])

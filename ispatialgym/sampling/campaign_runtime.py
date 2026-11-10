@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 from scripts.campaign_20261110.contracts import (
     ObjectRef, Perturbations, ScaleState, Template, ValidationKey,
-    attach_tro_metadata, canonical_json, file_digest, require, write_json_atomic,
+    attach_tro_metadata, canonical_json, digest, file_digest, require, write_json_atomic,
 )
 from ispatialgym.sampling import campaign_augmentation as augmentation
 
@@ -234,16 +234,78 @@ def _plain(value):
     return str(value)
 
 
+def _append_attempt_event(sampler, record):
+    from scripts.campaign_20261110.storage import atomic_directory_lock
+
+    path = Path(sampler.ctx.out_dir) / "campaign_attempts.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with atomic_directory_lock(path.with_suffix(".lockdir")):
+        with path.open("a") as stream:
+            stream.write(canonical_json(record) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+
+
+def attempt_started(sampler, *, index, attempt, seed):
+    """Durably mark entry to a native draw after activation and deadline checks."""
+    require(getattr(sampler, "_campaign_attempt_event", None) is None, "campaign attempt already started")
+    config, template, _, key = configuration()
+    config_path = Path(os.environ["ISPATIALGYM_CAMPAIGN_CONFIG"]).resolve()
+    require(json.loads(config_path.read_text()) == config, "campaign config changed before native attempt")
+    group_id = plan_sha = None
+    plan_path = os.environ.get("ISPATIALGYM_CAMPAIGN_GOAL_PLAN")
+    queued = bool(os.environ.get("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"))
+    state = getattr(sampler, "_campaign_goal_queue", None)
+    if queued:
+        require(state is not None and not state.get("exhausted"), "native attempt requires an activated queue entry")
+        entry = state["entries"][state["index"]]
+        require(plan_path and Path(plan_path).resolve() == Path(entry["path"]).resolve(), "active queue plan differs")
+    if plan_path:
+        plan = json.loads(Path(plan_path).read_text())
+        require(plan.get("campaign_id") == config["campaign_id"] and plan.get("split") == config["split"]
+                and plan.get("task") == template.task and plan.get("contract_template_sha256") == key.template_sha256,
+                "native attempt goal plan differs from campaign config")
+        group_id, plan_sha = plan.get("group_id"), file_digest(plan_path)
+        require(isinstance(group_id, str) and bool(group_id), "native attempt plan lacks group identity")
+        if queued:
+            require(group_id == entry["group_id"] and plan_sha == entry["sha256"], "active queue plan changed")
+    identity = {"output_dir": str(Path(sampler.ctx.out_dir).resolve()), "group_id": group_id,
+                "index": int(index), "attempt": int(attempt), "seed": int(seed),
+                "config_sha256": file_digest(config_path), "plan_sha256": plan_sha}
+    record = {"schema": "isg-campaign-attempt-v1", "event": "started", "created_at": time.time(),
+              "attempt_id": digest(identity), "campaign_id": config["campaign_id"], "class_id": template.class_id,
+              "task": template.task, "split": config["split"], "goal_group_id": group_id,
+              "index": int(index), "attempt": int(attempt), "seed": int(seed),
+              "config_path": str(config_path), "config_sha256": identity["config_sha256"],
+              "plan_sha256": plan_sha, "validation_key": config["validation_key"], "phase": "sample"}
+    _append_attempt_event(sampler, record)
+    sampler._campaign_attempt_event = record
+
+
+def attempt_finished(sampler, *, outcome, phase, reason=None, tro_path=None):
+    started = getattr(sampler, "_campaign_attempt_event", None)
+    if started is None:
+        return  # Reset failures and pre-draw queue transitions did not enter a native draw.
+    require(outcome in ("written", "rejected"), "invalid native attempt outcome")
+    record = {**started, "event": "finished", "created_at": time.time(), "outcome": outcome,
+              "phase": phase, "reason": reason, "tro_path": str(Path(tro_path).resolve()) if tro_path else None}
+    _append_attempt_event(sampler, record)
+    sampler._campaign_attempt_event = None
+
+
 def record_failure(sampler, draft, *, index, attempt, seed, phase, error):
     config, template, perturbations, _ = configuration()
     group = (draft.summary.get("campaign_goal_group") or {}) if draft is not None else {}
     proposed = getattr(sampler, "_campaign_latest_proposal", None) or {}
+    entered = getattr(sampler, "_campaign_attempt_event", None) or {}
     record = {
         "schema": "isg-campaign-failure-v1", "campaign_id": config["campaign_id"], "created_at": time.time(),
         "template_id": template.template_id, "class_id": template.class_id, "task": template.task,
         "index": index, "attempt": attempt, "seed": seed, "failure_kind": "sampling", "phase": phase,
         "reason": error.reason, "detail": str(error), "diagnostics": _plain(getattr(error, "details", {})),
-        "scale_sha256": perturbations.scale_fingerprint, "goal_group_id": group.get("group_id", proposed.get("group_id")),
+        "scale_sha256": perturbations.scale_fingerprint,
+        "goal_group_id": group.get("group_id") or proposed.get("group_id") or entered.get("goal_group_id"),
+        "native_attempt_id": entered.get("attempt_id"),
         "proposal_available": draft is not None or bool(proposed),
         "start_poses": _plain(draft.object_poses if draft is not None else proposed.get("start_poses")),
         "goal_poses": _plain(draft.goal_poses if draft is not None else proposed.get("goal_poses")),

@@ -133,7 +133,9 @@ if MAX_JOBS:
 
 def heartbeat():
     with LOCK:
-        run = {k: {"start": v["start"], "name": v["name"], "cpus": v["cpus_str"]} for k, v in STATE["running"].items()}
+        run = {k: {"start": v["start"], "name": v["name"], "cpus": v["cpus_str"],
+                   **{name:v.get(name) for name in ('phase','fetch_started_unix','runtime_started_unix','upload_started_unix')}}
+               for k, v in STATE["running"].items()}
         hb = {"instance": INST, "phase": STATE["phase"], "time": int(time.time()), "slots": SLOTS, "running": run, "done": STATE["done"],
               "failed": STATE["failed"], "free_cpus": len(FREE_CPUS), **GPU, "cpus": len(CPUS), "ram_gb": round(RAM, 1),
               "disk_free_gb": round(shutil.disk_usage("/work").free / 2**30, 1), "up_s": int(time.time() - STATE["started"])}
@@ -269,6 +271,8 @@ def run_job(spec, replay_s3):
     jd = spec["job_dir"]
     cpus = spec["_cpus"]
     t_fetch = time.time()
+    with LOCK:
+        STATE['running'][jid]['fetch_started_unix'] = t_fetch
     rc, err = None, None
     try:
         for c in spec["code"]:
@@ -292,6 +296,8 @@ def run_job(spec, replay_s3):
         cpus_str = ",".join(map(str, cpus))
         with LOCK:
             STATE["running"][jid]["phase"] = "run"
+            STATE['running'][jid]['fetch_started_unix'] = t_fetch
+            STATE['running'][jid]['runtime_started_unix'] = t_run
         with open(logp, "ab") as out:
             out.write(f"VAST_BACKEND id={jid} instance={INST} gpu=\"{GPU['gpu']}\" driver={GPU['driver']} cpus={cpus_str} "
                       f"start={time.strftime('%Y-%m-%dT%H:%M:%S%z')}\n".encode())
@@ -318,6 +324,9 @@ def run_job(spec, replay_s3):
         except OSError:
             pass
     t_end = time.time()
+    with LOCK:
+        STATE['running'][jid]['phase'] = 'upload'
+        STATE['running'][jid]['upload_started_unix'] = t_end
     stats = {}
     try:
         stats = json.load(open(os.path.join(jd, "job_stats.json")))
@@ -328,6 +337,8 @@ def run_job(spec, replay_s3):
                "rc": rc, "error": err, "fetch_s": round(t_run - t_fetch, 1), "elapsed_s": round(t_end - t_run, 1),
                "start": t_run, "end": t_end, "label": spec.get("label"), "machine_id": spec.get("machine_id"),
                "account": spec.get("account"), "dph": spec.get("dph")}
+    backend.update(attempt_id=spec.get('attempt_id'),gpu_count=GPU['n_gpus'],gpu_uuid=GPU.get('gpu_uuid'),
+                   fetch_started_unix=t_fetch,runtime_started_unix=t_run,runtime_ended_unix=t_end,upload_started_unix=t_end)
     up_err = None
     try:
         if os.path.isdir(jd):
@@ -359,6 +370,11 @@ def run_job(spec, replay_s3):
         up_err = repr(e)
     done = {**backend, "id": jid, "name": spec["name"], "job_dir": jd, "upload_error": up_err,
             "attempts": stats.get("attempts"), "written": stats.get("written"), "demos": stats.get("demos"), "successes": stats.get("successes")}
+    done['upload_finished_unix'] = time.time()
+    done['upload_seconds'] = done['upload_finished_unix']-t_end
+    if done.get('attempt_id'):
+        result=s5('pipe',f"{S3}/attempts/{jid}/{done['attempt_id']}.json",inp=json.dumps(done),check=False)
+        done['attempt_evidence_uploaded'] = result.returncode == 0
     s5("pipe", f"{S3}/done/{jid}.json", inp=json.dumps(done), check=False)
     with LOCK:
         STATE["running"].pop(jid, None)

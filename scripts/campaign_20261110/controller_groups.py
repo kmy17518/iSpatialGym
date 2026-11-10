@@ -72,6 +72,8 @@ def read_counts(root, template):
             standard = db.execute("SELECT COUNT(*) FROM members WHERE split='eval_standard' AND task=? AND class_id=?",
                                   (template.task, template.class_id)).fetchone()[0]
             result["evaluation_sibling_reserve"] = max(0, 10 - standard)
+    result["train_unbucketed"] = result["train_buckets"].pop(None, 0)
+    result["evaluation_unbucketed"] = result["evaluation"].pop(None, 0)
     return result
 
 

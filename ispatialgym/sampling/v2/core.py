@@ -1804,6 +1804,9 @@ class SamplerV2(TaskSampler):
                         cap_why += "; bounded by campaign goal-group deadline"
                     AC.begin(t0, cap_s)  # i7-stancememo 5x.3 (ISPATIALGYM_ATTEMPT_CAP): the cap runs while the attempt samples
                     try:
+                        if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+                            from ispatialgym.sampling.campaign_runtime import attempt_started
+                            attempt_started(self, index=index, attempt=attempt, seed=seed)
                         draft = self.sample(rng)
                     except AC.AttemptCapStop as stop:
                         _kit_count(self, "time_cap.cut")
@@ -1867,6 +1870,9 @@ class SamplerV2(TaskSampler):
                     self.attempt_end(index, attempt, "written", phase, None)
                     self._cap_after_attempt(None)
                     self.log_attempt_stages(index, attempt, clock)
+                    if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+                        from ispatialgym.sampling.campaign_runtime import attempt_finished
+                        attempt_finished(self, outcome="written", phase="published", tro_path=path)
                     if os.environ.get("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"):
                         from ispatialgym.sampling.campaign_goal_queue import after_written
                         exhausted = after_written(self)
@@ -1877,6 +1883,8 @@ class SamplerV2(TaskSampler):
                         from ispatialgym.sampling.campaign_runtime import record_failure
 
                         record_failure(self, draft, index=index, attempt=attempt, seed=seed, phase=phase, error=e)
+                        from ispatialgym.sampling.campaign_runtime import attempt_finished
+                        attempt_finished(self, outcome="rejected", phase=phase, reason=e.reason)
                     clock.mark(phase)
                     self.rejection_log.add(e.reason, str(e), phase=phase, index=index, attempt=attempt, seed=seed, **_plain_details(e.details))
                     log.debug("rejection traceback", exc_info=True)

@@ -46,6 +46,24 @@ def native_evidence(job):
     return result
 
 
+def attempt_accounting(root, jid, state):
+    attempts=[]
+    for path in sorted((root/'vast/state/attempts'/jid).glob('*.json')):
+        data=read(path);done=data['done'];start=done.get('fetch_started_unix');end=done.get('upload_finished_unix')
+        count=done.get('gpu_count')
+        attempts.append({'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),
+                         'attempt_id':data['attempt_id'],'try_number':data.get('try_number'),'instance':data.get('instance'),
+                         'native_attempts':done.get('attempts'),'written':done.get('written'),'demo_successes':done.get('successes'),
+                         'rc':done.get('rc'),'fetch_started_unix':start,'upload_finished_unix':end,'gpu_count':count,
+                         'complete_worker_gpu_seconds':((end-start)*count if start is not None and end is not None and count is not None else None)})
+    complete=(state['status'] in ('synced','failed') and len(attempts)==int(state.get('tries') or 0)
+              and bool(attempts) and all(x['complete_worker_gpu_seconds'] is not None for x in attempts))
+    return {'retained_attempts':attempts,'all_attempt_intervals_complete':complete,
+            'complete_worker_gpu_seconds_all_attempts':sum(x['complete_worker_gpu_seconds'] for x in attempts) if complete else None,
+            'retained_native_attempts_all_tries':sum(x['native_attempts'] for x in attempts)
+                if complete and all(x['native_attempts'] is not None for x in attempts) else None}
+
+
 def snapshot(root):
     started=time.time();rows={};ledger_errors=[]
     for path in sorted((root/'manifests').glob('*allocations.tsv')):
@@ -92,6 +110,9 @@ def snapshot(root):
                 record['missing_time_components']=['rental_boot_and_idle_not_attributable_to_one_job','post_run_upload_end_not_recorded']
                 if int(state.get('tries') or 0)>1:record['missing_time_components'].append('prior_retry_exact_start_end_not_retained')
                 if not done:record['missing_time_components'].append('current_worker_native_start_end_not_yet_synced')
+                record.update(attempt_accounting(root,jid,state))
+                if record['all_attempt_intervals_complete']:
+                    record['missing_time_components']=['rental_boot_and_idle_not_attributable_to_one_job']
             except (OSError,ValueError) as error:record.update(backend='vast',error=str(error))
         else:
             data=accounting.get(jid)

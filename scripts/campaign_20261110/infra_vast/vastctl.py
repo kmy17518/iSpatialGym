@@ -43,12 +43,14 @@ try:
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus
     from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs
     from .async_staging import StagingReservations
+    from .lifecycle import retain_attempt
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus
     from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs
     from async_staging import StagingReservations
+    from lifecycle import retain_attempt
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -825,11 +827,13 @@ def tick(c, s3, state):
     for s in states.values():
         if s["status"] in ("assigned",) and s["id"] in dones:
             d = r2_json(s3, f"done/{s['id']}.json") or {}
+            attempt_evidence = retain_attempt(os.path.join(VJ,'state','attempts'),s,d)
             # a job that made no sampling attempt at all (inputs failed, Kit died at its first frame, ...) runs once more on another
             # instance before its result counts; the instance is kept (a code error fails everywhere: the second result is synced)
             host_fail = (not d.get("attempts")) and not s.get("zero_retried") and s["tries"] < C["retries"]
             if host_fail:
-                s["history"].append({"instance": s.get("instance"), "rc": d.get("rc"), "error": d.get("error"), "time": t, "zero_attempts": True})
+                s["history"].append({"instance": s.get("instance"), "rc": d.get("rc"), "error": d.get("error"), "time": t, "zero_attempts": True,
+                                     'attempt_evidence':attempt_evidence,'assigned_unix':s.get('assigned'),'done':d})
                 ledger("suspect", machine_id=s.get("machine_id"), instance=s.get("instance"), job=s["id"], rc=d.get("rc"), error=d.get("error"))
                 log(f"REQUEUE {s['id']}: rc={d.get('rc')} err={d.get('error')} with 0 attempts on {s.get('instance')}")
                 s3.delete_object(Bucket=BUCKET, Key=f"{PREFIX}/done/{s['id']}.json")
@@ -841,6 +845,7 @@ def tick(c, s3, state):
                 added = sync_back(s3, s)
                 s["status"] = "synced" if d.get("rc") == 0 and not d.get("upload_error") else "failed"
                 s["done"] = d
+                s['attempt_evidence'] = attempt_evidence
                 s["cache_added"] = added
                 log(f"DONE {s['id']} {s['name']} rc={d.get('rc')} att={d.get('attempts')} wr={d.get('written')} ok={d.get('successes')} "
                     f"run {d.get('elapsed_s')} s fetch {d.get('fetch_s')} s gpu={d.get('gpu')} cache+{added}")
@@ -897,7 +902,8 @@ def tick(c, s3, state):
         candidate,_=assignment_plan([s],{iid:i},hbs,created,assigned_to,t)
         if not candidate:
             STAGER.release(jid,'worker no longer has a compatible free slot');continue
-        spec.update({'label':i.get('label'),'machine_id':i.get('machine_id'),'account':i.get('_key_name'),'dph':i.get('dph_total')})
+        spec.update({'label':i.get('label'),'machine_id':i.get('machine_id'),'account':i.get('_key_name'),'dph':i.get('dph_total'),
+                     'attempt_id':s['id']+'_'+str(int(s['tries'])+1)+'_'+uuid.uuid4().hex[:12]})
         STAGER.assigning(jid,spec)  # durable write-ahead, then exact remote assignment
         r2_put(s3,f'assign/{iid}/{jid}.json',json.dumps(spec))
         reconcile_assignment(STAGER.records[jid]);STAGER.assigned(jid)

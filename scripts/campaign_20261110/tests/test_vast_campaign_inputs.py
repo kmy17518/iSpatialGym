@@ -5,6 +5,7 @@ import unittest
 
 from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, sha, QUEUE_ENV
 from scripts.campaign_20261110.infra_vast.campaign_inputs import compatible_gpus, uncovered_jobs
+from scripts.campaign_20261110.infra_vast.campaign_inputs import QUEUE_SCHEMAS
 
 
 class VastQueueInputsTests(unittest.TestCase):
@@ -58,6 +59,18 @@ class VastQueueInputsTests(unittest.TestCase):
             config.write_text('{"template":{"scene":"hotel_suite_large"}}')
             with self.assertRaisesRegex(ValueError, 'differs from actual source'):
                 runtime_scenes(env, root)
+
+    def test_relocated_template_uses_native_metadata_scene_and_still_rejects_mismatch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);template=root/'templates/alignment-world_vertical_02';template.mkdir(parents=True)
+            (template/'template_meta.json').write_text('{"scene":"house_double_floor_upper"}')
+            config=root/'config.json';config.write_text('{"template":{"scene":"house_double_floor_upper"}}')
+            env={'TEMPLATE':str(template),'ISPATIALGYM_CAMPAIGN_CONFIG':str(config)}
+            self.assertEqual(runtime_scenes(env,root),['house_double_floor_upper'])
+            config.write_text('{"template":{"scene":"Rs_int"}}')
+            with self.assertRaisesRegex(ValueError,'differs from actual source'):runtime_scenes(env,root)
+            conventional=root/'Rs_int__room-living';template.rename(conventional);env['TEMPLATE']=str(conventional)
+            with self.assertRaisesRegex(ValueError,'conventional scene directory differ'):runtime_scenes(env,root)
     def test_warm_store_routing_preserves_native_key_selection_and_source_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); job, _, _ = self.fixture(root)
@@ -177,7 +190,7 @@ class VastQueueInputsTests(unittest.TestCase):
             self.assertEqual(prepare_queue(job, {QUEUE_ENV:record["staged_queue"]}, root), record)
 
     def test_both_native_queue_protocols_keep_exact_plan_bytes(self):
-        for schema in ("isg-held-goal-queue-v1", "isg-pair-goal-queue-v1", "isg-surface-goal-queue-v1"):
+        for schema in QUEUE_SCHEMAS:
             with self.subTest(schema=schema), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 job, queue, plan = self.fixture(root, schema)

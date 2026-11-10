@@ -2,6 +2,8 @@
 """Continue exact-key held-object queues through strict evaluation and soft training."""
 from __future__ import annotations
 
+from scripts.campaign_20261110 import controller_lifecycle as lifecycle
+
 import argparse
 from collections import Counter
 from dataclasses import replace
@@ -69,7 +71,13 @@ def read_counts(root, template, standards, room_plan):
     else:
         reserve = 10 * sum(t["task"] == template.task and t["scene"] + "/" + t["room"] == room for t in standards)
     cap = training_room_policy(room_plan, template.task)["caps"].get(room, 0)
+    # Soft training permits metrics outside the strict evaluation buckets.
+    # Preserve their capacity use separately; mixed None/int mapping keys
+    # cannot be durably serialized with canonical JSON's sorted keys.
+    unbucketed = train_buckets.pop(None, 0)
+    evaluation_unbucketed = counts.pop(None, 0)
     return {"evaluation": dict(counts), "train_buckets": dict(train_buckets), "class_remaining": max(0, 1000-train_class),
+            "train_unbucketed": unbucketed, "evaluation_unbucketed": evaluation_unbucketed,
             "room_remaining": max(0, cap-room_used), "evaluation_sibling_reserve": reserve}
 
 
@@ -375,8 +383,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
         if decision is None or remaining_budget < 3:
             state["status"] = ("pending_work_reserves_remaining_capacity" if inflight else "quota_or_room_capacity_complete") if decision is None else "candidate_budget_exhausted"
             return 0
-        decision["groups"] = min(decision["groups"], remaining_budget//3,
-                                 max(0, int((cfg["stop_at"]-time.time()-3600)//spec.get("group_budget_seconds", 900))))
+        decision["groups"] = lifecycle.bounded_group_count(cfg, min(decision["groups"], remaining_budget//3),
+                                                            spec.get("group_budget_seconds", 900))
         if allowance <= 0 or decision["groups"] <= 0:
             return 0
         record = (adapter.prepare_queue if adapter else prepare_queue)(spec, state, decision, cfg, root, template, save)
@@ -421,10 +429,11 @@ def main(*, adapter=None):
     root, path = Path(cfg["root"]).resolve(), Path(args.state).resolve()
     require(path.is_relative_to(root), "held controller state outside campaign")
     path.parent.mkdir(parents=True, exist_ok=True)
-    while time.time() < cfg["stop_at"]:
+    while lifecycle.continue_running(cfg):
         with atomic_directory_lock(path.with_suffix(".lockdir")):
             state = read(path, {"config_sha256": original_config_hash, "seeds": {}})
             require(state["config_sha256"] == original_config_hash, "held controller config changed")
+            lifecycle.record_policy(cfg, state)
             state['operational_limits']={key:cfg.get(key,default) for key,default in (('maximum_inflight_per_seed',1),('maximum_new_jobs_per_pass',3))}
             state['operational_limits']['dispatch_spool']=bool(cfg.get('dispatch_spool'))
             state['operational_limits']['dispatch_backends']=cfg.get('dispatch_backends')
@@ -453,7 +462,7 @@ def main(*, adapter=None):
             save()
         if args.once:
             break
-        time.sleep(min(60, max(1, cfg["stop_at"]-time.time())))
+        time.sleep(lifecycle.sleep_seconds(cfg))
 
 
 if __name__ == "__main__":

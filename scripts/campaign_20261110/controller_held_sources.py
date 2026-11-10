@@ -1,6 +1,8 @@
 """Admit newly validated held-model sources to strict, bounded evaluation refill."""
 from __future__ import annotations
 
+from scripts.campaign_20261110 import controller_lifecycle as lifecycle
+
 import argparse
 from pathlib import Path
 import time
@@ -74,10 +76,11 @@ def main():
     parser.add_argument('--once', action='store_true')
     args = parser.parse_args(); cfg = read(args.config); root = Path(cfg['root']).resolve(); path = Path(args.state).resolve()
     require(cfg['schema'] == 'isg-held-model-source-controller-v1' and path.is_relative_to(root/'controllers'), 'invalid held source controller')
-    while time.time() < cfg['stop_at']:
+    while lifecycle.continue_running(cfg):
         with atomic_directory_lock(path.with_suffix('.lockdir')):
             state = read(path, {'config_sha256': digest(cfg), 'checked_gates': {}})
             require(state['config_sha256'] == digest(cfg), 'held source controller config changed')
+            lifecycle.record_policy(cfg, state)
             catalog = read(cfg['seed_catalog']); owned = {row['class_id'] for row in catalog['seeds'] + cfg.get('seeds', [])}
             rows, queue = allocations(root), slurm_status()
             examined = 0
