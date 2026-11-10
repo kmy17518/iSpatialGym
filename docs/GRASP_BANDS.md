@@ -3486,6 +3486,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 55 | i7-ul03 up to 9e155787 (lead #79b) | acbb0642 | DEFAULT LARGE_EARLY_FRAME 1 + CARRY_FLOOR_CLEARANCE 1 |
 | 56 | i7-sink up to 68c4c560 (lead #83b) | f24ea424 | plate-in-sink customs, vekaaf basin interior spec, registry sinkvekaaf / sinkcounter080; layers i7sink_s08 (plate__luhkiz__s0.8 entry) + i7sink_vekaaf (8 map files) into v2maps_int2, all new names |
 | 57 | i7-t03both r4 up to 1a4864b0 (lead #94b) | 0ec27af3 | SHELF_OTHER_ARM off; no layer |
+| 58 | i7-measure up to ceb99806 (lead #92f) | d90e3530 | DEFAULT PUSH_NUDGE_STALL_STOP 1 + PUSH_NUDGE_MIN_SPEED 1 (0.025 m/s); BRIEFCASE_LYING / SUCCESS_YAW_FREE_SYMMETRIC off, LYING_TILT_DEG unset (eval bundle held) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
