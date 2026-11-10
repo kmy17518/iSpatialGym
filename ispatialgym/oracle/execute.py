@@ -4723,7 +4723,7 @@ def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: fl
     v_min = push_nudge_min_speed()
     raise_ = _NudgeMinSpeed(motions, goal2d[:2], tol, v_min) if v_min is not None else None
     log.info("%s(%s): %.1f mm still missing with the arm at its reach boundary -> nudging the base %.1f mm along the push direction (tol %.0f mm), arm locked%s",
-             label, obj, float(left) * 1000, move * 1000, tol * 1000, f"; the {'/'.join(hold_arms)} brace held in the world" if hold is not None else "")
+             label, obj, float(left) * 1000, move * 1000, tol * 1000, f"; the {'/'.join(hold_arms)} brace held in the world" if hold_arms else "")
     q = motions.robot.get_joint_positions()
     motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
     v = cfg.push_base_nudge_speed if speed is None else min(cfg.push_base_nudge_speed, float(speed))
