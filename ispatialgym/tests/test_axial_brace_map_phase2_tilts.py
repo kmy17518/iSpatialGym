@@ -16,10 +16,18 @@ from ispatialgym.sampling import contact_maps as CMAP
 from ispatialgym.sampling import reach_bands as RB
 from ispatialgym.sampling import reach_maps as RM
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.tests.test_axial_brace_map_fix import _margin_world, glib  # noqa: F401 - the fixture
+from ispatialgym.tests.test_axial_brace_map_fix import _margin_world
+from ispatialgym.tests.test_contact_library import _model_dir
 from ispatialgym.tests.test_contact_maps import _FakeHC, _lib
 
 ENV = "ISPATIALGYM_AXIAL_BRACE_MAP_PHASE2_TILTS"
+
+
+@pytest.fixture
+def glib(tmp_path):
+    root = str(tmp_path / "glib")
+    _model_dir(root, "magazine__flat__s1", (0.20, 0.28, 0.012))
+    return root
 
 
 def test_the_switch_is_off_by_default_and_enters_the_key_only_when_on(monkeypatch):
@@ -52,7 +60,7 @@ def test_the_columns_are_the_grid_plus_phase2s_stance_tilts():
         CMAP.trunk_columns(h, "dense")
 
 
-def _map(monkeypatch, glib, on):  # noqa: F811
+def _map(monkeypatch, glib, on):
     lib = _lib(glib, "magazine__flat__s1", "axial_brace", "brace", long_axis=[0, 1, 0])
     monkeypatch.setattr(CP, "HandChecker", _FakeHC)
     monkeypatch.setattr(CP, "sphere_support_ok", lambda sph, ln, sb, arm, policy, **k: (th.ones(sph.shape[0], dtype=th.bool), None))
@@ -69,7 +77,7 @@ def _map(monkeypatch, glib, on):  # noqa: F811
     return CMAP.compute_contact_map(_margin_world(cfg), lib, "axial_brace", 0.75, {"key": "h0.75", "height": 0.75}, geom, cfg=cfg)
 
 
-def test_the_built_columns_are_written_and_read_under_their_keys(monkeypatch, glib, tmp_path):  # noqa: F811
+def test_the_built_columns_are_written_and_read_under_their_keys(monkeypatch, glib, tmp_path):
     meta_off, arr_off = _map(monkeypatch, glib, False)
     meta_on, arr_on = _map(monkeypatch, glib, True)
     k_off = {t["key"] for t in meta_off["trunks"]}
