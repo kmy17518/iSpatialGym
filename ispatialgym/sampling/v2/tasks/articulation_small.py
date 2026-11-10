@@ -73,13 +73,13 @@ def draw_angles_on(s: Any = None) -> bool:
     template's one pair (open: ``default_rng(base_seed).choice(S)``; push-close: ``close_init_fraction`` of the range, the owner's 2026-09-19
     22:59 start, which this replaces for the drawn start; free close: min(S)). Every value the template computed from its pair is per pair:
     the required waypoints / ``passive_from`` (probed once per pair in the template), H_max / w_a at q_init, the band (the prefix map of the
-    pair's q_start / travel) and the start search (rerun per attempt for the drawn pair). Default off = the template's pair.
+    pair's q_start / travel) and the start search (rerun per attempt for the drawn pair). Default ON since lead #80c; "0" = the template's pair.
     Per alias: the customs ``generation.draw_angles`` (true / false) of sampler ``s`` wins over the switch (a scoped default)."""
     if s is not None:
         v = s.gen("draw_angles", None)
         if v is not None:
             return bool(v)
-    return os.environ.get("ISPATIALGYM_ARTSMALL_DRAW_ANGLES", "0") == "1"
+    return os.environ.get("ISPATIALGYM_ARTSMALL_DRAW_ANGLES", "1") != "0"  # default ON since lead #80c
 
 
 def close_start(q: float, lower: float, upper: float) -> float:

@@ -20,9 +20,9 @@ fake_tt = SD.fake_tt  # the fake tabletop layout (fixture)
 S_CARTON = [1.1781, 1.3548, 1.5315, 1.7082, 1.885, 2.0617, 2.2384, 2.3562]  # close_02's S (int2_5 template)
 
 
-def test_switch_default_off(monkeypatch):
+def test_switch_default_on(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_ARTSMALL_DRAW_ANGLES", raising=False)
-    assert not AS.draw_angles_on()
+    assert AS.draw_angles_on()
     monkeypatch.setenv("ISPATIALGYM_ARTSMALL_DRAW_ANGLES", "1")
     assert AS.draw_angles_on()
     # the customs generation.draw_angles of an alias wins over the switch
