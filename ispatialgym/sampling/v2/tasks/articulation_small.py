@@ -1402,17 +1402,12 @@ class ArticulationSmall(SamplerV2):
     # ------------------------------------------------------------------ instance (§5.4 Phase 3)
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
-        if getattr(self, "_pairs", None):
+        pairs = getattr(self, "_pairs", None)
+        if pairs:
             # i7-artsmall: without the per-attempt start draw (ISPATIALGYM_START_DRAW=0) the pair is drawn here, with the start search for it
             if not getattr(self, "_pair_drawn", False):
                 self._redraw_with_pair(rng, "sample_instance")
             self._pair_drawn = False
-            d = self._sample_instance(rng)
-            d.summary["artsmall_draw"] = {k: self._pair[k] for k in ("key", "q_init", "q_goal", "required", "passive_from")}
-            return d
-        return self._sample_instance(rng)
-
-    def _sample_instance(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
         errors = []
         # per-attempt budget (0916-205838: one attempt took 2356 s in the second-stance search + diagnostics)
@@ -1444,7 +1439,10 @@ class ArticulationSmall(SamplerV2):
                 self.world.park(o, list(self.world.spawned).index(o.name))
             self.kit.sync_world()
             try:
-                return self._sample_with(rng, init, manip, int(k))
+                d = self._sample_with(rng, init, manip, int(k))
+                if pairs:
+                    d.summary["artsmall_draw"] = {kk: self._pair[kk] for kk in ("key", "q_init", "q_goal", "required", "passive_from")}
+                return d
             except Reject as e:
                 errors.append(f"candidate {int(k)}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])

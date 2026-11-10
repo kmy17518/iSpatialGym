@@ -132,14 +132,20 @@ def test_without_start_draw_the_pair_is_drawn_in_sample_instance(monkeypatch):
     s.spa_redraw_start(np.random.default_rng(0))  # no start draw: a no-op
     assert not getattr(s, "_pair_drawn", False)
     got = []
+    s.manip_candidates = [object()]
+    s._deadline = None
+    s.sidecar = type("SC", (), {"reset_instance": lambda self: None, "add_stance": lambda self, st: None})()
+    s.world = type("W", (), {"spawned": {}})()
+    s.kit.sync_world = lambda: None
+    s.manip_candidates = [s.init_stance.with_trunk(0.5, 0.0, "manipulation")]
 
-    def inner(rng):
+    def inner(rng, init, manip, k):
         d = type("D", (), {})()
         d.summary = {}
         got.append((s.q_init, s.q_goal))
         return d
 
-    s._sample_instance = inner
+    s._sample_with = inner
     for i in range(30):
         d = s.sample_instance(np.random.default_rng([3, i]))
         assert d.summary["artsmall_draw"]["q_goal"] == s.q_goal and d.summary["artsmall_draw"]["q_init"] == 0.0
