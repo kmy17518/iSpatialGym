@@ -31527,7 +31527,6 @@
    "partner_moved_max_m": 0.005,
    "target_max_height_m": 0.35,
    "partner_view_min_points": 1,
-   "init_support_max_geodesic_m": 10.0,
    "inside_surface_z_m": 0.95,
    "inside_surface_tol_m": 0.05,
    "inside_stance_side": "-x",
@@ -31545,7 +31544,8 @@
     "max_penetration_m": 0.005,
     "preshape": true
    },
-   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)"
+   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)",
+   "_init_support_note": "i7-sink 2026-11-09: no init_support_max_geodesic_m (the awvzkn entry's 10 m cap): the named support is taken as bound - the cap's geodesic between the near-side anchors of vekaaf and countertop_ikwqer_0 (the same counter row, 1.25 m apart) found no path (template s0_i7sink: init_support_dropped 'no geodesic to the partner'); the stances' own navigation checks stay"
   },
   "constraints": [],
   "_note": "i7-sink 2026-11-09 (owner A3b): plate/luhkiz into tabletop_sink_vekaaf_0 (house_single_floor utility_room_0, the sink on the counter row at x 24.5) from countertop_ikwqer_0 (top 0.93, 1.25 m along the same row); generation = the awvzkn countertop variant's with the vekaaf inside keys; BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test"
