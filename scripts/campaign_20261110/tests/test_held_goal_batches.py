@@ -1,5 +1,6 @@
 import math
 import time
+from dataclasses import replace
 
 import pytest
 
@@ -58,6 +59,21 @@ def test_rotation_goal_region_is_native_normalized_and_precedes_fresh_starts(tmp
         assert sum(v*v for v in row["goal_pose"]["orientation"]) == pytest.approx(1)
         reconstructed=b.quaternion_product(b.axis_angle(row["axis_world"],row["goal_angle_deg"]),row["reference_orientation"])
         assert reconstructed==pytest.approx(row["goal_pose"]["orientation"])
+
+
+def test_mental_batch_uses_same_validated_plan_consumer_and_separate_fresh_groups(tmp_path):
+    anchor,template,code=anchor_fixture(tmp_path)
+    template=replace(template,task="mental_rotation",class_id="mental_rotation-mug")
+    anchor["summary"]["goal"] = {"axis_world":[0,0,1],"angle_deg":60}
+    anchor["template_meta"]["init_orientation"] = {"goal_angle_range_deg":[30,120]}
+    result=b.prepare_batch(anchor=anchor,template=template,campaign_root=tmp_path,batch_id="mental",count=2,
+        magnitude_range=[30,45],seed=7,campaign_id="new",code_sha256=c.file_digest(code/".snapshot_commit"),
+        physics_sha256=c.digest("physics"),data_sha256=c.digest("data"))
+    state=b.read_queue(result["queue"],result["config"])
+    assert len(state["entries"])==2
+    plans=[g.read_json(row["path"]) for row in state["entries"]]
+    assert all(row["task"]=="mental_rotation" and row["magnitude_range"]==[30,45] for row in plans)
+    assert plans[0]["goal_pose"] != plans[1]["goal_pose"]
 
 
 def test_base_transform_preserves_relative_goal_and_world_quaternion():

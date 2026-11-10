@@ -31,6 +31,7 @@ import json
 import logging
 import math
 import os
+import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -38,6 +39,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import alias_memory as AM
+from ispatialgym.sampling import campaign_block_goals as CBG
 from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling.sim_utils import Reject
@@ -273,6 +275,8 @@ class BlockDesign(SamplerV2):
         return [b.name for b in self.bindings.many(self.role)]
 
     def sample_template(self):
+        if os.environ.get(CBG.ENV):
+            self._campaign_block_active = self.campaign_block_plan()
         if bool(self.gen("block_pack_tail", False)):
             # owner 2026-11-08 (3.7, i7-contact3): the packing tail (the wide pack brace + its pushes) is removed; the block design uses the
             # board variant (block_4-breakfast_table_board: the pockets seat the blocks, no packing)
@@ -831,6 +835,9 @@ class BlockDesign(SamplerV2):
         return {c: f for f, c in self.faces.items()}
 
     def pattern(self, rng) -> Tuple[str, List[str]]:
+        plan = getattr(self, "_campaign_block_active", None)
+        if plan is not None:
+            return plan.pattern_id, list(plan.pattern)
         patterns = self.g("patterns") or {}
         if not patterns:
             raise Reject("spec", "generation.patterns is empty")
@@ -839,7 +846,71 @@ class BlockDesign(SamplerV2):
 
     # ------------------------------------------------------------------ instance
 
+    def campaign_block_plan(self):
+        if not os.environ.get(CBG.ENV):
+            return None
+        if not hasattr(self, "_campaign_group_started_at"):
+            self._campaign_group_started_at = time.time()
+        try:
+            plan = CBG.load_block_plan(template_id=self.ctx.template_id, scene=self.scene, rooms=self.choice.rooms,
+                                       activated_at=self._campaign_group_started_at,
+                                       expected_sha256=getattr(self, "_campaign_block_plan_sha", None))
+            if not self._has_board() or set(plan.target_names) != set(self.names()) or plan.board_name != self.bindings.one("board").name:
+                raise CBG.GoalPlanError("block goal bindings differ from the live task")
+            choices = self.choice.groups.get(self.role, []) or [self.choice.models[self.role]]
+            if len({(c.category, c.model, c.dataset, tuple(c.scale or ())) for c in choices}) != 1:
+                raise CBG.GoalPlanError("all four campaign blocks must have identical models and scales")
+            if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
+                raise Reject("campaign_group_complete", "block goal-group member limit reached")
+            self._campaign_block_plan_sha = plan.sha256
+            return plan
+        except CBG.GoalGroupTimeout as exc:
+            raise Reject("campaign_group_timeout", str(exc)) from exc
+        except (CBG.GoalPlanError, OSError, ValueError) as exc:
+            raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_group_remaining_s(self):
+        plan = self.campaign_block_plan()
+        return None if plan is None else max(0.0, plan.deadline_at-time.time())
+
+    @staticmethod
+    def campaign_tensor_pose(value):
+        return tuple(th.tensor(part, dtype=th.float32) for part in value)
+
+    def campaign_verify_goal(self, draft, *, settled=False):
+        plan = self._campaign_block_active
+        self.campaign_group_remaining_s()
+        names = self.names()
+        group = draft.groups[self._group_name(names)]
+        sids = list(group["target_slots"])
+        try:
+            for name, sid in zip(names, sids):
+                index = int(sid.removeprefix("slot_"))
+                actual = self.objects[name].get_position_orientation() if settled else draft.goal_poses[name]
+                plan.verify_slot(actual, index)
+                canonical = self.campaign_tensor_pose(plan.slots[index])
+                draft.goal_poses[name] = canonical
+                group["target_slots"][sid] = {"position": list(plan.slots[index][0]), "orientation": list(plan.slots[index][1])}
+            board = self.objects[plan.board_name].get_position_orientation() if settled else draft.object_poses[plan.board_name]
+            plan.verify_board(board)
+        except CBG.GoalPlanError as exc:
+            raise Reject("campaign_goal_drift", str(exc)) from exc
+        group["layout_relations"] = _relations(group["target_slots"])
+        flips = draft.summary["campaign_goal_group"]["actual_flips"]
+        if plan.split != "train" and not 1 <= flips <= 4:
+            raise Reject("campaign_bucket_drift", "evaluation block design requires one to four flips")
+
+    def write_instance(self, draft, index, seed):
+        if getattr(self, "_campaign_block_active", None) is not None:
+            self.campaign_verify_goal(draft)
+        path = super().write_instance(draft, index, seed)
+        if getattr(self, "_campaign_block_active", None) is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0)+1
+        return path
+
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        if os.environ.get(CBG.ENV):
+            self._campaign_block_active = self.campaign_block_plan()
         init = self.init_stance
         errors = []
         order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
@@ -911,6 +982,9 @@ class BlockDesign(SamplerV2):
         n = len(names)
         n_rows, n_cols = (int(v) for v in (self.g("grid") or [2, 2]))
         pid, pattern = self.pattern(rng)
+        campaign_plan = getattr(self, "_campaign_block_active", None)
+        if campaign_plan is not None:
+            self.campaign_group_remaining_s()
         c2f = self.color_to_face()
         for c in pattern:
             if c not in c2f:
@@ -923,6 +997,8 @@ class BlockDesign(SamplerV2):
         self._travel_between(init, manip)
         cam_init = self.camera_pose_at(init)
         right, toward, table_yaw = self._table_axes(manip)
+        if campaign_plan is not None and float(C.quat_angle(C.quat_from_yaw(table_yaw), th.tensor(campaign_plan.board[1]))) > .05:
+            raise Reject("campaign_board_direction", "stance table axes differ from the fixed board orientation")
         pitch = self._pitch()
         region = manip.extras["focus_info"]["cells"]
         gap = float(self.g("scatter_min_gap_m"))
@@ -1083,6 +1159,13 @@ class BlockDesign(SamplerV2):
                 up_of[bi] = side_options[int(rng.integers(len(side_options)))] if side_options else options[0]
             else:
                 up_of[bi] = goal_face[bi] if rng.random() < p_goal_up else options[int(rng.integers(len(options)))]
+        if campaign_plan is not None:
+            up_of = {bi: campaign_plan.initial_up_faces[slot_of[bi]] for bi in range(n)}
+            if any(up_of[bi] == TT.opposite_face(goal_face[bi]) for bi in range(n)):
+                raise Reject("campaign_block_profile", "initial face is opposite its goal face")
+            expected = {bi for bi in range(n) if up_of[bi] != goal_face[bi]}
+            if not must_flip <= expected or (flip_mode and any(not flip_eligible(chosen[bi]) for bi in expected)):
+                raise Reject("campaign_block_profile", "fixed start-face profile is not feasible at these fresh cells")
         poses: Dict[int, TT.Pose] = {}
         coarse_yaw: Dict[int, float] = {}
         flip_dir_of: Dict[int, Optional[str]] = {}
@@ -1105,7 +1188,16 @@ class BlockDesign(SamplerV2):
                 half = min(half, float(self.gen("flip_yaw_jitter_max_deg", 8.0)))
             jitter = float(rng.uniform(-math.radians(half), math.radians(half)))
             q = C.qmul(C.quat_from_yaw(yaw_c + jitter), q_up)
+            if campaign_plan is not None:
+                si = slot_of[bi]
+                flip_dir_of[bi] = campaign_plan.flip_directions[si]
+                q = C.qmul(C.quat_from_yaw(jitter), th.tensor(campaign_plan.initial_orientations[si], dtype=th.float32))
+                if float(TT.face_normal_world(up_of[bi], q)[2]) < .99:
+                    raise Reject("campaign_block_profile", "recorded start orientation has a different top face")
             poses[bi] = self._root_pose(chosen[bi], q, 0.002)
+        if campaign_plan is not None:
+            self._campaign_latest_proposal = {"start_poses": {names[bi]: poses[bi] for bi in range(n)},
+                "goal_poses": {names[bi]: campaign_plan.slots[slot_of[bi]] for bi in range(n)}, "group_id": campaign_plan.group_id}
         # footprints on the top, gaps, in frame (5 %)
         fps = {bi: self.world.footprint(self.hull, poses[bi]) for bi in range(n)}
         for bi in range(n):
@@ -1158,7 +1250,13 @@ class BlockDesign(SamplerV2):
                 dz_b = th.tensor([0.0, 0.0, float(self._board_geometry()["plate_thickness_m"])])
                 goal_pose[bi] = (self._root_pose(board_goals[si], q_goal, 0.001)[0] + dz_b, q_goal)
                 place_goal[bi] = (self._root_pose(board_aims[si], q_goal, 0.001)[0] + dz_b, q_goal)
-            slots[f"slot_{si}"] = {"position": [float(v) for v in goal_pose[bi][0]], "orientation": [float(v) for v in q_goal]}
+            if campaign_plan is not None:
+                try:
+                    campaign_plan.verify_slot(goal_pose[bi], si)
+                except CBG.GoalPlanError as exc:
+                    raise Reject("campaign_goal_drift", str(exc)) from exc
+                goal_pose[bi] = self.campaign_tensor_pose(campaign_plan.slots[si])
+            slots[f"slot_{si}"] = {"position": [float(v) for v in goal_pose[bi][0]], "orientation": [float(v) for v in goal_pose[bi][1]]}
         # §4.6 step 5: whole-body checks at init and manipulation with the blocks placed
         TT.whole_body_check_at(self, [init, manip], objects, require=True, reason="stance_collision")
         # owner item 3 (release height, core 2c59893): the actual surface under every slot (a downward raycast with the
@@ -1185,6 +1283,8 @@ class BlockDesign(SamplerV2):
         current = manip
         self._prev_end_q = None  # where the previous block's last tracked leg left the arm (28-D at its stance; the re-pose plan's start)
         for step, bi in enumerate(order):
+            if campaign_plan is not None:
+                self.campaign_group_remaining_s()
             flipping = bool(plans[bi]["flips"])
             if step > 0 and bool(self.gen("block_single_stance", False)):
                 rec, st = self._single_stance_block(rng, current, names, poses, place_goal, plans, order, step, right, toward, table_yaw)
@@ -1238,6 +1338,13 @@ class BlockDesign(SamplerV2):
         reposes = {rec["instance"]: f"{rec['repose'].get('from_stance')} -> {rec.get('stance')} ({rec['repose'].get('planned_from')})" for rec in records if isinstance(rec.get("repose"), dict)}
         if reposes:
             d.summary["block_reposes"] = reposes
+        if campaign_plan is not None:
+            d.summary["campaign_goal_group"] = campaign_plan.summary()
+            d.summary["campaign_goal_group"].update({"actual_flips": sum(bool(plans[bi]["flips"]) for bi in range(n)),
+                "requested_start": {"poses": {name: [v.tolist() for v in d.object_poses[name]] for name in names},
+                                    "grasp_records": [{key: rec.get(key) for key in ("instance", "face_pair", "pick", "flip_class")} for rec in records]}})
+            self._campaign_latest_proposal = {"start_poses": d.object_poses, "goal_poses": d.goal_poses, "group_id": campaign_plan.group_id}
+            self.campaign_verify_goal(d)
         return d
 
     # -- per-block stances (owner 2026-09-19) -----------------------------------------------------------------------
@@ -2731,6 +2838,20 @@ class BlockDesign(SamplerV2):
         ``divider_w_m``, ``divider_h_m``, ``ridge_apex_z_m`` (above the pocket floor), ``rim_top_z_m`` (above the board's bottom),
         ``rim_top_above_floor_m``, ``plate_thickness_m``, ``plate_m``, ``pocket_centres`` (board frame, slot order 0 far-left, 1
         far-right, 2 near-left, 3 near-right) and ``outer_corner_sign`` per pocket. Falls back to the built values (drop test v5)."""
+        if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+            choice = self.choice.models.get("board")
+            if choice is not None:
+                candidate = os.path.join(get_dataset_path(choice.dataset), "objects", choice.category, choice.model, "misc", "isg_board.json")
+                if os.path.isfile(candidate):
+                    import hashlib
+                    with open(candidate, "rb") as stream:
+                        contents = stream.read()
+                    geometry = campaign_board_geometry(json.loads(contents), self.obj("board").scale)
+                    self.template_facts["campaign_board_geometry"] = {
+                        "path": candidate, "sha256": hashlib.sha256(contents).hexdigest(), "geometry": geometry}
+                    return geometry
+                if (choice.category, choice.model) != ("tray", "isgboard"):
+                    raise Reject("spec", "campaign board has no model-specific geometry metadata")
         path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "assets", "objects", "block_board", "model", "isgboard",
                             "build_manifest.json")
         h = 0.0157
@@ -2804,6 +2925,12 @@ class BlockDesign(SamplerV2):
         k_diag = getattr(self, "_bd_k", -1)
         BDD.sweep(self, k_diag, manip, right, toward, table_yaw, cells, flip_eligible, n_blocks, support, layout_ok, name, q, half, half_b)
         positions = self._board_plan(manip)
+        campaign_plan = getattr(self, "_campaign_block_active", None)
+        if campaign_plan is not None:
+            self.campaign_group_remaining_s()
+            xy_base = manip.world_to_base(th.tensor(campaign_plan.board[0][:2], dtype=th.float32))
+            positions = [(float(xy_base[0]), float(xy_base[1]), False)]
+            q = th.tensor(campaign_plan.board[1], dtype=th.float32)
         table = board_table_on()
         grid_why: Dict[str, int] = {}
         grid_probes, grid_max = 0, int(self.gen("board_grid_max_probes", 12))
@@ -2832,6 +2959,10 @@ class BlockDesign(SamplerV2):
                     fail(f"{len(kept)} cells clear ({n_elig} flip-eligible)", "cells")
                     continue
             pose = (th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + 0.001]), q)
+            if campaign_plan is not None:
+                if abs(float(self.top.z)+.001-campaign_plan.board[0][2]) > .005:
+                    raise Reject("campaign_board_height", "fixed board height differs from the native support placement")
+                pose = self.campaign_tensor_pose(campaign_plan.board)
             early = board_early_on() or on_grid
             if on_grid and layout_ok is not None and cells is not None and not layout_ok(kept):
                 fail("", "no flip set")
@@ -3221,6 +3352,33 @@ class BlockDesign(SamplerV2):
                 raise Reject("goal_unstable", f"block {name} moved at the goal")
             group["target_slots"][sid] = {"position": p.tolist(), "orientation": q.tolist()}
         group["layout_relations"] = _relations(group["target_slots"])
+        if getattr(self, "_campaign_block_active", None) is not None:
+            self.campaign_verify_goal(draft, settled=True)
+
+
+def campaign_board_geometry(raw, scale):
+    """Use the loaded board's measured construction dimensions in native checks."""
+    horizontal = ("pocket_pitch_m", "seat_inner_m", "outer_mouth_m", "outer_chamfer_w_m", "divider_w_m", "plate_m")
+    vertical = ("wall_h_m", "chamfer_h_m", "divider_h_m", "ridge_apex_z_m", "rim_top_z_m", "rim_top_above_floor_m", "plate_thickness_m")
+    values = [float(value) for value in scale]
+    if len(values) != 3 or not all(math.isfinite(v) and v > 0 for v in values) or abs(values[0]-values[1]) > 1e-6:
+        raise Reject("spec", "board requires equal x/y scale and finite positive z scale")
+    result = {}
+    for key in horizontal + vertical:
+        value = float(raw.get(key, float("nan")))
+        if not math.isfinite(value) or value <= 0:
+            raise Reject("spec", f"board geometry lacks a positive {key}")
+        result[key] = value * (values[0] if key in horizontal else values[2])
+    for key in ("pocket_centres", "outer_corner_sign"):
+        rows = raw.get(key)
+        if not isinstance(rows, list) or len(rows) != 4 or any(
+                not isinstance(row, list) or len(row) != 2 or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in row)
+                for row in rows):
+            raise Reject("spec", f"board geometry needs four finite {key}")
+        result[key] = [[float(v) * (values[i] if key == "pocket_centres" else 1) for i, v in enumerate(row)] for row in rows]
+    if any(v not in (-1, 1) for row in result["outer_corner_sign"] for v in row):
+        raise Reject("spec", "board outer-corner signs must be +/-1")
+    return result
 
 
 def _rotation_with_up(face: str) -> th.Tensor:

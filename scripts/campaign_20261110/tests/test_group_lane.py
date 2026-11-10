@@ -80,6 +80,10 @@ def test_train_buckets_soft_eval_strict_and_boundary_rules(tmp_path):
     assert lane.bucket_index(tray, {"actual_crowdedness": .30}, strict=True) == 1
     joint = replace(f.template, task="configuration_matching-articulation_open_small_scale")
     assert lane.bucket_index(joint, {"actual_open_fraction": .5}, strict=True) == 0
+    block = replace(f.template, task="configuration_matching-block_design")
+    assert lane.bucket_index(block, {"actual_flips": 0}, strict=False) is None
+    with pytest.raises(c.ContractError, match="flip count"):
+        lane.bucket_index(block, {"actual_flips": 0}, strict=True)
 
 
 def test_heldout_allocations_never_fall_back_to_training():

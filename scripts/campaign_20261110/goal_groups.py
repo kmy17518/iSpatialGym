@@ -33,6 +33,7 @@ from ispatialgym.sampling.campaign_tray_goals import SCHEMA as TRAY_SCHEMA, vali
 from ispatialgym.sampling.campaign_pair_goals import SCHEMA as PAIR_SCHEMA, RELATIONS as PAIR_RELATIONS, validate_pair_plan, vary_nextto_gap
 from ispatialgym.sampling.campaign_joint_goals import SCHEMA as JOINT_SCHEMA, validate_joint_plan
 from ispatialgym.sampling.campaign_attachment_goals import SCHEMA as ATTACHMENT_SCHEMA, validate_attachment_plan
+from ispatialgym.sampling.campaign_block_goals import SCHEMA as BLOCK_SCHEMA, validate_block_plan
 
 
 def read_json(path):
@@ -203,7 +204,8 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
     pair_tasks = {f"inter_object_relation_satisfaction-{relation}_{scale}_scale": (relation, scale)
                   for scale, relations in (("small", PAIR_RELATIONS), ("large", ("ontop", "inside"))) for relation in relations}
     joint_task = template.task.startswith("configuration_matching-articulation_")
-    require(joint_task or template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "alignment-axial", "disembedding", "configuration_matching-attachment") or template.task in pair_tasks,
+    block_task = template.task == "configuration_matching-block_design"
+    require(block_task or joint_task or template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "alignment-axial", "disembedding", "configuration_matching-attachment") or template.task in pair_tasks,
             "unsupported goal author task")
     require(template.split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid group split")
     bindings = anchor["tro"]["ispatialgym"]["object_bindings"]
@@ -227,7 +229,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
     source_goal = anchor["summary"].get("goal_realised")
     if source_goal is None:
         targets = [ref.instance for ref in template.objects if ref.role == "target"]
-        require(len(targets) == 1, "anchor has no unambiguous target goal")
+        require(len(targets) == (4 if block_task else 1), "anchor has no unambiguous target goal")
         pose = anchor["planned_goal_poses"].get(targets[0])
         if pose is None and joint_task:
             target = anchor["tro"]["ispatialgym"].get("pose_targets", {}).get(targets[0], {})
@@ -246,7 +248,34 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             "created_at": now, "budget_seconds": budget_seconds, "max_members": max_members,
             "source_instance_id": anchor["instance_id"], "source_instance_is_member": False,
             "anchor_sources": anchor["sources"]}
-    if template.task == "configuration_matching-attachment":
+    if block_task:
+        targets = [ref.instance for ref in template.objects if ref.role == "target"]
+        boards = [ref.instance for ref in template.objects if ref.semantic_kind == "board"]
+        require(len(targets) == 4 and len(boards) == 1, "block anchor requires four blocks and one board")
+        require(len({(ref.model_key, ref.asset_sha256, ref.default_scale) for ref in template.objects if ref.role == "target"}) == 1,
+                "block contract must use four identical models")
+        groups = [value for value in anchor["tro"]["ispatialgym"].get("groups", {}).values() if set(value.get("members", [])) == set(targets)]
+        require(len(groups) == 1, "block anchor lacks one four-block goal group")
+        slots = groups[0].get("target_slots", {})
+        require(set(slots) == {f"slot_{i}" for i in range(4)}, "block anchor lacks four explicit slots")
+        summary = anchor["summary"]
+        order = summary.get("placement_order", [])
+        require(len(order) == 4 and set(order) == set(targets), "block anchor lacks slot-ordered block identities")
+        board = anchor["planned_start_poses"].get(boards[0]) or anchor.get("bound_object_poses", {}).get(boards[0])
+        require(board is not None and all(name in anchor["planned_start_poses"] for name in targets), "block anchor lacks start/board poses")
+        require(all(name in summary.get("up_faces", {}) and name in summary.get("flip_directions", {}) for name in targets),
+                "block anchor lacks initial face and flip profile")
+        plan.update(schema=BLOCK_SCHEMA, target_names=targets, board_name=boards[0],
+                    board_pose={"position": board[0], "orientation": board[1]},
+                    goal_slots=[slots[f"slot_{i}"] for i in range(4)], pattern_id=summary.get("pattern"), pattern=summary.get("pattern_faces"),
+                    initial_orientations=[anchor["planned_start_poses"][name][1] for name in order],
+                    initial_up_faces=[summary["up_faces"][name] for name in order],
+                    flip_directions=[summary["flip_directions"][name] for name in order])
+        plan.pop("goal_pose")
+        plan.pop("magnitude_range")
+        plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
+        validate_block_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room], activated_at=now, now=now)
+    elif template.task == "configuration_matching-attachment":
         roles = {role: [ref.instance for ref in template.objects if ref.role == role] for role in ("target", "partner")}
         require(all(len(names) == 1 for names in roles.values()), "ambiguous attachment target/partner binding")
         plan["target_name"], plan["partner_name"] = roles["target"][0], roles["partner"][0]

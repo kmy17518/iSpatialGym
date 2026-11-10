@@ -89,6 +89,8 @@ def bucket_index(template, group, *, strict):
         require(len(edges) == 4, "alignment needs three pinned native-range buckets")
     elif task == "configuration_matching-block_design":
         value = group.get("actual_flips")
+        if not strict and isinstance(value, int) and not isinstance(value, bool) and value == 0:
+            return None
         require(isinstance(value, int) and 1 <= value <= 4, "block group lacks verified flip count")
         return value - 1
     else:
