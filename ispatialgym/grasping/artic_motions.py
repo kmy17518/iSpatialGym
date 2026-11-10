@@ -161,9 +161,9 @@ def base_handles(s) -> List[Dict[str, Any]]:
 
 
 def push_base_sig_on() -> bool:
-    """i7-artsmall (2026-11-10, a sampler-only bug fix, default off until the lead decides): ``ISPATIALGYM_ARTIC_PUSH_BASE_SIG=1`` - the
+    """i7-artsmall (2026-11-10, a sampler-only bug fix, default ON since lead #80c; "0" off): ``ISPATIALGYM_ARTIC_PUSH_BASE_SIG`` - the
     push-close prefix map lookup signs the fist's base turn (:func:`base_handles`), not the turn the previous attempt left in ``handle``."""
-    return os.environ.get("ISPATIALGYM_ARTIC_PUSH_BASE_SIG", "0") == "1"
+    return os.environ.get("ISPATIALGYM_ARTIC_PUSH_BASE_SIG", "1") != "0"
 
 
 def build(alias: str, entry: Dict[str, Any], handle_doc: Dict[str, Any], hull, joint_limits: Tuple[float, float], scale=(1.0, 1.0, 1.0)) -> Dict[str, Any]:
