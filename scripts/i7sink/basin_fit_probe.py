@@ -7,12 +7,13 @@ Sink (``--res`` raster, default 5 mm, over the sink's AABB; every body but the r
     ``max(30, 2 %)`` of them (a drain hole is smaller; the counter flange / faucet are higher);
   * the OCCUPANCY at height ``h`` above the floor (``HEIGHTS``, 2 mm steps to 4 cm, then 6 / 8 / 10 / 15 cm): a downward ray starting at
     ``floor + h`` meets something above ``floor + 3 mm`` (a ray that starts inside a wall hits at ~0 m) - rays below the faucet / the
-    rim, so an arching spout is no wall; ``wall_h`` per cell = the lowest such ``h``;
+    rim, so an arching spout is no wall; ``surf_h`` per cell = the HIGHEST occupied ``h`` (0: the floor itself; a wall's material
+    fills its column from below, so the plate's underside at that cell must be above it);
   * the flat floor's inscribed radius (the free cells at ``h`` = 4 mm) and the basin's half width ``half_width(h)`` about that centre.
 Plate (spawned and parked: gravity off, nothing under it): an upward 2 mm raster of its underside -> the outline radius ``R`` about the
 hits' centroid and the underside height above its lowest point ``u(r)`` (minimum per 2 mm radius bin).
-Fit (level plate, foot on the floor): for each centre on the floor cells, every cell within ``R`` must have ``wall_h > u(r)``;
-``margin_mm`` = the best centre's least ``wall_h - u(r)`` (2 mm resolution; negative: a wall / the flare under the rim).
+Fit (level plate, foot on the floor): for each centre on the floor cells, every cell within ``R`` must have ``surf_h <= u(r)``;
+``margin_mm`` = the best centre's least ``u(r) - surf_h`` (2 mm resolution; negative: a wall / the flare under the rim).
 Drops = the goal check (``SamplerV2.check_goal_feasible``: teleport to the release, ``world.settle`` 120 + 10 physics steps, the up axis
 vs the level orientation <= 15 deg): at the fit centre (+-2 cm), level and tilted 30 / 45 deg about a horizontal axis (that rim down) in
 four directions, the lowest point ``--drop`` above the floor, raised in 5 mm steps until no hull point starts inside a body; the tilt after
@@ -30,6 +31,7 @@ import numpy as np
 
 HEIGHTS = [0.002 * k for k in range(1, 21)] + [0.06, 0.08, 0.10]
 CEILING_M = 0.15
+BASIN_LINK_M = 0.03
 
 
 def _components(mask):
@@ -68,16 +70,16 @@ def _bins_min(r, u, dr=0.002):
 
 def fit_plate(sink, plate):
     """(margin m, centre xy) of the best centre for the level plate (foot on the floor)."""
-    xs, ys, wh = np.array(sink["xs"]), np.array(sink["ys"]), np.array(sink["wall_h"], dtype=float)
+    xs, ys, wh = np.array(sink["xs"]), np.array(sink["ys"]), np.array(sink["surf_h"], dtype=float)
     gx, gy = np.meshgrid(xs, ys, indexing="ij")
     R, u, dr = plate["R"], np.array(plate["u"]), plate["dr"]
-    floor = wh > 0.004
+    floor = wh < 0.004
     best = (-9.0, None)
     for cx, cy in zip(gx[floor], gy[floor]):
         d = np.hypot(gx - cx, gy - cy)
         m = d <= R
         ui = u[np.minimum((d[m] / dr).astype(int), len(u) - 1)]
-        marg = float((wh[m] - ui).min())
+        marg = float((ui - wh[m]).min())
         if marg > best[0]:
             best = (marg, (float(cx), float(cy)))
     return best
@@ -135,8 +137,8 @@ def main(argv=None):
         k = int(np.nonzero(hist >= need)[0][0])
         sel = zs[(zs >= edges[k]) & (zs < edges[k + 1])]
         zf = float(np.median(sel))
-        wall_h = np.full(len(X), np.inf)
-        for h in reversed(HEIGHTS):  # lowest occupied height wins
+        wall_h = np.zeros(len(X))
+        for h in HEIGHTS:  # the highest occupied height wins
             P = [[float(x), float(y), zf + h] for x, y in zip(X, Y)]
             hh = rays(P, [[float(x), float(y), zf - 0.1] for x, y in zip(X, Y)], robot_paths)
             # ... or a ceiling within CEILING_M over that point (under the counter beside a drop-in basin, a lip over the wall); a faucet
@@ -144,15 +146,16 @@ def main(argv=None):
             hu = rays(P, [[float(x), float(y), zf + CEILING_M] for x, y in zip(X, Y)], robot_paths)
             occ = np.array([(bool(r.get("hit")) and float(r["position"][2]) > zf + 0.003) or bool(q.get("hit")) for r, q in zip(hh, hu)])
             wall_h[occ] = h
-        # the basin: the connected free region (4-neighbours at 4 mm) holding the most cells open from above onto the floor
+        # the basin: the connected region under BASIN_LINK_M (4-neighbours) holding the most cells open from above onto the floor
         open_floor = (np.abs(ztop - zf) <= 0.003).reshape(gx.shape)
         wall_h = wall_h.reshape(gx.shape)
-        lab = _components(wall_h > 0.004)
+        low = wall_h < BASIN_LINK_M  # the basin region: floor + its walls' foot (a drain ring does not split it)
+        lab = _components(low)
         if lab.max() > 0:
             counts = np.bincount(lab[open_floor & (lab > 0)].ravel(), minlength=lab.max() + 1)
             keep = int(counts.argmax()) if counts.max() > 0 else 0
-            wall_h[(lab != keep) & (wall_h > 0.004)] = 0.004  # free cells outside the basin (inside the cabinet below) count as walls
-        free = wall_h > 0.004
+            wall_h[(lab != keep) & low] = HEIGHTS[-1]  # low cells outside the basin (in the cabinet below the counter) count as walls
+        free = wall_h < 0.004
         bx, by = gx[~free], gy[~free]
         best = (0.0, None)
         for cx, cy in zip(gx[free], gy[free]):
@@ -163,13 +166,12 @@ def main(argv=None):
         if best[1] is not None:
             d = np.hypot(gx - best[1][0], gy - best[1][1])
             for h in HEIGHTS:
-                blocked = wall_h <= h + 1e-9
+                blocked = wall_h > h + 1e-9
                 hw[f"{h:.3f}"] = round(float(d[blocked].min()), 4) if blocked.any() else None
-        rec = {"aabb": [lo, hi], "xs": xs.tolist(), "ys": ys.tolist(), "wall_h": [[None if not np.isfinite(v) else round(float(v), 4) for v in row] for row in wall_h],
+        rec = {"aabb": [lo, hi], "xs": xs.tolist(), "ys": ys.tolist(), "surf_h": [[round(float(v), 4) for v in row] for row in wall_h],
                "floor_z": round(zf, 4), "top_z_max_on_sink": round(float(zs[-1]), 4), "free_floor_cells": int(free.sum()), "flat_inscribed_r": round(best[0], 4),
                "flat_centre": best[1], "half_width_at_h": hw,
                "free_extent_xy": [round(float(free.any(axis=1).sum() * a.res), 4), round(float(free.any(axis=0).sum() * a.res), 4)]}
-        rec["wall_h"] = [[1.0 if v is None else v for v in row] for row in rec["wall_h"]]  # inf -> 1 m (free up to the top)
         out["sinks"][sn] = rec
         print(f"SINK {sn} floor {zf:.4f} free cells {rec['free_floor_cells']} inscribed r {rec['flat_inscribed_r']:.4f} at {rec['flat_centre']} "
               f"extent {rec['free_extent_xy']} half_width(h) " + " ".join(f"{k}:{v}" for k, v in hw.items() if k in ("0.004", "0.010", "0.020", "0.030", "0.060", "0.100")),
