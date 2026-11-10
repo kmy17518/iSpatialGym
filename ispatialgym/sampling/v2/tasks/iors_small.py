@@ -575,6 +575,32 @@ PLACE_PARTNER_RETRY_REASONS = ("release_sweep", "gripper_not_in_frame", "not_in_
 #: chosen class is above the cap) / ``.map_lost`` (a map lookup feasible only above the cap)
 PUSH_TIP_CAP_ENV = "ISPATIALGYM_PUSH_TIP_CAP"
 PUSH_TIP_CAP_DEFAULT = "0"
+#: i7-t04push 2026-11-09 (owner A7 (1): "apply the push tip cap at the start draw"): the push the goal check will look for, screened when the
+#: candidate is drawn - the swept / open classes for the drawn place pose and the edge's push direction (capped at the tip height when
+#: :data:`PUSH_TIP_CAP_ENV` is on), each tried against :meth:`IORSSmall.push_hand_overlap` (geometry only: the hand beyond the fingers vs the
+#: target's hull, at the contact and at the push goal). No class clearing it = the goal check's "no push class passes from any push stance
+#: lateral" (the overlap does not depend on the stance): sym_t04_on (TIP_CAP=1) lost 17 attempts there, 1076 s, every one on the knuckle /
+#: gripper body 11-16 mm inside the hull. Rejected here the next candidate is drawn in the same attempt. "0" off (default), "shadow" (counted,
+#: nothing rejected), "1" on. Touching tabletop under the push height sweep only; not with ISPATIALGYM_HAND_OVERLAP_RANK (overlaps are then
+#: tried, not refused). r2 (tp_t04_capscr: the overlap alone checked 28, rejected 0 - the 5 / 6 cm tips cleared the hull and then failed the
+#: exact IK from every A1 push stance): the goal check's exact push chain + place from its A1 stances is screened too. Kit
+#: ``push_tip_screen.checked`` / ``.passed`` / ``.rejected`` (+ ``_overlap`` / ``_exact``) / ``.shadow_would_reject`` / ``.uncertain``
+PUSH_TIP_SCREEN_ENV = "ISPATIALGYM_PUSH_TIP_SCREEN"
+PUSH_TIP_SCREEN_DEFAULT = "0"
+#: i7-t04push 2026-11-09 (owner A7 (2): "try short strokes for the tabletop touching push"): ``ISPATIALGYM_TOUCH_PUSH_STROKE_M=<m>`` records a
+#: fingertip push (``push_tip_h`` / ``push_tip_v-``, closed hand) as strokes of at most that length for the oracle's ``execute._push_strokes``
+#: (today only the floor push's ``ISPATIALGYM_FLOORPUSH_STROKE_M``): before each stroke the target is held still and measured, the tips
+#: re-aim where the line through its root meets its back (with a yaw term, within :data:`TOUCH_PUSH_STROKE_REAIM_MAX_M`), between strokes
+#: the hand backs off :data:`TOUCH_PUSH_STROKE_BACKOFF_M`. The record adds the tips' geometry (``face_half_m`` = FINGERTIP_LENGTH,
+#: ``blade_standoff_m`` = that + the stop clearance, ``contact_strips_m``, ``contact_band_m`` +-3 cm about the tips - r1's +-1 cm held too few
+#: hull vertices and the stroke fell back to the root -, ``half_extent_m`` the root's depth behind the contact). Unset / "off" / "0" =
+#: one stroke (default). Kit ``touch_push_strokes.recorded`` / ``.skipped_class``
+TOUCH_PUSH_STROKE_ENV = "ISPATIALGYM_TOUCH_PUSH_STROKE_M"
+TOUCH_PUSH_STROKE_BACKOFF_M = 0.02
+TOUCH_PUSH_STROKE_REAIM_MAX_M = 0.015
+TOUCH_PUSH_STROKE_YAW_GAIN_M_PER_RAD = 0.15
+TOUCH_PUSH_STROKES_MAX = 6
+TOUCH_PUSH_STROKE_BAND_M = (-0.03, 0.03)
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
@@ -631,6 +657,23 @@ def _tip_keep(cap: float):
         m = re.search(r"@([0-9.]+)cm", str((row or {}).get("class") or ""))
         return m is None or float(m.group(1)) / 100.0 <= cap + 1e-6
     return keep
+
+
+def touch_push_stroke_m() -> Optional[float]:
+    """:data:`TOUCH_PUSH_STROKE_ENV` as a length (m), None when unset / "off" / "0"; ``ValueError`` for a length that is not positive."""
+    v = (os.environ.get(TOUCH_PUSH_STROKE_ENV) or "").strip().lower()
+    if v in ("", "off", "0", "none"):
+        return None
+    m = float(v)
+    if not m > 0.0:
+        raise ValueError(f"{TOUCH_PUSH_STROKE_ENV}={v!r}: a positive length (m)")
+    return m
+
+
+def push_tip_screen_mode() -> str:
+    """``"off"`` / ``"shadow"`` / ``"on"`` from :data:`PUSH_TIP_SCREEN_ENV` (unset or empty: :data:`PUSH_TIP_SCREEN_DEFAULT`)."""
+    v = (os.environ.get(PUSH_TIP_SCREEN_ENV) or PUSH_TIP_SCREEN_DEFAULT).strip().lower()
+    return "on" if v in ("1", "on") else ("shadow" if v == "shadow" else "off")
 
 
 def push_tip_cap_mode() -> str:
@@ -2910,7 +2953,100 @@ class IORSSmall(SamplerV2):
             self._touch_lift_screen(manip, grasp, t_pose, p_pose, int(k))
         if self.relation == "touching" and touch_a1_screen_mode() != "off":
             self._touch_a1_screen(manip, grasp, t_pose, p_pose, int(k))
+        if self.relation == "touching" and push_tip_screen_mode() != "off":
+            self._touch_tip_screen(manip, grasp, t_pose, p_pose, int(k))
         return p_pose
+
+    def _touch_tip_screen(self, manip: Stance, grasp: GraspRecord, t_pose: G.Pose, p_pose: G.Pose, k: int) -> None:
+        """:data:`PUSH_TIP_SCREEN_ENV` (i7-t04push): ``Reject("contact_unreachable")`` at the draw when the goal check's push stance search is
+        certain to fail - (a) no push class it would try clears the target's hull (:meth:`push_overlap_screen_why`, geometry), or (b) none of
+        its A1 push stances (:meth:`push_stance_candidates`, the first ``push_stance_max_exact``: the same call and inputs) has both a push
+        chain (:meth:`push_chain_feasible`: exact IK + retreat, capped under :data:`PUSH_TIP_CAP_ENV`) and the box's place
+        (:meth:`place_infeasible_why`) - the goal check's own acceptance; shadow counts. Not screened (``push_tip_screen.uncertain``): the
+        shelf layout / tip release, outside the push height sweep, with ISPATIALGYM_HAND_OVERLAP_RANK, and (b) without an A1 stance. Kit
+        ``push_tip_screen.rejected_overlap`` / ``.rejected_exact`` / ``.exact_stances``."""
+        if self.shelf_start is not None or self.shelf_tip() or not self.push_height_sweep_on() or hand_overlap_rank_on():
+            TT._count(self, "push_tip_screen.uncertain")
+            return
+        t_place = self.place_pose_for(t_pose, p_pose, manip)
+        TT._count(self, "push_tip_screen.checked")
+        why = self.push_overlap_screen_why(manip, t_place, p_pose)
+        kind = "overlap"
+        if why is None and TT.contact_maps_on():
+            laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+            rows, _f = self.push_stance_candidates(manip, t_place, laterals, p_pose=p_pose)
+            rows = rows[:int(self.gen("push_stance_max_exact", PUSH_STANCE_MAX_EXACT))]
+            if not rows:
+                TT._count(self, "push_tip_screen.uncertain")
+            else:
+                whys = []
+                for lat, cand, _x in rows:
+                    probe = cand if cand is not None else manip
+                    TT._count(self, "push_tip_screen.exact_stances")
+                    self._push_chain_fails = []
+                    push_kind = self.push_chain_feasible(probe, t_place, p_pose)
+                    place_why = self.place_infeasible_why(probe, t_place, grasp) if push_kind is not None else None
+                    if push_kind is not None and place_why is None:
+                        why = None
+                        break
+                    so = getattr(probe, "stand_off", None)
+                    whys.append(f"{lat:+.2f}{f' s{float(so):.2f}' if so is not None else ''}: " + (f"place: {place_why}" if push_kind else f"no class [{len(self._push_chain_fails)} cands]"))
+                else:
+                    why, kind = "no A1 push stance has a push chain and the place (exact): " + "; ".join(whys), "exact"
+        if why is None:
+            TT._count(self, "push_tip_screen.passed")
+            return
+        TT._count(self, f"push_tip_screen.rejected_{kind}" if push_tip_screen_mode() == "on" else f"push_tip_screen.shadow_would_reject_{kind}")
+        msg = f"push tip screen at the draw (candidate {k}, trunk {manip.translate}, {manip.tilt:.2f}): {why}"
+        if push_tip_screen_mode() == "shadow":
+            TT._count(self, "push_tip_screen.shadow_would_reject")
+            log.info("PUSH_TIP_SCREEN shadow would reject: %s", msg[:400])
+            return
+        TT._count(self, "push_tip_screen.rejected")
+        raise Reject("contact_unreachable", msg)
+
+    def push_overlap_screen_why(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Optional[str]:
+        """None when one push class of the goal check's stream (:meth:`touching_push_candidates` under the sweep, the open classes first
+        under :meth:`push_gripper_open_on`, the pair's ``push_max_height_m``, the tip cap when :data:`PUSH_TIP_CAP_ENV` is on) clears the
+        target's hull at its contact and at the push goal (:meth:`push_hand_overlap`, the goal check's first test); else why (the overlaps
+        counted). The push along ``st``'s edge, the box at ``t_place_pose``, the partner at ``p_pose``; geometry only."""
+        tangent = st.tangent
+        direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])
+        p_init, _b = self.touching_points(t_place_pose, p_pose, st)
+        hull_w = self.world.hull_at(self.hull["target"], t_place_pose)
+        t_face_z = (float(hull_w[:, 2].min()), float(hull_w[:, 2].max()))
+        p_hull = self.world.hull_at(self.hull["partner"], p_pose)
+        dist = self.push_distance(float((p_hull[:, :2] @ tangent).min() - (hull_w[:, :2] @ tangent).max()))
+        line_xy = self.push_line_xy(t_place_pose)
+        cands = self.touching_push_candidates(st, p_init, t_face_z, direction, t_hull_w=hull_w, line_xy=line_xy)
+        if self.push_gripper_open_on():
+            import itertools
+
+            cands = itertools.chain(self.open_push_candidates(st, hull_w, t_face_z, direction, line_xy=line_xy), cands)
+        pair = self.pair_goal_align()
+        h_max = float(pair["push_max_height_m"]) if (pair is not None and pair["push_max_height_m"] is not None) else None
+        cap = None
+        if push_tip_cap_mode() == "on":
+            cap = float(CPZ.push_tip_height_cap(hull_w, t_face_z[0], direction, line_xy=line_xy,
+                                                ratio=float(TT.phase2_gen(self, "push_tip_height_ratio", CPZ.PUSH_TIP_HEIGHT_RATIO)))["cap_m"])
+        import collections
+
+        why: "collections.Counter[str]" = collections.Counter()
+        n = 0
+        for _kind, init, extras in cands:
+            if h_max is not None and float(extras.get("fingertip_z") or G.t(init[0])[2]) - float(t_face_z[0]) > h_max + 1e-9:
+                continue
+            h = extras.get("contact_height_m")
+            if cap is not None and h is not None and float(h) > cap + 1e-6:
+                continue
+            n += 1
+            goal = (G.t(init[0]) + direction * float(dist), G.t(init[1]))
+            ov = self.push_hand_overlap(init, goal, t_place_pose, direction, dist, against="hull")
+            if ov is None:
+                return None
+            why[str(ov).split(" -")[0][:40]] += 1
+        return f"no push class of {n}{f' at or below the tip cap {100 * cap:.1f} cm' if cap is not None else ''} clears the target's hull (" + \
+            ", ".join(f"{c}x {w}" for w, c in why.most_common(4)) + ")"
 
     def _touch_a1_screen(self, manip: Stance, grasp: GraspRecord, t_pose: G.Pose, p_pose: G.Pose, k: int) -> None:
         """Follow-up :data:`TOUCH_A1_SCREEN_ENV`: the goal check's push stance search (:meth:`touching_push_stance`) at the draw, as far as it
@@ -7322,6 +7458,8 @@ class IORSSmall(SamplerV2):
             draft.summary["touching"]["push_gripper_open"] = {"open": push_fingers(push_extras) != IK.FINGER_CLOSED, "fingers_opening_m": push_extras.get("fingers_opening_m"),
                                                               **(open_fallback or {})}
         log.info("%s: touching push class %s from the %s stance%s", self.gp.variant, push_kind, manip.name, f" (failed before it: {'; '.join(why[:10])})" if why else "")
+        if touch_push_stroke_m() is not None:  # i7-t04push (TOUCH_PUSH_STROKE_ENV); off: today's record
+            push_extras = dict(push_extras, **self.touch_push_strokes(push_kind, push_extras, dist, root_xy=G.t(t_pose[0])[:2], direction=direction))
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
         if self.shelf_start is not None:
             push_rec.arm = self.shelf_push_arm()
@@ -7452,6 +7590,35 @@ class IORSSmall(SamplerV2):
             if h is not None and float(h) > float(tip["cap_m"]) + 1e-6:
                 TT._count(self, "push_tip_cap.chosen_above")  # shadow: the class the cap would have skipped
         return res
+
+    def touch_push_strokes(self, kind: str, extras: Dict[str, Any], dist: float, root_xy: Optional[th.Tensor] = None,
+                           direction: Optional[th.Tensor] = None) -> Dict[str, Any]:
+        """:data:`TOUCH_PUSH_STROKE_ENV` (i7-t04push): the push record's ``strokes`` plan (``iors_large.push_stroke_plan`` over the push's
+        ``dist``) and the fingertips' geometry for ``execute._push_strokes``; ``{}`` when off, for the shelf layout and for a class that is not a
+        closed fingertip push (``touch_push_strokes.skipped_class``)."""
+        stroke = touch_push_stroke_m()
+        if stroke is None or self.shelf_start is not None:
+            return {}
+        if not str(kind).startswith("push_tip_") or push_fingers(extras) != IK.FINGER_CLOSED:
+            TT._count(self, "touch_push_strokes.skipped_class")
+            return {}
+        from ispatialgym.sampling.v2.tasks.iors_large import push_contact_strips, push_stroke_plan
+
+        plan = push_stroke_plan(float(dist), stroke, TOUCH_PUSH_STROKES_MAX, backoff_m=TOUCH_PUSH_STROKE_BACKOFF_M, reaim_max_m=TOUCH_PUSH_STROKE_REAIM_MAX_M,
+                                yaw_gain_m_per_rad=TOUCH_PUSH_STROKE_YAW_GAIN_M_PER_RAD, yaw_deadband_rad=math.radians(2.0))
+        strips, _face = push_contact_strips("closed_turned" if str(kind).startswith("push_tip_h") else "blade")
+        clearance = float(extras.get("stop_clearance_m") or CPZ.STOP_CLEARANCE)
+        TT._count(self, "touch_push_strokes.recorded")
+        log.info("%s: touching push %s in %d strokes of <= %.3f m over %.3f m (TOUCH_PUSH_STROKE_M)", self.gp.variant, kind, plan["n"], stroke, float(dist))
+        out = {"strokes": plan, "face_half_m": round(C.FINGERTIP_LENGTH, 5), "blade_standoff_m": round(C.FINGERTIP_LENGTH + clearance, 5),
+               "contact_strips_m": [[round(c, 5), round(hw, 5)] for c, hw in strips], "contact_band_m": list(TOUCH_PUSH_STROKE_BAND_M)}
+        cp = extras.get("contact_point")
+        if root_xy is not None and direction is not None and cp is not None:
+            # the stroke's fallback without the live hull in its band: the target's back = its root less this along the push
+            d2 = G.t(direction).float()[:2]
+            d2 = d2 / max(float(th.linalg.norm(d2)), 1e-9)
+            out["half_extent_m"] = round(max(0.0, float((G.t(root_xy).float()[:2] - G.t(cp).float()[:2]) @ d2)), 5)
+        return out
 
     def push_tip_cap(self, t_pose: Optional[G.Pose], z0: float, direction: th.Tensor, hull_w: Optional[th.Tensor] = None,
                      line_xy: Optional[th.Tensor] = None) -> Optional[Dict[str, float]]:

@@ -5054,6 +5054,11 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
     strips = [tuple(float(v) for v in s) for s in (extra.get("contact_strips_m") or PUSH_BLADE_STRIPS_M)]
     tip_z = float(C.fingertip((p_init, q_blade))[2])
     band = (tip_z, tip_z + PUSH_BLADE_BAND_M)
+    if extra.get("contact_band_m") is not None:
+        # i7-t04push (iors_small.TOUCH_PUSH_STROKE_ENV): a fingertip push meets the object within this band around the tips' height (m,
+        # relative to it), not the floor blade's band above them
+        lo, hi = (float(v) for v in extra["contact_band_m"])
+        band = (tip_z + lo, tip_z + hi)
     res0, _ = push_residual(geom, state, obj, pose0, None)
     total = float(plan["ends_m"][-1])
     rep: Dict[str, Any] = {"n": int(plan["n"]), "plan": {k: (round(v, 4) if isinstance(v, float) else v) for k, v in plan.items()}, "strokes": []}
