@@ -14,6 +14,7 @@ def sha(path):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root', type=Path, required=True)
+    p.add_argument('--secondary-root', type=Path)
     a = p.parse_args(); root = a.root.resolve()
     now = datetime.now(timezone.utc).isoformat()
     rows = {}
@@ -104,12 +105,43 @@ def main():
                     put(task, cls, 'eval_model', 'target_grasp_library_positive',
                         'Exact target library passed native identity, default-scale and positive-grasp admission. Exact-height maps and task geometry/demo/replay remain separate gates.',
                         [dependency_path], 3)
-    bound_path = root / 'manifests/floating_consumer_contracts_r5.json'
-    bound = json.loads(bound_path.read_text())
-    for template in bound['templates']:
-        if template['split'] in ('eval_model', 'eval_category'):
-            put(template['task'], template['class_id'], template['split'], 'fresh_native_sample_bound',
-                'Fresh native consumer output is bound to exact ready assets, scales and definition. Annotated demonstration/replay and allocation are tracked separately.', [bound_path], 4)
+    native_batches = [(root, root / 'validation_inputs/wall_dispenser_corridor_v1/validation_jobs.json', 'held_wall_dispenser_corridor_v1')]
+    if a.secondary_root:
+        secondary = a.secondary_root.resolve()
+        assert secondary.name == 'campaign_20261110', 'unexpected secondary campaign source'
+        native_batches += [(secondary, secondary / 'heldout_model_wall_bootstrap_v1/validation_jobs.json', 'held_model_wall_bootstrap_v1'),
+                           (secondary, secondary / 'pair_bootstrap_inputs_v1/validation_jobs.json', 'held_pairs_native_bootstrap_v1')]
+    for source_root, jobs_path, tag in native_batches:
+        if not jobs_path.is_file():
+            continue
+        for job in json.loads(jobs_path.read_text())['jobs']:
+            directory = source_root / 'materialized_runs' / tag / 'validation' / job['class_id']
+            summary_path = directory / 'summary.json'
+            if not summary_path.is_file():
+                continue
+            summary = json.loads(summary_path.read_text())
+            if not summary.get('finished'):
+                continue
+            assert summary['args']['variant'] == job['alias'] and summary['args']['scene'] == job['scene'], 'native status identity mismatch'
+            counts = {}
+            for templates in summary.get('problems', {}).values():
+                for record in templates.values():
+                    for reason, count in record.get('rejections', {}).items():
+                        counts[reason] = counts.get(reason, 0) + count
+            written = summary.get('n_written', 0)
+            reason = (f'Native bounded sampler wrote {written} fresh sample(s); exact binding, demo and replay remain separate gates.' if written else
+                      'Last completed bounded native attempt wrote no sample: ' + (', '.join(f'{key}={value}' for key, value in sorted(counts.items())) or 'no valid template choices; inspect native summary') + '. No thresholds changed.')
+            put(job['task'], job['class_id'], job['split'], 'fresh_native_sample_written' if written else 'blocked_native_geometry',
+                reason, [summary_path, jobs_path], 4)
+    bound_paths = [root / 'manifests/floating_consumer_contracts_r5.json']
+    for pattern in ('held_model_wall_fresh_contracts_r*.json', 'held_pairs_fresh_contracts_r*.json'):
+        bound_paths.extend(sorted((root / 'manifests').glob(pattern)))
+    for bound_path in bound_paths:
+        bound = json.loads(bound_path.read_text())
+        for template in bound['templates']:
+            if template['split'] in ('eval_model', 'eval_category'):
+                put(template['task'], template['class_id'], template['split'], 'fresh_native_sample_bound',
+                    'Fresh native consumer output is bound to exact ready assets, scales and definition. Annotated demonstration/replay and allocation are tracked separately.', [bound_path], 5)
     output = dict(schema='isg-campaign-pipeline-status-v1', campaign_id='campaign_20261110',
                   rows=[value[1] for _, value in sorted(rows.items())])
     text = json.dumps(output, indent=2, sort_keys=True) + '\n'

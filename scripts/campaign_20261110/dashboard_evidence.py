@@ -131,12 +131,13 @@ def controller_reasons(root, catalog):
                     continue
                 scope=config_scope(record['prepared']['config'],root,sources)
                 status=record.get('status','status not recorded')
+                phase='training' if scope['split']=='train' else 'evaluation'
                 message=record.get('error') or record.get('reason') or {
-                    'ready':'Fresh training canary prepared; awaiting dispatch.',
-                    'external_submission':'Fresh training canary queued or running; exact runtime demo and replay gate required.',
-                    'admitted':'Exact runtime training gate passed; seed admitted to bounded refill.',
+                    'ready':f'Fresh {phase} canary prepared; awaiting dispatch.',
+                    'external_submission':f'Fresh {phase} canary queued or running; exact runtime demo and replay gate required.',
+                    'admitted':'Exact runtime gate passed; seed admitted to bounded refill.',
                 }.get(status,status)
-                if status=='admitted':message='Exact runtime training gate passed; seed admitted to bounded refill.'
+                if status=='admitted':message='Exact runtime gate passed; seed admitted to bounded refill.'
                 reasons[(scope['task'],scope['class_id'])].append({
                     'controller':directory.name,'admission_id':identity,'status':status,'reason':str(message),
                     'split':scope['split'],'observed_at':epoch(state.get('updated_at'),source['mtime']),

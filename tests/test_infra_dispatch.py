@@ -89,10 +89,10 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(D.backend_capacity('minyeong_svl', rows), 8)
         self.assertEqual(D.backend_capacity('vast_5090', rows), 8)
 
-    def test_capacity_is_scoped_to_actual_qos_not_combined_user_jobs(self):
-        rows = [['minyeong','svl','RUNNING','N/A','svl']] * 56
-        rows += [['minyeong','viscam','RUNNING','N/A','viscam']] * 60
-        rows += [['minyeong','svl,viscam','PENDING','gres/gpu:1','viscam']] * 23
+    def test_capacity_uses_partition_qos_when_job_qos_is_normal(self):
+        rows = [['minyeong','svl','RUNNING','N/A','normal']] * 56
+        rows += [['minyeong','viscam','RUNNING','N/A','normal']] * 60
+        rows += [['minyeong','svl,viscam','PENDING','gres/gpu:1','normal']] * 23
         self.assertEqual(D.backend_capacity('minyeong_svl', rows), 0)
         self.assertEqual(D.backend_capacity('minyeong_viscam', rows), 7)
         self.assertEqual(D.backend_capacity('shiyuc_viscam', rows), 8)

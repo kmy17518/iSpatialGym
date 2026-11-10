@@ -483,7 +483,8 @@ def main():
                         entry = spec["adopt_anchor"]
                         rows = [row for row in allocations(root) if row["jobid"] == str(entry["jobid"])]
                         require(len(rows) == 1 and rows[0]["key"] == spec["class_id"], "adopted anchor allocation ambiguous")
-                        name = "family_auto_" + spec["class_id"].replace("-", "_") + "_0001"
+                        name = ("family_auto_" + spec["class_id"].replace("-", "_") + "_"
+                                + str(len(family.get('history',[]))+1).zfill(4))
                         bucket = next_bucket(accepted_counts(root, spec["class_id"]), spec["eval_quotas"], spec.get('enabled_buckets'))
                         require(bucket is not None, "adopted anchor class quota already full")
                         family.update(anchor_adopted=True, current={"name": name, "bucket": bucket, "created_at": time.time(), "anchor": {

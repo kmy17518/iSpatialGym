@@ -220,9 +220,10 @@ def backend_capacity(backend, rows):
     if backend.startswith('vast_'): return 8
     user, partition = backend.split('_')
     own = [row for row in rows if row[0] == user]
-    # QoS limits span accounts, not unrelated QoS classes. CPU services consume
-    # svl job slots but never GPU TRES; viscam has no 56-job limit.
-    part = [row for row in own if (row[4] if len(row) > 4 else row[1]) == partition]
+    # These are PARTITION QoS limits; a job's %q is normally "normal".
+    # Pending dual-partition jobs count against both until Slurm picks one.
+    # CPU services consume svl job slots but never GPU TRES; viscam has no 56-job limit.
+    part = [row for row in own if partition in row[1].split(',')]
     gpus = sum(int(row[3].rsplit(':', 1)[1]) for row in part if 'gpu:' in row[3])
     running = sum(row[2] in ('RUNNING','COMPLETING') for row in part)
     limits = [8, (48 if partition == 'svl' else 30) - gpus]

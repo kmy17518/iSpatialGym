@@ -40,7 +40,7 @@ def reconcile_author_gaps(state):
     state["author_reconciliation"] = AUTHOR_RECONCILIATION
 
 
-def source_proof(gate_path, *, root, started_at, campaign_id):
+def source_proof(gate_path, *, root, started_at, campaign_id, permitted_split=None):
     """Audit one annotated anchor without treating it as accepted dataset data."""
     gate_path = artifact(gate_path, root, started_at)
     gate = read(gate_path)
@@ -54,8 +54,11 @@ def source_proof(gate_path, *, root, started_at, campaign_id):
     block = raw.get("campaign")
     require(block is not None, "unannotated anchor cannot admit a generic training seed")
     validate_campaign_block(block, object_bindings=raw["object_bindings"])
-    require(block["campaign_id"] == campaign_id and block["split"] in ("train", "eval_standard"), "heldout/other-campaign anchor cannot train")
-    require(groups.supports(block["task"]), "anchor task has no generic queue adapter")
+    require(permitted_split in (None, "eval_model"), "unsupported explicit source-proof split")
+    allowed_splits = ("eval_model",) if permitted_split == "eval_model" else ("train", "eval_standard")
+    require(block["campaign_id"] == campaign_id and block["split"] in allowed_splits, "anchor outside permitted split; heldout anchor cannot train")
+    require(groups.supports(block["task"]) or (permitted_split == "eval_model" and block["task"] in held.RANGES),
+            "anchor task has no generic queue adapter")
     gid = block.get("goal_group_id")
     require(not gid or not (root / "groups" / gid / "release_block.json").exists(), "source group is release blocked")
     env = read_env(job / "job.env")
@@ -86,7 +89,8 @@ def source_proof(gate_path, *, root, started_at, campaign_id):
     check_reservations(template, policy[1], policy[2])
     if template.task == "disembedding":
         require(template.scene_setup.get("binding_pool"), "disembedding admission requires the immutable full-pool contract")
-    return {"schema": "isg-training-anchor-admission-v1", "campaign_id": campaign_id, "source_job": str(job),
+    return {"schema": "isg-heldout-anchor-admission-v1" if permitted_split else "isg-training-anchor-admission-v1",
+        "campaign_id": campaign_id, "source_job": str(job),
         "source_gate": {"path": str(gate_path), "sha256": file_digest(gate_path)}, "instance_id": iid,
         "config": {"path": str(config_path), "sha256": file_digest(config_path)}, "template": asdict(template),
         "validation_key": asdict(key), "perturbations": config["perturbations"],

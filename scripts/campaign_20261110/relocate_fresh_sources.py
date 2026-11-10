@@ -27,10 +27,11 @@ def main():
         matches = [j for j in jobs if j['alias'] == original['variant'] and j['scene'] == original['scene']]
         assert len(matches) == 1, 'native output must match one exact prepared job'
         job = matches[0]
-        source_jobs = json.loads(Path(job['source_manifest']).read_text())['jobs']
+        source_manifest = Path(job['source_manifest']).resolve()
+        source_jobs = json.loads(source_manifest.read_text())['jobs']
         match = [j for j in source_jobs if j['template_fingerprint'] == job['template_fingerprint']]
         assert len(match) == 1
-        argv = match[0]['sample_argv']
+        argv = [arg.replace('${MATERIALIZED}', str(source_manifest.parent)) for arg in match[0]['sample_argv']]
         customs = Path(argv[argv.index('--customs') + 1]).resolve()
         old_customs = Path(original['customs']).resolve()
         assert customs.is_relative_to(a.root.resolve())
