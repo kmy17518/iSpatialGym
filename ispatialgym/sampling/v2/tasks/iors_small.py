@@ -265,6 +265,19 @@ def shelf_stance_shift_on(s=None) -> bool:
     return _AS.switch_on(SHELF_STANCE_SHIFT_ENV, s)
 
 
+#: i7-t03both 2026-11-09 (owner decision A5, DEFAULT OFF): with ``generation.shelf_start_draw`` and the v2 library's lean rests, each attempt
+#: draws the compartment AND the board the target leans against among every layout of the support whose board has a lean rest with an interior
+#: reach map (``tabletop.shelf_lean_pool``), then that board's lean rest (its angle) uniformly - the grasps, the rest, the band and the working
+#: arm follow the drawn rest (:meth:`IORSSmall.draw_shelf_side`). Today (off): the template's ONE lean rest pins the board (and its angle).
+#: Needs start_per_attempt (each attempt's Phase 2 with its arm and band); eval keeps the board opposite ``generation.partner_side``.
+SHELF_BOARD_DRAW_ENV = "ISPATIALGYM_SHELF_BOARD_DRAW"
+
+
+def shelf_board_draw_on(s=None) -> bool:
+    """``ISPATIALGYM_SHELF_BOARD_DRAW`` (i7-t03both, owner A5; default off - not in ``alias_switches.SHELF_TIP_DEFAULTS``)."""
+    return _AS.switch_on(SHELF_BOARD_DRAW_ENV, s)
+
+
 def shelf_need_of(err: Reject) -> Optional[str]:
     """Why a candidate's fixed start failed, for the stance shift: ``"transit"`` (the transit / back-off checks), ``"grasp"`` (no library
     grasp reaches the fixed start pose), None for anything the base position cannot change (the shift is not tried)."""
@@ -1170,8 +1183,9 @@ class IORSSmall(SamplerV2):
         if p_touch:
             ws = [TT.grasp_pinch_width(g) for g in self.grasps]
             op = None if not ws or None in ws else min(C.FINGER_OPEN, max(0.5 * w + IK.ORACLE_PRESHAPE_MARGIN_M for w in ws))
+            self._shelf_finger_open_template = op
             self.ikc.set_finger_touch(IK.FingerTouch(p_touch["margin_m"], p_touch["max_penetration_m"], p_touch["preshape"], supports=self.support_objects,
-                                                     opening=lambda: op))
+                                                     opening=lambda: self.__dict__.get("_shelf_finger_open", op)))  # i7-t03both: the drawn rest's
         # pinch centring (oracle-B, run 0916-202403: a pinch off the object's centre along the closing axis lets one pad reach
         # the object first and drag it until the other lands - +15.4 mm at the closure): the pinch centre is moved onto
         # the hull's centre along c when it sits farther than ``pinch_offset_max_m`` from it (the pads close until contact,
@@ -1276,6 +1290,7 @@ class IORSSmall(SamplerV2):
                 # every attempt draws its own from (:meth:`draw_shelf_side`, :meth:`draw_shelf_layout`); the template check above stays
                 self._shelf_template = {k: self.shelf_start.get(k) for k in ("key", "lean_side", "lean_deg", "context")}
                 self._shelf_rest0 = {"target": self.rest["target"].clone(), "partner": self.rest["partner"].clone()}
+                self._board_keys = self.shelf_board_pool() if shelf_board_draw_on(self) else None  # i7-t03both (owner A5)
                 self.template_facts["shelf_start_draw"] = self.shelf_draw_facts()
             if shelf_span_rule_on():  # 5k.1: the computed requirement at the most favourable drawable leans
                 self.shelf_template_span_check()
@@ -3692,6 +3707,29 @@ class IORSSmall(SamplerV2):
         if not isinstance(tries, int) or tries < 1:
             raise Reject("spec", f"{bad}.tries must be a positive int, got {tries!r}")
         spec = {"layouts": layouts, "lean_deg": pair("lean_deg", 0.0, 45.0), "spine_behind_edge_m": pair("spine_behind_edge_m", 0.0, 0.5), "tries": tries}
+        # i7-t03both 2026-11-09 (owner A5): ``rows`` {support: {"<board height m above the floor>": [[bay_m, side], ...]}} - the compartments of the
+        # support's OTHER rows; drawn only with ISPATIALGYM_SHELF_BOARD_DRAW (each its own interior surface and maps; normalised [(z, layouts)])
+        rows_raw = (raw.get("rows") or {}).get(name)
+        rows_n: List[Tuple[float, List[Tuple[float, float]]]] = []
+        if rows_raw is not None:
+            if not isinstance(rows_raw, dict):
+                raise Reject("spec", f"{bad}.rows.{name} must map a board height to its layouts, got {rows_raw!r}")
+            for zk, lays in rows_raw.items():
+                try:
+                    zf = round(float(zk), 4)
+                except (TypeError, ValueError):
+                    zf = None
+                if zf is None:
+                    raise Reject("spec", f"{bad}.rows.{name}: a row key is a board height in m, got {zk!r}")
+                out_l = []
+                for row in lays or []:
+                    if not (isinstance(row, (list, tuple)) and len(row) == 2 and isinstance(row[0], (int, float)) and row[1] in ("left", "right")):
+                        raise Reject("spec", f"{bad}.rows.{name}.{zk}: every layout is [bay_m, 'left' | 'right'], got {row!r}")
+                    out_l.append((float(row[0]), 1.0 if row[1] == "left" else -1.0))
+                if out_l:
+                    rows_n.append((zf, out_l))
+        if rows_n:
+            spec["rows"] = sorted(rows_n)
         self._shelf_draw_spec = (raw, spec)
         return spec
 
@@ -3703,7 +3741,8 @@ class IORSSmall(SamplerV2):
         return {"layouts": [[bay, TT.side_name(sd)] for bay, sd in spec["layouts"]], "lean_deg": spec["lean_deg"], "spine_behind_edge_m": spec["spine_behind_edge_m"],
                 "tries": spec["tries"], "template_layout": [float(bays.get(self.support.name, 0.0)) if isinstance(bays, dict) else 0.0,
                                                             TT.side_name(self._shelf_template["lean_side"])],
-                "mirror": bool(start_per_attempt(self)) and any(sd != self._shelf_template["lean_side"] for _, sd in spec["layouts"])}
+                "mirror": bool(start_per_attempt(self)) and any(sd != self._shelf_template["lean_side"] for _, sd in spec["layouts"]),
+                **({"rows": {str(z): [[bay, TT.side_name(sd)] for bay, sd in lays] for z, lays in spec["rows"]}} if spec.get("rows") and shelf_board_draw_on(self) else {})}
 
     def shelf_use_arm(self, arm: str) -> None:
         """The shelf layout's working arm (owner 2026-10-11 11:46): the arm on the target's side grasps, places and pushes, the other arm has no
@@ -3740,20 +3779,244 @@ class IORSSmall(SamplerV2):
         elif not start_per_attempt(self):
             fixed, why = float(base["lean_side"]), "no start_per_attempt: the template's arm and candidates"
         lean_side = TT.lean_rest_side(getattr(self, "grasp_key", None))
+        pool = getattr(self, "_board_keys", None)
+        board_draw = bool(pool) and bool(start_per_attempt(self))
+        if board_draw:
+            # i7-t03both 2026-11-09 (owner A5, ISPATIALGYM_SHELF_BOARD_DRAW): the compartment (its row too: ``shelf_start_draw.rows``) and the board
+            # are drawn among the layouts whose board has a lean rest with that row's interior map; eval keeps the board opposite partner_side
+            have = [sd for sd in (1.0, -1.0) if pool.get(sd)]
+            if fixed is not None and assigned in ("left", "right"):
+                have = [sd for sd in have if sd == fixed]
+            z0 = self._shelf_row_z0
+            cands = []
+            for c in [(b, sd, z0) for b, sd in layouts] + [(b, sd, self.shelf_row_key(z)) for z, lays in (spec.get("rows") or []) for b, sd in lays]:
+                if c not in cands and c[1] in have and any(c[2] in st["rows"] for st in pool[c[1]]):
+                    cands.append(c)
+            if not cands:
+                raise Reject("missing_grasps:lean", f"shelf board draw: no layout of {self.support.name} on a board with a lean rest and its row's map "
+                                                    f"({sorted(TT.side_name(sd) for sd in have)})")
+            fixed, why = None, f"shelf board draw: the boards with a lean rest {[TT.side_name(sd) for sd in have]}"
+            lean_side = None
+        elif pool:
+            TT._count(self, "shelf_board_draw.off_no_start_per_attempt")
         if lean_side is not None:  # i7-lean 2026-11-07: a v2 lean rest leans on one board (its grasps and its map are that rest's)
             fixed, why = lean_side, f"v2 lean rest {getattr(self, 'grasp_key', None)}: its board"
         if fixed is not None:
             bays = self.gen("shelf_bay_lateral_m")
             bay0 = float(bays.get(self.support.name, 0.0)) if isinstance(bays, dict) else 0.0
             layouts = [lay for lay in layouts if lay[1] == fixed] or [(bay0, fixed)]
-        k = int(rng.integers(len(layouts)))
-        bay, side = layouts[k]
+        drawn_key = None
+        if board_draw:
+            bay, side, z = cands[int(rng.integers(len(cands)))]
+            states = [st for st in pool[side] if z in st["rows"]]
+            st_k = states[int(rng.integers(len(states)))] if len(states) > 1 else states[0]
+            self.apply_board_key(st_k, z)
+            base = self._shelf_template
+            drawn_key = st_k["key"]
+            layouts = [(c[0], c[1]) for c in cands]
+            TT._count(self, f"shelf_board_draw.drawn.{TT.side_name(side)}")
+            TT._count(self, f"shelf_board_draw.layout.{z:.4f}_{bay:+.2f}_{TT.side_name(side)}")
+            TT._count(self, f"shelf_board_draw.rest.{drawn_key.split('@')[-1]}")
+            log.info("%s: shelf board draw: row %.4f bay %+.2f %s board, lean rest %s (%d layouts, %d rests on that board and row)", self.gp.variant, z, bay,
+                     TT.side_name(side), drawn_key, len(cands), len(states))
+        else:
+            k = int(rng.integers(len(layouts)))
+            bay, side = layouts[k]
         self.shelf_start = {"key": base["key"], "lean_side": side, "lean_deg": base["lean_deg"], "context": base.get("context")}
         self.rest["target"], self.rest["partner"] = self.shelf_rests(side, float(base["lean_deg"]), float(base["lean_deg"]))
         self.shelf_use_arm(self.shelf_push_arm())
         self.shelf_pose = self.shelf_partner_pose = None
         self._shelf_draw = {"layout": [bay, TT.side_name(side)], "n_layouts": len(layouts), "restricted": why}
-        self._shelf_side_layouts = [lay for lay in layouts if lay[1] == side]
+        if drawn_key is not None:
+            self._shelf_draw["board_draw"] = {"grasp_key": drawn_key, "lean_deg": base["lean_deg"], "row_z": z, "n_rests": len(states)}
+            self._shelf_side_layouts = [(c[0], c[1]) for c in cands if c[1] == side and c[2] == z]  # a redraw stays on the row (its top)
+        else:
+            self._shelf_side_layouts = [lay for lay in layouts if lay[1] == side]
+
+    def _board_key_state(self, key: str) -> Dict[str, Any]:
+        """i7-t03both (owner A5): the target's grasp set at lean key ``key`` as :meth:`sample_template` builds the template's - the library's
+        rows (``tabletop.library_grasps(key=)``), the attachable ones, the pinch re-centring, the flush tier - with its rest, its shelf facts
+        (lean side / angle) and its pre-shape opening. ``Reject`` as the template's would."""
+        tgt = self.obj("target")
+        grasps, key, rest = TT.library_grasps(self, "target", key=key)
+        grasps = [g for g in grasps if self.ikc.attachable(tgt, g.pose, "right")]
+        if not grasps:
+            raise Reject("no_attachable_grasp", f"{key}: every library grasp self-collides once the object is attached")
+        p_touch = IK.finger_touch_params(self.gen("approach_finger_support_touch"))
+        op = None
+        if p_touch:
+            ws = [TT.grasp_pinch_width(g) for g in grasps]
+            op = None if not ws or None in ws else min(C.FINGER_OPEN, max(0.5 * w + IK.ORACLE_PRESHAPE_MARGIN_M for w in ws))
+        keep = {k: self.template_facts.get(k) for k in ("grasp_pinch_recentre",)}  # the template's own facts stay the template's
+        try:
+            grasps, offsets = self.recentre_pinches(grasps, tgt)
+        finally:
+            for k, v in keep.items():
+                if v is None:
+                    self.template_facts.pop(k, None)
+                else:
+                    self.template_facts[k] = v
+        tilt_max = float(self.gen("closing_tilt_max_deg", CLOSING_TILT_MAX_DEG))
+        flush = [g for g in grasps if self.closing_tilt_deg(g.pose) <= tilt_max]
+        facts = TT.upright_shelf_facts(key, rest) or {}
+        return {"key": key, "grasps": list(grasps), "grasps_flush": flush if flush else list(grasps), "rest": rest.clone(), "finger_open": op,
+                "template": {"key": key, "lean_side": facts.get("lean_side"), "lean_deg": facts.get("lean_deg"), "context": facts.get("context")},
+                "bands": {}, "rows": []}
+
+    def apply_board_key(self, st: Dict[str, Any], z: Optional[float] = None) -> None:
+        """i7-t03both: the attempt's lean rest ``st`` (:meth:`_board_key_state`) becomes the sampler's - grasp key, grasps (both tiers), the
+        target's rest and the shelf template the draw starts from, the pre-shape opening - at the row ``z`` (board height above the floor;
+        None = the current row, :meth:`apply_shelf_row`), and its band there (cached per rest and row: the band left behind is kept on its
+        state; None = :func:`tabletop.ensure_bands` reads the rest's interior map at the next lookup). A cached map band re-registers the
+        rest's support policy at the row's board (as its lookup did)."""
+        cur, cz = getattr(self, "_board_current", None), getattr(self, "_shelf_row_z", None)
+        if cur is not None:
+            cur["bands"][cz] = self.bands
+            if self.bands is not None:  # kept alive: tabletop.arm_band caches the other arm's band by id() of this one
+                self.__dict__.setdefault("_board_band_refs", []).append(self.bands)
+        if z is not None and z != cz:
+            self.apply_shelf_row(z)
+        self.grasp_key, self.grasps, self.grasps_flush = st["key"], list(st["grasps"]), list(st["grasps_flush"])
+        self.rest["target"] = st["rest"].clone()
+        self._shelf_rest0["target"] = st["rest"].clone()
+        self._shelf_template = dict(st["template"])
+        if st["finger_open"] is not None or "_shelf_finger_open" in self.__dict__:
+            self._shelf_finger_open = st["finger_open"]
+        self.bands = st["bands"].get(getattr(self, "_shelf_row_z", None))
+        self._board_current = st
+        if self.bands is not None and (cur is not st or z != cz):
+            self._board_policy()
+
+    def _board_policy(self) -> None:
+        """The support policy of the current lean rest at the current row's board (``tabletop._register_map_policy``, as an interior map hit
+        registers it) - a band served from the cache did not look the map up again."""
+        from ispatialgym.sampling import grasp_library as GL
+
+        lib = GL.v2_entry(self.grasp_key)
+        rid = GL.v2_rest_id_for_key(lib, self.grasp_key) if lib is not None else None
+        if lib is not None and rid is not None and getattr(self, "top", None) is not None:
+            TT._register_map_policy(self, lib, rid, {self.support.name: float(self.top.z)})
+
+    def shelf_row_key(self, z: float) -> float:
+        """A ``shelf_start_draw.rows`` height as the row it names: the template's own row (``_shelf_row_z0``) within ``interiors.HEIGHT_TOL_M``
+        (the rows list may repeat the template's board to add compartments there), else the height (4 decimals)."""
+        from ispatialgym.sampling import interiors as IN
+
+        z0 = getattr(self, "_shelf_row_z0", None)
+        return z0 if z0 is not None and abs(float(z) - float(z0)) <= IN.HEIGHT_TOL_M else round(float(z), 4)
+
+    def shelf_row(self, z: float) -> Dict[str, Any]:
+        """i7-t03both (``shelf_start_draw.rows``): the row context at board height ``z`` (m above the floor) - its interior surface
+        (``tabletop.support_surface(top_z=)`` with the template's H_max), its own start-per-attempt edge trunks - built once (the template's
+        own row is :meth:`sample_template`'s). The current row's surface, support split registration and facts are left as they were."""
+        rows = self.__dict__.setdefault("_shelf_rows", {})
+        if z in rows:
+            return rows[z]
+        keep_fact, keep_top, keep_sz = self.template_facts.get("support_surface"), self.top, getattr(self, "surface_z", None)
+        H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
+        try:
+            top = TT.support_surface(self, self.support, height=H_max, top_z=float(z))
+            sz = self.surface_z
+        finally:
+            self.template_facts["support_surface"] = keep_fact
+            self.top, self.surface_z = keep_top, keep_sz
+            if keep_top is not None:
+                from ispatialgym.sampling.v2 import support_split as SS
+
+                SS.register_top(self, self.support, keep_top, what="interior")
+        rows[z] = {"top": top, "surface_z": sz, "spa_edges": {}, "facts": {"z_world": round(float(top.z), 4), "n_free_cells": int(top.free.sum())}}
+        return rows[z]
+
+    def apply_shelf_row(self, z: float) -> None:
+        """i7-t03both: the row ``z`` becomes the sampler's - its interior surface (``top``, ``surface_z``: the band lookups' height), its support
+        split plane, its edge trunks; the attempt's start (edge, init, Phase 2) is then drawn on it (start_per_attempt). Kit
+        ``shelf_board_draw.row_switch``."""
+        from ispatialgym.sampling.v2 import support_split as SS
+
+        cz = getattr(self, "_shelf_row_z", None)
+        if cz is not None:
+            self.shelf_row(cz)["spa_edges"] = self.__dict__.get("_spa_edges", {})
+        row = self.shelf_row(z)
+        self.top, self.surface_z = row["top"], row["surface_z"]
+        self._spa_edges = row["spa_edges"]
+        SS.register_top(self, self.support, self.top, what="interior")
+        self._shelf_row_z = z
+        TT._count(self, "shelf_board_draw.row_switch")
+
+    def shelf_board_pool(self) -> Optional[Dict[float, List[Dict[str, Any]]]]:
+        """i7-t03both 2026-11-09 (owner A5, :data:`SHELF_BOARD_DRAW_ENV`), once per template: ``{+1 (left board) / -1: [rest states]}`` - every
+        lean rest of the target's model within ``shelf_start_draw.lean_deg`` (``tabletop.shelf_lean_pool``) whose grasp set builds, with the
+        rows (the template's board and every ``shelf_start_draw.rows`` height) where its interior reach maps serve for the default arm and the
+        board's working arm (the probe reads them now; ``st["rows"]``). A rest without a row is dropped (kit
+        ``shelf_board_draw.rest_dropped.<reason>``), a row without a rest is never drawn. The template's own rest is its state as built.
+        None when the template is not at a v2 lean rest (the switch does nothing); facts ``template_facts["shelf_board_draw"]``."""
+        from ispatialgym.grasping import lean as LN
+
+        base_key, tag = LN.split_lean_key(self.grasp_key)
+        if tag is None:
+            return None
+        keys = TT.shelf_lean_pool(self, base_key)
+        z0 = round(float(self.top.z) - float(getattr(self.world, "floor_z", 0.0)), 4)
+        self._shelf_row_z0 = self._shelf_row_z = z0
+        self._shelf_rows = {z0: {"top": self.top, "surface_z": getattr(self, "surface_z", None), "spa_edges": self.__dict__.get("_spa_edges", {}),
+                                 "facts": {"z_world": round(float(self.top.z), 4), "n_free_cells": int(self.top.free.sum()), "template": True}}}
+        rows = [z0]
+        for z, _ in ((self.shelf_start_draw() or {}).get("rows") or []):
+            if self.shelf_row_key(z) not in rows:
+                rows.append(self.shelf_row_key(z))
+        own = {"key": self.grasp_key, "grasps": list(self.grasps), "grasps_flush": list(self.grasps_flush), "rest": self._shelf_rest0["target"].clone(),
+               "finger_open": self.__dict__.get("_shelf_finger_open_template"), "template": dict(self._shelf_template), "bands": {}, "rows": []}
+        saved = {"bands": self.bands, "arm_bands": dict(self.arm_bands or {})}
+        pool: Dict[float, List[Dict[str, Any]]] = {}
+        facts: Dict[str, Any] = {"keys": {}, "template_key": self.grasp_key, "rows": {}}
+        self._board_current = own
+        try:
+            for z in rows:
+                try:
+                    if z != z0:
+                        self.shelf_row(z)
+                except Reject as e:
+                    TT._count(self, f"shelf_board_draw.row_dropped.{e.reason}")
+                    facts["rows"][str(z)] = {"dropped": f"[{e.reason}] {str(e)[:200]}"}
+                    continue
+                facts["rows"][str(z)] = self._shelf_rows[z]["facts"]
+            for side_name, ks in sorted(keys.items()):
+                for k in ks:
+                    try:
+                        st = own if k == self.grasp_key else self._board_key_state(k)
+                    except Reject as e:
+                        TT._count(self, f"shelf_board_draw.rest_dropped.{e.reason}")
+                        facts["keys"][k] = {"dropped": f"[{e.reason}] {str(e)[:200]}"}
+                        continue
+                    arm = "left" if float(st["template"]["lean_side"]) > 0 else "right"
+                    misses = {}
+                    for z in [z for z in rows if z in self._shelf_rows]:
+                        try:
+                            self.apply_board_key(st, z)
+                            self.bands = None
+                            st["bands"][z] = TT.ensure_bands(self, top=self.top)
+                            TT.arm_band(self, arm, bands=st["bands"][z])
+                            st["rows"].append(z)
+                        except Reject as e:
+                            st["bands"].pop(z, None)
+                            self.bands = None
+                            misses[str(z)] = f"[{e.reason}] {str(e)[:160]}"
+                            TT._count(self, f"shelf_board_draw.row_map_missing.{e.reason}")
+                    facts["keys"][k] = {"side": side_name, "lean_deg": st["template"]["lean_deg"], "n_grasps": len(st["grasps"]), "arm": arm, "rows": list(st["rows"]),
+                                        "missing": misses}
+                    if not st["rows"]:
+                        TT._count(self, "shelf_board_draw.rest_dropped.no_row")
+                        continue
+                    pool.setdefault(float(st["template"]["lean_side"]), []).append(st)
+        finally:
+            self.apply_board_key(own, z0)  # the template's rest at its row; its probed band (if any) is the template's band from here on
+            self.arm_bands = saved["arm_bands"]
+            if self.bands is None:
+                self.bands = saved["bands"]
+        facts["boards"] = {TT.side_name(sd): {st["key"]: st["rows"] for st in v} for sd, v in pool.items()}
+        self.template_facts["shelf_board_draw"] = facts
+        log.info("%s: shelf board draw: lean rests by board (rows) %s; rows %s", self.gp.variant, facts["boards"], facts["rows"])
+        return pool or None
 
     def draw_shelf_layout(self, rng: np.random.Generator) -> None:
         """:meth:`shelf_start_draw`, after the attempt's start (its edge): the books' leaning starts of the drawn layout - the target against
@@ -4355,6 +4618,8 @@ class IORSSmall(SamplerV2):
             key = key + ("backoff", round(self.shelf_backoff_m(), 4), self.gen("shelf_transit_max_reach_rad"))
         if shelf_draw_on(self) and self.shelf_pose is not None:  # oracle-fix 2026-11-06 (shelf_start_draw): the start is the attempt's
             key = key + ("start", tuple(round(float(v), 3) for v in [*G.t(self.shelf_pose[0]).tolist(), *G.t(self.shelf_pose[1]).tolist()]))
+        if getattr(self, "_board_keys", None):  # i7-t03both: the attempt's lean rest (its grasps) is drawn too
+            key = key + ("grasp_key", self.grasp_key)
         return key
 
     def _fixed_start_memo_persisted(self, key: Tuple[Any, ...], why: Optional[str] = None) -> Optional[str]:

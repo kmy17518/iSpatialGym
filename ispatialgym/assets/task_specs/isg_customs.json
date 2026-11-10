@@ -40860,9 +40860,54 @@
     "lean_deg": [
      11.0,
      20.0
-    ]
+    ],
+    "rows": {
+     "bookcase_kmuacd_0": {
+      "0.8354": [
+       [
+        0.0,
+        "left"
+       ],
+       [
+        0.37,
+        "left"
+       ],
+       [
+        0.37,
+        "right"
+       ]
+      ],
+      "0.4486": [
+       [
+        0.37,
+        "left"
+       ],
+       [
+        0.37,
+        "right"
+       ],
+       [
+        0.0,
+        "left"
+       ],
+       [
+        0.0,
+        "right"
+       ],
+       [
+        -0.37,
+        "left"
+       ],
+       [
+        -0.37,
+        "right"
+       ]
+      ]
+     }
+    }
    },
-   "_shelf_start_draw_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside demo: \"touching 3 - it does need more varied start - why don't we try also initializing in different compartments' walls, and at different lean angles?\"): each attempt draws the compartment, the board the target leans against (the partner on the other board, the arm on the target's side works) and both leans (11-20 deg, independent) instead of the template's one start. fix1 (counted eval index, kmuacd_0 T1): 265 completed attempts in g300013-18, all repeats_eval (start_base 0.12 m / 0 deg, both books 0.00 m / 0 deg); only start cell 9 (base lateral -0.065) of the 10 collision-free cells (-0.515..-0.065) completes - cells 0-4 not_in_frame (the target at +0.12 out of the init image), 5-8 grasp_unreachable. kmuacd_0 at 0.84 m: three 0.34 m cubes (centre boards +0.166 / -0.176, right cube about -0.20..-0.54, centre -0.37); layouts: centre cube mirrored (right arm), right cube with the left arm (in the image from cells 0-4), right cube mirrored; the left cube (+0.37) is out (no base pose left of -0.015: door_pxhbim_1 / the wall), the eval's own layout (centre, left board) is out (any lean in range moves its books <= 0.9 cm / 5 deg from the key's 15, inside 0.03 m / 0.2 rad: every instance repeats). otwukr_1: bays +-0.19 (the divider at 0), opryhp_0: its bay, both boards. Leans: below atan(thickness / height) = 8.0 deg (acbrnv 3.1 / 22.3 cm) / 8.8 deg (agbqsy 3.3 / 21.3 cm) a book's centre of mass stays over its own bottom edge and nothing holds it to the board; at 11 deg the lever toward the board is 5.9 / 4.1 mm (13.8 / 11.7 mm at 15). At 20 / 20 the free span of the 0.342 m cube is 0.128 m (22 / 22: 0.115 < shelf_free_span_min_m 0.12), the tip release's goal tilt ~18 deg (geometry 15.2 + the 2.7 measured excess at 15) under goal_tip_max_deg 20; the drafted goal leans parallel to the partner's drawn lean"
+   "_shelf_start_draw_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside demo: \"touching 3 - it does need more varied start - why don't we try also initializing in different compartments' walls, and at different lean angles?\"): each attempt draws the compartment, the board the target leans against (the partner on the other board, the arm on the target's side works) and both leans (11-20 deg, independent) instead of the template's one start. fix1 (counted eval index, kmuacd_0 T1): 265 completed attempts in g300013-18, all repeats_eval (start_base 0.12 m / 0 deg, both books 0.00 m / 0 deg); only start cell 9 (base lateral -0.065) of the 10 collision-free cells (-0.515..-0.065) completes - cells 0-4 not_in_frame (the target at +0.12 out of the init image), 5-8 grasp_unreachable. kmuacd_0 at 0.84 m: three 0.34 m cubes (centre boards +0.166 / -0.176, right cube about -0.20..-0.54, centre -0.37); layouts: centre cube mirrored (right arm), right cube with the left arm (in the image from cells 0-4), right cube mirrored; the left cube (+0.37) is out (no base pose left of -0.015: door_pxhbim_1 / the wall), the eval's own layout (centre, left board) is out (any lean in range moves its books <= 0.9 cm / 5 deg from the key's 15, inside 0.03 m / 0.2 rad: every instance repeats). otwukr_1: bays +-0.19 (the divider at 0), opryhp_0: its bay, both boards. Leans: below atan(thickness / height) = 8.0 deg (acbrnv 3.1 / 22.3 cm) / 8.8 deg (agbqsy 3.3 / 21.3 cm) a book's centre of mass stays over its own bottom edge and nothing holds it to the board; at 11 deg the lever toward the board is 5.9 / 4.1 mm (13.8 / 11.7 mm at 15). At 20 / 20 the free span of the 0.342 m cube is 0.128 m (22 / 22: 0.115 < shelf_free_span_min_m 0.12), the tip release's goal tilt ~18 deg (geometry 15.2 + the 2.7 measured excess at 15) under goal_tip_max_deg 20; the drafted goal leans parallel to the partner's drawn lean",
+   "_shelf_board_draw_note": "i7-t03both 2026-11-09 (owner decision A5: lean rests on both boards, the other compartments, compartment + board drawn per attempt): shelf_start_draw.rows - kmuacd_0's compartments beyond today's layouts, read ONLY with ISPATIALGYM_SHELF_BOARD_DRAW=1 (default off: the layouts above and the template's one lean rest as before). The top row (0.8354, the template's board) adds the centre cube's left board (the eval's own layout) and the left cube (+0.37, both boards); the middle row (board 0.4486) its three cubes x both boards (interior spec bookcase_kmuacd_0@0.4486). The bottom row (0.0715) is left out: lean_left_20's interior maps there hold 24 (left arm) / 5 (right) feasible cell x trunk pairs over d_e 0.35-0.55 vs 689 / 706 on the top row and 319 / 291 on the middle row ($OFH/t03both_20261109/maps_l20*, the spec bookcase_kmuacd_0@0.0715 stays registered). A row or board without a lean rest whose interior map serves it is never drawn (IORSSmall.shelf_board_pool)."
   },
   "constraints": []
  },

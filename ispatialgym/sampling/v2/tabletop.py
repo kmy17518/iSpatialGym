@@ -158,15 +158,18 @@ def support_surface_spec(s, support) -> Optional[Dict[str, Any]]:
     return None
 
 
-def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[float] = None):
+def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[float] = None, top_z: Optional[float] = None):
     """The raster the sampler works on for ``support`` (owner 2026-10-11 item 2): ``SimWorld.support_interior`` at the selection's
     ``top_z`` (m above the floor) when its row says ``init=inside`` or that height is more than :data:`SURFACE_MISMATCH_M` from the
     support top's, else the support top (rows marked ``surface: top`` always). On an interior surface the cells whose headroom
     is below ``height`` + :data:`INTERIOR_HEADROOM_MARGIN_M` count as occupied, and ``s.surface_z`` (the selection's height) makes
     the band lookups ask for the interior band (``ReachBands.load(..., surface_z=...)``); on the top ``s.surface_z`` is None.
     The decision goes to ``template_facts["support_surface"]``. A row naming ``neighbors`` (owner 2026-10-12 A4) gets the support
-    top united with theirs (``neighbors.union_top``; never an interior surface)."""
+    top united with theirs (``neighbors.union_top``; never an interior surface). ``top_z`` (i7-t03both 2026-11-09, the shelf board draw's other
+    rows): the interior surface at that height (m above the floor) instead of the selection's."""
     spec = support_surface_spec(s, support)
+    if top_z is not None:
+        spec = {**(spec or {"name": getattr(support, "name", support)}), "top_z": float(top_z), "init": "inside", "surface": "interior"}
     s.surface_z = None
     top, top_err = None, None
     try:
@@ -348,6 +351,29 @@ def shelf_lean_key(s, base_key: str) -> Optional[str]:
                             "board": ln.get("board"), "pool": [t for t, _ in pool], "side_why": why, "lean_deg_range": list(rng_deg) if rng_deg else None}
     log.info("%s: the v2 lean rest %s (%s board, %s deg; %s) of %s", getattr(getattr(s, "gp", None), "variant", "?"), tag, ln.get("side"), ln.get("deg"), why, base_key)
     return LN.lean_key(base_key, tag)
+
+
+def shelf_lean_pool(s, base_key: str) -> Dict[str, List[str]]:
+    """i7-t03both 2026-11-09 (owner A5, ``ISPATIALGYM_SHELF_BOARD_DRAW``): every lean grasp key of ``base_key`` the v2 library holds (entries
+    with validated grasps, :func:`grasp_library.v2_lean_tags`) within ``generation.shelf_start_draw.lean_deg`` (when given), by board side
+    (``{"left": [key, ...], "right": [...]}``, sorted by angle) - the keys an attempt draws its board's rest from. ``{}`` without a v2 root,
+    a maps root or lean rests (the template's key path as before)."""
+    from ispatialgym.grasping import lean as LN
+    from ispatialgym.sampling import grasp_library as GL
+
+    if not base_key or not GL.v2_root() or not map_sampling_root():
+        return {}
+    gen = getattr(s, "gen", None)
+    draw = gen("shelf_start_draw") if callable(gen) else None
+    rng_deg = draw.get("lean_deg") if isinstance(draw, dict) else None
+    out: Dict[str, List[str]] = {}
+    for tag, ln in GL.v2_lean_tags(base_key):
+        if isinstance(rng_deg, (list, tuple)) and len(rng_deg) == 2 and not (float(rng_deg[0]) - 1e-6 <= float(ln.get("deg", -1.0)) <= float(rng_deg[1]) + 1e-6):
+            continue
+        k = LN.lean_key(base_key, tag)
+        if k not in out.setdefault(str(ln.get("side")), []):
+            out[str(ln.get("side"))].append(k)
+    return out
 
 
 def shelf_wall_lateral(s, edge: EdgeFrame, depth: float, z: float, side: float, support, lateral0: float = 0.0) -> Tuple[Optional[float], Dict[str, Any]]:
@@ -1207,23 +1233,26 @@ def filter_by_turn(s, grasps: List[Any], lib, key: str) -> List[Any]:
 
 
 def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", kinds: Optional[Sequence[str]] = None, lean: bool = False,
-                   overhang: bool = False):
+                   overhang: bool = False, key: Optional[str] = None):
     """``(grasps, key, rest_quat)`` of the role's model for the pipeline the customs entry requires (``roles.<role>.
     require.grasps``); ``Reject("missing_grasps:<pipeline>")`` when the library has no admissible row. ``lean`` (i7-lean 2026-11-07, the
     touching shelf layout): the key's v2 LEAN rest when the library holds one (:func:`shelf_lean_key`: the key becomes ``<key>@<lean tag>``,
     its grasps and rest the lean entry's), else as before. ``overhang`` (i7-overhang 2026-11-07, the overhang pick's primary path): the key's
-    v2 OVERHANG rest when the library holds one (:func:`overhang_key`: ``<key>@<overhang tag>``, its grasps and rest the overhang entry's)."""
+    v2 OVERHANG rest when the library holds one (:func:`overhang_key`: ``<key>@<overhang tag>``, its grasps and rest the overhang entry's).
+    ``key`` (i7-t03both 2026-11-09, ``ISPATIALGYM_SHELF_BOARD_DRAW``): that grasp key as given (another lean rest of the same model,
+    :func:`shelf_lean_pool`) instead of the resolved one - the load, the scale check and the turn filter as for the resolved key."""
     from ispatialgym.sampling import grasp_library as GL
 
     choice = s.choice.models[role]
     pipeline = PIPELINE_VARIANTS.get(s.gp.roles[role].grasp_pipeline() or default_pipeline, s.gp.roles[role].grasp_pipeline() or default_pipeline)
     kinds = list(kinds) if kinds else [pipeline]
     try:
-        key = GL.resolve_key(choice.category, choice.model, choice.grasp_key, kinds)
-        if lean:
-            key = shelf_lean_key(s, key) or key
-        if overhang:
-            key = overhang_key(s, key) or key
+        if key is None:
+            key = GL.resolve_key(choice.category, choice.model, choice.grasp_key, kinds)
+            if lean:
+                key = shelf_lean_key(s, key) or key
+            if overhang:
+                key = overhang_key(s, key) or key
         grasps = GL.load_grasps(key)
     except (FileNotFoundError, ValueError) as e:
         _reject(f"missing_grasps:{pipeline}", f"{choice.category}/{choice.model}: {e}")

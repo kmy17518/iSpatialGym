@@ -69,7 +69,9 @@ def test_the_hall_tree_board_is_found_at_the_touching_goal_height(monkeypatch):
 # integration-2 (merge of i7-goalmaps after i7-t03specs): + the touching_03 bookcases now in this registry (T03_INTERIOR_DIGESTS)
 # integration-2 (merge of i7-ft2): + its sink awvzkn (the digest i7-goalmaps checked on / off on i7-ft2's registry)
 ALL_KNOWN_DIGESTS = {**INT1_INTERIOR_DIGESTS, **GOAL_INTERIOR_DIGESTS, "bookcase_kmuacd_0@0.8354": "b58d4e5c790e", **T03_INTERIOR_DIGESTS,
-                     "drop_in_sink_awvzkn_0@basin": "4571693d44c4"}
+                     "drop_in_sink_awvzkn_0@basin": "4571693d44c4",
+                     # i7-t03both 2026-11-09 (owner A5): kmuacd_0's middle and bottom rows (the shelf board draw's other compartments)
+                     "bookcase_kmuacd_0@0.4486": "f581827abd0c", "bookcase_kmuacd_0@0.0715": "3b6de0af6ac4"}
 
 
 class _Raster:
