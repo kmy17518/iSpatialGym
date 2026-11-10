@@ -20,6 +20,7 @@ def test_switch_default_on(monkeypatch):
 
 
 def test_off_and_on_nudge_the_same_when_the_base_moves(monkeypatch):
+    monkeypatch.setenv(EX.PUSH_NUDGE_MIN_SPEED_ENV, "0")
     cfg = EX.ExecuteConfig()
     moved = {}
     for v in ("0", "1"):
@@ -36,6 +37,7 @@ def test_off_and_on_nudge_the_same_when_the_base_moves(monkeypatch):
 
 def test_a_stalled_base_stops_the_nudge(monkeypatch):
     monkeypatch.setenv(EX.PUSH_NUDGE_STALL_STOP_ENV, "1")
+    monkeypatch.setenv(EX.PUSH_NUDGE_MIN_SPEED_ENV, "0")
     cfg = EX.ExecuteConfig()
     robot, env, motions, state = _world()
     pose = motions.base_pose2d()
@@ -46,7 +48,7 @@ def test_a_stalled_base_stops_the_nudge(monkeypatch):
 
 def test_min_speed_parsing(monkeypatch):
     monkeypatch.delenv(EX.PUSH_NUDGE_MIN_SPEED_ENV, raising=False)
-    assert EX.push_nudge_min_speed() is None
+    assert EX.push_nudge_min_speed() == EX.PUSH_NUDGE_MIN_SPEED_DEFAULT_M_S  # default ON since owner #92
     for v, want in (("1", EX.PUSH_NUDGE_MIN_SPEED_DEFAULT_M_S), ("on", EX.PUSH_NUDGE_MIN_SPEED_DEFAULT_M_S), ("0.03", 0.03), ("0", None), ("off", None), ("x", None)):
         monkeypatch.setenv(EX.PUSH_NUDGE_MIN_SPEED_ENV, v)
         assert EX.push_nudge_min_speed() == want, v

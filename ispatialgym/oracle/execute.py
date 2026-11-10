@@ -4640,9 +4640,15 @@ PUSH_NUDGE_MIN_SPEED_ENV = "ISPATIALGYM_PUSH_NUDGE_MIN_SPEED"
 PUSH_NUDGE_MIN_SPEED_DEFAULT_M_S = 0.025
 
 
+#: DEFAULT ON since owner #92 (2026-11-10, the standard rule on the recollect of r2_ul02_stand 360102: off 3 nudges, the third stood still and
+#: timed out; on - the command raised on the first two, the second re-nudge never needed: 2523 steps / 398 s vs 2733 / 441, the same verdict and
+#: final pose; fpr2_base 370003 raised once, unchanged outcome). "0" / "off" = the tracker's own command
+PUSH_NUDGE_MIN_SPEED_DEFAULT = "1"
+
+
 def push_nudge_min_speed() -> Optional[float]:
-    """:data:`PUSH_NUDGE_MIN_SPEED_ENV` in m/s, None when off ("", "0", "off")."""
-    v = (os.environ.get(PUSH_NUDGE_MIN_SPEED_ENV) or "").strip().lower()
+    """:data:`PUSH_NUDGE_MIN_SPEED_ENV` in m/s (unset: :data:`PUSH_NUDGE_MIN_SPEED_DEFAULT`), None when off ("0", "off")."""
+    v = (os.environ.get(PUSH_NUDGE_MIN_SPEED_ENV) or PUSH_NUDGE_MIN_SPEED_DEFAULT).strip().lower()
     if v in ("", "0", "off", "false", "no"):
         return None
     if v in ("1", "on", "true", "yes"):
