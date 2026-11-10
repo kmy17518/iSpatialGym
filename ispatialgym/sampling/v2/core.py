@@ -1792,6 +1792,9 @@ class SamplerV2(TaskSampler):
                     clock.mark("reset")
                     phase = "sample"
                     cap_s, cap_why = self.attempt_cap()
+                    if os.environ.get("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"):
+                        from ispatialgym.sampling.campaign_goal_queue import activate_initial
+                        activate_initial(self)
                     remaining = getattr(self, "campaign_group_remaining_s", None)
                     group_remaining_s = remaining() if callable(remaining) else None
                     if group_remaining_s is not None:
@@ -1864,6 +1867,9 @@ class SamplerV2(TaskSampler):
                     self.attempt_end(index, attempt, "written", phase, None)
                     self._cap_after_attempt(None)
                     self.log_attempt_stages(index, attempt, clock)
+                    if os.environ.get("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"):
+                        from ispatialgym.sampling.campaign_goal_queue import after_written
+                        exhausted = after_written(self)
                     ok = True
                     break
                 except Reject as e:
@@ -1881,6 +1887,10 @@ class SamplerV2(TaskSampler):
                     self.log_attempt_stages(index, attempt, clock)  # STAGE_TIMING: separate lines, the rejection line above keeps its format
                     self.on_reject(e)
                     if e.reason in ("campaign_group_timeout", "campaign_group_complete"):
+                        if os.environ.get("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"):
+                            from ispatialgym.sampling.campaign_goal_queue import advance
+                            if advance(self, e.reason):
+                                continue
                         out_of_time = True
                         self.counters[e.reason] = self.counters.get(e.reason, 0) + 1
                         break
@@ -1896,6 +1906,9 @@ class SamplerV2(TaskSampler):
         self.template_meta["n_written"] = self.template_meta.get("n_written", 0) + len(written)
         if self.template_paths is not None:
             self.write_template_meta()
+        if os.environ.get("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"):
+            from ispatialgym.sampling.campaign_goal_queue import finalize
+            finalize(self)
         return written
 
     def run(self, n_instances: int, max_attempts: int = 30) -> List[str]:  # v1 name
