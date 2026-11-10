@@ -3,6 +3,7 @@ import os
 import tempfile
 import time
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from scripts.campaign_20261110 import contracts as c
@@ -87,6 +88,62 @@ class GoalGroupControllerTests(unittest.TestCase):
             meta_path.write_text(json.dumps(meta))
             with self.assertRaises(c.ContractError):
                 g.successful_anchor(job, campaign_root=root, ledger=ledger, campaign_started_at=time.time() - 10)
+
+    def test_tray_author_uses_fresh_validated_goal_region_and_fixed_destination(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            job, ledger, tro_path, template, code = self.fixture(root)
+            anchor = g.successful_anchor(job, campaign_root=root, ledger=ledger, campaign_started_at=time.time() - 10)
+            source = c.ObjectRef("tray.n.01_1", "support", "tray", "source", c.digest("source"), semantic_kind="tray",
+                                 ready=True, readiness_source="ready fixture")
+            dest = replace(source, instance="tray.n.01_2", model="dest", asset_sha256=c.digest("dest"))
+            template = replace(template, task="disembedding", objects=template.objects + (source, dest))
+            anchor["template_meta"]["bindings"] = [{"name": "apple.n.01_1", "role": "target"},
+                {"name": source.instance, "role": "source"}, {"name": dest.instance, "role": "destination"}]
+            anchor["tro"]["ispatialgym"]["object_bindings"].update({x.instance: {"category": x.category, "model": x.model} for x in (source, dest)})
+            anchor["planned_start_poses"] = {source.instance: [[0, 2, .7], [0, 0, 0, 1]], dest.instance: [[1, 2, .7], [0, 0, 0, 1]]}
+            region = [{"position": [1.02, 2.01, .8], "orientation": [0, 0, 0, 1]}]
+            anchor["summary"]["campaign_goal_space"] = {"target_poses": region}
+            out = root / "groups/tray"
+            g.prepare_group(anchor=anchor, template=template, campaign_id="new", group_id="tray", output=out,
+                            code_sha256=c.file_digest(code / ".snapshot_commit"), physics_sha256=c.digest("physics"),
+                            data_sha256=c.digest("maps"), magnitude_range=[.3, .45])
+            plan = g.read_json(out / "goal_plan.json")
+            self.assertEqual(plan["schema"], "isg-tray-goal-plan-v1")
+            self.assertEqual(plan["goal_pose"], region[0])
+            self.assertEqual(plan["destination_pose"]["position"], [1, 2, .7])
+            self.assertEqual(plan["crowdedness_range"], [.3, .45])
+            anchor["summary"].pop("campaign_goal_space")
+            with self.assertRaises(c.ContractError):
+                g.prepare_group(anchor=anchor, template=template, campaign_id="new", group_id="bad", output=root / "groups/bad",
+                                code_sha256=c.file_digest(code / ".snapshot_commit"), physics_sha256=c.digest("physics"),
+                                data_sha256=c.digest("maps"), magnitude_range=[.3, .45])
+
+    def test_pair_author_preserves_partner_and_varies_nextto_gap_before_new_starts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            job, ledger, _, template, code = self.fixture(root)
+            anchor = g.successful_anchor(job, campaign_root=root, ledger=ledger, campaign_started_at=time.time() - 10)
+            partner = c.ObjectRef("partner.n.01_1", "partner", "platter", "p", c.digest("partner"),
+                                  ready=True, readiness_source="ready fixture")
+            template = replace(template, task="inter_object_relation_satisfaction-nextto_small_scale", objects=template.objects + (partner,))
+            anchor["template_meta"]["bindings"] = [{"name": "apple.n.01_1", "role": "target"}, {"name": partner.instance, "role": "partner"}]
+            bindings = anchor["tro"]["ispatialgym"]["object_bindings"]
+            bindings["apple.n.01_1"]["scene_object_name"] = "target_apple_a_0"
+            bindings[partner.instance] = {"category": partner.category, "model": partner.model}
+            anchor["planned_start_poses"] = {partner.instance: [[0, 0, .7], [0, 0, 0, 1]]}
+            anchor["summary"].update({"goal_realised": {"position": [0, .2, .81], "orientation": [0, 0, 0, 1]},
+                "goal_check": {"settled_poses": {"target_apple_a_0": [[0, .2, .8], [0, 0, 0, 1]]}},
+                "nextto_gap_m": .08, "pair": {"g_NT": .1}, "manipulation_stance": {"base_pose2d": [0, 0, 0]}})
+            out = root / "groups/pair"
+            g.prepare_group(anchor=anchor, template=template, campaign_id="new", group_id="pair", output=out,
+                            code_sha256=c.file_digest(code / ".snapshot_commit"), physics_sha256=c.digest("physics"),
+                            data_sha256=c.digest("maps"), magnitude_range=[0, 1])
+            plan = g.read_json(out / "goal_plan.json")
+            self.assertEqual(plan["schema"], "isg-pair-goal-plan-v1")
+            self.assertTrue(.01 <= plan["nextto_gap_proposal_m"] <= .09)
+            self.assertEqual(plan["partner_pose"]["position"], [0, 0, .7])
+            self.assertAlmostEqual(plan["goal_pose"]["position"][1], .2 + plan["nextto_gap_proposal_m"] - .08)
 
 
 if __name__ == "__main__":

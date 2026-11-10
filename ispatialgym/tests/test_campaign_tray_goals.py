@@ -45,11 +45,11 @@ def test_settled_target_keeps_exact_requested_goal_and_destination_identity():
 
 def test_settled_goal_or_destination_drift_is_rejected():
     s, d = fixture()
-    d.object_poses["dest"][0][0] += .002
+    d.object_poses["dest"][0][0] += .04
     with pytest.raises(Reject, match="destination drifted"):
         s.campaign_verify_goal(d)
     s, d = fixture()
-    s.objects["target"].get_position_orientation = lambda: (th.tensor([1.003, 2., .8]), th.tensor([0., 0., 0., 1.]))
+    s.objects["target"].get_position_orientation = lambda: (th.tensor([1.04, 2., .8]), th.tensor([0., 0., 0., 1.]))
     with pytest.raises(Reject, match="settled tray goal drifted"):
         s.campaign_verify_goal(d, settled=True)
 

@@ -28,6 +28,8 @@ from scripts.campaign_20261110.contracts import (
 )
 from ispatialgym.sampling.campaign_held_goals import SCHEMA, validate_goal_plan
 from ispatialgym.sampling.campaign_surface_goals import SCHEMA as SURFACE_SCHEMA, validate_surface_plan
+from ispatialgym.sampling.campaign_tray_goals import SCHEMA as TRAY_SCHEMA, validate_tray_plan
+from ispatialgym.sampling.campaign_pair_goals import SCHEMA as PAIR_SCHEMA, RELATIONS as PAIR_RELATIONS, validate_pair_plan, vary_nextto_gap
 
 
 def read_json(path):
@@ -103,6 +105,7 @@ def successful_anchor(job_dir, *, campaign_root, ledger, campaign_started_at: fl
     return {"instance_id": iid, "allocation": allocation, "sources": sources, "tro": tro,
             "summary": summary, "template_meta": tmeta, "template_dir": str(tro_path.parent.parent),
             "planned_goal_poses": planned_goals,
+            "planned_start_poses": ((tro["ispatialgym"].get("campaign") or {}).get("runtime") or {}).get("planned_start_poses") or {},
             "goal_proposal_source": "fresh_sampler_goal_realised", "anchor_is_final_member": False}
 
 
@@ -124,7 +127,9 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                   code_sha256: str, physics_sha256: str, data_sha256: str,
                   magnitude_range, budget_seconds: float = 900, max_members: int = 3):
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", group_id), "group id must be a safe path component")
-    require(template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical"), "unsupported goal author task")
+    pair_tasks = {f"inter_object_relation_satisfaction-{relation}_small_scale": relation for relation in PAIR_RELATIONS}
+    require(template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "disembedding") or template.task in pair_tasks,
+            "unsupported goal author task")
     require(template.split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid group split")
     bindings = anchor["tro"]["ispatialgym"]["object_bindings"]
     for ref in template.objects:
@@ -152,7 +157,56 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             "created_at": now, "budget_seconds": budget_seconds, "max_members": max_members,
             "source_instance_id": anchor["instance_id"], "source_instance_is_member": False,
             "anchor_sources": anchor["sources"]}
-    if template.task == "alignment-world_vertical":
+    if template.task in pair_tasks:
+        roles = {role: [b["name"] for b in tm.get("bindings", []) if b.get("role") == role] for role in ("target", "partner")}
+        require(all(len(names) == 1 for names in roles.values()), "ambiguous pair target/partner binding")
+        plan["target_name"], plan["partner_name"] = roles["target"][0], roles["partner"][0]
+        partner = anchor["planned_start_poses"].get(plan["partner_name"])
+        require(partner is not None, "pair anchor lacks recorded partner pose")
+        settled = anchor["summary"].get("goal_check", {}).get("settled_poses", {})
+        target_scene_name = bindings[plan["target_name"]].get("scene_object_name")
+        target = settled.get(target_scene_name)
+        require(target is not None, "pair anchor lacks a settled target goal bound to its scene object")
+        plan["release_pose"] = plan["goal_pose"]
+        plan["goal_pose"] = {"position": target[0], "orientation": target[1]}
+        plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
+        if pair_tasks[template.task] == "nextto":
+            summary = anchor["summary"]
+            require("nextto_gap_m" in summary and "g_NT" in summary.get("pair", {}), "nextto anchor lacks measured gap range")
+            base = summary.get("manipulation_stance", {}).get("base_pose2d")
+            require(base and len(base) == 3, "nextto anchor lacks pair lateral frame")
+            changed_goal, changed_release, gap = vary_nextto_gap(target, (source_goal["position"], source_goal["orientation"]), partner,
+                gap_max=summary["pair"]["g_NT"], observed_gap=summary["nextto_gap_m"], base_yaw=base[2],
+                fraction=int(digest({"group": group_id, "anchor": anchor["instance_id"]})[:16], 16) / (2 ** 64 - 1))
+            plan["goal_pose"] = {"position": changed_goal[0], "orientation": changed_goal[1]}
+            plan["release_pose"] = {"position": changed_release[0], "orientation": changed_release[1]}
+            plan["nextto_gap_proposal_m"] = gap
+        plan["schema"] = PAIR_SCHEMA
+        plan.pop("magnitude_range")
+        plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
+        validate_pair_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room],
+                           relation=pair_tasks[template.task], activated_at=now, now=now)
+    elif template.task == "disembedding":
+        roles = {}
+        for binding in tm.get("bindings", []):
+            roles.setdefault(binding.get("role"), []).append(binding["name"])
+        for field, aliases in (("target_name", ("target",)), ("source_name", ("source", "tray_source")),
+                               ("destination_name", ("destination", "tray_dest"))):
+            names = [n for role in aliases for n in roles.get(role, [])]
+            require(len(names) == 1, f"ambiguous {field} binding")
+            plan[field] = names[0]
+        for field, name in (("source_pose", plan["source_name"]), ("destination_pose", plan["destination_name"])):
+            value = anchor["planned_start_poses"].get(name)
+            require(value is not None, f"fresh anchor has no recorded tray pose: {name}")
+            plan[field] = {"position": value[0], "orientation": value[1]}
+        candidates = anchor["summary"].get("campaign_goal_space", {}).get("target_poses", [])
+        require(candidates, "disembedding needs a fresh anchor with verified destination-floor goal candidates")
+        plan["goal_pose"] = candidates[int(digest({"group": group_id, "anchor": anchor["instance_id"]}), 16) % len(candidates)]
+        plan["schema"] = TRAY_SCHEMA
+        plan["crowdedness_range"] = plan.pop("magnitude_range")
+        plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
+        validate_tray_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room], activated_at=now, now=now)
+    elif template.task == "alignment-world_vertical":
         plan["schema"] = SURFACE_SCHEMA
         plan["magnitude_range_deg"] = plan.pop("magnitude_range")
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")  # Robot starts vary within this goal group.

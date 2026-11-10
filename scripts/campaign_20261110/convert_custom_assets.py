@@ -44,6 +44,10 @@ def main():
             path = source / rel
             if not path.is_relative_to(source) or sha256(path) != digest:
                 raise ValueError(f"source hash mismatch {path}")
+        if row.get("assembly_file"):
+            assembly = index_path.parent / row["assembly_file"]
+            if sha256(assembly) != row["assembly_sha256"]:
+                raise ValueError(f"assembly hash mismatch {assembly}")
         row["source"] = source
     dataset.mkdir(parents=True)
     os.environ.setdefault("OMNIGIBSON_HEADLESS", "1")
@@ -68,6 +72,11 @@ def main():
                     ("faces", "opposite_pairs", "tile_up_axis", "mass_kg", "edge_m")}, indent=2) + "\n")
             elif row["family"] == "block_board":
                 (dest / "misc/isg_board.json").write_text(json.dumps({k: v for k, v in manifest.items() if k != "urdf"}, indent=2) + "\n")
+            elif row["family"] == "mental_rotation":
+                (dest / "misc/isg_mental_rotation_block.json").write_text(json.dumps({k:v for k,v in manifest.items() if k!="urdf"},indent=2)+"\n")
+            elif row["family"] == "embedded_figure":
+                assembly = json.loads((index_path.parent / row["assembly_file"]).read_text())
+                (dest / "misc/isg_embedded_figure.json").write_text(json.dumps({"model":{k:v for k,v in manifest.items() if k!="urdf"},"assembly":assembly},indent=2)+"\n")
             processed, usd = convert_urdf_to_usd(urdf_path=str(urdf), obj_category=category, obj_model=model,
                 dataset_root=str(dataset), use_omni_convex_decomp=False, use_usda=False,
                 merge_fixed_joints=False, import_inertia_tensor=True)
