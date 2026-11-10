@@ -286,6 +286,22 @@ def record_runtime_failure(record, state):
     return failure
 
 
+def completed_empty_tail(records):
+    """Count only completed attempts since the most recent accepted queue.
+
+    Queued or running work has no measured yield yet. It must not exhaust the
+    empty-attempt safeguard or obscure an earlier successful completed queue.
+    """
+    count = 0
+    for record in reversed(records):
+        if record.get('status') != 'complete' or record.get('migration', {}).get('never_started'):
+            continue
+        if any(value.get('accepted') for value in record.get('groups', {}).values()):
+            break
+        count += 1
+    return count
+
+
 def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=None):
     require(file_digest(spec["seed_config"]) == spec["seed_config_sha256"], "held seed config changed")
     seed_config = read(spec["seed_config"])
@@ -360,12 +376,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
     if any(record.get('needs_new_gate') and record['phase'] not in gates for record in inflight):
         state['status']='waiting_for_new_phase_gate'
         return 0
-    zero_tail = 0
-    for record in reversed(records):
-        if record.get('migration',{}).get('never_started'):continue
-        if any(v.get("accepted") for v in record.get("groups", {}).values()):
-            break
-        zero_tail += 1
+    zero_tail = completed_empty_tail(records)
     if zero_tail >= cfg.get("maximum_empty_queues", 3):
         state["status"] = "needs_feasibility_diagnosis"
         return 0

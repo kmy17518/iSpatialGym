@@ -3,6 +3,18 @@ from types import SimpleNamespace
 import pytest
 
 from scripts.campaign_20261110.controller_held import job_terminal, next_work, queue_closures, record_runtime_failure
+
+
+def test_pending_queues_do_not_count_as_empty_completed_attempts():
+    from scripts.campaign_20261110.controller_held import completed_empty_tail
+
+    accepted = {'status': 'complete', 'groups': {'g': {'accepted': {'member': 'train'}}}}
+    empty = {'status': 'complete', 'groups': {}}
+    pending = {'status': 'external_submission', 'groups': {}}
+    never_started = {'status': 'complete', 'groups': {}, 'migration': {'never_started': True}}
+    assert completed_empty_tail([accepted, pending, pending, pending]) == 0
+    assert completed_empty_tail([empty, accepted, empty, pending, never_started, empty]) == 2
+    assert completed_empty_tail([empty, pending, empty, empty]) == 3
 from scripts.campaign_20261110.contracts import ContractError
 
 
