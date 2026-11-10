@@ -26,17 +26,31 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     for arg in ('campaign-root','defaults','reservations','source-scene','output'):p.add_argument('--'+arg,type=Path,required=True)
     p.add_argument('--category',default='pedestal_table');p.add_argument('--model',default='tdpuit')
+    p.add_argument('--split',choices=('eval_category','eval_model'),default='eval_category')
+    p.add_argument('--scene',default='office_cubicles_right');p.add_argument('--room',default='conference_hall_0')
+    p.add_argument('--measurement-reservations',type=Path)
     a=p.parse_args();out=a.output.resolve();require(not out.exists() and out.is_relative_to(a.campaign_root.resolve()),'new private output required')
-    scene='office_cubicles_right';room='conference_hall_0';key=a.category+'/'+a.model;name=a.category+'_'+a.model+'_campaign_0'
+    scene=a.scene;room=a.room;key=a.category+'/'+a.model;name=a.category+'_'+a.model+'_campaign_0'
     policy=json.loads(a.reservations.read_text());defaults=json.loads(a.defaults.read_text())
-    require(defaults['status']=='native_defaults_and_geometry_recorded' and defaults['reservation_sha256']==sha(a.reservations),'native default probe mismatch')
+    measurement_policy=a.measurement_reservations or a.reservations
+    require(defaults['status']=='native_defaults_and_geometry_recorded' and defaults['reservation_sha256']==sha(measurement_policy),'native default probe mismatch')
+    prior=json.loads(measurement_policy.read_text())
+    for field in ('model_holdout_models','category_holdout_models','train_exclude_models'):
+        require(set(prior[field])<=set(policy[field]),'measurement reservation is not an ancestor')
+    for field in ('category_holdout_categories','category_holdout_rooms','train_exclude_categories'):
+        require(prior[field]==policy[field],'category or room policy changed since measurement')
     row=next(r for r in defaults['objects'] if r['category']+'/'+r['model']==key)
-    require(row['ready'] and key in policy['category_holdout_models'] and a.category in policy['category_holdout_categories'],'support not a ready reserved category')
-    require({'scene':scene,'room':room} in policy['category_holdout_rooms'],'room not heldout')
+    require(row['ready'] and key in policy['train_exclude_models'],'support not a ready reserved model')
+    if a.split=='eval_category':
+        require(key in policy['category_holdout_models'] and a.category in policy['category_holdout_categories'],'support not a reserved category')
+        require({'scene':scene,'room':room} in policy['category_holdout_rooms'],'room not heldout')
+    else:
+        require(key in policy['model_holdout_models'] and a.category not in policy['category_holdout_categories'],'support is not a model holdout')
+        require({'scene':scene,'room':room} not in policy['category_holdout_rooms'],'model room belongs to category holdout')
     require(sha(Path(row['asset_path']))==row['asset_sha256'],'support asset changed')
     source=json.loads(a.source_scene.read_text());source_hash=sha(a.source_scene)
     require(name not in source['objects_info']['init_info'],'support name already exists')
-    out.mkdir(parents=True);report={'schema':'campaign-category-support-scene-v1','status':'started','production_released':False,'source_scene_sha256':source_hash,'defaults_sha256':sha(a.defaults),'reservation_sha256':sha(a.reservations),'scene':scene,'room':room,'object_name':name,'model_key':key,'default_scale':row['default_scale'],'asset_sha256':row['asset_sha256'],'readiness_source':row['readiness_source']}
+    out.mkdir(parents=True);report={'schema':'campaign-category-support-scene-v1','status':'started','production_released':False,'split':a.split,'source_scene_sha256':source_hash,'defaults_sha256':sha(a.defaults),'measurement_reservation_sha256':sha(measurement_policy),'reservation_sha256':sha(a.reservations),'scene':scene,'room':room,'object_name':name,'model_key':key,'default_scale':row['default_scale'],'asset_sha256':row['asset_sha256'],'readiness_source':row['readiness_source']}
     __import__('ispatialgym.sampling.robot_utils')
     import cv2
     import numpy as np
@@ -59,16 +73,19 @@ def main():
         require(len(indices)>0,'heldout room has no conservative support footprint plus walking clearance')
         indices=sorted(indices,key=lambda x:(-float(distance[tuple(x)]),int(x[0]),int(x[1])))
         selected=None;tested=[]
+        # No simulation step occurs while proposing placements; only the new
+        # support moves. Reuse the unchanged context pieces across proposals.
+        context_pieces={other.name:_collision_piece_aabbs(other) for other in world.scene.objects
+                        if other.name!=name and other.category!='floors'}
         for ij in indices:
             xy=seg.map_to_world(th.tensor(ij)).tolist()
             if any(sum((xy[k]-v[k])**2 for k in range(2))<.25**2 for v in tested):continue
             tested.append(xy)
             obj.set_position_orientation(th.tensor([*xy,float(world.floor_z)-local_bottom+.001]),th.tensor([0.,0.,0.,1.]))
             pieces=_collision_piece_aabbs(obj);bad=[]
-            for other in world.scene.objects:
-                if other.name==name or other.category=='floors':continue
-                amount=max((depth(x,y) for x in pieces for y in _collision_piece_aabbs(other)),default=-1.)
-                if amount>.002:bad.append({'name':other.name,'overlap_m':amount})
+            for other_name,other_pieces in context_pieces.items():
+                amount=max((depth(x,y) for x in pieces for y in other_pieces),default=-1.)
+                if amount>.002:bad.append({'name':other_name,'overlap_m':amount})
             if not bad:selected=xy;break
             if len(tested)>=200:break
         require(selected is not None,'all conservative room placements overlap existing collision pieces')

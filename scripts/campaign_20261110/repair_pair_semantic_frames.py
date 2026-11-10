@@ -26,9 +26,16 @@ def main():
     require(file_digest(source) == review['native_geometry_report']['sha256'], 'native render evidence changed')
     native = {r['category'] + '/' + r['model']: r for r in json.loads(source.read_text())['objects']}
     for key, row in review['objects'].items():
+        measured_native = native
+        if row.get('native_geometry_report'):
+            record = row['native_geometry_report']; extra = Path(record['path'])
+            require(extra.resolve().is_relative_to(a.root.resolve()) and file_digest(extra) == record['sha256'], 'object render proof changed or outside campaign')
+            extra_doc = json.loads(extra.read_text())
+            require(extra_doc['status'] == 'native_defaults_and_geometry_recorded', 'object render probe incomplete')
+            measured_native = {r['category'] + '/' + r['model']: r for r in extra_doc['objects']}
         require(row['front'] in ('+x', '-x', '+y', '-y') and row['status'] == 'passed', 'invalid reviewed signed front')
-        require(row['asset_sha256'] == native[key]['asset_sha256'], 'reviewed asset differs from native render')
-        measured = {(im['path'], im['sha256']) for im in native[key]['images']}
+        require(row['asset_sha256'] == measured_native[key]['asset_sha256'], 'reviewed asset differs from native render')
+        measured = {(im['path'], im['sha256']) for im in measured_native[key]['images']}
         require(row['images'] and row['findings'], 'semantic review evidence absent')
         for image in row['images']:
             require((image['path'], image['sha256']) in measured and file_digest(Path(image['path'])) == image['sha256'], 'review image changed')

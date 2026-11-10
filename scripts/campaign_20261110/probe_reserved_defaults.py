@@ -26,8 +26,11 @@ def main():
     p.add_argument('--bottom-view', action='store_true', help='Include the opposite face when canonical views hide semantic detail')
     p.add_argument('--axis-views', action='store_true', help='Render all six cardinal faces for semantic frame review')
     p.add_argument('--render-size', type=int, default=256, choices=(256, 512, 1024), help='Diagnostic image resolution; physics and object scale remain unchanged')
+    p.add_argument('--camera-distance-factor', type=float, default=1., help='Diagnostic camera distance multiplier; default view unchanged')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
+    if not .5 <= a.camera_distance_factor <= 1.:
+        raise ValueError('diagnostic camera distance factor must be in [0.5, 1]')
     out = a.output.resolve()
     if out.exists() or not out.is_relative_to(a.campaign_root.resolve()):
         raise ValueError('new campaign output required')
@@ -137,7 +140,7 @@ def main():
                                  for name,joint in obj.joints.items()},
                       'images': []}
             centre = ((hi + lo) * .5).cpu().numpy()
-            radius = float(th.max(hi - lo)) * 1.7 + .1
+            radius = (float(th.max(hi - lo)) * 1.7 + .1) * a.camera_distance_factor
             views = [('front', [1., -1., .55]), ('back', [-1., 1., .55]), ('top', [.01, 0., 1.])]
             if a.bottom_view:
                 views.append(('bottom', [.01, 0., -1.]))

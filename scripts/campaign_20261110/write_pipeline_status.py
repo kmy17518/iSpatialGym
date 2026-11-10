@@ -131,7 +131,13 @@ def main():
                     put(task, cls, 'eval_model', 'target_grasp_library_positive',
                         'Exact target library passed native identity, default-scale and positive-grasp admission. Exact-height maps and task geometry/demo/replay remain separate gates.',
                         [dependency_path], 3)
-    native_batches = [(root, root / 'validation_inputs/wall_dispenser_corridor_v1/validation_jobs.json', 'held_wall_dispenser_corridor_v1')]
+    native_batches = [(root, root / 'validation_inputs/wall_dispenser_corridor_v1/validation_jobs.json', 'held_wall_dispenser_corridor_v1'),
+                      (root, root / 'validation_inputs/held_model_disembedding_geometry_v1/validation_jobs.json', 'held_model_disembedding_geometry_v1'),
+                      (root, root / 'validation_inputs/held_small_pairs_reviewed_fronts_v1/validation_jobs.json', 'held_pairs_reviewed_fronts_v1'),
+                      (root, root / 'validation_inputs/category_under_pair_geometry_v1/validation_jobs.json', 'category_under_pair_geometry_v1'),
+                      (root, root / 'validation_inputs/held_touching_consumers_v1/validation_jobs.json', 'held_touching_consumers_v1'),
+                      (root, root / 'validation_inputs/held_axial05_consumer_v1/validation_jobs.json', 'held_axial05_consumer_v1'),
+                      (root, root / 'validation_inputs/held_attachment_consumers_v1/validation_jobs.json', 'held_attachment_consumers_v1')]
     if a.secondary_root:
         secondary = a.secondary_root.resolve()
         assert secondary.name == 'campaign_20261110', 'unexpected secondary campaign source'
@@ -160,7 +166,9 @@ def main():
             put(job['task'], job['class_id'], job['split'], 'fresh_native_sample_written' if written else 'blocked_native_geometry',
                 reason, [summary_path, jobs_path], 4)
     bound_paths = [root / 'manifests/floating_consumer_contracts_r5.json']
-    for pattern in ('held_model_wall_fresh_contracts_r*.json', 'held_pairs_fresh_contracts_r*.json'):
+    for pattern in ('held_model_wall_fresh_contracts_r*.json', 'held_pairs_fresh_contracts_r*.json',
+                    'category_ontop_fresh_contract_r*.json', 'held_nextto03_fresh_contract_r*.json',
+                    'held_attachment_fresh_contract_r*.json'):
         bound_paths.extend(sorted((root / 'manifests').glob(pattern)))
     for bound_path in bound_paths:
         bound = json.loads(bound_path.read_text())
