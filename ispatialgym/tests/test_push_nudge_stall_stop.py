@@ -11,11 +11,11 @@ from ispatialgym.oracle.executor import NOTE_KEYS
 from ispatialgym.tests.test_push_nudge_brace_hold import _run, _world
 
 
-def test_switch_default_off(monkeypatch):
+def test_switch_default_on(monkeypatch):
     monkeypatch.delenv(EX.PUSH_NUDGE_STALL_STOP_ENV, raising=False)
+    assert EX.push_nudge_stall_stop_on()  # default ON since the 360102 recollect (owner #92)
+    monkeypatch.setenv(EX.PUSH_NUDGE_STALL_STOP_ENV, "0")
     assert not EX.push_nudge_stall_stop_on()
-    monkeypatch.setenv(EX.PUSH_NUDGE_STALL_STOP_ENV, "1")
-    assert EX.push_nudge_stall_stop_on()
     assert "push_nudge_stall" in NOTE_KEYS
 
 
@@ -54,7 +54,7 @@ def test_min_speed_parsing(monkeypatch):
 
 def test_min_speed_raises_the_slow_command_and_reaches_the_goal(monkeypatch):
     # lead #90c: the tracker's command decays below the base's breakaway near the goal; the floor keeps it above until within tolerance
-    monkeypatch.delenv(EX.PUSH_NUDGE_STALL_STOP_ENV, raising=False)
+    monkeypatch.setenv(EX.PUSH_NUDGE_STALL_STOP_ENV, "0")
     cfg = EX.ExecuteConfig()
     res = {}
     for v in ("0", "0.025"):

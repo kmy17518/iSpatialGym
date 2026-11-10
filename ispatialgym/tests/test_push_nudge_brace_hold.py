@@ -84,7 +84,7 @@ def test_a_base_nudge_holds_the_brace_hand_where_it_stands():
     robot2, env2, motions2, state2 = _world()
     l0 = robot2.eef_pose("left")[0].clone()
     rec2, _ = _run(env2, EX._base_nudge(motions2, state2, "right", "box", [1.0, 0.0, 0.0], 0.02, cfg, "push", speed=0.02))
-    assert rec2 is None and float(robot2.eef_pose("left")[0][0] - l0[0]) == pytest.approx(float(robot2.pos[0]), abs=1e-3)
+    assert (rec2 is None or rec2.get("kind") == "stall_stop") and float(robot2.eef_pose("left")[0][0] - l0[0]) == pytest.approx(float(robot2.pos[0]), abs=1e-3)
 
 
 def test_a_held_nudge_stops_at_the_goal_or_when_the_base_stalls():

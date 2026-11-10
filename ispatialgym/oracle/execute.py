@@ -4624,9 +4624,11 @@ class _NudgeBraceHold:
 #: achieved. Cause (demo.hdf5 of ms_ul02_on3 360001 / on4 360000, fpr2_base 370003, ul02_lb_sd0 360001 - every pause after a nudge): the
 #: tracker's command decays to a constant ~0.006 m/s while the base stands still (0.000 mm per step, with or without the object in
 #: contact), short of the tolerance, until the QA pause (no joint, base joints included, faster than 0.001 for 50 steps) fails the demo.
-#: Default "0" = the nudge as before; kit-like record ``ctx["push_nudge_stall"]``.
+#: Default "1" since owner #92 (2026-11-10, the standard rule on the recollect of r2_ul02_stand 360102, the same instance and snapshot: off - 3
+#: nudges, the third timed out 3 mm short after the base stood still; on - the stall exit fired after 19 steps of that nudge, same verdict and final
+#: pose, 155 steps / 16 s less); "0" = the nudge as before; kit-like record ``ctx["push_nudge_stall"]``.
 PUSH_NUDGE_STALL_STOP_ENV = "ISPATIALGYM_PUSH_NUDGE_STALL_STOP"
-PUSH_NUDGE_STALL_STOP_DEFAULT = "0"
+PUSH_NUDGE_STALL_STOP_DEFAULT = "1"
 
 
 #: i7-measure 2026-11-10 (lead #90c): the base does not answer a slow command - over the 9 recorded stalled push nudges (under_large_01 / 02)
