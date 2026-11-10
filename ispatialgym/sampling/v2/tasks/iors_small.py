@@ -4070,16 +4070,19 @@ class IORSSmall(SamplerV2):
                         with self.ikc.ignoring(ign_last):
                             pr["grasp_links_touching"] = [ln for ln in links if not bool(self.kit.links_clear(qg2, [ln], 0.0)[0])][:8]
                         pr["grasp_self_pairs"] = [f"{a} x {b}" for (a, b), _ in (self.ikc.self_collision_pairs(qg2) or [])[:3]]
-                        try:  # the support piece nearest each touching link's origin (the split-kept pieces' SDF)
-                            fk = self.kit.fk(list(pr["grasp_links_touching"]), qg2)
-                            near = {}
-                            for ln in pr["grasp_links_touching"]:
-                                p_ln = G.t(fk[ln][0]).float().reshape(1, 3)
-                                best = min(((float(geom.sdf(p_ln).min()), prim.rsplit("/", 1)[-1]) for prim, _cm, geom in self._kept_pieces()), default=None)
-                                near[ln] = None if best is None else [best[1], round(best[0], 4), [round(v, 3) for v in p_ln.reshape(-1).tolist()]]
-                            pr["grasp_nearest_piece"] = near
+                        try:  # the gripper body's box behind the eef (eef frame: x +-0.045, y +-0.06, z -0.13..0) vs each split-kept support piece (SDF)
+                            gx, gy, gz = np.meshgrid(np.linspace(-0.045, 0.045, 4), np.linspace(-0.06, 0.06, 5), np.linspace(-0.13, 0.0, 8), indexing="ij")
+                            pts = th.tensor(np.stack([gx.ravel(), gy.ravel(), gz.ravel()], axis=1), dtype=th.float32)
+                            pts_w = G.local_points_world(pts, (G.t(eef[0]).float(), G.t(eef[1]).float()))
+                            rows = []
+                            for prim, _cm, geom in self._kept_pieces():
+                                d = geom.sdf(pts_w)
+                                j = int(th.argmin(d))
+                                rows.append((float(d[j]), prim.rsplit("/", 1)[-1], [round(float(v), 3) for v in pts[j].tolist()], [round(float(v), 4) for v in pts_w[j].tolist()]))
+                            rows.sort(key=lambda r: r[0])
+                            pr["grasp_gripper_box_pieces"] = rows[:3]  # (sdf m, piece, the eef-frame point, its world point)
                         except Exception as e:  # noqa: BLE001
-                            pr["grasp_nearest_piece"] = repr(e)[:120]
+                            pr["grasp_gripper_box_pieces"] = repr(e)[:120]
                 probes[getattr(g, "name", "?")] = pr
             rec["probes"] = probes
             log.info("T03B_GRASP_DIAG %s", json.dumps(rec, default=str))
