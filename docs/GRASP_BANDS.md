@@ -6200,3 +6200,23 @@ Only the customs starts had maps, so a drawn start would have rejected `missing_
   some hull-valid grasps (lid__tnwisp).
 - Interior shelf planes are authored values (1e-2 m), not measured; the 88-height pool assumes subtask-level compatibility.
 - Twin physics is assumed identical to its row (symmetric fingers); twins get their own geometric checks in maps.
+
+## i7-artsmall (owner 2026-11-09): articulation small draws both joint angles per attempt
+
+- `ISPATIALGYM_ARTSMALL_DRAW_ANGLES` (6b8ff521; default ON since lead #80c): each attempt draws (q_init, q_goal) uniformly over the
+  stable set S (open: closed -> s; close: s -> closed), following articulation_large (pair probe in `sample_template`, draw in
+  `sample_instance`). Replaces the owner's 2026-09-19 fixed `close_init_fraction` start for the drawn start. Customs
+  `generation.draw_angles` scopes it per alias (2f42d017). Needs the per-start push-close prefix maps
+  (`$OFH/artsmall_20261109/prefix/maps/_articulation`, 32 maps; nearest-start `find_prefix`).
+- `ISPATIALGYM_ARTIC_PUSH_BASE_SIG` (35afbbf3; default ON since #80c): a trunk bug under START_DRAW - push-close left `handle` on the
+  fist's twin turn, so every later attempt looked up prefix maps with the twin's signature and missed (close_01 / close_02: 46 att / 1 wr,
+  45 missing_map each). Affects only the two push-close aliases.
+
+| alias | off att/wr/ok, GPU-h | on att/wr/ok, GPU-h | angles written, off -> on |
+|---|---|---|---|
+| open_01 (blender) | 7/4/4, 0.17 | 7/4/4, 0.20 | goal 1.5004 -> 1.29-1.71 |
+| open_02 (carton) | 39/4/4, 2.63 | 23/4/4, 1.76 | goal 0.7697 -> 0.74-2.36 |
+| close_01 (blender; BASE_SIG on both) | 11/4/3, 0.80 | 8/4/4, 0.56 | start 0.7854 -> 0.50-0.70 |
+| close_02 (carton; BASE_SIG on both) | 5/4/4, 0.40 | 5/4/4, 0.43 | start 1.6493 -> 1.71-2.06 |
+
+N 4, index 361000, svl titanrtx, own ledger and empty sampling cache per arm. BASE_SIG A/B: close_01/02 off 46/1/1 each (45 missing_map) vs on 11/4/3 and 5/4/4.
