@@ -71,3 +71,17 @@ def test_twins_add_the_hand_turned_about_its_approach():
     T = Rot.from_quat(g["mirror_side_9~r180"]["quat_xyzw"]).as_matrix()
     assert np.allclose(A[:, 2], T[:, 2], atol=1e-6) and np.allclose(A[:, 0], -T[:, 0], atol=1e-6)  # same approach, x / y turned
     assert g["mirror_side_9"]["position"] == g["mirror_side_9~r180"]["position"]
+
+
+def test_expand_adds_agent_proposals_at_the_mirrored_pinch():
+    from ispatialgym.grasping import candidates as CA
+
+    j = LN.mirror_job(_job(), _src(), BOX, ["side_9"], twins=True, expand=True)
+    co = j["cand_overrides"]
+    assert co["families"] == ["legacy", "agent"] and [p["name"] for p in co["agent_proposals"]] == ["mirror_side_9", "mirror_side_9~r180"]
+    T, s0 = CA.agent_proposal_poses(co["agent_proposals"][0], CA.CandidateConfig())
+    dst = LN.lean_quat(LN.xyzw(BASE_WXYZ), LN.LeanSpec(20.0, "right"))
+    g = co["legacy_grasps"][0]
+    Rd = Rot.from_quat(dst).as_matrix()
+    assert len(T) > 1 and np.allclose(T[0][:3, 3], Rd @ np.array(g["position"]), atol=1e-5)  # the unexpanded pose is the mirror itself
+    assert np.allclose(T[0][:3, 2], (Rd @ Rot.from_quat(g["quat_xyzw"]).as_matrix())[:, 2], atol=1e-5)
