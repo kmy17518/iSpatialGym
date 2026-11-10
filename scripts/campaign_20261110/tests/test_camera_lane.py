@@ -76,7 +76,14 @@ def test_strict_eval_quotas_training_soft_buckets_and_idempotency(tmp_path):
     assert result["counts"]["eval_standard"] == {"3": 3, "5": 4, "10": 3}
     assert result["counts"]["train_total"] == 2
     assert claim(f, review)["accepted"] == {}
-    assert len(lane.read(f.root / "accepted/camera.json")["accepted"]) == 12
+    accepted=lane.read(f.root / "accepted/camera.json")["accepted"]
+    assert len(accepted) == 12
+    assert all(row["contract"]["class_id"]==f.template.class_id and row["source_job"]==str(f.job) for row in accepted.values())
+    state=lane.read(f.root / "accepted/camera.json")
+    state["accepted"]["camera_00"].pop("contract")
+    c.write_json_atomic(f.root / "accepted/camera.json",state)
+    assert claim(f,review)["accepted"]=={}
+    assert lane.read(f.root / "accepted/camera.json")["accepted"]["camera_00"]["contract"]["class_id"]==f.template.class_id
 
 
 def test_wrong_code_and_bucket_fail_closed(tmp_path):

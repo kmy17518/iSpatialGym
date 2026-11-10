@@ -9,9 +9,10 @@ from scripts.campaign_20261110.goal_groups import read_json
 def bind_camera_room_candidate(candidate, directory, *, code, root, started_at):
     directory, code, root = (Path(p).resolve() for p in (directory,code,root))
     require(directory.is_relative_to(root) and code.is_relative_to(root/"code"), "camera binding outside owned sandbox")
-    require(candidate.task == "camera_relocalization-standard" and candidate.split in ("train","eval_category"),
-            "camera room binder requires a training/category camera template")
-    require(all(o.semantic_kind == "floor" for o in candidate.objects), "camera-standard room candidate unexpectedly contains objects")
+    require(candidate.task in ("camera_relocalization-standard","camera_relocalization-obstructed")
+            and candidate.split in ("train","eval_model","eval_category"), "camera room binder requires a training/heldout camera template")
+    require(all(o.semantic_kind == "floor" or (candidate.task.endswith("obstructed") and o.role == "target") for o in candidate.objects),
+            "camera room candidate contains undeclared object roles")
     metadata, state = directory/"template_meta.json", directory/"template.json"
     require(all(p.is_file() and p.stat().st_mtime >= started_at for p in (metadata,state)), "camera template is not fresh")
     meta, full = read_json(metadata), read_json(state)
@@ -34,6 +35,7 @@ def bind_camera_room_candidate(candidate, directory, *, code, root, started_at):
         scale = args.get("scale")
         require(isinstance(scale,list) and len(scale)==3, "fresh camera floor scale missing")
         if max(abs(a-b) for a,b in zip(scale,ref.default_scale)) > 1e-6:
+            require(ref.semantic_kind == "floor", "fresh obstacle scale differs from its approved default")
             actual = stable_info.get(row["scene_object_name"],{}).get("args",{})
             require((actual.get("category"),actual.get("model")) == (ref.category,ref.model)
                     and isinstance(actual.get("scale"),list) and len(actual["scale"])==3
@@ -51,5 +53,11 @@ def bind_camera_room_candidate(candidate, directory, *, code, root, started_at):
         "runtime_template_id":meta["template_id"],"source_bddl_sha256":meta["bddl_sha256"],"source_alias":meta["variant"],
         "inst_to_name":bindings,"task_rooms":meta["task_rooms"],"fresh_metadata_binding_check":"passed",
         "fresh_metadata_sha256":file_digest(metadata),"actual_init_args":actual_init,"default_scale_resolution":resolutions}
-    return replace(candidate,objects=tuple(refs),definition_sha256=digest({"candidate_definition":candidate.definition_sha256,
+    bound = replace(candidate,objects=tuple(refs),definition_sha256=digest({"candidate_definition":candidate.definition_sha256,
         "template_sha256":file_digest(state),"bddl_sha256":meta["bddl_sha256"],"actual_init_args":actual_init}),scene_setup=setup)
+    if candidate.task.endswith("obstructed"):
+        from scripts.campaign_20261110.camera_definitions import bind_obstructed_definition
+        bound = bind_obstructed_definition(bound,directory)
+        require(bound.scene_setup["runtime_bddl_sha256"] == meta["bddl_sha256"],
+                "obstacle bootstrap did not use the required stationary-goal definition")
+    return bound

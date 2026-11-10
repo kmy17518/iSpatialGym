@@ -192,6 +192,11 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
             require(bucket in EVAL_QUOTAS and path_bucket(member["geodesic_m"]) == bucket, "invalid reviewed bucket")
             if iid in accepted:
                 require(accepted[iid]["artifacts"] == member["artifacts"], "accepted camera ID changed")
+                require(digest(accepted[iid].get("contract",review["contract"])) == digest(review["contract"]), "accepted camera contract changed")
+                # Older quota rows predate the standalone export. Backfill only
+                # from the freshly re-audited, identical physical artifacts.
+                accepted[iid]["contract"] = review["contract"]
+                accepted[iid]["source_job"] = review["source_job"]
                 continue
             if member["sampling_split"] == "eval_standard" and not member["perturbed"] and eval_counts[bucket] < EVAL_QUOTAS[bucket]:
                 split = "eval_standard"
@@ -203,7 +208,8 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
                 deferred.append(iid)
                 continue
             accepted[iid] = {**member, "split": split, "validation_key": asdict(key), "gate": review["gate"],
-                             "evidence": review["evidence"], "release_review_sha256": digest(review)}
+                             "evidence": review["evidence"], "release_review_sha256": digest(review),
+                             "contract":review["contract"],"source_job":review["source_job"]}
             added[iid] = split
         state["counts"] = {"eval_standard": dict(eval_counts), "train_rooms": dict(train_counts), "train_total": sum(train_counts.values())}
         write_json_atomic(state_path, state)

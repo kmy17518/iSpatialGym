@@ -206,9 +206,14 @@ def _scene_frame_fn():
 class Demo:
     """The recorded arrays of one demo's committed episode (``data/demo_0``)."""
 
-    def __init__(self, demo_dir: str):
+    def __init__(self, demo_dir: str, campaign_record=None):
         self.dir = demo_dir
         self.name = os.path.basename(os.path.normpath(demo_dir))
+        self.campaign_meta = None
+        if campaign_record is not None:
+            from ispatialgym.multienv.campaign_rendering import checked_metadata
+
+            self.campaign_meta = checked_metadata(campaign_record, demo_dir)
         with h5py.File(os.path.join(demo_dir, "demo.hdf5"), "r") as f:
             g = f["data/demo_0"]
             self.scene_file = json.loads(f["data"].attrs["scene_file"])
@@ -223,6 +228,10 @@ class Demo:
                 self.tro_path = (json.loads(attrs["config"]).get("task") or {}).get("tro_path")
             except (KeyError, ValueError, AttributeError):
                 self.tro_path = None
+            if campaign_record is not None:
+                # The collection HDF5 can retain a node-local scratch path;
+                # the accepted manifest pins its unchanged durable TRO bytes.
+                self.tro_path = campaign_record["artifacts"]["tro"]["path"]
             self.state = g["state"][()]
             self.state_size = g["state_size"][()]
             self.action = th.as_tensor(g["action"][()], dtype=th.float32)
@@ -243,10 +252,11 @@ class DemoSource:
     ``done_file`` exists."""
 
     def __init__(self, demo_dirs: List[str], watch: Optional[str] = None, done_file: Optional[str] = None, poll_s: float = 5.0,
-                 claims: Optional[str] = None):
+                 claims: Optional[str] = None, campaign_records=None):
         self.pending: List[str] = list(demo_dirs)
         self.watch, self.done_file, self.poll_s = watch, done_file, float(poll_s)
         self.claims = claims
+        self.campaign_records = campaign_records
         if claims:
             os.makedirs(claims, exist_ok=True)
         self.seen = set(demo_dirs)
@@ -288,7 +298,8 @@ class DemoSource:
         while self.pending:
             d = self.pending.pop(0)
             if self._claim(d):
-                return Demo(d)
+                record = None if self.campaign_records is None else self.campaign_records[os.path.realpath(d)]
+                return Demo(d, campaign_record=record)
         return None
 
     def finished(self) -> bool:
@@ -523,6 +534,7 @@ class Slot:
         self.last_obs = None
         #: --delta-load: every object's recorded state as last loaded into this slot (None: load everything next)
         self.loaded: Optional[Dict[str, Any]] = None
+        self.campaign_restoration = None
 
     def start(self, demo: Demo) -> None:
         from omnigibson.envs.data_wrapper import _align_scene_object_states_with_recorded_schema
@@ -546,6 +558,15 @@ class Slot:
                   "recorded scene file changes this scene's objects to the crop", flush=True)
         self.scene.restore(scene_file, update_initial_file=True)
         _align_scene_object_states_with_recorded_schema(scene=self.scene, recorded_scene_file=scene_file)
+        self.campaign_restoration = None
+        if getattr(demo, "campaign_meta", None) is not None:
+            import omnigibson as og
+            from ispatialgym.multienv.campaign_rendering import restore_campaign_scene
+
+            if self.scene_mode != "recorded":
+                raise ValueError("campaign rendering requires the exact recorded scene")
+            self.scene.load_state(demo.state_at(0), serialized=True)
+            self.campaign_restoration = restore_campaign_scene(self.scene, og.sim, demo.campaign_meta)
         self.n_objects_scene = len(self.scene.object_registry.get_dict("name"))
         self.demo, self.i, self.t0 = demo, 0, time.time()
         self.loaded = None
@@ -574,6 +595,7 @@ def main(argv=None) -> int:
     ap.add_argument("--watch", default=None, help="replay the successful runs appearing under this demo root (see the module doc)")
     ap.add_argument("--done-file", default=None, help="--watch: no more demos come once this file exists")
     ap.add_argument("--claims", default=None, help="--watch: claim directory shared by several replayers of one demo root")
+    ap.add_argument("--campaign-manifest", default=None, help="accepted campaign instances.jsonl; verify inputs and restore exact augmentations")
     ap.add_argument("--poll-s", type=float, default=5.0)
     ap.add_argument("--root", required=True, help="LeRobot root dir: one dataset per slot, <root>/<repo prefix>_slot<k>")
     ap.add_argument("--task", required=True, help="task name written into the datasets (the variant)")
@@ -618,10 +640,17 @@ def main(argv=None) -> int:
         ap.error("--demos or --watch")
     if args.watch and not args.done_file:
         ap.error("--watch needs --done-file")
+    campaign_records = None
+    if args.campaign_manifest:
+        if args.watch or args.scene != "recorded" or args.tiled or args.delta_load:
+            ap.error("campaign rendering requires a fixed accepted list, --scene recorded, individual cameras and full state loads")
+        from ispatialgym.multienv.campaign_rendering import selected_records
+
+        campaign_records = selected_records(args.campaign_manifest, demo_dirs)
     n_slots = max(1, int(args.slots) if args.watch else min(int(args.slots), len(demo_dirs)))
     tiled = args.tiled and n_slots > 1
     t_start = time.time()
-    source = DemoSource(demo_dirs, args.watch, args.done_file, args.poll_s, claims=args.claims)
+    source = DemoSource(demo_dirs, args.watch, args.done_file, args.poll_s, claims=args.claims, campaign_records=campaign_records)
     first = source.first()
 
     def usable(demo: Demo) -> Demo:
@@ -780,6 +809,7 @@ def main(argv=None) -> int:
                 index = s.writer.end(save=keep)
                 emit("REPLAY_DEMO", {"demo": d.dir, "slot": s.k, "frames": d.T, "episode_index": index, "wall_s": round(time.time() - s.t0, 2),
                                      "dataset": os.path.join(args.root, f"{args.repo_prefix}_slot{s.k}"), "kept": keep,
+                                     "campaign_restoration": s.campaign_restoration,
                                      "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
                                                                                   "occluded": occl.get("occluded")}})
                 s.demo = None

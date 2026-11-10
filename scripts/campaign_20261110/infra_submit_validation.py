@@ -13,6 +13,7 @@ def main():
     p.add_argument('--index', required=True, type=int)
     p.add_argument('--ledger', default='canary_allocations.tsv')
     p.add_argument('--template-customs', action='store_true')
+    p.add_argument('--bddl-root', type=Path)
     p.add_argument('--kcollect', type=int, default=2)
     p.add_argument('--dry-run', action='store_true')
     a = p.parse_args()
@@ -34,6 +35,10 @@ def main():
            'ISPATIALGYM_FAST_COLLECTOR_PREBUILD':'0'}
     if a.template_customs:
         env['START_PER_ATTEMPT'] = '0'
+    if a.bddl_root:
+        bddl = a.bddl_root.resolve()
+        assert bddl.is_dir() and bddl.is_relative_to(root) and not any(c.isspace() for c in str(bddl)), 'private BDDL must be an owned whitespace-free directory'
+        env['KEEP_SCENE'] = '--keep-template-scene --bddl-root ' + str(bddl)
     cmd = ['python3',str(snapshot/'scripts/trainfast/submit_fast.py'),'submit',a.key,'1','--flow','fast',
            '--code',str(snapshot),'--root',str(root),'--ledger',str(root/'manifests'/a.ledger),
            '--base-index',str(a.index),'--tag',a.tag,'--job-prefix','isg261110_','--grasps','v2only',

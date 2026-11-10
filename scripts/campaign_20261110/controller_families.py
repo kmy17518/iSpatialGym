@@ -201,6 +201,9 @@ def advance(spec, state, cfg, root, queue, allowance, save):
     bucket = next_bucket(counts, spec["eval_quotas"])
     cycle = state.get("current")
     if cycle is None:
+        if spec.get("allow_new_cycles", True) is False:
+            state["status"] = "needs_family_diagnosis"
+            return 0
         if bucket is None:
             state["status"] = "evaluation_quota_complete"
             return 0
@@ -279,6 +282,7 @@ def main():
         seed = Path(spec["seed"]).resolve()
         require(seed.is_relative_to(root) and not (seed / "release_block.json").exists(), "blocked or external seed")
         config = read(seed / "campaign_config.json")
+        require(file_digest(seed / "campaign_config.json") == spec["seed_config_sha256"], "seed configuration changed")
         require(config["purpose"] == "validation" and config["template"]["class_id"] == spec["class_id"], "seed class differs")
         require(file_digest(Path(spec["anchor_snapshot"]) / ".snapshot_commit") == config["validation_key"]["code_sha256"], "seed code identity mismatch")
         require(len(spec["eval_quotas"]) == len(spec["magnitude_ranges"]), "bucket/range counts differ")

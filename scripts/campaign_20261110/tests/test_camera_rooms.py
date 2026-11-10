@@ -5,6 +5,7 @@ import pytest
 
 from scripts.campaign_20261110 import contracts as c
 from scripts.campaign_20261110.camera_rooms import bind_camera_room_candidate
+from scripts.campaign_20261110.goal_groups import read_json
 
 
 def fixture(root):
@@ -48,4 +49,35 @@ def test_unproved_default_and_changed_asset_fail_closed(tmp_path):
     asset=code/"Behavior-1K/datasets/behavior-1k-assets/objects/floors/abc/usd/abc.encrypted.usd"
     asset.write_bytes(b"changed")
     with pytest.raises(c.ContractError,match="asset bytes differ"):
+        bind_camera_room_candidate(template,directory,code=code,root=tmp_path,started_at=time.time()-60)
+
+
+def test_heldout_obstacle_binding_proves_stationary_goal_and_rejects_scale_drift(tmp_path):
+    from ispatialgym.sampling.campaign_obstacles import with_stationary_goals
+    template,directory,code,_=fixture(tmp_path)
+    asset=code/"Behavior-1K/datasets/behavior-1k-assets/objects/hamper/new/usd/new.encrypted.usd"
+    asset.parent.mkdir(parents=True);asset.write_bytes(b"heldout-hamper")
+    obstacle=c.ObjectRef("hamper.n.02_1","target","hamper","new",c.file_digest(asset),ready=True,readiness_source="test")
+    state=read_json(directory/"template.json")
+    state["objects_info"]["init_info"]["hamper_obj"]={"args":{"category":"hamper","model":"new","scale":[1,1,1]}}
+    c.write_json_atomic(directory/"template.json",state)
+    text="""(define (problem camera_relocalization-1) (:domain ispatialgym) (:variant camera_relocalization-obstructed-hamper_1)
+    (:objects agent.n.01_1 - agent.n.01 floor.n.01_1 - floor.n.01 hamper.n.02_1 - hamper.n.02)
+    (:init (ontop agent.n.01_1 floor.n.01_1) (ontop hamper.n.02_1 floor.n.01_1))
+    (:goal (and (pose_reached ?agent.n.01_1))) (:measure (pose_reached ?agent.n.01_1)))"""
+    definition=directory/"problem.bddl";definition.write_text(with_stationary_goals(text,[obstacle.instance]))
+    meta=read_json(directory/"template_meta.json")
+    meta.update(problem="camera_relocalization-1",variant="camera_relocalization-obstructed-hamper_1",
+                template_sha256=c.file_digest(directory/"template.json"),bddl_sha256=c.file_digest(definition))
+    meta["bindings"].append({"role":"obstacles","name":obstacle.instance,"scene_object_name":"hamper_obj"})
+    c.write_json_atomic(directory/"template_meta.json",meta)
+    template=replace(template,task="camera_relocalization-obstructed",split="eval_model",objects=template.objects+(obstacle,),
+                     scene_setup={"runtime_bddl_sha256":c.file_digest(definition)})
+    result=bind_camera_room_candidate(template,directory,code=code,root=tmp_path,started_at=time.time()-60)
+    assert result.scene_setup["runtime_bddl_adaptation"]["measure"]==[["pose_reached","?agent.n.01_1"]]
+    assert result.scene_setup["runtime_bddl_sha256"]==meta["bddl_sha256"]
+    state["objects_info"]["init_info"]["hamper_obj"]["args"]["scale"]=[1.1,1,1]
+    c.write_json_atomic(directory/"template.json",state);meta["template_sha256"]=c.file_digest(directory/"template.json")
+    c.write_json_atomic(directory/"template_meta.json",meta)
+    with pytest.raises(c.ContractError,match="obstacle scale differs"):
         bind_camera_room_candidate(template,directory,code=code,root=tmp_path,started_at=time.time()-60)

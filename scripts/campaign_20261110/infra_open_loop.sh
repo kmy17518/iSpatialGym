@@ -14,7 +14,6 @@ set -a
 source <(grep -E '^(ISPATIALGYM|ISG)_[A-Z0-9_]*=' "$JOBDIR/job.env")
 set +a
 unset ISPATIALGYM_HEAD_CAMERA_ONLY ISPATIALGYM_PHYSICS_ONLY
-export ISPATIALGYM_FAST_PARTIAL_SCENE=0
 export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR="$JB/numba_cache" ISPATIALGYM_ORACLE_STILL_EXIT=1
 export ISPATIALGYM_SAMPLING_CACHE="$ISGF_SAMPLING_CACHE"
 mkdir -p "$GATE_OUT"
@@ -33,10 +32,22 @@ for meta in sorted((root/'demo').glob('*/meta.json')):
 PY
 )
 if [ "${#INPUTS[@]}" -ne 2 ]; then echo 'No unambiguous successful demo + TRO to replay' >&2; exit 2; fi
+SCENE_HELPER="${ISGF_REPLAY_SCENE_HELPER:-$ISGF_ROOT/tools/infra_replay_scene.py}"
+export ISPATIALGYM_FAST_PARTIAL_SCENE
+ISPATIALGYM_FAST_PARTIAL_SCENE=$(python "$SCENE_HELPER" --demo "${INPUTS[1]}" --job "$JOBDIR" --identity "$GATE_OUT/scene_identity.json")
 set +e
 timeout -s INT -k 120 1800 python -m ispatialgym.oracle.run_isg --instance "${INPUTS[0]}" --mode replay --replay "${INPUTS[1]}" --record hdf5 --no-goal-override --out "$GATE_OUT/replay" > "$GATE_OUT/replay.log" 2>&1
 REPLAY_RC=$?
 set -e
+REPLAY_META="$GATE_OUT/replay/$(basename "$(dirname "${INPUTS[1]}")")/meta.json"
+SCENE_RC=1
+if [ -f "$REPLAY_META" ]; then
+    set +e
+    python "$SCENE_HELPER" --identity "$GATE_OUT/scene_identity.json" --replay-report "$REPLAY_META" > "$GATE_OUT/scene_verify.log" 2>&1
+    SCENE_RC=$?
+    set -e
+fi
+if [ "$SCENE_RC" -ne 0 ]; then REPLAY_RC=5; fi
 python3 - "$GATE_OUT" "$JOBDIR" "$SNAPSHOT" "${INPUTS[0]}" "${INPUTS[1]}" "$REPLAY_RC" <<'PY'
 import datetime,hashlib,json,pathlib,sys
 out,job,snapshot,tro,demo,rc=sys.argv[1:]
@@ -53,6 +64,7 @@ for line in (pathlib.Path(out)/'replay.log').read_text(errors='replace').splitli
 result=results[-1] if results else {}
 passed=int(rc)==0 and result.get('success') is True and result.get('status')=='success'
 gate={'schema':1,'validated_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'validation_only':True,'source_job':job,'snapshot':snapshot,'instance':tro,'demo':demo,'demo_sha256':sha256(demo),'tro_sha256':sha256(tro),'replay_meta_paths':[str(p) for p in pathlib.Path(out,'replay').rglob('meta.json')],'replay_rc':int(rc),'replay_mode':'physics_action_open_loop','success':passed,'result':result}
+gate['scene_identity']=json.loads((pathlib.Path(out)/'scene_identity.json').read_text())
 (pathlib.Path(out)/'gate.json').write_text(json.dumps(gate,indent=2)+'\n')
 print(json.dumps(gate))
 sys.exit(0 if passed else 2)

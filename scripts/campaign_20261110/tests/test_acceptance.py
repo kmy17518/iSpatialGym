@@ -92,3 +92,26 @@ def test_same_intended_start_cannot_be_counted_as_two_instances(tmp_path):
     f = fixture(tmp_path, starts=(1, 1))
     with pytest.raises(c.ContractError, match="duplicates a start"):
         audit(f)
+
+
+def test_reuse_gate_requires_exact_template_key_and_campaign(tmp_path):
+    source = fixture(tmp_path, prefix="source_")
+    target = fixture(tmp_path, prefix="target_")
+    result = a.audit_job(target.job, source.gate, root=tmp_path, started_at=source.since,
+                         group_closed=True, group_id="target_group")
+    assert result["proposed_allocation"] == {"target_fresh_0": "eval_standard", "target_fresh_1": "train"}
+    with pytest.raises(c.ContractError, match="explicit current group"):
+        a.audit_job(target.job, source.gate, root=tmp_path, started_at=source.since, group_closed=True)
+    path = next((target.job / "inst").rglob("*-tro_state.json"))
+    tro = json.loads(path.read_text())
+    tro["ispatialgym"]["campaign"]["campaign_id"] = "different"
+    c.write_json_atomic(path, tro)
+    with pytest.raises(c.ContractError, match="campaign identities"):
+        a.audit_job(target.job, source.gate, root=tmp_path, started_at=source.since,
+                    group_closed=True, group_id="target_group")
+    tro["ispatialgym"]["campaign"]["campaign_id"] = "campaign"
+    tro["ispatialgym"]["campaign"]["validation_key"]["physics_sha256"] = c.digest("other-physics")
+    c.write_json_atomic(path, tro)
+    with pytest.raises(c.ContractError, match="validation keys"):
+        a.audit_job(target.job, source.gate, root=tmp_path, started_at=source.since,
+                    group_closed=True, group_id="target_group")
