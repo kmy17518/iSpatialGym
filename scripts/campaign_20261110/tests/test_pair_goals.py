@@ -17,11 +17,29 @@ class PairPlanTests(unittest.TestCase):
         return g.validate_pair_plan(self.fixture(relation), template_id="t", scene="s", rooms=["r"],
                                      relation=relation, activated_at=999, now=now)
 
-    def test_unsupported_contact_plan_and_deadline_reject(self):
+    def test_contact_plan_requires_distinct_pre_push_place_and_deadline_rejects(self):
         with self.assertRaises(g.GoalPlanError):
             self.parse("touching")
         with self.assertRaises(g.GoalGroupTimeout):
             self.parse(now=1299)
+
+    def test_touching_keeps_contact_goal_separate_from_the_pre_push_place(self):
+        raw = self.fixture("touching")
+        raw["place_pose"] = {"position": [0, -.08, .8], "orientation": [0, 0, 0, 1]}
+        plan = g.validate_pair_plan(raw, template_id="t", scene="s", rooms=["r"], relation="touching", activated_at=999, now=1000)
+        self.assertEqual(plan.place[0], (0., -.08, .8))
+        self.assertEqual(plan.summary()["requested_goal"]["target"]["position"], [0., 0., .8])
+        self.assertEqual(plan.summary()["requested_place"]["position"], [0., -.08, .8])
+
+    def test_recover_object_place_handles_rotated_grasp_frame(self):
+        import math
+        half = math.sqrt(.5)
+        gripper = {"position": [1, 2.1, 3], "orientation": [0, 0, half, half]}
+        local = {"position": [.1, 0, 0], "orientation": [0, 0, 0, 1]}
+        position, rotation = g.object_pose_from_grasp(gripper, local)
+        self.assertAlmostEqual(position[0], 1.)
+        self.assertAlmostEqual(position[1], 2.)
+        self.assertEqual(rotation, (0., 0., half, half))
 
     def test_native_settling_tolerance_and_inside_orientation_policy(self):
         p = self.parse()

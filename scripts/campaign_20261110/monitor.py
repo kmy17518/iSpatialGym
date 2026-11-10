@@ -90,6 +90,7 @@ def refresh(output, host):
         'contract_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in contract_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in contract_gates),'gates':contract_gates},
         'vast_arch_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in vast_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in vast_gates),'gates':vast_gates},
         'campaign_results':results,'acceptance_evidence':accepted,
+        'family_controller':cluster.get('family_controller',{}),'throughput':cluster.get('throughput',{}),
         'pending':runtime.get('pending',['Freeze split/perturbation contracts','Launch fresh template demo and open-loop replay validation','Apply owner updates for five pending aliases']),
         'new_campaign_vast_budget_usd':runtime.get('vast_budget_usd',3000),
         'automatically_stop_at_deadline':False,
@@ -100,6 +101,11 @@ def refresh(output, host):
     for release in state['data_releases']:
         lines.extend([f"| Released exact-scale grasp libraries ({pathlib.Path(release['path']).name}) | {release.get('new_scale_libraries',0)} |",f"| Released exact-scale arm maps ({pathlib.Path(release['path']).name}) | {release.get('new_scale_maps',0)} |"])
     lines.extend(f"| {k.replace('_',' ')} | {v} |" for k,v in state['campaign_results'].items())
+    if state['throughput']:
+        forecast=state['throughput']
+        lines.extend(['',f"Forecast observed: {forecast.get('observed_at')}. Remaining throughput required: {forecast.get('required_instances_per_hour',0):.1f} accepted instances/hour."])
+        for row in forecast.get('collection_jobs',[]):
+            lines.append(f"- {row['key']}: {row['successes']} successful demos / {row['attempted_demos']} completed demos; {row['successes_per_gpu_hour_with_startup']:.1f} successes/GPU-hour including startup. These measured lanes do not establish throughput for other families.")
     if own_vast:
         lines.extend(['',f"Campaign Vast ledger estimate: ${own_vast.get('spend_estimate_usd',0):.2f} spent + ${own_vast.get('future_compute_commitment_usd',0):.2f} reserved compute + ${own_vast.get('transfer_reserve_usd',0):.2f} transfer/storage reserve. Provider invoice reconciliation pending. Fleet observed at Unix {own_vast.get('observed_at_unix')}."])
     lines.extend(['','Cluster QOS limits: 48 GPUs per user on svl; 30 per user on viscam. Capacity below is a point-in-time resource estimate, not a reservation.','',f"Observed capacity: `{json.dumps(state['cluster_capacity'],sort_keys=True)}`.",'','Pending work:',''])

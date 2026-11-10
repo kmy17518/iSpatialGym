@@ -3383,6 +3383,35 @@ class IORSSmall(SamplerV2):
             if why:
                 raise Reject("campaign_partner_placement", why)
             self.partner_draw = {"source": "goal_plan", "group_id": campaign_plan.group_id}
+            if self.relation == "touching":
+                # Keep the native side, contact-map and possible push-stance
+                # checks even though the partner pose was selected first.
+                p_hull = self.world.hull_at(self.hull["partner"], pose)
+                p_lat = (p_hull[:, :2] - manip.base_xy) @ manip.tangent
+                if float(manip.local(t_pose[0])[1]) >= .5 * float(p_lat.min() + p_lat.max()):
+                    raise Reject("touching_side", "fresh target start is on the wrong side of the fixed partner")
+                t_place = self.place_pose_for(t_pose, pose, manip)
+                if TT.contact_maps_on():
+                    self.contact_maps_of_pair()
+                    self.template_facts["left_contact_band"] = "touch_brace map"
+                    gate = self.contact_map_gate(manip, t_place, pose)
+                    if gate["ok"]:
+                        self._brace_gate = gate
+                    else:
+                        available = self.push_map_any(manip, t_place, pose)
+                        if not available["push_any"]:
+                            raise Reject("contact_unreachable", "fixed touching pair has no native feasible push stance")
+                        self._brace_gate = dict(gate, ok=bool(available["pair_any"]), a1=available,
+                                                at="fixed pair native push stance candidates")
+                else:
+                    right = self.bands.band(manip.translate, manip.tilt, **TT.band_kw(self.bands, manip)) if getattr(self, "bands", None) is not None else None
+                    left = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]), stance=manip)
+                    if right is None or left is None:
+                        self._brace_gate = {"ok": None, "why": "left contact band unavailable"}
+                    else:
+                        work, brace = self.touching_points(t_place, pose, manip)
+                        self._brace_gate = {"ok": brace_placement_admissible(manip.world_to_base(work[:2]), manip.world_to_base(brace[:2]), right, left),
+                                            "why": "fixed pair native contact bands"}
             self._campaign_latest_proposal = {"start_poses": {campaign_plan.target_name: t_pose, campaign_plan.partner_name: pose},
                                               "goal_poses": {campaign_plan.target_name: campaign_plan.goal},
                                               "base_pose2d": manip.base_pose2d, "group_id": campaign_plan.group_id}
@@ -3888,6 +3917,16 @@ class IORSSmall(SamplerV2):
     def place_pose_for(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> G.Pose:
         """Target pose at its *place* position for a drafted partner pose: the nearer-side rule of ``goal_pose`` with the
         place gap (nextto: g_NT - 1 cm; touching: the same, the push closes it); :meth:`pair_goal_align`: at the levelled depth."""
+        campaign_plan = getattr(self, "_campaign_pair_active", None)
+        if campaign_plan is not None and self.relation == "touching":
+            planned = tuple(G.t(v) for v in campaign_plan.place)
+            native_pos = G.t(campaign_plan.goal[0]) - th.tensor([float(manip.tangent[0]), float(manip.tangent[1]), 0.0]) * self.place_gap()
+            dp, dq = CPG.pose_error((native_pos, G.t(campaign_plan.goal[1])), planned)
+            if dp > self.ikc.WITNESS_POS_TOL or dq > self.ikc.WITNESS_ANG_TOL:
+                raise Reject("campaign_place_drift", "fixed touching place disagrees with native push direction/gap")
+            if not self.top.polygon_supported(self.world.footprint(self.hull["target"], planned), margin=self.margin_support):
+                raise Reject("campaign_goal_support", "fixed touching pre-push place leaves the support")
+            return planned
         t_quat = self.target_goal_quat(t_pose, manip, p_pose)
         t_hull = G.local_points_world(self.hull["target"], (th.zeros(3), t_quat))
         p_hull_w = self.world.hull_at(self.hull["partner"], p_pose)
@@ -6333,6 +6372,13 @@ class IORSSmall(SamplerV2):
                     place_pos = goal_pos - self.shelf_push_direction(manip) * self.place_gap()
                 self._touching_place_pos = place_pos
                 draft.summary["touching"] = {"place_gap_m": round(self.place_gap(), 4)}
+                if getattr(self, "_campaign_pair_active", None) is not None:
+                    fixed = self.place_pose_for(draft.object_poses[tname], self.obj("partner").get_position_orientation(), manip)
+                    dp, dq = CPG.pose_error((place_pos, goal_quat), fixed)
+                    if dp > self.ikc.WITNESS_POS_TOL or dq > self.ikc.WITNESS_ANG_TOL:
+                        raise Reject("campaign_place_drift", "settled touching place changed before exact IK")
+                    place_pos, goal_quat = fixed
+                    self._touching_place_pos = place_pos
                 if self.shelf_tip():
                     # oracle-fix 2026-11-04 round 4: the lift moves the book shelf_lift_away_m toward the partner too - straight up it stayed against the
                     # side board it leans on (t03tip2b: the carried drive's first swept pose, attached book + left gripper on bookcase_opryhp_0)

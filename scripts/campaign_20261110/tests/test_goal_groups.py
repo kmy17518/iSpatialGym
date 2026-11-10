@@ -252,7 +252,7 @@ def test_alignment_buckets_use_applied_native_range_without_widening(tmp_path):
         g.with_alignment_buckets(template, [25, 25], source={"sha256": c.digest("meta"), "field": "applied_range"})
 
 
-def test_only_documented_legacy_articulation_measure_migration_is_allowed(tmp_path):
+def test_only_documented_legacy_articulation_measure_migration_is_allowed(tmp_path, monkeypatch):
     import pytest
     source, runtime = tmp_path / "source", tmp_path / "runtime"
     source.mkdir()
@@ -280,6 +280,13 @@ def test_only_documented_legacy_articulation_measure_migration_is_allowed(tmp_pa
     assert proof["migration"]["removed_gating_atoms"] == [["layout_reached", "?apple.n.01_1"]]
     write(source, old[:-1] + "(:measure " + atom + "))")
     template = replace(template, scene_setup={**template.scene_setup, "source_bddl_sha256": c.file_digest(source / "problem.bddl")})
+    with pytest.raises(c.ContractError, match="semantics differ"):
+        g.bind_runtime_definition(template, runtime)
+    exact = (template.class_id, c.file_digest(source / "problem.bddl"), c.file_digest(runtime / "problem.bddl"))
+    monkeypatch.setattr(g, "EXPLICIT_ARTICULATION_MEASURE_REPAIRS", {exact: "fixture-demonstrated-current-definition"})
+    pinned = g.bind_runtime_definition(template, runtime)
+    assert pinned.scene_setup["runtime_bddl_equivalence"]["migration"]["exact_explicit_measure_repair"]["source_sha256"] == exact[1]
+    write(runtime, new.replace("(pose_settled ?apple.n.01_1)", ""))
     with pytest.raises(c.ContractError, match="semantics differ"):
         g.bind_runtime_definition(template, runtime)
 

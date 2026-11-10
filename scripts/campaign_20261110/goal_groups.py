@@ -36,6 +36,18 @@ from ispatialgym.sampling.campaign_attachment_goals import SCHEMA as ATTACHMENT_
 from ispatialgym.sampling.campaign_block_goals import SCHEMA as BLOCK_SCHEMA, validate_block_plan
 
 
+# This archived carton template already had an explicit measure but retained
+# the pre-migration gating atom. The current frozen oracle's definition passed
+# fresh baseline demo/replay job 18420653. No other explicit-measure source is
+# eligible for this compatibility repair; every other semantic section is still
+# compared below, and the measured atom must remain identical.
+EXPLICIT_ARTICULATION_MEASURE_REPAIRS = {
+    ("configuration_matching-articulation_close_small_scale_02",
+     "40c3592afdc39494609881559eea7558fe570678d62f7ea9d7e3695d72e21f09",
+     "137524dc9be630524b4df0a38c7674d6eca94fe7bcad006fc8b5eec2f19acb2b"): "fresh_baseline_18420653",
+}
+
+
 def read_json(path):
     return json.loads(Path(path).read_text())
 
@@ -162,7 +174,9 @@ def bind_runtime_definition(template: Template, runtime_template_dir, *, runtime
                           "has_explicit_measure": bool(re.search(r"\(:measure\b", re.sub(r";[^\n]*", "", path.read_text())))})
     equivalent = snapshots[0]["semantics"] == snapshots[1]["semantics"]
     migration = None
-    if not equivalent and template.task.startswith("configuration_matching-articulation_") and not snapshots[0]["has_explicit_measure"]:
+    explicit_repair = EXPLICIT_ARTICULATION_MEASURE_REPAIRS.get((template.class_id, snapshots[0]["sha256"], snapshots[1]["sha256"]))
+    if (not equivalent and template.task.startswith("configuration_matching-articulation_")
+            and (not snapshots[0]["has_explicit_measure"] or explicit_repair)):
         before, after = snapshots[0]["semantics"], snapshots[1]["semantics"]
         moved = [atom for atom in before["goal"] if isinstance(atom, list) and atom[:1] == ["layout_reached"]]
         remaining = [atom for atom in before["goal"] if atom not in moved]
@@ -173,6 +187,9 @@ def bind_runtime_definition(template: Template, runtime_template_dir, *, runtime
                          "removed_gating_atoms": moved, "measurement_atoms_unchanged": True,
                          "policy_source": "ispatialgym/activity/problem.py:LEGACY_MEASURE_TASK_RULES",
                          "authorization": "campaign owner preserves the working current runtime scoring migration"}
+            if explicit_repair:
+                migration["exact_explicit_measure_repair"] = {"source_sha256": snapshots[0]["sha256"],
+                    "runtime_sha256": snapshots[1]["sha256"], "current_runtime_validation": explicit_repair}
     require(equivalent or migration is not None, "runtime BDDL semantics differ from ready contract")
     proof = {"source": {k: v for k, v in snapshots[0].items() if k != "semantics"},
              "runtime": {k: v for k, v in snapshots[1].items() if k != "semantics"},
@@ -345,6 +362,17 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["release_pose"] = plan["goal_pose"]
         plan["goal_pose"] = {"position": target[0], "orientation": target[1]}
         plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
+        if relation == "touching":
+            from ispatialgym.sampling.campaign_pair_goals import object_pose_from_grasp
+
+            require(file_digest(anchor["sources"]["sidecar"]["path"]) == anchor["sources"]["sidecar"]["sha256"],
+                    "touching anchor sidecar changed after audit")
+            sidecar = read_json(anchor["sources"]["sidecar"]["path"])
+            grasps = [row for row in sidecar.get("grasps", []) if row.get("object") == plan["target_name"]]
+            require(len(grasps) == 1 and grasps[0].get("place") and grasps[0].get("eef_in_object"),
+                    "touching anchor lacks one verified pre-push grasp/place")
+            placed = object_pose_from_grasp(grasps[0]["place"], grasps[0]["eef_in_object"])
+            plan["place_pose"] = {"position": placed[0], "orientation": placed[1]}
         if relation == "nextto":
             summary = anchor["summary"]
             require("nextto_gap_m" in summary and "g_NT" in summary.get("pair", {}), "nextto anchor lacks measured gap range")

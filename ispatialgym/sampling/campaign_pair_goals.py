@@ -13,7 +13,7 @@ from ispatialgym.sampling.campaign_held_goals import ENV, GoalGroupTimeout, Goal
 from ispatialgym.sampling.campaign_tray_goals import pose, pose_error
 
 SCHEMA = "isg-pair-goal-plan-v1"
-RELATIONS = ("ontop", "under", "inside", "nextto")
+RELATIONS = ("ontop", "under", "inside", "nextto", "touching")
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,7 @@ class PairGoalPlan:
     sha256: str
     scale: str = "small"
     goal_cell: tuple | None = None
+    place: tuple | None = None
 
     @property
     def orientation_required(self):
@@ -41,13 +42,16 @@ class PairGoalPlan:
 
     def summary(self):
         as_pose = lambda x: {"position": list(x[0]), "orientation": list(x[1])}
-        return {"campaign_id": self.campaign_id, "group_id": self.group_id, "split": self.split,
+        result = {"campaign_id": self.campaign_id, "group_id": self.group_id, "split": self.split,
                 "runtime_template_id": self.template_id, "contract_template_sha256": self.contract_template_sha256,
                 "requested_goal": {"target": as_pose(self.goal), "partner": as_pose(self.partner)},
                 "requested_release": as_pose(self.release), "relation": self.relation,
                 "target_name": self.target_name, "partner_name": self.partner_name,
                 "plan_sha256": self.sha256, "deadline_at": self.deadline_at, "max_members": self.max_members,
                 "phase": "planned_before_start", "target_orientation_required": self.orientation_required, "scale": self.scale}
+        if self.place is not None:
+            result["requested_place"] = as_pose(self.place)
+        return result
 
     def verify_settled(self, target, partner, *, position_tol=.03, orientation_tol=.20, partner_position_tol=.005):
         dp, dq = pose_error(partner, self.partner)
@@ -72,6 +76,19 @@ def vary_nextto_gap(goal, release, partner, *, gap_max, observed_gap, base_yaw, 
     return shifted(goal), shifted(release), desired
 
 
+def object_pose_from_grasp(place, eef_in_object):
+    """Recover the actual pre-push object place from the fresh oracle sidecar."""
+    pp, pq = pose(place, "gripper place")
+    gp, gq = pose(eef_in_object, "gripper in object")
+    def multiply(a, b):
+        x, y, z, w = a
+        X, Y, Z, W = b
+        return (w*X+x*W+y*Z-z*Y, w*Y-x*Z+y*W+z*X, w*Z+x*Y-y*X+z*W, w*W-x*X-y*Y-z*Z)
+    oq = multiply(pq, (-gq[0], -gq[1], -gq[2], gq[3]))
+    offset = multiply(multiply(oq, (*gp, 0.0)), (-oq[0], -oq[1], -oq[2], oq[3]))
+    return tuple(pp[i]-offset[i] for i in range(3)), oq
+
+
 def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at, now=None, scale="small"):
     now = time.time() if now is None else now
     _require(isinstance(raw, dict) and raw.get("schema") == SCHEMA, "invalid pair goal schema")
@@ -91,6 +108,9 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     sha = raw.get("contract_template_sha256")
     _require(isinstance(sha, str) and len(sha) == 64 and all(c in "0123456789abcdef" for c in sha), "invalid contract hash")
     release, goal, partner = (pose(raw.get(k), k) for k in ("release_pose", "goal_pose", "partner_pose"))
+    place = pose(raw.get("place_pose"), "touching pre-push place") if relation == "touching" else None
+    if place is not None:
+        _require(pose_error(place, goal)[0] > .001, "touching place must precede its contact goal")
     created, budget = float(raw.get("created_at", 0)), float(raw.get("budget_seconds", 0))
     _require(all(math.isfinite(x) for x in (created, budget, activated_at, now))
              and 0 < created <= activated_at <= now and budget > 0, "invalid time budget")
@@ -100,7 +120,7 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid group size")
     fingerprint = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     return PairGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, relation,
-                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell)
+                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place)
 
 
 def load_pair_plan(*, template_id, scene, rooms, relation, activated_at, expected_sha256=None, scale="small"):

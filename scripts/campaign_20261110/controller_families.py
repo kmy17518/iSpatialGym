@@ -13,6 +13,7 @@ import csv
 import json
 from pathlib import Path
 import shutil
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -273,6 +274,7 @@ def main():
     p.add_argument("--once", action="store_true")
     p.add_argument("--execute", action="store_true")
     p.add_argument("--interval", type=float, default=45)
+    p.add_argument("--config-transition-from", type=Path)
     args = p.parse_args()
     cfg = read(args.config)
     root = Path(cfg["root"]).resolve()
@@ -293,7 +295,18 @@ def main():
     path.parent.mkdir(parents=True, exist_ok=True)
     with atomic_directory_lock(path.with_suffix(".lockdir")):
         state = read(path, {"schema": 1, "config_sha256": file_digest(args.config), "families": {}})
+        if state["config_sha256"] != file_digest(args.config) and args.config_transition_from:
+            previous = read(args.config_transition_from)
+            require(file_digest(args.config_transition_from) == state["config_sha256"], "transition does not name active config")
+            require(previous["root"] == cfg["root"] and previous["started_at"] == cfg["started_at"], "transition changes campaign identity")
+            require({s["class_id"] for s in previous["families"]} <= {s["class_id"] for s in cfg["families"]}, "transition drops an owned family")
+            state.setdefault("config_transitions", []).append({"previous": str(args.config_transition_from),
+                "previous_sha256": state["config_sha256"], "next": str(args.config), "next_sha256": file_digest(args.config), "at": time.time()})
+            state["config_sha256"] = file_digest(args.config)
         require(state["config_sha256"] == file_digest(args.config), "controller config changed; version and reconcile explicitly")
+        def interrupted(_signum, _frame):
+            raise KeyboardInterrupt("controller stopped; durable allocations preserved")
+        signal.signal(signal.SIGTERM, interrupted)
         def save():
             state["updated_at_unix"] = time.time()
             write_json_atomic(path, state)
@@ -304,6 +317,17 @@ def main():
                 allowance = submission_capacity(queue, cfg.get("max_submissions_per_tick", 2))
                 for spec in cfg["families"]:
                     family = state["families"].setdefault(spec["class_id"], {"history": []})
+                    if not family.get("current") and spec.get("adopt_anchor") and not family.get("anchor_adopted"):
+                        entry = spec["adopt_anchor"]
+                        rows = [row for row in allocations(root) if row["jobid"] == str(entry["jobid"])]
+                        require(len(rows) == 1 and rows[0]["key"] == spec["class_id"], "adopted anchor allocation ambiguous")
+                        name = "family_auto_" + spec["class_id"].replace("-", "_") + "_0001"
+                        bucket = next_bucket(accepted_counts(root, spec["class_id"]), spec["eval_quotas"])
+                        require(bucket is not None, "adopted anchor class quota already full")
+                        family.update(anchor_adopted=True, current={"name": name, "bucket": bucket, "created_at": time.time(), "anchor": {
+                            "directory": spec["seed"], "status": "waiting", "allocation": rows[0]}})
+                        active += 1
+                        save()
                     if not family.get("current") and spec.get("adopt_group") and not family.get("adopted"):
                         entry = spec["adopt_group"]
                         rows = [row for row in allocations(root) if row["jobid"] == str(entry["jobid"])]

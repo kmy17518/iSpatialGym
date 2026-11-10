@@ -100,3 +100,24 @@ def test_large_inside_keeps_orientation_and_exact_goal_after_native_settle():
     s.objects["target"].get_position_orientation = lambda: (p.goal[0], (1., 0., 0., 0.))
     with pytest.raises(Reject, match="settled pair target drifted"):
         s.campaign_verify_pair(d, settled=True)
+
+
+def test_touching_place_stays_fixed_and_rejects_an_incompatible_push_direction():
+    from dataclasses import replace
+    p = replace(plan("touching"), place=((0., -.08, .8), (0., 0., 0., 1.)))
+    s = SimpleNamespace(_campaign_pair_active=p, relation="touching", place_gap=lambda: .08,
+        ikc=SimpleNamespace(WITNESS_POS_TOL=.005, WITNESS_ANG_TOL=.05),
+        top=SimpleNamespace(polygon_supported=lambda *args, **kwargs: True), margin_support=.02,
+        world=SimpleNamespace(footprint=lambda *args: None), hull={"target": None})
+    stance = SimpleNamespace(tangent=th.tensor([0., 1.]))
+    start = (th.tensor([.5, -.5, .8]), th.tensor([0., 0., 1., 0.]))
+    actual = I.IORSSmall.place_pose_for(s, start, p.partner, stance)
+    assert th.allclose(actual[0], th.tensor(p.place[0]))
+    assert th.allclose(actual[1], th.tensor(p.place[1]))
+    stance.tangent = th.tensor([1., 0.])
+    with pytest.raises(Reject, match="push direction"):
+        I.IORSSmall.place_pose_for(s, start, p.partner, stance)
+    stance.tangent = th.tensor([0., 1.])
+    s.top.polygon_supported = lambda *args, **kwargs: False
+    with pytest.raises(Reject, match="leaves the support"):
+        I.IORSSmall.place_pose_for(s, start, p.partner, stance)

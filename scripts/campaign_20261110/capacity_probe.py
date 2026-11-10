@@ -75,15 +75,25 @@ if group_path.exists():
         template_keys.update(m['validation_key']['template_sha256'] for m in members)
         acceptance['sources'].append({'path':str(group_path),'mtime':group_path.stat().st_mtime})
     except (OSError,ValueError,KeyError,AssertionError) as exc:acceptance['errors'].append(str(exc))
-camera_path=campaign_root/'dataset/camera_quota.json'
-if camera_path.exists():
+camera_ids=set()
+for camera_path in [campaign_root/'dataset/camera_quota.json',campaign_root/'dataset/camera_obstructed_quota.json']:
+    if not camera_path.exists():continue
     try:
         state=json.loads(camera_path.read_text())
         assert state['campaign_id']=='campaign_20261110'
-        for member in state['accepted'].values():
+        for iid,member in state['accepted'].items():
+            assert iid not in camera_ids, 'camera instance appears in two quota states'
+            camera_ids.add(iid)
             counts[member['split']]+=1
             template_keys.add(member['validation_key']['template_sha256'])
         acceptance['sources'].append({'path':str(camera_path),'mtime':camera_path.stat().st_mtime})
     except (OSError,ValueError,KeyError,AssertionError) as exc:acceptance['errors'].append(str(exc))
 acceptance.update(counts=dict(counts),templates=len(template_keys))
-print(json.dumps(dict(acceptance=acceptance,data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))
+family_controller={}
+try:
+    raw=json.loads((campaign_root/'controllers/families/state.json').read_text())
+    family_controller={'updated_at_unix':raw['updated_at_unix'],'probe_error':raw.get('probe_error'),'families':{key:{'status':value.get('status'),'error':value.get('error'),'completed_cycles':len(value.get('history',[])), 'active_job':(value.get('current',{}).get('group') or value.get('current',{}).get('anchor') or {}).get('allocation',{}).get('jobid')} for key,value in raw['families'].items()}}
+except (OSError,ValueError,KeyError):pass
+try:throughput=json.loads((campaign_root/'infra/throughput.json').read_text())
+except (OSError,ValueError):throughput={}
+print(json.dumps(dict(acceptance=acceptance,family_controller=family_controller,throughput=throughput,data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))
