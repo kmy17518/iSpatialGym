@@ -45,3 +45,47 @@ def test_batch_has_independent_group_files_and_one_immutable_config(tmp_path):
     assert command[command.index("submit")+2] == "6"
     assert not any(value.startswith("ISPATIALGYM_CAMPAIGN_GOAL_PLAN=") for value in command)
     assert any(value.startswith(b.ENV+"=") for value in command)
+
+
+def test_rotation_goal_region_is_native_normalized_and_precedes_fresh_starts(tmp_path):
+    anchor,_,_=anchor_fixture(tmp_path)
+    anchor["summary"]["goal"] = {"axis_world":[0,0,1],"angle_deg":60}
+    anchor["template_meta"]["init_orientation"] = {"goal_angle_range_deg":[30,120]}
+    proposals=b.rotation_goal_proposals(anchor,20,seed=5)
+    assert len(proposals)==20 and proposals==b.rotation_goal_proposals(anchor,20,seed=5)
+    for row in proposals:
+        assert 30 <= row["goal_angle_deg"] <= 120
+        assert sum(v*v for v in row["goal_pose"]["orientation"]) == pytest.approx(1)
+        reconstructed=b.quaternion_product(b.axis_angle(row["axis_world"],row["goal_angle_deg"]),row["reference_orientation"])
+        assert reconstructed==pytest.approx(row["goal_pose"]["orientation"])
+
+
+def test_base_transform_preserves_relative_goal_and_world_quaternion():
+    proposal={"goal_pose":{"position":[2,3,1.2],"orientation":[0,0,0,1]}}
+    moved=b.move_goal_with_base(proposal,[1,3,0],[10,20,math.pi/2])
+    assert moved["goal_pose"]["position"]==pytest.approx([10,21,1.2])
+    assert moved["goal_pose"]["orientation"]==pytest.approx([0,0,math.sqrt(.5),math.sqrt(.5)])
+    assert moved["base_pose2d"]==[10,20,math.pi/2]
+
+
+def test_map_regions_produce_distinct_room_bases_and_reject_forged_cells(tmp_path):
+    import cv2
+    import numpy as np
+    from scripts.campaign_20261110.base_regions import room_base_region
+    anchor,_,_=anchor_fixture(tmp_path)
+    scene=anchor["template_meta"]["scene"]
+    room=anchor["tro"]["ispatialgym"]["scene"]["task_rooms"][0]
+    category=room.rsplit("_",1)[0]
+    assets=tmp_path/"data/behavior-1k-assets"
+    layout=assets/"scenes"/scene/"layout";layout.mkdir(parents=True)
+    (assets/"metadata").mkdir();(assets/"metadata/room_categories.txt").write_text(category+"\n")
+    for name,value in [("floor_insseg_0.png",1),("floor_semseg_0.png",1),("floor_trav_0.png",255)]:
+        cv2.imwrite(str(layout/name),np.full((200,200),value,dtype=np.uint8))
+    region=room_base_region(tmp_path/"data",scene,room)
+    proposals=b.depth_goal_proposals(anchor,6,magnitude_range=[.05,.1],seed=7)
+    varied=b.apply_base_region(proposals,anchor,region,seed=5)
+    assert len({tuple(row["base_pose2d"][:2]) for row in varied})==6
+    assert all(row["base_pose2d"][:2] in region["free_xy"] for row in varied)
+    region["free_xy"][0]=[999,999]
+    with pytest.raises(c.ContractError,match="cells differ"):
+        b.apply_base_region(proposals,anchor,region,seed=5)

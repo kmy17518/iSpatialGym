@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Measure native default loads of reserved room-family objects, read-only assets.
+
+This proves actual scale and loadable geometry, not grasp/task acceptance.
+"""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import sys
+import traceback
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--campaign-root', type=Path, required=True)
+    p.add_argument('--reservations', type=Path, required=True)
+    p.add_argument('--asset-hashes', type=Path, required=True)
+    p.add_argument('--output', type=Path, required=True)
+    a = p.parse_args()
+    out = a.output.resolve()
+    if out.exists() or not out.is_relative_to(a.campaign_root.resolve()):
+        raise ValueError('new campaign output required')
+    reservations = json.loads(a.reservations.read_text())
+    hashes = json.loads(a.asset_hashes.read_text())
+    if hashes['reservation_sha256'] != sha(a.reservations):
+        raise ValueError('reservation identity mismatch')
+    families = {'mental_rotation', 'object_scaling', 'camera_relocalization-obstructed'}
+    rows = []
+    for template in reservations['model_holdout_templates']:
+        if template['task'] not in families:
+            continue
+        for role in template['roles']:
+            key = role['category'] + '/' + role['model']
+            evidence = hashes['ready_assets'][key]
+            if not role['ready'] or not evidence['ready'] or sha(Path(evidence['path'])) != evidence['asset_sha256']:
+                raise ValueError('unready or changed reserved object: ' + key)
+            rows.append({**role, 'class_id': template['class_id'], 'task': template['task'],
+                         'asset_sha256': evidence['asset_sha256'], 'asset_path': evidence['path']})
+    if len(rows) != 29:
+        raise ValueError('expected 29 frozen room-family reservations')
+    out.mkdir(parents=True)
+    report = {'schema': 'campaign-native-defaults-v1', 'reservation_sha256': sha(a.reservations),
+              'status': 'started', 'objects': [], 'task_acceptance': 'pending geometry, demo and replay'}
+    import numpy as np
+    import torch as th
+    from PIL import Image, ImageDraw
+    import omnigibson as og
+    from omnigibson.macros import gm
+    from omnigibson.objects import DatasetObject
+    from omnigibson.utils.transform_utils import mat2quat
+    try:
+        # Match SimWorld: transition recipes are unrelated to task geometry and
+        # would consume overlapping initial imports before they are positioned.
+        with gm.unlocked():
+            gm.ENABLE_OBJECT_STATES = True
+            gm.USE_GPU_DYNAMICS = False
+            gm.ENABLE_TRANSITION_RULES = False
+        report['runtime_flags'] = {'ENABLE_OBJECT_STATES': True, 'USE_GPU_DYNAMICS': False,
+                                   'ENABLE_TRANSITION_RULES': False, 'source': 'sampling.sim_utils.SimWorld'}
+        env = og.Environment(configs={'env': {'action_frequency': 30, 'physics_frequency': 120, 'rendering_frequency': 30},
+            'render': {'viewer_width': 256, 'viewer_height': 256}, 'scene': {'type': 'Scene'}, 'robots': []})
+        og.sim.stop()
+        objects = []
+        for row in rows:
+            # Omitting scale is deliberate: record the provider/runtime default.
+            obj = DatasetObject(name='reserved_' + row['model'], category=row['category'], model=row['model'],
+                                dataset_name='behavior-1k-assets')
+            env.scene.add_object(obj)
+            objects.append(obj)
+        og.sim.play()
+        for i, (obj, row) in enumerate(zip(objects, rows)):
+            obj.set_position_orientation(th.tensor([i * 10., 0., 2.]), th.tensor([0., 0., 0., 1.]))
+            lo, hi = obj.aabb
+            if not th.isfinite(lo).all() or not th.isfinite(hi).all() or not th.all(hi > lo):
+                raise ValueError('invalid native bounds: ' + row['model'])
+            collision_count = sum(len(link.collision_meshes) for link in obj.links.values())
+            if not collision_count:
+                raise ValueError('no collision geometry: ' + row['model'])
+            result = {**row, 'default_scale': obj.scale.tolist(), 'native_extent': (hi-lo).tolist(),
+                      'collision_meshes': collision_count, 'dataset': 'behavior-1k-assets',
+                      'default_scale_provenance': 'Native DatasetObject with scale omitted; observed initialized object.scale',
+                      'images': []}
+            centre = ((hi + lo) * .5).cpu().numpy()
+            radius = float(th.max(hi - lo)) * 1.7 + .1
+            for name, direction in [('front', [1., -1., .55]), ('back', [-1., 1., .55]), ('top', [.01, 0., 1.])]:
+                direction = np.array(direction); direction /= np.linalg.norm(direction)
+                eye = centre + radius * direction
+                back = direction; right = np.cross([0., 1., 0.], back); right /= np.linalg.norm(right)
+                up = np.cross(back, right)
+                og.sim.viewer_camera.set_position_orientation(th.tensor(eye, dtype=th.float32),
+                    mat2quat(th.tensor(np.column_stack([right, up, back]), dtype=th.float32)))
+                for _ in range(5):
+                    og.sim.render()
+                obs, _ = og.sim.viewer_camera.get_obs()
+                rgb = obs['rgb'].cpu().numpy()[..., :3]
+                path = out / (row['model'] + '_' + name + '.png')
+                Image.fromarray(rgb.astype(np.uint8)).save(path)
+                result['images'].append({'path': str(path), 'sha256': sha(path)})
+            report['objects'].append(result)
+            (out / 'default_geometry.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
+        for task in sorted(families):
+            subset = [r for r in report['objects'] if r['task'] == task]
+            sheet = Image.new('RGB', (3 * 256, len(subset) * 280), 'white')
+            draw = ImageDraw.Draw(sheet)
+            for i, row in enumerate(subset):
+                draw.text((3, i*280+3), row['category'] + '/' + row['model'], fill='black')
+                for j, frame in enumerate(row['images']):
+                    sheet.paste(Image.open(frame['path']), (j*256, i*280+24))
+            path = out / (task + '_review.png'); sheet.save(path)
+        report['status'] = 'native_defaults_and_geometry_recorded'
+    except BaseException as exc:
+        report.update(status='failed', error=str(exc), traceback=traceback.format_exc())
+        traceback.print_exc()
+        raise
+    finally:
+        (out / 'default_geometry.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
+        sys.stdout.flush(); sys.stderr.flush(); og.shutdown()
+
+
+if __name__ == '__main__':
+    main()

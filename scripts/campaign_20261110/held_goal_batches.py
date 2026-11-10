@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Author distinct object-scaling goals before starts and queue them in one worker."""
+"""Author distinct held-object goals before starts and queue them in one worker."""
 from __future__ import annotations
 
 import argparse
@@ -25,6 +25,91 @@ def rotate(q, v):
     uv = cross((x,y,z), v)
     uuv = cross((x,y,z), uv)
     return [v[i] + 2*(w*uv[i]+uuv[i]) for i in range(3)]
+
+
+def quaternion_product(a, b):
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    out = [aw*bx+ax*bw+ay*bz-az*by, aw*by-ax*bz+ay*bw+az*bx,
+           aw*bz+ax*by-ay*bx+az*bw, aw*bw-ax*bx-ay*by-az*bz]
+    norm = math.sqrt(sum(v*v for v in out))
+    require(norm > 0 and math.isfinite(norm), "invalid composed goal orientation")
+    return [v/norm for v in out]
+
+
+def axis_angle(axis, degrees):
+    norm = math.sqrt(sum(v*v for v in axis))
+    require(norm > 0 and math.isfinite(norm), "invalid rotation axis")
+    half = math.radians(degrees)/2
+    return [v/norm*math.sin(half) for v in axis]+[math.cos(half)]
+
+
+def rotation_goal_proposals(anchor, count, *, seed, minimum_separation_deg=5):
+    """Native goal-angle region about a fresh reference pose, before new starts."""
+    require(isinstance(count, int) and 1 <= count <= 100, "invalid batch goal count")
+    require(minimum_separation_deg >= 5, "rotation goals need at least five degrees separation")
+    summary, meta = anchor["summary"], anchor["template_meta"]
+    goal = summary["goal_realised"]
+    lo, hi = (float(v) for v in meta["init_orientation"]["goal_angle_range_deg"])
+    require(0 <= lo < hi <= 180, "invalid native rotation range")
+    source_rotation = summary["goal"]
+    # Reconstruct the fresh reference from its recorded world-axis turn. This
+    # reference never becomes a final group member or constrains future starts.
+    inverse = axis_angle(source_rotation["axis_world"], -float(source_rotation["angle_deg"]))
+    reference = quaternion_product(inverse, goal["orientation"])
+    rng, proposals, selected = random.Random(seed), [], [goal["orientation"]]
+    for _ in range(count*1000):
+        z, phi = rng.uniform(-1, 1), rng.uniform(-math.pi, math.pi)
+        axis = [math.sqrt(1-z*z)*math.cos(phi), math.sqrt(1-z*z)*math.sin(phi), z]
+        angle = rng.uniform(lo, hi)
+        orientation = quaternion_product(axis_angle(axis, angle), reference)
+        distance = lambda q: math.degrees(2*math.acos(min(1, abs(sum(a*b for a,b in zip(q,orientation))))))
+        if any(distance(q) < minimum_separation_deg for q in selected):
+            continue
+        proposals.append({"goal_pose": {"position": list(goal["position"]), "orientation": orientation},
+            "reference_orientation": reference, "axis_world": axis, "goal_angle_deg": angle,
+            "native_goal_angle_range_deg": [lo, hi], "minimum_separation_deg": minimum_separation_deg,
+            "proposal_validation": "native_angle_region_only; full sampler frame/IK/path/physics still required"})
+        selected.append(orientation)
+        if len(proposals) == count:
+            return proposals
+    raise ValueError("native rotation region cannot supply separated goals")
+
+
+def move_goal_with_base(proposal, original_base, new_base):
+    """Rigidly move the preselected world goal with its base-relative camera."""
+    old_x, old_y, old_yaw = (float(v) for v in original_base)
+    x, y, yaw = (float(v) for v in new_base)
+    require(all(math.isfinite(v) for v in (x,y,yaw)), "nonfinite base proposal")
+    delta = yaw-old_yaw
+    rotation = [0,0,math.sin(delta/2),math.cos(delta/2)]
+    goal = proposal["goal_pose"]
+    offset = rotate(rotation, [goal["position"][0]-old_x,goal["position"][1]-old_y,goal["position"][2]])
+    return {**proposal, "goal_pose": {"position": [x+offset[0],y+offset[1],offset[2]],
+        "orientation": quaternion_product(rotation,goal["orientation"])}, "base_pose2d": [x,y,yaw],
+        "source_base_pose2d": list(original_base)}
+
+
+def apply_base_region(proposals, anchor, region, *, seed):
+    """Select distinct declared free room cells; physical feasibility stays native."""
+    require(region.get("schema") == "isg-room-base-region-v1", "missing room base region")
+    meta = anchor["template_meta"]
+    require(region["scene"] == meta["scene"], "base region scene differs from anchor")
+    require(region["room"] in anchor["tro"]["ispatialgym"]["scene"]["task_rooms"], "base region outside task rooms")
+    sources = region.get("sources", [])
+    require(sources and all(file_digest(row["path"]) == row["sha256"] for row in sources), "base region map source changed")
+    from scripts.campaign_20261110.base_regions import room_base_region
+    require(digest(room_base_region(region["dataset"],region["scene"],region["room"])) == digest(region),
+            "base-region cells differ from their actual frozen maps")
+    points = region["free_xy"]
+    require(len(points) >= len(proposals) and all(len(p)==2 and all(math.isfinite(float(v)) for v in p) for p in points),
+            "base region lacks enough finite free cells")
+    require(len({tuple(p) for p in points}) == len(points), "duplicate free cells in base region")
+    rng = random.Random(seed)
+    chosen = rng.sample(points,len(proposals))
+    return [{**move_goal_with_base(proposal,anchor["summary"]["base_pose2d"],[*xy,rng.uniform(-math.pi,math.pi)]),
+             "base_region_sha256": digest(region), "base_region_validation": "room segmentation and eroded free cells; native collision/IK/path checks still required"}
+            for proposal,xy in zip(proposals,chosen)]
 
 
 def depth_goal_proposals(anchor, count, *, magnitude_range, seed, minimum_separation_m=.005):
@@ -72,13 +157,16 @@ def depth_goal_proposals(anchor, count, *, magnitude_range, seed, minimum_separa
 
 
 def prepare_batch(*, anchor, template, campaign_root, batch_id, count, magnitude_range, seed,
-                  campaign_id, code_sha256, physics_sha256, data_sha256, budget_seconds=900):
-    require(template.task == "object_scaling", "automatic batch goal proposals currently support object scaling only")
+                  campaign_id, code_sha256, physics_sha256, data_sha256, budget_seconds=900, base_region=None):
+    require(template.task in ("object_scaling", "mental_rotation"), "automatic batch requires a held-object task")
     root = Path(campaign_root).resolve()
     require(batch_id and all(c.isalnum() or c in "_.-" for c in batch_id), "invalid batch ID")
     queue_dir = root / "queues" / batch_id
     require(not queue_dir.exists(), "queue already exists")
-    proposals = depth_goal_proposals(anchor,count,magnitude_range=magnitude_range,seed=seed)
+    proposals = (depth_goal_proposals(anchor,count,magnitude_range=magnitude_range,seed=seed) if template.task == "object_scaling"
+                 else rotation_goal_proposals(anchor,count,seed=seed))
+    if base_region is not None:
+        proposals = apply_base_region(proposals,anchor,base_region,seed=seed)
     # Existing group plans are also excluded, including diagnostic/superseded ones.
     prior_goals = set()
     for path in (root/"groups").glob("*/goal_plan.json"):
@@ -91,7 +179,9 @@ def prepare_batch(*, anchor, template, campaign_root, batch_id, count, magnitude
         group_id = f"{batch_id}_{i:04d}"
         derived = copy.deepcopy(anchor)
         derived["summary"]["goal_realised"] = proposal["goal_pose"]
-        derived["goal_proposal_source"] = "fresh_anchor_native_depth_region_before_any_group_start"
+        if "base_pose2d" in proposal:
+            derived["summary"]["base_pose2d"] = proposal["base_pose2d"]
+        derived["goal_proposal_source"] = "fresh_anchor_native_goal_region_before_any_group_start"
         directory = root/"groups"/group_id
         g.prepare_group(anchor=derived,template=template,campaign_id=campaign_id,group_id=group_id,output=directory,
                         code_sha256=code_sha256,physics_sha256=physics_sha256,data_sha256=data_sha256,
@@ -106,7 +196,8 @@ def prepare_batch(*, anchor, template, campaign_root, batch_id, count, magnitude
     queue_dir.mkdir(parents=True,exist_ok=False)
     queue_path=queue_dir/"queue.json"
     write_json_atomic(queue_path,{"schema":SCHEMA,"campaign_id":campaign_id,"config_sha256":file_digest(config_path),
-                                "config_path":str(config_path),"entries":entries,"group_ids":groups,"seed":seed})
+                                "config_path":str(config_path),"entries":entries,"group_ids":groups,"seed":seed,
+                                "base_region_sha256": digest(base_region) if base_region is not None else None})
     read_queue(queue_path,config_path)
     return {"queue":str(queue_path),"config":str(config_path),"group_ids":groups,"candidate_instances":3*len(groups)}
 
@@ -135,12 +226,13 @@ def main():
     parser.add_argument("--seed",type=int,required=True)
     parser.add_argument("--magnitude-range",type=float,nargs=2,required=True)
     parser.add_argument("--budget-seconds",type=float,default=900)
+    parser.add_argument("--base-region",help="Hashed scene-map free-cell manifest for varied room bases")
     a=parser.parse_args()
     anchor=g.successful_anchor(a.anchor_job,campaign_root=a.campaign_root,ledger=a.anchor_ledger,campaign_started_at=a.campaign_started_at)
     print(json.dumps(prepare_batch(anchor=anchor,template=g.load_template_contract(a.contracts,a.class_id),campaign_root=a.campaign_root,
         batch_id=a.batch_id,count=a.count,magnitude_range=a.magnitude_range,seed=a.seed,campaign_id=a.campaign_id,
         code_sha256=file_digest(a.code_identity_file),physics_sha256=file_digest(a.physics_spec),data_sha256=file_digest(a.data_manifest),
-        budget_seconds=a.budget_seconds)))
+        budget_seconds=a.budget_seconds,base_region=g.read_json(a.base_region) if a.base_region else None)))
 
 
 if __name__ == "__main__":
