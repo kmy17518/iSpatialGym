@@ -148,3 +148,34 @@ class GoalGroupControllerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_runtime_bddl_binding_normalizes_legacy_spelling_and_measure_but_not_goal(tmp_path):
+    source = tmp_path / "source"
+    runtime = tmp_path / "runtime"
+    source.mkdir()
+    runtime.mkdir()
+    old = """(define (problem object_scaling-3) (:domain ispatialgym) (:alias object_scaling-apple)
+    (:objects apple.n.01_1 - apple.n.01 agent.n.01_1 - agent.n.01)
+    (:init (grasped agent.n.01_1 apple.n.01_1))
+    (:goal (and (grasped ?agent.n.01_1 ?apple.n.01_1) (pose_reached ?apple.n.01_1))))"""
+    new = old.replace(":alias", ":variant")[:-1] + "(:measure (pose_reached ?apple.n.01_1)))"
+    for directory, text in ((source, old), (runtime, new)):
+        (directory / "problem.bddl").write_text(text)
+        c.write_json_atomic(directory / "template_meta.json", {"activity_definition": "problem.bddl", "problem": "object_scaling-3",
+                                                              "bddl_sha256": c.file_digest(directory / "problem.bddl")})
+    obj = c.ObjectRef("apple.n.01_1", "target", "apple", "a", c.digest("asset"), ready=True, readiness_source="test")
+    template = c.Template("t", "object_scaling", "apple", "eval_standard", "house_single_floor", "living_room_0", (obj,), c.digest("definition"),
+                          {"source_template": str(source), "source_bddl_sha256": c.file_digest(source / "problem.bddl")})
+    changed = g.bind_runtime_definition(template, runtime)
+    assert changed.fingerprint != template.fingerprint
+    assert changed.scene_setup["runtime_bddl_sha256"] == c.file_digest(runtime / "problem.bddl")
+    assert changed.scene_setup["source_bddl_sha256"] == c.file_digest(source / "problem.bddl")
+    # Same union of goal/measure atoms is insufficient: removing the gating atom is forbidden.
+    (runtime / "problem.bddl").write_text(new.replace("(pose_reached ?apple.n.01_1)", "", 1))
+    meta = g.read_json(runtime / "template_meta.json")
+    meta["bddl_sha256"] = c.file_digest(runtime / "problem.bddl")
+    c.write_json_atomic(runtime / "template_meta.json", meta)
+    import pytest
+    with pytest.raises(c.ContractError, match="semantics differ"):
+        g.bind_runtime_definition(template, runtime)

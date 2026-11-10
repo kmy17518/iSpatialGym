@@ -59,7 +59,9 @@ def main():
     import omnigibson.lazy as lazy
 
     reports = []
-    og.launch()
+    # Conversion launches the simulator before Environment is constructed.
+    # Pin all clocks here as well; Environment rejects a prelaunched 60 Hz sim.
+    og.launch(physics_dt=1.0/120, rendering_dt=1.0/30, sim_step_dt=1.0/30)
     try:
         for row in rows:
             category, model = row["category"], row["model"]
@@ -113,7 +115,7 @@ def main():
         # dataset name; get_dataset_path preserves absolute dataset roots.
         import torch as th
         from omnigibson.objects import DatasetObject
-        env = og.Environment(configs={"env": {"action_frequency": 30, "physics_frequency": 120},
+        env = og.Environment(configs={"env": {"action_frequency": 30, "physics_frequency": 120, "rendering_frequency": 30},
                                       "scene": {"type": "Scene"}, "robots": []})
         objects = []
         og.sim.stop()
@@ -144,8 +146,37 @@ def main():
             report["ready"] = True
             report["readiness_source"] = "project:exact converted USD SHA256 + fresh DatasetObject collision/bounds/settling smoke"
             report["task_validation"] = "pending grasps, geometry, successful demo and open-loop replay"
+        # Save native RGB evidence for visual review of material assignment and
+        # geometry. Physics readiness remains distinct from task acceptance.
+        import numpy as np
+        from PIL import Image
+        from omnigibson.utils.transform_utils import mat2quat
+        camera = og.sim.viewer_camera
+        if camera is None:
+            raise ValueError("native viewer camera unavailable for visual smoke evidence")
+        centre = np.array([0.6, ((len(objects)-1)//5)*0.15, 0.03])
+        span = max(1.5, ((len(objects)+4)//5)*0.3)
+        images = []
+        for name, offset in (("top", [0.,0.,span]), ("oblique", [span*.5,-span*.7,span])):
+            eye = centre + np.array(offset)
+            back = (eye-centre)/np.linalg.norm(eye-centre)
+            right = np.cross([0.,1.,0.], back)
+            right /= np.linalg.norm(right)
+            up = np.cross(back,right)
+            rotation = np.column_stack([right,up,back])
+            camera.set_position_orientation(th.tensor(eye,dtype=th.float32),mat2quat(th.tensor(rotation,dtype=th.float32)))
+            for _ in range(6):
+                og.sim.render()
+            obs, _ = camera.get_obs()
+            rgb = obs["rgb"].cpu().numpy()[...,:3]
+            if not np.isfinite(rgb).all() or float(rgb.std()) < 2.:
+                raise ValueError("native visual smoke image is empty or invalid")
+            path = dataset / f"smoke_{name}.png"
+            Image.fromarray(rgb.astype(np.uint8)).save(path)
+            images.append({"path":str(path),"sha256":sha256(path),"view":name})
         (dataset / "campaign_readiness.json").write_text(json.dumps({"schema": "isg-project-readiness-v1",
-            "build_index_sha256": sha256(index_path), "objects": reports}, indent=2, sort_keys=True) + "\n")
+            "build_index_sha256": sha256(index_path), "objects": reports, "visual_smoke_images":images,
+            "visual_review":"pending image inspection; task acceptance remains blocked"}, indent=2, sort_keys=True) + "\n")
         print(f"CAMPAIGN_CUSTOM_READY models={len(reports)} dataset={dataset}", flush=True)
     except BaseException as exc:
         failure = {"status":"failed","exception":type(exc).__name__,"message":str(exc),

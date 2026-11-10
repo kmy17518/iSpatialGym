@@ -12,7 +12,7 @@ def main():
     ap=argparse.ArgumentParser();ap.add_argument('--root',type=pathlib.Path,required=True);ap.add_argument('--snapshot',required=True);ap.add_argument('--interval',type=float,default=30);ap.add_argument('--once',action='store_true');ap.add_argument('--ledger',type=pathlib.Path,action='append');a=ap.parse_args()
     statepath=a.root/'validation/controller.json';state=read(statepath,{'schema':1,'gates':{}})
     while True:
-        ledgers=a.ledger or [a.root/'manifests'/name for name in ('canary_allocations.tsv','vast_canary_allocations.tsv','goal_group_allocations.tsv')]
+        ledgers=a.ledger or [a.root/'manifests'/name for name in ('canary_allocations.tsv','vast_canary_allocations.tsv','goal_group_allocations.tsv','augmentation_allocations.tsv')]
         rows=[]
         for ledger in ledgers:
             if ledger.exists():

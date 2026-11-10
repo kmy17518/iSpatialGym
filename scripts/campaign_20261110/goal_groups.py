@@ -16,7 +16,7 @@ import shlex
 import subprocess
 import sys
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -123,6 +123,43 @@ def load_template_contract(path, class_id):
     return template
 
 
+def bind_runtime_definition(template: Template, runtime_template_dir, *, runtime_metadata=None):
+    """Pin fresh bytes only after the real parser proves task semantics unchanged.
+
+    Goal and measure are compared separately: a gating atom cannot silently move
+    into the measurement-only section even when content_key() considers it equal.
+    """
+    from ispatialgym.activity.problem import parse_problem_string
+
+    runtime_dir = Path(runtime_template_dir).resolve()
+    runtime_meta = runtime_metadata or read_json(runtime_dir / "template_meta.json")
+    source_dir = Path(template.scene_setup["source_template"]).resolve()
+    source_meta = read_json(source_dir / "template_meta.json")
+    snapshots = []
+    for directory, metadata, expected in (
+        (source_dir, source_meta, template.scene_setup["source_bddl_sha256"]),
+        (runtime_dir, runtime_meta, runtime_meta["bddl_sha256"]),
+    ):
+        path = (directory / metadata["activity_definition"]).resolve()
+        require(path.is_file(), "runtime BDDL source absent")
+        actual = file_digest(path)
+        require(actual == expected, "BDDL bytes differ from pinned metadata")
+        match = re.fullmatch(r"(.+)-(\d+)", metadata["problem"])
+        require(match is not None, "invalid source BDDL problem identity")
+        parsed = parse_problem_string(path.read_text(), match[1], int(match[2]))
+        semantic = {"activity": parsed.activity, "domain": parsed.domain, "variant": parsed.variant,
+                    "objects": parsed.objects, "groups": parsed.groups, "init": parsed.init,
+                    "goal": parsed.goal, "measure": parsed.measure}
+        snapshots.append({"path": str(path), "sha256": actual, "semantics": semantic})
+    require(snapshots[0]["semantics"] == snapshots[1]["semantics"], "runtime BDDL semantics differ from ready contract")
+    proof = {"source": {k: v for k, v in snapshots[0].items() if k != "semantics"},
+             "runtime": {k: v for k, v in snapshots[1].items() if k != "semantics"},
+             "semantic_sha256": digest(snapshots[0]["semantics"]),
+             "comparison": "parsed activity/domain/variant/objects/groups/init/goal/measure; goal and measure remain separate"}
+    return replace(template, scene_setup={**template.scene_setup,
+        "runtime_bddl_sha256": snapshots[1]["sha256"], "runtime_bddl_equivalence": proof})
+
+
 def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str, output: Path,
                   code_sha256: str, physics_sha256: str, data_sha256: str,
                   magnitude_range, budget_seconds: float = 900, max_members: int = 3):
@@ -142,6 +179,8 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
     runtime_id = tm["template_id"]
     declared_runtime_id = template.scene_setup.get("runtime_template_id")
     require(declared_runtime_id is None or declared_runtime_id == runtime_id, "runtime template ID mismatch")
+    if template.scene_setup.get("source_bddl_sha256"):
+        template = bind_runtime_definition(template, anchor["template_dir"], runtime_metadata=tm)
     now = time.time()
     source_goal = anchor["summary"].get("goal_realised")
     if source_goal is None:

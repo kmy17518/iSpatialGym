@@ -96,14 +96,26 @@ def main():
         # Declared distractor categories are a pool; repeated selected model entries are collapsed.
         unique = {json.dumps(a, sort_keys=True): a for a in assignments}
         heldout_templates.append({"class_id": key, "task": standard["task"], "status": "reserved_candidates_not_validated", "roles": list(unique.values())})
+    pending_custom = [
+        {"category":"toy_dice","model":"isgk10","split":"eval_model"},
+        {"category":"dice","model":"isgwch","split":"eval_category"},
+        {"category":"tray","model":"isgbdm","split":"eval_model"},
+        {"category":"tray","model":"isgbdw","split":"eval_category"},
+    ]
+    lef_index = root / "tmp/campaign_20261110/assets/lef_variants_v3/asset_builds.json"
+    if lef_index.is_file():
+        pending_custom.extend({"category":r["category"],"model":r["model"],"split":r["split_reservation"]}
+                              for r in json.loads(lef_index.read_text())["models"] if r["split_reservation"] != "train")
+    pending_pairs = {(r["category"],r["model"]) for r in pending_custom}
     data = {"status": "reservations_require_standard_rebindings_and_geometry_validation", "mandatory_standard_rebindings": mandatory,
             "ready_repair_heldin_models": [f"{c}/{m}" for c,m in sorted(ready_repair_heldin)],
             "model_holdout_templates": heldout_templates, "model_holdout_models": [f"{c}/{m}" for c,m in sorted(model_refs)],
             "category_holdout_models": [f"{c}/{m}" for c,m in sorted(category_models)], "category_holdout_categories": sorted(category_set),
             "category_holdout_rooms": [{"scene": "office_cubicles_right", "room": "conference_hall_0"}],
-            "train_exclude_models": [f"{c}/{m}" for c,m in sorted(model_refs.keys() | category_models.keys())],
+            "train_exclude_models": [f"{c}/{m}" for c,m in sorted(model_refs.keys() | category_models.keys() | pending_pairs)],
             "train_exclude_categories": sorted(category_set), "structural_model_category_exempt": ["walls", "floors"],
             "category_only_exempt_semantic_kinds": ["tray", "board"],
+            "pending_custom_hard_reservations_not_ready": pending_custom,
             "custom_development_queue_not_ready_candidates": [
                 {"category": "toy_dice", "model": "isgk10", "split": "eval_model", "description": "Unseen Kohs face permutation;9instances"},
                 {"category": "dice", "model": "isgwch", "split": "eval_category", "description": "Wechsler block;1instance"},
