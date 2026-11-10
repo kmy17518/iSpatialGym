@@ -13,7 +13,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts.campaign_20261110.acceptance import artifact, read, report_passed
+from scripts.campaign_20261110.acceptance import artifact, read, report_passed, replay_report_path
 from scripts.campaign_20261110.contracts import (
     ObjectRef, Template, Perturbations, ScaleState, ValidationEvidence, ValidationKey, digest, file_digest,
     require, require_validation, validate_campaign_block, write_json_atomic,
@@ -112,7 +112,7 @@ def audit_camera(job, gate_path, *, root, started_at, template):
     iid = meta["instance_id"]
     evidence = []
     for path, mode, kind in ((source_demo.parent / "meta.json", "oracle", "demo"),
-                             (gate_path.parent / "replay" / iid / "meta.json", "replay", "open_loop_replay")):
+                             (replay_report_path(gate,gate_path,iid,root=root,started_at=started_at), "replay", "open_loop_replay")):
         path, _, created = _report(path, mode, iid, snapshot, root, started_at)
         evidence.append(ValidationEvidence(key, kind, True, True, created, str(path), file_digest(path), file_digest(source_demo), iid, True))
     require_validation(key, evidence, campaign_started_at=started_at)

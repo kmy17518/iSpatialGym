@@ -121,3 +121,34 @@ def test_reuse_gate_requires_exact_template_key_and_campaign(tmp_path):
     with pytest.raises(c.ContractError, match="validation keys"):
         a.audit_job(target.job, source.gate, root=tmp_path, started_at=source.since,
                     group_closed=True, group_id="target_group")
+
+
+def test_recovered_replay_uses_exact_hash_bound_attempt_report(tmp_path):
+    f=fixture(tmp_path)
+    gate=a.read(f.gate);iid=a.read(gate['instance'])['ispatialgym']['instance_id']
+    old=f.gate.parent/'replay'/iid/'meta.json'
+    target=f.gate.parent/'attempt_02/replay'/iid/'meta.json';target.parent.mkdir(parents=True)
+    old.rename(target)
+    gate['replay_meta_paths']=[str(target)]
+    gate['scene_identity']={'verified_replay':True,'replay_report':str(target),'replay_report_sha256':c.file_digest(target)}
+    c.write_json_atomic(f.gate,gate)
+    result=audit(f)
+    assert next(e for e in result['evidence'] if e['kind']=='open_loop_replay')['report_path']==str(target)
+    target.write_text(target.read_text()+' ')
+    with pytest.raises(c.ContractError,match='report hash changed'):
+        audit(f)
+
+
+def test_explicit_replay_locator_rejects_ambiguity_escape_and_wrong_instance(tmp_path):
+    f=fixture(tmp_path);gate=a.read(f.gate);iid=a.read(gate['instance'])['ispatialgym']['instance_id']
+    original=f.gate.parent/'replay'/iid/'meta.json'
+    second=f.gate.parent/'attempt_02/replay'/iid/'meta.json';second.parent.mkdir(parents=True);second.write_bytes(original.read_bytes())
+    gate['replay_meta_paths']=[str(original),str(second)]
+    with pytest.raises(c.ContractError,match='exactly one'):
+        a.replay_report_path(gate,f.gate,iid,root=tmp_path,started_at=f.since)
+    gate['replay_meta_paths']=[str(f.job/'demo'/iid/'meta.json')]
+    with pytest.raises(c.ContractError,match='outside this gate'):
+        a.replay_report_path(gate,f.gate,iid,root=tmp_path,started_at=f.since)
+    gate['replay_meta_paths']=[str(second)];report=a.read(second);report['instance_id']='different';c.write_json_atomic(second,report)
+    with pytest.raises(c.ContractError,match='exactly one'):
+        a.replay_report_path(gate,f.gate,iid,root=tmp_path,started_at=f.since)

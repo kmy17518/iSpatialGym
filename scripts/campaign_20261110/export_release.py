@@ -20,7 +20,7 @@ import sqlite3
 import tempfile
 import time
 
-from scripts.campaign_20261110.acceptance import artifact, read, report_passed
+from scripts.campaign_20261110.acceptance import artifact, read, report_passed, replay_report_path
 from scripts.campaign_20261110.contracts import (
     ObjectRef, Template, ValidationEvidence, ValidationKey, audit_splits,
     canonical_json, digest, file_digest, require, require_validation,
@@ -151,9 +151,13 @@ def normalize_record(row, *, root, started_at, templates, reservations, reservat
     auditor.check({"path": str(identity), "sha256": key.code_sha256})
     require(Path(report["provenance"]["isg_root"]).resolve() == snapshot, "demo used a different snapshot")
     evidence = []
+    gate_iid=read(gate['instance'])['ispatialgym']['instance_id']
+    gate_replay=replay_report_path(gate,row['gate']['path'],gate_iid,root=root,started_at=started_at)
     for item in row["evidence"]:
         e = ValidationEvidence(**{**item, "key": ValidationKey(**item["key"])})
         evidence.append(e)
+        if e.kind=='open_loop_replay':
+            require(Path(e.report_path).resolve()==gate_replay,'accepted replay evidence differs from gate attempt')
         rep = read(auditor.check({"path": e.report_path, "sha256": e.report_sha256}))
         report_passed(rep, "oracle" if e.kind == "demo" else "replay")
     require_validation(key, evidence, campaign_started_at=started_at)

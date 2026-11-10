@@ -47,6 +47,39 @@ def report_passed(report, mode):
     require(restore.get("scale_verified") is True, f"{mode} has no verified campaign restoration")
 
 
+def replay_report_path(gate, gate_path, instance_id, *, root, started_at):
+    """Resolve the exact successful attempt without scanning unrelated reports."""
+    gate_path=Path(gate_path).resolve();root=Path(root).resolve()
+    def checked(value):
+        path=artifact(value,root,started_at)
+        require(path.is_relative_to(gate_path.parent),'replay report outside this gate attempt tree')
+        report=read(path)
+        require(report.get('instance_id')==instance_id,'replay report instance differs from gate')
+        require(report.get('mode')=='replay','gate report is not a replay')
+        return path
+    declared=gate.get('replay_meta_paths')
+    require(declared is None or (isinstance(declared,list) and declared and all(isinstance(p,str) for p in declared)),
+            'invalid explicit replay report list')
+    identity=gate.get('scene_identity') or {}
+    if identity.get('replay_report') is not None:
+        require(identity.get('verified_replay') is True,'scene replay report was not verified')
+        path=checked(identity['replay_report'])
+        require(identity.get('replay_report_sha256')==file_digest(path),'scene replay report hash changed')
+        if declared is not None:
+            require(sum(Path(p).resolve()==path for p in declared)==1,'scene replay report differs from declared attempt')
+        return path
+    if declared is not None:
+        require(len({str(Path(p).resolve()) for p in declared})==len(declared),'duplicate replay reports declared')
+        matches=[]
+        for value in declared:
+            path=artifact(value,root,started_at)
+            require(path.is_relative_to(gate_path.parent),'replay report outside this gate attempt tree')
+            if read(path).get('instance_id')==instance_id:matches.append(checked(path))
+        require(len(matches)==1,'gate must identify exactly one matching replay report')
+        return matches[0]
+    return checked(gate_path.parent/'replay'/instance_id/'meta.json')
+
+
 def audit_job(job, gate_path, *, root, started_at, group_closed=False, group_id=None):
     root, job = Path(root).resolve(), Path(job).resolve()
     require(job.is_relative_to(root / "out"), "job outside campaign output")
@@ -79,7 +112,7 @@ def audit_job(job, gate_path, *, root, started_at, group_closed=False, group_id=
     require(file_digest(identity) == key.code_sha256, "gate code differs from campaign validation key")
     iid = raw["ispatialgym"]["instance_id"]
     demo_meta_path = artifact(source_demo.parent / "meta.json", root, started_at)
-    replay_meta_path = artifact(gate_path.parent / "replay" / iid / "meta.json", root, started_at)
+    replay_meta_path = replay_report_path(gate,gate_path,iid,root=root,started_at=started_at)
     evidence = []
     for path, mode, kind in ((demo_meta_path, "oracle", "demo"), (replay_meta_path, "replay", "open_loop_replay")):
         report = read(path)

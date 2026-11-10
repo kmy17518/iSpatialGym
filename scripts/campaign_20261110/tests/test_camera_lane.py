@@ -117,3 +117,19 @@ def test_area_weighted_room_allocation_preserves_total():
     for invalid in (0, -1, float("nan"), 10.01):
         with pytest.raises(c.ContractError):
             lane.path_bucket(invalid)
+
+
+def test_camera_recovery_gate_accepts_only_its_explicit_verified_attempt(tmp_path):
+    f=fixture(tmp_path,distances=(1,))
+    gate=lane.read(f.gate);iid='camera_00'
+    old=f.gate.parent/'replay'/iid/'meta.json'
+    target=f.gate.parent/'attempt_02/replay'/iid/'meta.json';target.parent.mkdir(parents=True);old.rename(target)
+    gate['replay_meta_paths']=[str(target)]
+    gate['scene_identity']={'verified_replay':True,'replay_report':str(target),'replay_report_sha256':c.file_digest(target)}
+    c.write_json_atomic(f.gate,gate)
+    result=audit(f)
+    assert next(row for row in result['evidence'] if row['kind']=='open_loop_replay')['report_path']==str(target)
+    report=lane.read(target);report['provenance']['isg_root']=str(tmp_path/'code/other')
+    c.write_json_atomic(target,report);gate['scene_identity']['replay_report_sha256']=c.file_digest(target);c.write_json_atomic(f.gate,gate)
+    with pytest.raises(c.ContractError,match='another code'):
+        audit(f)
