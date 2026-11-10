@@ -6128,6 +6128,32 @@ Record `$OFH/ul03_20261109` (wob*.py, calib.py / calib_all.txt, att.py, abtab.py
   candidates before its push chain). Kit `early_frame.grasp.*`, `early_frame.preplace.*`, `early_frame.agree.<rule>.<early>_<late>`.
   DEFAULT ON since 842e33e4 (owner #36; "0" = off).
 
+### A/Bs (svl titanrtx, v2maps_int2 v2only, alias memory off, own ledger + EMPTY sampling cache per arm)
+
+A/B 1 (trunk_03b4fd8c, under_large_03 360000 N 4; control under_large_01 360000):
+
+| arm | att / wr / ok | GPU-h | GPU-h / ok | gripper_not_in_frame | demo failures |
+|---|---|---|---|---|---|
+| ul03_r4_off (both shadow) | 40 / 3 / 2 | 4.40 | 2.199 | 13 | collision |
+| ul03_cf_on (CARRY_FLOOR=1) | 50 / 2 / 2 | 5.39 | 2.694 | 16 | - |
+| ul03_ef_on (LARGE_EARLY_FRAME=1) | 13 / 4 / 2 | 1.73 | 0.864 | 0 | collision, robot_wobble |
+| ul01_r4_shadow (control) | 11 / 4 / 2 | 2.93 | 1.466 | 0 | plan_failed, arm_stutter |
+
+Early vs late frame verdicts of the final drafts (shadow arms): grasp box 13 fail/fail + 22 pass/pass, pre-place 16 + 5, grasp fingertip 0 + 5 -
+no disagreement; all 13 gripper_not_in_frame of the off arm failed early. On arm: late checks all pass; acted on 106 grasp options, 53 draws, 211
+pairs before their push chain, 35 pre-place options. under_large_01: every verdict passes (never acts). -> 842e33e4 LARGE_EARLY_FRAME DEFAULT ON
+(owner #36). CARRY_FLOOR acted (22 refusals) but the off arm wrote no wobble this time: unclear -> A/B 2.
+
+A/B 2 (trunk_842e33e4 = early frame on, under_large_03 N 8 = 360000 + 360100):
+
+| arm | att / wr / ok | GPU-h | GPU-h / ok | robot_wobble | refusals |
+|---|---|---|---|---|---|
+| ul03_cf2_shadow | 20 / 8 / 4 | 2.47 | 0.619 | 3 (predicted hull -0.036 / -0.036 / -0.018 m) | (4 would) |
+| ul03_cf2_on | 20 / 8 / 7 | 2.62 | 0.375 | 0 (those instances at +0.012 / +0.013 / +0.036 m) | 4 |
+
+The same 20 attempts with the same outcomes in both arms. Over both A/Bs every written demo with predicted clearance >= +0.012 m had no wobble, every
+one below 0 wobbled. under_large_01: 0 of 1355 checks below the floor. -> 5f3f0355 CARRY_FLOOR_CLEARANCE DEFAULT ON.
+
 ### int2_14 (f5b89921, 1.69 GPU-h / ok) vs int2_18 / int2_20 (4.65 / 4.44)
 - The three runs replay the SAME attempts (empty caches: deterministic; 31 of 40 identical outcomes int2_14 vs int2_20). +3.8 ks sampling =
   +2.27 ks from 7 identical time_cap attempts cut at 975 s instead of 650 s, +1.66 ks where they part (360000 a4: int2_14 wrote it - demo
