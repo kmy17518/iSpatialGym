@@ -6200,6 +6200,28 @@ through its push-under rule (any pushed object, round or not), not through a sym
 
 Kit counts `round_symmetry.COUNTS`; `meta.success_yaw_free` per demo.
 
+**Results (2026-11-09 / 11-10; index 360000, N 4, svl titanrtx, own ledger + empty cache per arm).**
+- **A4, offline re-score of every recorded under_large_03 demo** (`$OFH/measure_20261109/rescore_ul03.py`, 113 unique demos):
+  - Recomputing with the full error reproduces the recorded per-step error and `geometric_within` at every step.
+  - 27 of 29 symbolic_only demos become success (full error 0.10-0.40 rad, yaw-free <= 0.014 rad); 2 stay symbolic_only on position.
+  - ok goes from 31 to 58 of 113.
+- **A4, where it acts** (`affected.py`): 4 targets in 4 aliases - under_large_03's can, inside_large_03's plate luhkiz, disembedding_05's
+  beaker, disembedding_07's tape. 7 more round targets are already free through customs `zinf`.
+- **A4, under_large_03 A/B:** OFF 42 att / 3 wr / 1 ok (4.08 GPU-h per ok), ON 35 / 3 / 0. The switch acted but decided no verdict: every
+  failure was a hard one (robot_wobble, collision).
+- **A2, under_large_02 OFF** (standing): 12 / 4 / 1, 6.60 GPU-h per ok.
+- **A2, the lying arms built up in four steps, 2 lying demos each:**
+  1. No drop was reachable at 0.15 m (fixed by cf37dc01).
+  2. Backing off the drop along -a hit the torso or a joint jump (fixed by cf8c0375).
+  3. All actions were ok, but the yaw drifted to 72-78 deg in 0.10 m strokes (fixed by b13771ab, which held the yaw within +-13 deg).
+  4. The remaining failures:
+     - the push's arm-locked base nudge trips the QA pause (pre-existing: fpr2_base, ul02_lb_sd0);
+     - the place's up-retreat hits a joint jump at the near-singular horizontal-hand drop configuration (lower_drop never lowers a lying
+       drop for the same reason);
+     - 0.046 rad of yaw over tolerance.
+  - The lying briefcase always landed flat (tilt <= 0.1 deg) and never toppled. 0 ok in 4 lying demos, so **no default is flipped**; the
+    lead cancelled the arms. The proposed fixes wait for the owner (DECISIONS 2026-11-10 i7-measure).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
