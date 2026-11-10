@@ -79,6 +79,26 @@ class ReplayRecoveryTests(unittest.TestCase):
             self.assertTrue(apply_retry_request(old_entry,request,root,{}))
             self.assertEqual(len(old_entry['attempt_history']),1)
 
+    def test_foreign_cache_retry_requires_exact_pre_simulation_permission_failure(self):
+        for executed in (False,True):
+            with self.subTest(executed=executed),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);folder,entry,request=self.metadata_fixture(root)
+                foreign='/vision/u/shiyuc/minyeong/campaign_20261110/isaacsim_overlay/apps/omnigibson_5_1_0.kit'
+                log=folder/'replay.log';log.write_text('_launch_app PermissionError: '+foreign)
+                gate=json.loads((folder/'gate.json').read_text())
+                gate['result']={'status':'error','success':False,'exit_code':4,'error':'PermissionError(13)',
+                    'wall_time_s':.7,'n_action_steps':1 if executed else 0}
+                (folder/'gate.json').write_text(json.dumps(gate))
+                request.update(failure_kind='foreign_replay_cache',foreign_cache_path=foreign,
+                    replay_log_sha256=hashlib.sha256(log.read_bytes()).hexdigest(),
+                    expected_failed_gate_sha256=hashlib.sha256((folder/'gate.json').read_bytes()).hexdigest())
+                if executed:
+                    with self.assertRaisesRegex(ValueError,'pre-simulation'):apply_retry_request(entry,request,root,{})
+                    self.assertTrue((folder/'gate.json').exists())
+                else:
+                    self.assertTrue(apply_retry_request(entry,request,root,{}))
+                    self.assertTrue((folder/'failed_gate_before_02.json').exists())
+
     def fixture(self, root):
         folder=root/'validation/open_loop/class/123'
         folder.mkdir(parents=True)

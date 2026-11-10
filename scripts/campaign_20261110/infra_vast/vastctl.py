@@ -37,10 +37,10 @@ from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
-    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan
+    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from .bounded_process import run_bounded
 except ImportError:
-    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan
+    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -605,8 +605,10 @@ def load_states():
 
 def save_state(s):
     p = os.path.join(STATE, f"{s['id']}.json")
-    json.dump(s, open(p + ".tmp", "w"), indent=1)
-    os.replace(p + ".tmp", p)
+    temporary = p + '.' + uuid.uuid4().hex + '.tmp'
+    with open(temporary, "x") as stream:
+        json.dump(s, stream, indent=1); stream.flush(); os.fsync(stream.fileno())
+    os.replace(temporary, p)
 
 
 def ingest(states, C):
@@ -1020,9 +1022,7 @@ def main():
             print(fmt_offer(o))
         return 0
     if a.cmd == "stage":
-        states = load_states()
-        ingest(states, cfg())
-        result = stage(s3, states[a.id], {})
+        result = stage(s3, staging_record(STATE, a.id), {})
         if a.output:
             with open(a.output, "x") as stream:
                 json.dump(result, stream, indent=2)

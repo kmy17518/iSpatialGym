@@ -12,7 +12,7 @@ import sqlite3
 import tempfile
 
 from scripts.campaign_20261110 import controller_held as held
-from scripts.campaign_20261110.contracts import file_digest, require, task_quotas, write_json_atomic
+from scripts.campaign_20261110.contracts import digest, file_digest, require, task_quotas, write_json_atomic
 from scripts.campaign_20261110.controller_families import read, reserve_indices
 
 QUOTAS = {q.task: q for q in task_quotas()}
@@ -78,19 +78,21 @@ def read_counts(root, template):
 def pending(root):
     result = []
     for path in sorted((root / "controllers").glob("*/state.json")):
-        for state in read(path).get("seeds", {}).values():
-            for record in state.get("queues", []):
-                if record.get("status") == "complete":
-                    continue
-                ids = [gid for gid in record["prepared"]["group_ids"] if gid not in record.get("groups", {})]
-                if not ids:
-                    continue
-                template = read(root / "groups" / ids[0] / "campaign_config.json")["template"]
-                if not supports(template["task"]):
-                    continue
-                require(record.get("decision") is not None, "generic pending queue lacks its quota decision")
-                result.append({"task": template["task"], "class_id": template["class_id"], "phase": record["phase"],
-                    "bucket": record["decision"]["bucket"], "groups": len(ids), "state": str(path)})
+        raw = read(path)
+        records = [record for state in raw.get("seeds", {}).values() for record in state.get("queues", [])]
+        records += [record for record in raw.get("records", {}).values() if isinstance(record, dict) and "admission_id" in record]
+        for record in records:
+            if record.get("status") in ("complete", "admitted", "failed"):
+                continue
+            ids = [gid for gid in record["prepared"]["group_ids"] if gid not in record.get("groups", {})]
+            if not ids:
+                continue
+            template = read(root / "groups" / ids[0] / "campaign_config.json")["template"]
+            if not supports(template["task"]):
+                continue
+            require(record.get("decision") is not None, "generic pending queue lacks its quota decision")
+            result.append({"task": template["task"], "class_id": template["class_id"], "phase": record["phase"],
+                "bucket": record["decision"]["bucket"], "groups": len(ids), "state": str(path)})
     return result
 
 
@@ -187,6 +189,47 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     save()
     write_json_atomic(Path(record["directory"]) / "submission.json", record)
     return record
+
+
+def load_seeds(cfg, state):
+    """Admit only additive, independently audited seeds; existing pins never move."""
+    from scripts.campaign_20261110.acceptance import audit_job
+    from scripts.campaign_20261110.group_lane import check_reservations
+    from scripts.campaign_20261110.reservation_policy import active_policy
+    root = Path(cfg["root"]).resolve()
+    path = Path(cfg["seed_catalog"]).resolve()
+    require(path.is_relative_to(root / "controllers"), "seed catalog outside owned controllers")
+    raw = read(path, {"schema": "isg-group-seed-catalog-v1", "campaign_id": cfg["campaign_id"], "seeds": []})
+    require(raw["schema"] == "isg-group-seed-catalog-v1" and raw["campaign_id"] == cfg["campaign_id"], "wrong admission catalog")
+    all_seeds = cfg["seeds"] + raw["seeds"]
+    require(len({s["id"] for s in all_seeds}) == len(all_seeds), "duplicate admitted seed ID")
+    seen = state.setdefault("admitted_seed_hashes", {})
+    current = {spec["id"]: digest(spec) for spec in raw["seeds"]}
+    require(all(current.get(key) == value for key, value in seen.items()), "admitted seed was removed or changed")
+    policy = active_policy(root)
+    require(policy is not None, "seed admission requires active reservations")
+    for spec in raw["seeds"]:
+        if spec["id"] in seen:
+            continue
+        require(spec["snapshot"] == cfg["admission_snapshot"], "admitted seed has unapproved target runtime")
+        require(isinstance(spec["max_candidates"], int) and 3 <= spec["max_candidates"] <= 10000
+                and 1 <= spec.get("groups_per_batch", 6) <= 6, "invalid admitted candidate budget")
+        config_path = Path(spec["seed_config"]).resolve()
+        require(config_path.is_relative_to(root) and file_digest(config_path) == spec["seed_config_sha256"], "admission config changed")
+        config = read(config_path)
+        template = held.template_from(config["template"])
+        require(supports(template.task) and template.split == "train" and template.class_id == spec["class_id"], "invalid admitted training task")
+        require(file_digest(Path(spec["snapshot"]) / ".snapshot_commit") == config["validation_key"]["code_sha256"], "admitted runtime key changed")
+        check_reservations(template, policy[1], policy[2])
+        proof = spec["admission_review"]
+        proof_path = Path(proof["path"]).resolve()
+        require(proof_path.is_relative_to(root) and file_digest(proof_path) == proof["sha256"], "admission review changed")
+        prior = read(proof_path)
+        actual = audit_job(spec["anchor_job"], spec["source_gate"], root=root, started_at=cfg["started_at"],
+                           group_closed=True, group_id=prior["group_id"])
+        require(digest(actual) == digest(prior) and actual["validation_key"] == config["validation_key"], "admission evidence differs from exact new key")
+        seen[spec["id"]] = current[spec["id"]]
+    return all_seeds
 
 
 def main():

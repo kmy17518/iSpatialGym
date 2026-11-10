@@ -10,6 +10,14 @@ import shutil
 QUEUE_ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
 
 
+def staging_record(state_root, job_id):
+    """Staging children read one coordinator-owned record and never ingest work."""
+    if not str(job_id).isdigit(): raise ValueError('invalid staging job ID')
+    value = json.loads((Path(state_root) / (str(job_id) + '.json')).read_text())
+    if str(value['id']) != str(job_id): raise ValueError('staging state identity differs')
+    return value
+
+
 def assignment_plan(queued, live, heartbeats, created, assigned_to, timestamp):
     """Reserve each queued job once against compatible, ready worker slots."""
     remaining = list(queued)

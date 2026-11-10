@@ -253,6 +253,53 @@ def reusable_anchor_record(spec, state, root):
     return None
 
 
+def adopt_pending_replacement(stage, root):
+    """Follow the dispatcher's audited never-started migration, without submitting."""
+    if not stage.get('dispatch_receipt'):
+        return None
+    receipt=read(stage['dispatch_receipt'],{})
+    migration=receipt.get('migration')
+    if not migration:
+        return 'pending' if receipt.get('migration_pending') else None
+    require(migration.get('never_started') is True,'replacement lacks never-started proof')
+    evidence=migration['proof'];path=Path(evidence['path']).resolve()
+    require(path.is_relative_to(root) and file_digest(path)==evidence['sha256'],'migration evidence changed')
+    proof=read(path);old=stage.get('allocation') or receipt.get('allocation')
+    require(old and proof.get('schema')=='isg-never-started-migration-v1' and proof.get('never_started') is True,
+            'invalid migration proof schema')
+    require(proof['original_allocation']==old,'migration allocation differs from owned stage')
+    accounting=proof['after']['accounting']
+    require(accounting['state']=='CANCELLED' and accounting['start'] in ('Unknown','None','N/A','')
+            and proof['final_execution_proof']['nonempty_execution_artifacts']==[], 'migrated source may have executed')
+    replacement=migration['replacement'];directory=Path(replacement['directory']).resolve()
+    original=Path(stage['directory']).resolve()
+    require(directory!=original and directory.is_relative_to(root/'groups') and original.is_relative_to(root/'groups'),
+            'replacement must use a fresh owned group directory')
+    require(file_digest(directory/'campaign_config.json')==file_digest(original/'campaign_config.json'),
+            'migration changed exact collection configuration')
+    intent=Path(replacement['dispatch_intent']).resolve()
+    require(intent.is_relative_to(root/'dispatch/ready'),'replacement intent outside campaign')
+    payload=read(intent);identity=payload['identity']
+    require(payload['command']==replacement['command'] and digest(payload['command'])==payload['command_sha256'],
+            'replacement command differs from immutable intent')
+    require(identity['start']==replacement['index'] and identity['n']==replacement['count']==int(old['n'])
+            and identity['code']==old['code'] and identity['tag']==old['tag'] and identity['key']==old['key'],
+            'replacement changes owned job identity')
+    receipt_path=Path(replacement['dispatch_receipt']).resolve()
+    require(receipt_path==root/'dispatch/receipts'/intent.name,'replacement receipt does not match intent')
+    if 'group_id' in stage:
+        plan=read(directory/'goal_plan.json')
+        require(plan['group_id']==replacement['group_id']==directory.name,'replacement group plan identity differs')
+    history=stage.setdefault('migration_history',[])
+    history.append({'prior_stage':{k:copy.deepcopy(v) for k,v in stage.items() if k!='migration_history'},
+        'proof':evidence,'adopted_at':time.time()})
+    stage.update({key:replacement[key] for key in ('directory','index','count','dispatch_intent','dispatch_receipt','command')})
+    if 'group_id' in stage:stage['group_id']=replacement['group_id']
+    stage.pop('allocation',None)
+    stage.update(status='external_submission',dry_run_passed=True)
+    return 'adopted'
+
+
 def claim(record, spec, cfg, root):
     from scripts.campaign_20261110.acceptance import audit_job
     from scripts.campaign_20261110.goal_groups import load_template_contract
@@ -303,6 +350,11 @@ def advance(spec, state, cfg, root, queue, allowance, save):
         save()
     group = cycle.get("group")
     stage = group or cycle["anchor"]
+    migration=adopt_pending_replacement(stage,root)
+    if migration:
+        state['status']='waiting_for_pending_migration' if migration=='pending' else 'migration_replacement_adopted'
+        save()
+        if migration=='pending':return 0
     if stage["status"] in ("ready", "submitting"):
         if allowance <= 0:
             return 0

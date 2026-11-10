@@ -9,6 +9,57 @@ from scripts.campaign_20261110 import controller_families as c
 
 
 class FamilyControllerTests(unittest.TestCase):
+    def migration_fixture(self, root):
+        old=root/'groups/old';new=root/'groups/new'
+        for folder in (old,new):
+            folder.mkdir(parents=True);(folder/'campaign_config.json').write_text('{"key":"same"}')
+        (new/'goal_plan.json').write_text('{"group_id":"new"}')
+        allocation={'jobid':'12','n':'3','key':'a','code':'/snapshot','tag':'goal_groups'}
+        proof={'schema':'isg-never-started-migration-v1','never_started':True,'original_allocation':allocation,
+            'after':{'accounting':{'state':'CANCELLED','start':'Unknown'}},
+            'final_execution_proof':{'nonempty_execution_artifacts':[]}}
+        proof_path=root/'migration.json';proof_path.write_text(json.dumps(proof))
+        ready=root/'dispatch/ready/new.json';ready.parent.mkdir(parents=True)
+        command=['python','submit_fast.py','submit','a','3']
+        ready.write_text(json.dumps({'command':command,'command_sha256':c.digest(command),
+            'identity':{'start':50000100,'n':3,'code':'/snapshot','tag':'goal_groups','key':'a'}}))
+        receipt=root/'dispatch/receipts/old.json';receipt.parent.mkdir(parents=True)
+        migration={'never_started':True,'proof':{'path':str(proof_path),'sha256':c.file_digest(proof_path)},
+            'replacement':{'directory':str(new),'index':50000100,'count':3,'dispatch_intent':str(ready),
+                'dispatch_receipt':str(receipt.with_name('new.json')),'command':command,'group_id':'new'}}
+        receipt.write_text(json.dumps({'allocation':allocation,'migration':migration}))
+        stage={'group_id':'old','directory':str(old),'index':50000000,'status':'waiting',
+               'allocation':allocation,'dispatch_receipt':str(receipt)}
+        return stage,proof_path,receipt,new
+
+    def test_migration_adopts_only_verified_fresh_replacement_and_preserves_prior_stage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);stage,_,_,_=self.migration_fixture(root)
+            self.assertEqual(c.adopt_pending_replacement(stage,root),'adopted')
+            self.assertEqual(stage['group_id'],'new');self.assertEqual(stage['index'],50000100)
+            self.assertNotIn('allocation',stage)
+            self.assertEqual(stage['status'],'external_submission')
+            self.assertEqual(stage['migration_history'][0]['prior_stage']['allocation']['jobid'],'12')
+            self.assertIsNone(c.adopt_pending_replacement(stage,root))
+
+    def test_migration_waits_for_cancellation_and_rejects_changed_configuration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);stage,_,receipt,new=self.migration_fixture(root)
+            data=json.loads(receipt.read_text());receipt.write_text(json.dumps({'migration_pending':{'request':'queued'}}))
+            self.assertEqual(c.adopt_pending_replacement(stage,root),'pending')
+            self.assertEqual(stage['allocation']['jobid'],'12')
+            receipt.write_text(json.dumps(data));(new/'campaign_config.json').write_text('{"key":"changed"}')
+            with self.assertRaisesRegex(ValueError,'exact collection configuration'):c.adopt_pending_replacement(stage,root)
+            self.assertEqual(stage['index'],50000000)
+
+    def test_migration_rejects_a_previously_started_job_even_with_valid_proof_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);stage,proof,receipt,_=self.migration_fixture(root)
+            data=json.loads(proof.read_text());data['after']['accounting']['start']='2026-11-10T00:00:00'
+            proof.write_text(json.dumps(data));data=json.loads(receipt.read_text())
+            data['migration']['proof']['sha256']=c.file_digest(proof);receipt.write_text(json.dumps(data))
+            with self.assertRaisesRegex(ValueError,'may have executed'):c.adopt_pending_replacement(stage,root)
+
     def test_reuse_requires_opt_in_exact_runtime_and_genuine_gate(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);state,path=self.recovered_fixture(root)

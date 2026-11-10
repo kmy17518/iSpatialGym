@@ -6,16 +6,21 @@ SNAPSHOT=${2:?frozen snapshot}
 GATE_OUT=${3:?gate output directory}
 source "$JOBDIR/job.env"
 export ISGE_CODE="$SNAPSHOT"
-export KIT_TPL_NFS_ROOT=${KIT_TPL_NFS_ROOT:-$ISGF_ROOT/kit_templates}
-export KIT_TEX_STORE=${KIT_TEX_STORE:-$ISGF_ROOT/kit_textures}
-export EXP_PATH=${ISGF_EXP_PATH:-$ISGF_ROOT/isaacsim_overlay/apps}
+# Replay is submitted by the primary campaign account, including demos collected
+# by shiyuc. Its writable caches must belong to the replay account; inheriting
+# the collector's .kit overlay caused PermissionError before simulation began.
+export KIT_TPL_NFS_ROOT="$ISGF_ROOT/kit_templates"
+export KIT_TEX_STORE="$ISGF_ROOT/kit_textures"
+export ISGF_JB_NFS="$ISGF_ROOT/jobs/replay"
+export ISGF_EXP_PATH="$ISGF_ROOT/isaacsim_overlay/apps"
+export EXP_PATH="$ISGF_EXP_PATH"
 source "$SNAPSHOT/scripts/trainfast/env_fast.sh"
 set -a
 source <(grep -E '^(ISPATIALGYM|ISG)_[A-Z0-9_]*=' "$JOBDIR/job.env")
 set +a
 unset ISPATIALGYM_HEAD_CAMERA_ONLY ISPATIALGYM_PHYSICS_ONLY
 export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR="$JB/numba_cache" ISPATIALGYM_ORACLE_STILL_EXIT=1
-export ISPATIALGYM_SAMPLING_CACHE="$ISGF_SAMPLING_CACHE"
+export ISPATIALGYM_SAMPLING_CACHE="$JB/isg_cache/sampling"
 mkdir -p "$GATE_OUT"
 KIT_RC=1
 trap 'kit_appdata_teardown' EXIT

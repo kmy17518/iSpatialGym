@@ -24,6 +24,7 @@ def main():
     p.add_argument('--candidate-manifest', type=Path)
     p.add_argument('--reserved-candidate-manifest', type=Path)
     p.add_argument('--bottom-view', action='store_true', help='Include the opposite face when canonical views hide semantic detail')
+    p.add_argument('--axis-views', action='store_true', help='Render all six cardinal faces for semantic frame review')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     out = a.output.resolve()
@@ -139,10 +140,15 @@ def main():
             views = [('front', [1., -1., .55]), ('back', [-1., 1., .55]), ('top', [.01, 0., 1.])]
             if a.bottom_view:
                 views.append(('bottom', [.01, 0., -1.]))
+            if a.axis_views:
+                views = [(axis + suffix, [sign if j == i else 0. for j in range(3)])
+                         for i, axis in enumerate(('x', 'y', 'z')) for suffix, sign in (('plus', 1.), ('minus', -1.))]
             for name, direction in views:
                 direction = np.array(direction); direction /= np.linalg.norm(direction)
                 eye = centre + radius * direction
-                back = direction; right = np.cross([0., 1., 0.], back); right /= np.linalg.norm(right)
+                back = direction
+                camera_up = [0., 0., 1.] if a.axis_views and abs(back[2]) < .95 else [0., 1., 0.]
+                right = np.cross(camera_up, back); right /= np.linalg.norm(right)
                 up = np.cross(back, right)
                 og.sim.viewer_camera.set_position_orientation(th.tensor(eye, dtype=th.float32),
                     mat2quat(th.tensor(np.column_stack([right, up, back]), dtype=th.float32)))
@@ -152,14 +158,14 @@ def main():
                 rgb = obs['rgb'].cpu().numpy()[..., :3]
                 path = out / (row['model'] + '_' + name + '.png')
                 Image.fromarray(rgb.astype(np.uint8)).save(path)
-                result['images'].append({'path': str(path), 'sha256': sha(path)})
+                result['images'].append({'path': str(path), 'sha256': sha(path), 'camera_direction_from_object': direction.tolist()})
             report['objects'].append(result)
             (out / 'default_geometry.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
         for task in sorted({r['task'] for r in rows}):
             subset = [r for r in report['objects'] if r['task'] == task]
             for start in range(0,len(subset),10):
                 page=subset[start:start+10]
-                sheet = Image.new('RGB', ((4 if a.bottom_view else 3) * 256, len(page) * 280), 'white')
+                sheet = Image.new('RGB', ((6 if a.axis_views else 4 if a.bottom_view else 3) * 256, len(page) * 280), 'white')
                 draw = ImageDraw.Draw(sheet)
                 for i, row in enumerate(page):
                     draw.text((3, i*280+3), row['category'] + '/' + row['model'], fill='black')

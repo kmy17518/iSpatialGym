@@ -5,7 +5,6 @@ import copy
 from dataclasses import asdict
 import json
 from pathlib import Path
-import sys
 
 from scripts.campaign_20261110.contracts import ObjectRef, Template, digest, file_digest, require, write_json_atomic
 from scripts.campaign_20261110.group_lane import check_reservations
@@ -117,7 +116,7 @@ def main():
         jobs.append(dict(candidate_id=template.template_id, class_id=cls, task=task, alias=alias, scene=scene, room=room, split='eval_model',
                          template_fingerprint=template.fingerprint, required_new_grasp_key=gkey, measured_table_height_key=table_proof['tabletop_height_key'],
                          source_manifest=str((a.out / 'validation_jobs.json').resolve()), production_released=False,
-                         sample_argv=[sys.executable, '-m', 'ispatialgym.sampling.sample_isg', '--variant', alias, '--customs', str(customs),
+                         sample_argv=['python', '-m', 'ispatialgym.sampling.sample_isg', '--variant', alias, '--customs', str(customs),
                                       '--bddl-root', str(directory / 'bddl'), '--scene', scene, '--templates', '1', '--instances-per-template', '1',
                                       '--max-attempts', '3', '--seed', '20261110', '--no-write-back', '--out', '${CAMPAIGN_OUT}/validation/' + cls]))
         request = dict(class_id=cls, target=target['category'] + '/' + target['model'], scale=target['default_scale'], asset_sha256=target['asset_sha256'],

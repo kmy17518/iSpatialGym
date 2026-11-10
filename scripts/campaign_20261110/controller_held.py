@@ -282,7 +282,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
         actual = read(prepared["config"])["validation_key"]
         require(actual == seed_config["validation_key"], "adopted queue differs from seed key")
         records.append({"queue": path, "prepared": prepared, "validation_key": actual, "phase": template.split,
-                        "index": submission["index"], "count": prepared["candidate_instances"], "status": "external_submission"})
+                        "index": submission["index"], "count": prepared["candidate_instances"], "status": "external_submission",
+                        **({"decision": submission["decision"]} if adapter is not None else {})})
     for record in records:
         from scripts.campaign_20261110.controller_migration import controller_check
         controller_check(root,record,state,cfg,queue,save,family='held')
@@ -417,7 +418,8 @@ def main(*, adapter=None):
             save = lambda: write_json_atomic(path, state)
             rows, queue = allocations(root), slurm_status()
             allowance = cfg.get('maximum_new_jobs_per_pass',3) if cfg.get('dispatch_spool') else submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))
-            for spec in cfg["seeds"]:
+            specs = adapter.load_seeds(cfg, state) if adapter is not None and cfg.get("seed_catalog") else cfg["seeds"]
+            for spec in specs:
                 current = state["seeds"].setdefault(spec["id"], {})
                 try:
                     allowance -= advance(spec, current, cfg, root, rows, queue, allowance, save, adapter=adapter)

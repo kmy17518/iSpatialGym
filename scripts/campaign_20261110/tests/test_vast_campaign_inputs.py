@@ -3,10 +3,23 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, sha, QUEUE_ENV
+from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, sha, QUEUE_ENV
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_staging_reads_only_target_state_without_ingesting_or_mutating(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root/'900001.json'; target.write_text('{"id":"900001","status":"queued"}')
+            (root/'900002.json').write_text('unrelated partially published external input')
+            before = target.read_bytes()
+            value = staging_record(root, '900001'); value['status'] = 'assigned'
+            self.assertEqual(target.read_bytes(), before)
+            with self.assertRaises(FileNotFoundError): staging_record(root, '900003')
+            with self.assertRaises(ValueError): staging_record(root, '../900001')
+            target.write_text('{"id":"900002"}')
+            with self.assertRaisesRegex(ValueError, 'identity'): staging_record(root, '900001')
+
     def test_parallel_plan_reserves_each_job_once_and_respects_worker_constraints(self):
         jobs = [{'id':str(i), 'gpu':'RTX 5090', 'time_s':1800} for i in range(5)]
         jobs[0]['avoid'] = 'ready'

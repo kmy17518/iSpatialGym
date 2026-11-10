@@ -3,6 +3,7 @@ import concurrent.futures
 from pathlib import Path
 import tempfile
 import unittest
+from contextlib import contextmanager
 from unittest.mock import patch
 
 from scripts.campaign_20261110 import infra_dispatch as D
@@ -105,6 +106,34 @@ class DispatchTests(unittest.TestCase):
         self.assertTrue(path.stat().st_mode & 0o040)
         path.write_text('{"schema":"wrong"}')
         with self.assertRaises(ValueError): D.enqueue(self.root, 'bad_index', command)
+
+    def test_vast_activation_retries_contention_without_resubmission(self):
+        path = D.enqueue(self.root, 'fresh', self.command, backends=['vast_5090'])
+        payload = json.loads(path.read_text())
+        D.shared_json(self.root/'vast/config.json', {})
+        original = D.atomic_directory_lock
+        attempts = []
+        @contextmanager
+        def busy_once(path):
+            attempts.append(path)
+            if len(attempts) == 1: raise FileExistsError(path)
+            with original(path): yield
+        with patch.object(D, 'atomic_directory_lock', busy_once), patch.object(D.time, 'sleep'):
+            D.activate_vast(self.root, payload, {'jobid':'900001'})
+        self.assertEqual(len(attempts), 2)
+        self.assertEqual(json.loads((self.root/'vast/config.json').read_text())['dispatch_job_ids'], ['900001'])
+
+    def test_allocated_blocked_receipt_only_reconciles_activation(self):
+        path = D.enqueue(self.root, 'fresh', self.command, backends=['vast_5090'])
+        row = {'jobid':'900001'}
+        D.shared_json(self.root/'dispatch/receipts/fresh.json',
+                      {'status':'blocked','backend':'vast_5090','allocation':row,'error':'lock contention'})
+        with patch.object(D, 'find_allocation', return_value=row), patch.object(D, 'activate_vast') as activate, patch.object(D.subprocess, 'run') as run:
+            D.execute(self.root, path, 'vast_5090')
+        run.assert_not_called(); activate.assert_called_once()
+        receipt = json.loads((self.root/'dispatch/receipts/fresh.json').read_text())
+        self.assertEqual(receipt['status'], 'submitted')
+        self.assertEqual(receipt['reconciliation_history'][0]['previous_error'], 'lock contention')
 
 
 if __name__ == '__main__': unittest.main()

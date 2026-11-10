@@ -254,6 +254,25 @@ def find_allocation(root, identity):
     return None
 
 
+def activate_vast(root, payload, row, timeout=25):
+    """Reconcile queue activation after submission without submitting again."""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            with atomic_directory_lock(root / 'vast/config.dispatch.lockdir'):
+                path = root / 'vast/config.json'
+                config = json.loads(path.read_text())
+                ids = config.setdefault('dispatch_job_ids', [])
+                if row['jobid'] not in ids: ids.append(row['jobid'])
+                priority = config.setdefault('dispatch_priority_job_ids', [])
+                if payload['priority'] < 50 and row['jobid'] not in priority: priority.append(row['jobid'])
+                shared_json(path, config)
+            return
+        except FileExistsError:
+            if time.monotonic() >= deadline: raise
+            time.sleep(.25)
+
+
 def execute(root, path, backend):
     root, path = Path(root).resolve(), Path(path)
     payload = json.loads(path.read_text())
@@ -262,6 +281,10 @@ def execute(root, path, backend):
         prior = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
         row = find_allocation(root, payload['identity'])
         if row:
+            if prior.get('backend', backend).startswith('vast_'):
+                activate_vast(root, payload, row)
+            if prior.get('error'):
+                prior.setdefault('reconciliation_history', []).append({'at': time.time(), 'previous_error': prior.pop('error')})
             shared_json(receipt_path, {**prior, 'status': 'submitted', 'allocation': row, 'reconciled_at': time.time()})
             return
         require(prior.get('status') not in ('submitting', 'blocked', 'submitted'), 'prior outcome needs reconciliation')
@@ -282,14 +305,7 @@ def execute(root, path, backend):
             require(row is not None, 'submit completed without ledger; reconcile before retry')
             receipt.update(status='submitted', allocation=row, completed_at=time.time())
             if backend.startswith('vast_'):
-                with atomic_directory_lock(root / 'vast/config.dispatch.lockdir'):
-                    config_path = root / 'vast/config.json'
-                    config = json.loads(config_path.read_text())
-                    ids = config.setdefault('dispatch_job_ids', [])
-                    if row['jobid'] not in ids: ids.append(row['jobid'])
-                    priority = config.setdefault('dispatch_priority_job_ids', [])
-                    if payload['priority'] < 50 and row['jobid'] not in priority: priority.append(row['jobid'])
-                    shared_json(config_path, config)
+                activate_vast(root, payload, row)
         except Exception as exc:
             receipt.update(status='blocked', error=str(exc), failed_at=time.time())
             raise
@@ -318,7 +334,10 @@ def main():
             if getpass.getuser() == 'minyeong':
                 prepare_intent_ledger(a.root, payload['token'])
             receipt = a.root / 'dispatch/receipts' / path.name
-            if a.backend in payload['backends'] and not receipt.exists():
+            prior = json.loads(receipt.read_text()) if receipt.exists() else {}
+            activation_retry = (prior.get('status') == 'blocked' and prior.get('allocation')
+                                and prior.get('backend') == a.backend and a.backend.startswith('vast_'))
+            if a.backend in payload['backends'] and (not receipt.exists() or activation_retry):
                 candidates.append((payload['priority'], path.name, path))
         for _, _, path in sorted(candidates)[:allowance]:
             try: execute(a.root, path, a.backend)
