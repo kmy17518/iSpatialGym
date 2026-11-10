@@ -3483,6 +3483,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 52 | i7-sleep up to 42ffa417 (lead #86b) | 7d990d96 | SLEEP_ASSIST_RESTART_ON_WAKE off; FINAL-COLLECTION PHYSICS FREEZE POINT ($OFH/physics_freeze_20261109.md) |
 | 53 | i7-t03both r2/r3 up to d26c2c01 (lead #84d) | 2aa34022 | DEFAULT SHELF_FREE_START_CONNECTED for the shelf tip family; MAP_STANCE / BOARD_DRAW / lean.mirror off; no t03both layer consolidated |
 | 54 | i7-t04push up to 26d001ef (lead #85b) | aa431704 | PUSH_TIP_SCREEN / TOUCH_PUSH_STROKE_M off; execute reads contact_band_m only when recorded |
+| 55 | i7-ul03 up to 9e155787 (lead #79b) | acbb0642 | DEFAULT LARGE_EARLY_FRAME 1 + CARRY_FLOOR_CLEARANCE 1 |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
