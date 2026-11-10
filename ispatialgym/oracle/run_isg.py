@@ -1545,6 +1545,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                             "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_start)), "provenance": provenance(),
                             "reused_world": bool(shared and shared.get("env") is not None)}
     result: Dict[str, Any] = {"status": "error", "mode": args.mode, "provenance": meta["provenance"]}
+    # ISPATIALGYM_GROUP_ASSIGN_POSE_TIEBREAK (i7-blockdiag): this episode's own counters (group_entity imports omnigibson, so it
+    # is only touched once loaded)
+    _ge = sys.modules.get("ispatialgym.eval.group_entity")
+    if _ge is not None:
+        _ge.pose_tiebreak_reset()
     exit_code = EXIT_ERROR
     out_dir = None
     recorder: Optional[Recorder] = None
@@ -1978,6 +1983,9 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             fast_meta["world_sync"] = {k: (round(v, 3) if isinstance(v, float) else v) for k, v in _bk._isg_sync_stats.items()}
             fast_meta["world_sync"]["n_meshes"] = len(getattr(_bk, "_world_mesh_names", ()) or ())
         meta["fast"] = {"flags": fast_flags_seen(), **fast_meta}
+        _ge = sys.modules.get("ispatialgym.eval.group_entity")
+        if _ge is not None and _ge.pose_tiebreak_on():  # i7-blockdiag: where the group assignment's pose tie-break acted (absent when off)
+            meta["group_assign_pose_tiebreak"] = _ge.pose_tiebreak_report()
         _backend = locals().get("backend")
         if os.environ.get("ISPATIALGYM_EXECUTOR_MESH_CACHE") and _backend is not None:
             # the store cannot grow: meshes held (loaded ones stay, disabled, once their object leaves) vs capacity
