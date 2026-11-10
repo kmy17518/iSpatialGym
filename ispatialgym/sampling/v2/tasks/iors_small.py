@@ -6833,7 +6833,8 @@ class IORSSmall(SamplerV2):
             draft.summary["touching"]["push_gripper_open"] = {"open": push_fingers(push_extras) != IK.FINGER_CLOSED, "fingers_opening_m": push_extras.get("fingers_opening_m"),
                                                               **(open_fallback or {})}
         log.info("%s: touching push class %s from the %s stance%s", self.gp.variant, push_kind, manip.name, f" (failed before it: {'; '.join(why[:10])})" if why else "")
-        push_extras = dict(push_extras, **self.touch_push_strokes(push_kind, push_extras, dist))  # i7-t04push (TOUCH_PUSH_STROKE_ENV)
+        if touch_push_stroke_m() is not None:  # i7-t04push (TOUCH_PUSH_STROKE_ENV); off: today's record
+            push_extras = dict(push_extras, **self.touch_push_strokes(push_kind, push_extras, dist))
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
         if self.shelf_start is not None:
             push_rec.arm = self.shelf_push_arm()
