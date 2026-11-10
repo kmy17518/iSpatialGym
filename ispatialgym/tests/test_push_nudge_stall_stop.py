@@ -42,6 +42,7 @@ def test_a_stalled_base_stops_the_nudge(monkeypatch):
     robot, env, motions, state = _world()
     pose = motions.base_pose2d()
     monkeypatch.setattr(motions, "base_pose2d", lambda: pose)  # the base does not answer the command (the deadband the demos show)
+    monkeypatch.setattr(state, "base_pose2d", lambda: pose)
     rec, n = _run(env, EX._base_nudge(motions, state, "right", "box", [1.0, 0.0, 0.0], 0.02, cfg, "push", speed=0.02))
     assert rec["stop"] == "stalled" and rec["steps"] == cfg.push_nudge_stall_steps and n < 30
 

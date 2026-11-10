@@ -4665,8 +4665,9 @@ class _NudgeMinSpeed:
     the base's translational command to ``v_min`` (direction kept) while the base is more than ``tol`` from ``goal_xy``; never stops the base.
     ``record``: the steps it raised."""
 
-    def __init__(self, motions: Motions, goal_xy, tol: float, v_min: float):
+    def __init__(self, motions: Motions, goal_xy, tol: float, v_min: float, pose2d: Optional[Callable[[], Any]] = None):
         self.m, self.goal, self.tol, self.v_min = motions, C.as_tensor(goal_xy).reshape(-1)[:2].float(), float(tol), float(v_min)
+        self.pose2d = pose2d or motions.base_pose2d
         self.record: Dict[str, Any] = {"v_min_m_s": round(self.v_min, 4), "raised_steps": 0}
 
     def __call__(self) -> bool:
@@ -4674,7 +4675,7 @@ class _NudgeMinSpeed:
         v = getattr(st, "base_vel", None)
         if v is None:
             return False
-        left = float(th.linalg.norm(C.as_tensor(self.m.base_pose2d()[:2]).float() - self.goal))
+        left = float(th.linalg.norm(C.as_tensor(self.pose2d()[:2]).float() - self.goal))
         sp = float(th.linalg.norm(v[:2]))
         if left > self.tol and 1e-9 < sp < self.v_min:
             st.base_vel = th.tensor([float(v[0]) * self.v_min / sp, float(v[1]) * self.v_min / sp, float(v[2])], dtype=th.float32)
@@ -4691,16 +4692,17 @@ class _NudgeStall:
     still more than ``tol`` short of ``move``, advanced less than ``cfg.push_nudge_stall_m`` over the last ``cfg.push_nudge_stall_steps``
     steps (:class:`_NudgeBraceHold`'s stall rule). ``record``: steps, the base's travel, why it stopped."""
 
-    def __init__(self, motions: Motions, direction, cfg: ExecuteConfig, move: float, tol: float):
+    def __init__(self, motions: Motions, direction, cfg: ExecuteConfig, move: float, tol: float, pose2d: Optional[Callable[[], Any]] = None):
         self.m, self.cfg, self.move, self.tol = motions, cfg, float(move), float(tol)
+        self.pose2d = pose2d or motions.base_pose2d  # the live base pose (the nudge's state.base_pose2d)
         d = C.as_tensor(direction).reshape(-1)[:3].float()
         self.d = d[:2] / max(float(th.linalg.norm(d[:2])), 1e-9)
-        self.along: List[float] = [float(C.as_tensor(motions.base_pose2d()[:2]).float() @ self.d)]
+        self.along: List[float] = [float(C.as_tensor(self.pose2d()[:2]).float() @ self.d)]
         self.record: Dict[str, Any] = {"kind": "stall_stop", "steps": 0, "stop": None, "move_m": round(self.move, 4), "tol_m": round(self.tol, 4)}
 
     def __call__(self) -> bool:
         self.record["steps"] += 1
-        self.along.append(float(C.as_tensor(self.m.base_pose2d()[:2]).float() @ self.d))
+        self.along.append(float(C.as_tensor(self.pose2d()[:2]).float() @ self.d))
         self.record["base_moved_m"] = round(self.along[-1] - self.along[0], 4)
         n = int(self.cfg.push_nudge_stall_steps)
         short = self.move - (self.along[-1] - self.along[0]) > self.tol
@@ -4727,9 +4729,9 @@ def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: fl
     goal2d = [x + float(d[0]) * move, y + float(d[1]) * move, yaw]
     hold = _NudgeBraceHold(motions, hold_arms, d, cfg, stop_when=stop_when, move=move, tol=tol) if hold_arms else None
     if hold is None and push_nudge_stall_stop_on():
-        hold = _NudgeStall(motions, d, cfg, move, tol)
+        hold = _NudgeStall(motions, d, cfg, move, tol, pose2d=getattr(state, "base_pose2d", None))
     v_min = push_nudge_min_speed()
-    raise_ = _NudgeMinSpeed(motions, goal2d[:2], tol, v_min) if v_min is not None else None
+    raise_ = _NudgeMinSpeed(motions, goal2d[:2], tol, v_min, pose2d=getattr(state, "base_pose2d", None)) if v_min is not None else None
     log.info("%s(%s): %.1f mm still missing with the arm at its reach boundary -> nudging the base %.1f mm along the push direction (tol %.0f mm), arm locked%s",
              label, obj, float(left) * 1000, move * 1000, tol * 1000, f"; the {'/'.join(hold_arms)} brace held in the world" if hold_arms else "")
     q = motions.robot.get_joint_positions()
