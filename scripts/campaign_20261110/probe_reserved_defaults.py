@@ -60,7 +60,8 @@ def main():
                 raise ValueError('train candidate leaks reserved model/category/hash')
             if not row['ready'] or sha(Path(row['asset_path']))!=row['asset_sha256']:raise ValueError('unready or changed train candidate')
             rows.append(row)
-        proposals=[];report_scope='train_extra_rooms'
+        proposals=[];report_scope=candidate_doc.get('scope','train_extra_rooms')
+        if report_scope not in {'train_extra_rooms','ready_catalog_screen'}:raise ValueError('unknown candidate probe scope')
     elif a.category_proposal:
         proposals=[]
         for template in json.loads(a.category_proposal.read_text())['templates']:
@@ -81,7 +82,7 @@ def main():
                 raise ValueError('unready or changed reserved object: ' + key)
             rows.append({**role, 'class_id': template['class_id'], 'task': template['task'],
                          'asset_sha256': evidence['asset_sha256'], 'asset_path': evidence['path']})
-    expected_count=len(candidate_doc['objects']) if a.reserved_candidate_manifest else (64 if a.candidate_manifest else (3 if a.category_proposal else 29))
+    expected_count=len(candidate_doc['objects']) if (a.reserved_candidate_manifest or (a.candidate_manifest and report_scope=='ready_catalog_screen')) else (64 if a.candidate_manifest else (3 if a.category_proposal else 29))
     if not rows or len(rows) != expected_count:
         raise ValueError('unexpected number of frozen room-family reservations')
     out.mkdir(parents=True)
@@ -127,7 +128,7 @@ def main():
             result = {**row, 'default_scale': obj.scale.tolist(), 'native_extent': (hi-lo).tolist(),
                       'collision_meshes': collision_count, 'dataset': row.get('dataset','behavior-1k-assets'),
                       'default_scale_provenance': ('Exact actual stable-scene init_info scale, checked against source hash; observed initialized object.scale' if row.get('scene_default_scale') is not None else 'Native DatasetObject with scale omitted; observed initialized object.scale'),
-                      'joint_positions': obj.get_joint_positions().tolist(),
+                      'joint_positions': obj.get_joint_positions().tolist() if obj.joints else [],
                       'joints': {name:{'name':joint.name,'type':str(joint.joint_type),
                                        'lower_limit':float(joint.lower_limit),'upper_limit':float(joint.upper_limit)}
                                  for name,joint in obj.joints.items()},
