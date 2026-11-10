@@ -6716,3 +6716,30 @@ The switch acts only on the under_large_02 variant's pitched floor push of an el
   - `robot_touching_objects` and `protected_contact` count only robot links and held objects (`qa._check_collision` / `_protected_pairs`);
   - the desk is not a protected (task-placed) object.
 - **Kit counters:** `push_guide_wall.scan`, `.walls`, `.edge_without_wall`, `.recorded`.
+
+### i7-ul02guide r2 (2026-11-10): why the first ON arm wrote nothing, and the fix (commit 6cd642f0; A/B snapshot trunk_0f1315a1)
+
+- **Run.** ug_ul02_on (trunk_b30097bd, N 8 at 360000 + 360100): 8 attempts, 0 written; the lead cancelled it. The baseline arm ug_ul02_off kept running.
+- **Root cause 1: the front drop was out of the pitched hand's reach.** This was the dominant cause, found from the logs without GPU.
+  - The front drop sits 0.195 m outside the edge. With the goal 0.265 m inside, the push is 0.49 m long.
+  - The pitched hand's reach window ahead of the base, measured over every pitched chain of r2_ul02_stand + ug_ul02_off + ug_ul02_on:
+    - eef start below 0.47 m: 0 of 1395 chains solved. Every one failed with `exact IK failed at pose 1 of 4`: the pre-pose, back and up from the start, is too close to the body.
+    - eef start 0.47-0.49 m: 273 of 1036 solved.
+    - eef goal 0.89-0.91 m: 5 of 726 solved. Goal at 0.91 m or more: 0 of 721 (`approach_untrackable`).
+  - The window is therefore about 0.385 m long, so a 0.49 m push cannot fit at any stand-off. The r1 bound `PUSH_GUIDE_HAND_AHEAD_M` (0.35, 0.90) still admitted these stances.
+  - Effect on the ON arm: 1363 of its 1765 unsolved chains (77 %) were these front drops. Its eef starts were 0.36-0.42 m and none solved.
+  - Fix: `PUSH_GUIDE_HAND_AHEAD_M` = (0.49, 0.875), checked by `guide_push_in_reach`, and `PUSH_GUIDE_DROP_OUTS_M` = (0.03, 0.06).
+  - Both drops are now alongside the panel: the briefcase's front half is beside the panel from the start. The stand-offs that fit are 0.725-0.775 m and 0.75-0.775 m.
+- **Root cause 2: the endwise yaw often had no pair of F that could release it.**
+  - Of the 166 C stances with a solved chain, 76 then failed with `the push-under yaw lock endwise keeps none of F's yaws`.
+  - At the endwise carried yaws, the drop releases with one hand orientation only. The cached F_goal sets show top_2 at yaw 0 and top_0 at yaw pi, which is often not the pair B took.
+  - Fix: `guide_endwise_pairs` screens the drop release at the locked yaws before the chain is solved. A C with no such pair is skipped.
+- **Ruled out.**
+  - The panel: the failing pose is the pre-pose, 0.2 m outside the edge, and the short pushes on the lanes solve 39 %.
+  - A too-narrow contact face: the contact offsets are 0.166-0.172 m and the band is never empty.
+  - The largest-offset yaw order: both ends have equal offsets.
+  - The goal depth on its own: eef goals of 0.82-0.88 m solve.
+- **Not changed.**
+  - Lane 17.01 seen from the front: 22 of its C stances fail the B -> C carry because the C base is "disconnected on the eroded map". This is the generic carry check.
+  - The A -> B transit failures near (18.1, -11.57) come from the drawn robot start, not from the lanes.
+- **New kit counters:** `push_guide_wall.c_out_of_reach`, `.c_no_endwise_pair`, `.c_endwise_pair`. One INFO line per C: 'guide-wall endwise pairs at C'.
