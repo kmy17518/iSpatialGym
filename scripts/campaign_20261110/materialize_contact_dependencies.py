@@ -15,6 +15,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     for name in ('root', 'release', 'geometry-root', 'out'):
         p.add_argument('--' + name, type=Path, required=True)
+    p.add_argument('--source', type=Path, help='One campaign-owned candidate batch instead of the original fixed batch')
+    p.add_argument('--class-id', action='append', default=[])
     a = p.parse_args()
     require(not a.out.exists() and a.out.resolve().is_relative_to(a.root.resolve()), 'new private manifest required')
     pointer, policy, hashes = active_policy(a.root)
@@ -23,6 +25,10 @@ def main():
     selections = [('heldout_small_pairs_v1', {'inter_object_relation_satisfaction-touching_01', 'inter_object_relation_satisfaction-touching_04'}),
                   ('heldout_category_pairs_v1', {'inter_object_relation_satisfaction-touching_small_scale-box_of_crackers-box_of_cookies'}),
                   ('heldout_model_table_tasks_v2', {'alignment-axial_' + str(i).zfill(2) for i in range(1, 6)})]
+    require(bool(a.source) == bool(a.class_id), 'explicit source and class IDs are required together')
+    if a.source:
+        require(a.source.resolve().is_relative_to(a.root.resolve()), 'contact source outside campaign')
+        selections = [(str(a.source.resolve()), set(a.class_id))]
     for folder, classes in selections:
         path = a.root / folder
         contracts = {row['class_id']: load_contract(row) for row in json.loads((path / 'contract_candidates.json').read_text())['templates']}
@@ -33,6 +39,7 @@ def main():
             argv = [x.replace('${MATERIALIZED}', str(path)) for x in job['sample_argv']]
             customs = Path(argv[argv.index('--customs') + 1]); entry = json.loads(customs.read_text())[job['alias']]
             axial = template.task == 'alignment-axial'
+            require(axial or template.task == 'inter_object_relation_satisfaction-touching_small_scale', 'unsupported contact task')
             for role in ('target',) if axial else ('target', 'partner'):
                 obj = next(o for o in template.objects if o.role == role)
                 key = obj.category + '/' + obj.model
@@ -70,7 +77,7 @@ def main():
                     evidence = dict(status='awaiting fresh native geometry and stable rest')
                 requests.append(dict(class_id=cls, role=role, split=template.split, height_key=height, job=contact_job,
                     dependency=evidence, kinds=['push_blade', 'axial_brace'] if axial else ['touch_push' if role == 'target' else 'touch_brace']))
-    require(len(requests) == 11, 'expected six touching and five axial contact roles')
+    require(bool(requests) and (a.source is not None or len(requests) == 11), 'missing expected native contact roles')
     a.out.mkdir(parents=True)
     write_json_atomic(a.out / 'geometry_jobs.json', list(geometry.values()))
     write_json_atomic(a.out / 'contact_profiles.json', dict(active_policy_sha256=pointer['policy_sha256'], requests=requests,

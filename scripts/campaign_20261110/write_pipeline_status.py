@@ -84,7 +84,7 @@ def main():
                         [default_path, review_path, reservation], 1)
     folders = ('heldout_room_materialized_v2', 'heldout_small_pairs_v1', 'heldout_articulation_v1', 'heldout_carton_hhlmbi_v1',
                'heldout_block_materialized_v2', 'heldout_mental_isgm10_v1', 'heldout_lef_ief09_v1', 'heldout_pot_tbsjnw_v1', 'heldout_model_table_tasks_v1',
-               'heldout_model_disembedding_v1', 'heldout_model_wall_v3')
+               'heldout_model_disembedding_v1', 'heldout_model_wall_v3', 'heldout_small_pairs_replacements_v1')
     manifests = [root / folder / 'contract_candidates.json' for folder in folders]
     index_path = root / 'manifests/category_materialization_index_v4.json'
     index = json.loads(index_path.read_text())
@@ -137,12 +137,17 @@ def main():
                       (root, root / 'validation_inputs/category_under_pair_geometry_v1/validation_jobs.json', 'category_under_pair_geometry_v1'),
                       (root, root / 'validation_inputs/held_touching_consumers_v1/validation_jobs.json', 'held_touching_consumers_v1'),
                       (root, root / 'validation_inputs/held_axial05_consumer_v1/validation_jobs.json', 'held_axial05_consumer_v1'),
-                      (root, root / 'validation_inputs/held_attachment_consumers_v1/validation_jobs.json', 'held_attachment_consumers_v1')]
+                      (root, root / 'validation_inputs/held_attachment_consumers_v1/validation_jobs.json', 'held_attachment_consumers_v1'),
+                      (root, root / 'validation_inputs/held_ontop04_replacement_geometry_v1/validation_jobs.json', 'held_ontop04_replacement_geometry_v1'),
+                      (root, root / 'validation_inputs/held_under_replacements_geometry_v1/validation_jobs.json', 'held_under_replacements_geometry_v1'),
+                      (root, root / 'validation_inputs/held_axial05_consumer_v2/validation_jobs.json', 'held_axial05_consumer_v2'),
+                      (root, root / 'validation_inputs/held_axial05_consumer_v3/validation_jobs.json', 'held_axial05_consumer_v3')]
     if a.secondary_root:
         secondary = a.secondary_root.resolve()
         assert secondary.name == 'campaign_20261110', 'unexpected secondary campaign source'
         native_batches += [(secondary, secondary / 'heldout_model_wall_bootstrap_v1/validation_jobs.json', 'held_model_wall_bootstrap_v1'),
                            (secondary, secondary / 'pair_bootstrap_inputs_v1/validation_jobs.json', 'held_pairs_native_bootstrap_v1')]
+    native_observations = []
     for source_root, jobs_path, tag in native_batches:
         if not jobs_path.is_file():
             continue
@@ -151,20 +156,24 @@ def main():
             summary_path = directory / 'summary.json'
             if not summary_path.is_file():
                 continue
-            summary = json.loads(summary_path.read_text())
-            if not summary.get('finished'):
-                continue
-            assert summary['args']['variant'] == job['alias'] and summary['args']['scene'] == job['scene'], 'native status identity mismatch'
-            counts = {}
-            for templates in summary.get('problems', {}).values():
-                for record in templates.values():
-                    for reason, count in record.get('rejections', {}).items():
-                        counts[reason] = counts.get(reason, 0) + count
-            written = summary.get('n_written', 0)
-            reason = (f'Native bounded sampler wrote {written} fresh sample(s); exact binding, demo and replay remain separate gates.' if written else
-                      'Last completed bounded native attempt wrote no sample: ' + (', '.join(f'{key}={value}' for key, value in sorted(counts.items())) or 'no valid template choices; inspect native summary') + '. No thresholds changed.')
-            put(job['task'], job['class_id'], job['split'], 'fresh_native_sample_written' if written else 'blocked_native_geometry',
-                reason, [summary_path, jobs_path], 4)
+            native_observations.append((summary_path.stat().st_mtime_ns, str(summary_path), jobs_path, job))
+    # Newest completed native evidence wins across primary and secondary roots.
+    for _, summary_name, jobs_path, job in sorted(native_observations):
+        summary_path = Path(summary_name)
+        summary = json.loads(summary_path.read_text())
+        if not summary.get('finished'):
+            continue
+        assert summary['args']['variant'] == job['alias'] and summary['args']['scene'] == job['scene'], 'native status identity mismatch'
+        counts = {}
+        for templates in summary.get('problems', {}).values():
+            for record in templates.values():
+                for reason, count in record.get('rejections', {}).items():
+                    counts[reason] = counts.get(reason, 0) + count
+        written = summary.get('n_written', 0)
+        reason = (f'Native bounded sampler wrote {written} fresh sample(s); exact binding, demo and replay remain separate gates.' if written else
+                  'Last completed bounded native attempt wrote no sample: ' + (', '.join(f'{key}={value}' for key, value in sorted(counts.items())) or 'no valid template choices; inspect native summary') + '. No thresholds changed.')
+        put(job['task'], job['class_id'], job['split'], 'fresh_native_sample_written' if written else 'blocked_native_geometry',
+            reason, [summary_path, jobs_path], 4)
     bound_paths = [root / 'manifests/floating_consumer_contracts_r5.json']
     for pattern in ('held_model_wall_fresh_contracts_r*.json', 'held_pairs_fresh_contracts_r*.json',
                     'category_ontop_fresh_contract_r*.json', 'held_nextto03_fresh_contract_r*.json',

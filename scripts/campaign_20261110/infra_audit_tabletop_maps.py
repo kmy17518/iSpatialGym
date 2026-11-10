@@ -11,15 +11,18 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def audit(admission, layers, output):
+def audit(admission, layers, output, root='/vision/u/shiyuc/minyeong/campaign_20261110'):
     from ispatialgym.grasping import schema as S
     from ispatialgym.sampling import reach_maps as R
+    owned_root = Path(root).resolve()
+    assert owned_root.name == 'campaign_20261110', 'unexpected campaign source root'
     admission = Path(admission).resolve(); document = json.loads(admission.read_text())
+    assert admission.is_relative_to(owned_root) and Path(output).resolve().is_relative_to(owned_root)
     sources = {row['id']:row for row in document['admitted']}
     libraries = {}; files = {}; maps = []; coverage = {}
     def add(path, relative):
         path = Path(path).resolve()
-        assert path.is_relative_to(Path('/vision/u/shiyuc/minyeong/campaign_20261110'))
+        assert path.is_relative_to(owned_root)
         record = {'source':str(path), 'destination':relative, 'sha256':sha(path), 'bytes':path.stat().st_size}
         assert relative not in files or files[relative] == record
         files[relative] = record
@@ -71,4 +74,5 @@ def audit(admission, layers, output):
 if __name__ == '__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--admission',required=True)
     p.add_argument('--layer',action='append',required=True);p.add_argument('--output',required=True)
-    a=p.parse_args();audit(a.admission,a.layer,a.output)
+    p.add_argument('--root',default='/vision/u/shiyuc/minyeong/campaign_20261110')
+    a=p.parse_args();audit(a.admission,a.layer,a.output,a.root)
