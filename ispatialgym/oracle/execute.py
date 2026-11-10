@@ -4618,6 +4618,45 @@ class _NudgeBraceHold:
         return False
 
 
+#: i7-measure 2026-11-10 (lead #90 / #90b, owner: fix the pause once its cause is confirmed): a plain push base nudge (no brace arm held) gets
+#: the stall exit the brace hold (:class:`_NudgeBraceHold`) has - the base still more than ``tol`` short of the nudge's ``move`` and advanced
+#: less than ``push_nudge_stall_m`` over ``push_nudge_stall_steps`` steps -> the base stops there and the push keeps what the nudge
+#: achieved. Cause (demo.hdf5 of ms_ul02_on3 360001 / on4 360000, fpr2_base 370003, ul02_lb_sd0 360001 - every pause after a nudge): the
+#: tracker's command decays to a constant ~0.006 m/s while the base stands still (0.000 mm per step, with or without the object in
+#: contact), short of the tolerance, until the QA pause (no joint, base joints included, faster than 0.001 for 50 steps) fails the demo.
+#: Default "0" = the nudge as before; kit-like record ``ctx["push_nudge_stall"]``.
+PUSH_NUDGE_STALL_STOP_ENV = "ISPATIALGYM_PUSH_NUDGE_STALL_STOP"
+PUSH_NUDGE_STALL_STOP_DEFAULT = "0"
+
+
+def push_nudge_stall_stop_on() -> bool:
+    return (os.environ.get(PUSH_NUDGE_STALL_STOP_ENV) or PUSH_NUDGE_STALL_STOP_DEFAULT).strip().lower() in ("1", "on", "true", "yes")
+
+
+class _NudgeStall:
+    """:data:`PUSH_NUDGE_STALL_STOP_ENV`: ``Motions.track_path``'s ``on_step`` for a plain push nudge - True (stop the base) once the base,
+    still more than ``tol`` short of ``move``, advanced less than ``cfg.push_nudge_stall_m`` over the last ``cfg.push_nudge_stall_steps``
+    steps (:class:`_NudgeBraceHold`'s stall rule). ``record``: steps, the base's travel, why it stopped."""
+
+    def __init__(self, motions: Motions, direction, cfg: ExecuteConfig, move: float, tol: float):
+        self.m, self.cfg, self.move, self.tol = motions, cfg, float(move), float(tol)
+        d = C.as_tensor(direction).reshape(-1)[:3].float()
+        self.d = d[:2] / max(float(th.linalg.norm(d[:2])), 1e-9)
+        self.along: List[float] = [float(C.as_tensor(motions.base_pose2d()[:2]).float() @ self.d)]
+        self.record: Dict[str, Any] = {"kind": "stall_stop", "steps": 0, "stop": None, "move_m": round(self.move, 4), "tol_m": round(self.tol, 4)}
+
+    def __call__(self) -> bool:
+        self.record["steps"] += 1
+        self.along.append(float(C.as_tensor(self.m.base_pose2d()[:2]).float() @ self.d))
+        self.record["base_moved_m"] = round(self.along[-1] - self.along[0], 4)
+        n = int(self.cfg.push_nudge_stall_steps)
+        short = self.move - (self.along[-1] - self.along[0]) > self.tol
+        if short and len(self.along) > n and self.along[-1] - self.along[-1 - n] < float(self.cfg.push_nudge_stall_m):
+            self.record["stop"] = "stalled"
+            return True
+        return False
+
+
 def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: float, cfg: ExecuteConfig, label: str,
                 speed: Optional[float] = None, hold_arms: Sequence[str] = (), stop_when: Optional[Callable[[], bool]] = None) -> Generator[th.Tensor, None, Optional[Dict[str, Any]]]:
     """Drive the base ``left`` (+ overshoot) along the push ``direction`` with the arm locked at its joints (the door
@@ -4634,6 +4673,8 @@ def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: fl
     x, y, yaw = state.base_pose2d()
     goal2d = [x + float(d[0]) * move, y + float(d[1]) * move, yaw]
     hold = _NudgeBraceHold(motions, hold_arms, d, cfg, stop_when=stop_when, move=move, tol=tol) if hold_arms else None
+    if hold is None and push_nudge_stall_stop_on():
+        hold = _NudgeStall(motions, d, cfg, move, tol)
     log.info("%s(%s): %.1f mm still missing with the arm at its reach boundary -> nudging the base %.1f mm along the push direction (tol %.0f mm), arm locked%s",
              label, obj, float(left) * 1000, move * 1000, tol * 1000, f"; the {'/'.join(hold_arms)} brace held in the world" if hold is not None else "")
     q = motions.robot.get_joint_positions()
@@ -4648,6 +4689,12 @@ def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: fl
             hold.record["stop"] = "tracker_timeout"
     if hold is None:
         return None
+    if isinstance(hold, _NudgeStall):
+        rec = dict(hold.record, label=label, stop=hold.record["stop"] or "nudge_goal")
+        if rec["stop"] == "stalled":
+            log.info("%s(%s): PUSH_NUDGE_STALL_STOP: the base stalled after %.1f mm of the %.1f mm nudge (tol %.0f mm, %d steps) -> stopped, keeping what it achieved",
+                     label, obj, 1000 * float(rec.get("base_moved_m") or 0.0), 1000 * move, 1000 * tol, rec["steps"])
+        return rec
     rec = dict(hold.record, label=label, stop=hold.record["stop"] or "nudge_goal")
     rec["arms"] = {a: {k: (round(v_, 4) if isinstance(v_, float) else v_) for k, v_ in r.items()} for a, r in rec["arms"].items()}
     log.info("%s(%s): the brace held through the nudge (%s): base %.1f mm, hand drift %s, IK misses %s", label, obj, rec["stop"], 1000 * float(rec.get("base_moved_m") or 0.0),
@@ -5655,7 +5702,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             hold_rec = yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push", speed=ctx.get("push_speed_m_s"),
                                               hold_arms=nudge_hold_arms, stop_when=_object_at_goal if nudge_hold_arms else None)
             if hold_rec is not None:
-                ctx.setdefault("push_nudge_brace_hold", []).append(hold_rec)
+                ctx.setdefault("push_nudge_stall" if hold_rec.get("kind") == "stall_stop" else "push_nudge_brace_hold", []).append(hold_rec)
             yield from _hold_until_still(motions, state, obj, cfg)
             end_pose = as_world_pose(state.eef_pose(arm))
             after_nudge, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
@@ -5695,7 +5742,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         hold_rec = yield from _base_nudge(motions, state, arm, obj, targets["direction"], final, cfg, f"re-nudge {rounds}", speed=ctx.get("push_speed_m_s"),
                                           hold_arms=nudge_hold_arms, stop_when=_object_at_goal if nudge_hold_arms else None)
         if hold_rec is not None:
-            ctx.setdefault("push_nudge_brace_hold", []).append(hold_rec)
+            ctx.setdefault("push_nudge_stall" if hold_rec.get("kind") == "stall_stop" else "push_nudge_brace_hold", []).append(hold_rec)
         yield from _hold_until_still(motions, state, obj, cfg)
         end_pose = as_world_pose(state.eef_pose(arm))
         back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
