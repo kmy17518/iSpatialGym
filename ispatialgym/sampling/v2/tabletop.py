@@ -5912,13 +5912,22 @@ def _polygons_overlap(a: th.Tensor, b: th.Tensor, margin: float = 0.0) -> bool:
 
 def place_distractors(s, rng, raster, z: float, target_pose: Pose, target_hull: th.Tensor, items: Sequence[Tuple[str, th.Tensor, Any]], *,
                       margin: float = TRAY_MARGIN, gap: float = 0.01, cam: Optional[Pose] = None, in_frame_margin: float = IN_FRAME_MARGIN,
-                      n_tries: int = 80, budget: Optional[float] = None) -> Dict[str, Pose]:
+                      n_tries: int = 80, budget: Optional[float] = None, max_backtracks: int = 0,
+                      search_seconds: Optional[float] = None) -> Dict[str, Pose]:
     """§4.6 step 3 / §6.4: each ``(name, hull, rest_quat)`` item on the ``raster`` (``cells()`` world xy, ``polygon_supported
     (fp, margin)``, ``area()``) at a random cell and yaw, footprint supported (``margin``) and >= ``gap`` from every placed
     footprint, the target's included. With ``budget`` the footprints (each model's bbox at its rest orientation) may cover at most
     that fraction of the raster area (``tray_budget``). Owner 2026-10-12 (A2b): no spacing from the target along the grasp's pinch
     axis and no pad-clearance growth of the budgeted footprints - the grasp may touch the distractors (``grasps[].may_touch``).
-    ``Reject("distractor_placement")``."""
+    ``Reject("distractor_placement")``. With ``max_backtracks > 0``, place the largest rest footprints first and revisit
+    earlier random positions if a later item cannot fit. This changes proposal search only: support, gap, visibility and
+    area tests are identical. Backtrack count and optional wall time bound the search; the legacy greedy path is the default."""
+    if max_backtracks < 0 or search_seconds is not None and search_seconds <= 0:
+        raise ValueError("distractor search bounds must be positive (or zero backtracks)")
+    if max_backtracks:
+        return _place_distractors_backtracking(s, rng, raster, z, target_pose, target_hull, items,
+            margin=margin, gap=gap, cam=cam, in_frame_margin=in_frame_margin, n_tries=n_tries,
+            budget=budget, max_backtracks=max_backtracks, search_seconds=search_seconds)
     placed: Dict[str, Pose] = {}
     fps: Dict[str, th.Tensor] = {"__target__": s.world.footprint(target_hull, target_pose)}
     cells = raster.cells()
@@ -5950,6 +5959,67 @@ def place_distractors(s, rng, raster, z: float, target_pose: Pose, target_hull: 
             used_area += float(ext[0]) * float(ext[1])
             if used_area > float(budget) * float(raster.area()):
                 _reject("distractor_placement", f"distractor footprints cover {used_area / max(raster.area(), 1e-9):.2f} > {budget} of the floor")
+    return placed
+
+
+def _place_distractors_backtracking(s, rng, raster, z, target_pose, target_hull, items, *, margin, gap, cam,
+                                   in_frame_margin, n_tries, budget, max_backtracks, search_seconds):
+    cells = raster.cells()
+    if not len(cells):
+        _reject("distractor_placement", "raster has no cells")
+    sized = [(name, hull, rest, hull_extents(hull, rest)) for name, hull, rest in items]
+    sized.sort(key=lambda item: float(item[3][0] * item[3][1]), reverse=True)
+    if budget is not None and hasattr(raster, "area"):
+        area = sum(float(ext[0]) * float(ext[1]) for _, _, _, ext in sized)
+        if area > float(budget) * float(raster.area()):
+            _reject("distractor_placement", f"distractor footprints cover {area / max(raster.area(), 1e-9):.2f} > {budget} of the floor")
+    deadline = time.monotonic() + search_seconds if search_seconds is not None else None
+    target_fp = s.world.footprint(target_hull, target_pose)
+    placed, footprints, choices = {}, {}, {}
+    depth, backtracks = 0, 0
+
+    def candidates(hull, rest):
+        for cell_index in rng.permutation(len(cells))[:int(n_tries)]:
+            if deadline is not None and time.monotonic() >= deadline:
+                _count(s, "distractor_search.time_limit")
+                _reject("distractor_placement", f"packing search reached {search_seconds:g}s with {len(placed)}/{len(sized)} items")
+            _count(s, "distractor_search.proposals")
+            pose = object_pose_on(s, hull, rest, cells[int(cell_index)], float(rng.uniform(-math.pi, math.pi)), z)
+            fp = s.world.footprint(hull, pose)
+            if not raster.polygon_supported(fp, margin=margin):
+                continue
+            if _polygons_overlap(fp, target_fp, gap):
+                continue
+            if cam is not None and not in_frame(s, cam, hull_corners_world(hull, pose), in_frame_margin):
+                continue
+            yield pose, fp
+
+    while depth < len(sized):
+        name, hull, rest, _ = sized[depth]
+        if depth not in choices:
+            choices[depth] = candidates(hull, rest)
+        found = False
+        for pose, fp in choices[depth]:
+            if any(_polygons_overlap(fp, other, gap) for other in footprints.values()):
+                continue
+            placed[name], footprints[name] = pose, fp
+            depth += 1
+            found = True
+            break
+        if found:
+            continue
+        choices.pop(depth)
+        if depth == 0 or backtracks >= max_backtracks:
+            _count(s, "distractor_search.exhausted")
+            _reject("distractor_placement", f"no free position for {name} (gap {gap}; {backtracks} backtracks)")
+        depth -= 1
+        previous = sized[depth][0]
+        placed.pop(previous); footprints.pop(previous)
+        backtracks += 1
+        _count(s, "distractor_search.backtracks")
+    _count(s, "distractor_search.passed")
+    if backtracks:
+        _count(s, "distractor_search.recovered_after_backtrack")
     return placed
 
 

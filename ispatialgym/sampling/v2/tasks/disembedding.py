@@ -1452,7 +1452,9 @@ class Disembedding(SamplerV2):
             # grasp may touch them, the demo checks they are still on the source tray
             items = [(n, self.hull[n], self.rest[n]) for n in dnames]
             dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, margin=float(self.g("tray_footprint_margin_m")), gap=0.01,
-                                              cam=cam_init, budget=self._tray_budget(), n_tries=int(self.g("distractor_place_tries") or 80))
+                                              cam=cam_init, budget=self._tray_budget(), n_tries=int(self.g("distractor_place_tries") or 80),
+                                              max_backtracks=24 if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG") else 0,
+                                              search_seconds=15 if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG") else None)
         objects = {tname: t_pose, sname: s_pose, dname: d_pose, **dist_poses}
         if campaign_plan is not None:
             self._campaign_latest_proposal = {"start_poses": objects, "goal_poses": {tname: campaign_plan.goal},

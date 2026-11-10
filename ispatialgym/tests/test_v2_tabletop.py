@@ -883,7 +883,8 @@ def test_destination_fit_decides_the_source_tray_position():
     assert s._destination_fit(init, [toward, deep]) == [toward] and len(s.template_facts["destination_fit"]) == 3
 
 
-def test_place_distractors_keeps_the_gap_floor_and_budget_without_pinch_spacing():
+@pytest.mark.parametrize("backtracks", [0, 4])
+def test_place_distractors_keeps_the_gap_floor_and_budget_without_pinch_spacing(backtracks):
     """Owner 2026-10-12 (A2b addition): the distractors keep their footprints >= 1 cm apart (the target's included), on the source
     floor (its margin) and within ``tray_budget`` of the floor - their own footprints, not grown by the pad clearance - but no spacing
     from the target along the grasp's pinch axis: disembedding#04 lost 280 candidates to it."""
@@ -917,21 +918,68 @@ def test_place_distractors_keeps_the_gap_floor_and_budget_without_pinch_spacing(
     near = Floor(th.tensor([[0.075, 0.0]]))
     rng = np.random.default_rng(0)
     for _ in range(50):
-        poses = TT.place_distractors(s, rng, near, 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], margin=0.01, gap=0.01, n_tries=1)
+        poses = TT.place_distractors(s, rng, near, 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], margin=0.01, gap=0.01, n_tries=1, max_backtracks=backtracks)
         gap = TT.polygon_gap(footprint(target, t_pose), footprint(box, poses["box"]))
         assert gap >= 0.01 - 1e-6
     # closer than the 1 cm gap, or off the floor: no position
     with pytest.raises(Reject) as err:
-        TT.place_distractors(s, rng, Floor(th.tensor([[0.045, 0.0]])), 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], gap=0.01, n_tries=1)
+        TT.place_distractors(s, rng, Floor(th.tensor([[0.045, 0.0]])), 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], gap=0.01, n_tries=1, max_backtracks=backtracks)
     assert err.value.reason == "distractor_placement" and "spacing" not in str(err.value)
     with pytest.raises(Reject):
-        TT.place_distractors(s, rng, Floor(th.tensor([[0.14, 0.0]])), 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], margin=0.01, n_tries=1)
+        TT.place_distractors(s, rng, Floor(th.tensor([[0.14, 0.0]])), 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], margin=0.01, n_tries=1, max_backtracks=backtracks)
     # the budget counts the bbox at the rest orientation as it is: 0.0016 m2 of a 0.06 m2 floor fits 3 %, not 2 %
     far = Floor(th.tensor([[-0.10, 0.0]]))
-    TT.place_distractors(s, rng, far, 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], budget=0.03, n_tries=1)
+    TT.place_distractors(s, rng, far, 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], budget=0.03, n_tries=1, max_backtracks=backtracks)
     with pytest.raises(Reject) as err:
-        TT.place_distractors(s, rng, far, 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], budget=0.02, n_tries=1)
+        TT.place_distractors(s, rng, far, 0.8, t_pose, target, [("box", box, C.IDENTITY_QUAT.clone())], budget=0.02, n_tries=1, max_backtracks=backtracks)
     assert "cover 0.03 > 0.02" in str(err.value)
+
+
+def test_distractor_search_recovers_a_greedy_dead_end_and_remains_bounded(monkeypatch):
+    from types import SimpleNamespace
+    from ispatialgym.sampling.sim_utils import Reject
+
+    class Floor:
+        def cells(self):
+            return th.tensor([[-0.10, 0.0], [0.0, 0.0], [0.10, 0.0]])
+
+        def area(self):
+            return 0.21
+
+        def polygon_supported(self, fp, margin=0.0):
+            return bool((fp[:, 0].abs() <= 0.35-margin).all() and (fp[:, 1].abs() <= 0.15-margin).all())
+
+    class Draws:
+        def permutation(self, _):
+            return [1, 0, 2]  # Centre first traps the second box; left and right fit.
+
+        def uniform(self, *_):
+            return 0.0
+
+    def footprint(hull, pose):
+        return C.transform_points((TT._t(pose[0]), TT._t(pose[1])), hull)[:, :2][[0, 2, 6, 4]]
+
+    s = SimpleNamespace(world=SimpleNamespace(footprint=footprint, bottom_offset=lambda hull, q: 0.0))
+    target, box = _box(0.05, 0.05, 0.05), _box(0.12, 0.12, 0.05)
+    target_pose = (th.tensor([-0.28, 0.0, 0.8]), C.IDENTITY_QUAT.clone())
+    items = [(name, box, C.IDENTITY_QUAT.clone()) for name in ("a", "b")]
+    args = (s, Draws(), Floor(), 0.8, target_pose, target, items)
+    with pytest.raises(Reject):
+        TT.place_distractors(*args, n_tries=3)
+    poses = TT.place_distractors(*args, n_tries=3, max_backtracks=1, budget=0.14)
+    assert set(poses) == {"a", "b"}
+    fps = [footprint(target, target_pose)] + [footprint(box, p) for p in poses.values()]
+    assert all(TT.polygon_gap(a, b) >= 0.01 for i, a in enumerate(fps) for b in fps[i+1:])
+    assert all(Floor().polygon_supported(fp, margin=0.01) for fp in fps[1:])
+    with pytest.raises(Reject, match="cover"):
+        TT.place_distractors(*args, n_tries=3, max_backtracks=1, budget=0.10)
+    monkeypatch.setattr(TT, "in_frame", lambda *_: False)
+    with pytest.raises(Reject):
+        TT.place_distractors(*args, n_tries=3, max_backtracks=1, cam=target_pose)
+    ticks = iter([0.0, 2.0])
+    monkeypatch.setattr(TT.time, "monotonic", lambda: next(ticks))
+    with pytest.raises(Reject, match="search reached"):
+        TT.place_distractors(*args, n_tries=3, max_backtracks=1, search_seconds=1)
 
 
 # ----------------------------------------------------------------------------------------------------------------
