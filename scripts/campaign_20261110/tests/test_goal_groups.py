@@ -171,6 +171,10 @@ def test_runtime_bddl_binding_normalizes_legacy_spelling_and_measure_but_not_goa
     assert changed.fingerprint != template.fingerprint
     assert changed.scene_setup["runtime_bddl_sha256"] == c.file_digest(runtime / "problem.bddl")
     assert changed.scene_setup["source_bddl_sha256"] == c.file_digest(source / "problem.bddl")
+    import shutil
+    copied = tmp_path / "fresh_runtime"
+    shutil.copytree(runtime, copied)
+    assert g.bind_runtime_definition(changed, copied).fingerprint == changed.fingerprint
     # Same union of goal/measure atoms is insufficient: removing the gating atom is forbidden.
     (runtime / "problem.bddl").write_text(new.replace("(pose_reached ?apple.n.01_1)", "", 1))
     meta = g.read_json(runtime / "template_meta.json")
@@ -179,6 +183,8 @@ def test_runtime_bddl_binding_normalizes_legacy_spelling_and_measure_but_not_goa
     import pytest
     with pytest.raises(c.ContractError, match="semantics differ"):
         g.bind_runtime_definition(template, runtime)
+    with pytest.raises(c.ContractError, match="previously pinned"):
+        g.bind_runtime_definition(changed, copied)
 
 
 def test_joint_author_uses_actual_root_target_and_all_joint_names(tmp_path):

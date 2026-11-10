@@ -196,6 +196,17 @@ def bind_runtime_definition(template: Template, runtime_template_dir, *, runtime
              "semantic_sha256": digest(snapshots[0]["semantics"]),
              "runtime_semantic_sha256": digest(snapshots[1]["semantics"]), "semantic_equivalence": equivalent, "migration": migration,
              "comparison": "parsed activity/domain/variant/objects/groups/init/goal/measure; goal and measure remain separate"}
+    prior = template.scene_setup.get("runtime_bddl_equivalence")
+    if isinstance(prior, dict) and isinstance(prior.get("runtime"), dict):
+        # An exact copy in a new fresh job must not invent a new physical key.
+        # Both new files were hashed and parsed above; the original proof stays
+        # authoritative only while its referenced runtime bytes still match.
+        same_location = {**proof, "runtime": {**proof["runtime"], "path": prior["runtime"].get("path")}}
+        if same_location == prior and template.scene_setup.get("runtime_bddl_sha256") == snapshots[1]["sha256"]:
+            old_runtime = Path(prior["runtime"]["path"])
+            require(old_runtime.is_file() and file_digest(old_runtime) == snapshots[1]["sha256"],
+                    "previously pinned runtime BDDL bytes changed")
+            return template
     return replace(template, scene_setup={**template.scene_setup,
         "runtime_bddl_sha256": snapshots[1]["sha256"], "runtime_bddl_equivalence": proof})
 
