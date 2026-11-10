@@ -1103,9 +1103,9 @@ CARRY_FLOOR_CLEARANCE_M_ENV = "ISPATIALGYM_CARRY_FLOOR_CLEARANCE_M"
 CARRY_FLOOR_SWEEP_SAMPLES = 21
 
 
-def _mode_env(name: str) -> str:
-    """"off" | "shadow" | "on" of a three-way switch (unset / "0" = off)."""
-    v = (os.environ.get(name, "") or "0").strip().lower()
+def _mode_env(name: str, default: str = "0") -> str:
+    """"off" | "shadow" | "on" of a three-way switch (unset = ``default``; "0" = off)."""
+    v = (os.environ.get(name, "") or default).strip().lower()
     if v == "shadow":
         return "shadow"
     return "on" if v in ("1", "on", "true", "yes") else "off"
@@ -1136,7 +1136,9 @@ LARGE_EARLY_FRAME_ENV = "ISPATIALGYM_LARGE_EARLY_FRAME"
 
 
 def large_early_frame_mode() -> str:
-    return _mode_env(LARGE_EARLY_FRAME_ENV)
+    # DEFAULT ON (owner #36 via the lead, i7-ul03 A/B 1: early = late verdict in every compared case, under_large_03 ef_on 13 / 4 / 2 at
+    # 0.864 GPU-h per ok vs off 40 / 3 / 2 at 2.199); "0" = off, "shadow" = judge and compare only
+    return _mode_env(LARGE_EARLY_FRAME_ENV, "1")
 
 
 def carry_centred_on(gp: Any = None) -> bool:
