@@ -249,7 +249,7 @@ def scene_crop_request(problem: GroundedProblem, scene: str) -> Tuple[str, Dict[
 
 
 def scene_crop_plan(scene: str, rooms: List[str], scene_json: dict, scene_path: str, mode: str, bindings: Dict[str, Any], radius: float,
-                    out_dir: str):
+                    out_dir: str, extra_keep=()):
     """The ``scene_crop.CropPlan`` of a world about to load ``scene_json`` (the variant / stable json at ``scene_path``) for the task
     ``rooms``; a cropped plan's scene file is written under ``out_dir`` (``<scene>__crop_<hash>.json``). Today's room list (rooms +
     adjacent with ``ISG_LOAD_ADJACENT``, as ``SimWorld``) gives the ``dropped`` list."""
@@ -260,7 +260,7 @@ def scene_crop_plan(scene: str, rooms: List[str], scene_json: dict, scene_path: 
     today = None
     if rooms:
         today = list(rooms) + ([r for r in adjacent_rooms(scene, rooms) if r not in rooms] if load_adjacent else [])
-    plan = SCROP.compute_crop(scene_json, mode, rooms, today, bindings=bindings, radius=radius)
+    plan = SCROP.compute_crop(scene_json, mode, rooms, today, bindings=bindings, radius=radius, extra_keep=extra_keep)
     if plan.cropped:
         SCROP.write_cropped_scene(scene_json, plan, out_dir, scene, scene_path)
     return plan
@@ -330,7 +330,10 @@ class WorldPool:
                              "moved_objects": vjson["metadata"]["ispatialgym"].get("moved_objects")}
             log.info("scene variant for %s: %d objects moved out of the scene (%s)", scene, len(removed), removed)
         plan = scene_crop_plan(scene, rooms, vjson if removed else stable, scene_variant["path"] if scene_variant else stable_scene_path(scene), crop_mode, crop_bindings,
-                               crop_radius, os.path.join(self.out_root, "scene_variants"))
+                               crop_radius, os.path.join(self.out_root, "scene_variants"),
+                               # The campaign verifies physical parking at sampling and replay. The normal
+                               # crop drops far-away objects, including these deliberately parked objects.
+                               extra_keep=removed if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG") else ())
         crop = None
         if plan.cropped:
             crop = {"path": plan.path, "loaded_rooms": list(plan.loaded_rooms or []), "meta": plan.meta(), "log": plan.describe(),

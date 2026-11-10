@@ -111,6 +111,22 @@ def test_region_restricts_to_the_support_radius():
     assert set(p.dropped) == TODAY_SET - kept
 
 
+@pytest.mark.parametrize("mode", ["rooms", "region"])
+def test_requested_parked_objects_survive_crop_and_keep_their_restore_state(mode):
+    sc = scene()
+    sc["objects_info"]["init_info"]["moved_chair"]["args"]["fixed_base"] = True
+    sc["metadata"]["ispatialgym"]["moved_objects"] = {
+        "moved_chair": {"pos": [1, 1, 0], "moved_to": [-100, -100, -99.55], "fixed_base": False}
+    }
+    assert "moved_chair" not in crop(mode, sc=sc).kept
+    plan = crop(mode, sc=sc, extra_keep=["moved_chair"])
+    loaded = SC.cropped_scene(sc, plan)
+    assert SC.loaded_by_rule(loaded["objects_info"]["init_info"]["moved_chair"]["args"], plan.loaded_rooms, ALWAYS)
+    assert loaded["objects_info"]["init_info"]["moved_chair"]["args"]["fixed_base"]
+    assert loaded["state"]["registry"]["object_registry"]["moved_chair"] == sc["state"]["registry"]["object_registry"]["moved_chair"]
+    assert loaded["metadata"]["ispatialgym"]["moved_objects"] == sc["metadata"]["ispatialgym"]["moved_objects"]
+
+
 def test_region_grows_an_open_articulated_object():
     assert "fridge" not in crop("region").kept
     assert "fridge" in crop("region", sc=scene(fridge_joint=0.5)).kept  # an open door may swing into the region
