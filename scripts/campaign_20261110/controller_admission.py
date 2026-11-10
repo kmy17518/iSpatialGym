@@ -325,6 +325,28 @@ def recent_gates(root):
     return [path for _, path in sorted(rows, reverse=True)]
 
 
+def source_in_scope(gate, root, cfg):
+    """Cheap negative filter only; every eligible source still gets the full audit."""
+    try:
+        path = Path(gate['instance']).resolve()
+        if not path.is_relative_to(root / 'out'):
+            return True  # Let the authoritative audit explain invalid paths.
+        block = read(path)['ispatialgym'].get('campaign')
+        if block is None:
+            return False
+        split = cfg.get('admission_split', 'train')
+        allowed = (split,) if split in ('eval_model', 'eval_category') else ('train', 'eval_standard')
+        if block.get('split') not in allowed:
+            return False
+        if cfg.get('admitted_classes') is not None and block.get('class_id') not in cfg['admitted_classes']:
+            return False
+        if cfg.get('admitted_tasks') is not None and block.get('task') not in cfg['admitted_tasks']:
+            return False
+        return True
+    except (KeyError, TypeError, OSError, ValueError):
+        return True  # Malformed or unavailable evidence must still fail the full audit.
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--config", required=True); p.add_argument("--state", required=True); p.add_argument("--once", action="store_true")
@@ -374,6 +396,8 @@ def main():
                 if state["checked_gates"].get(str(gate), {}).get("sha256") == sha:
                     continue
                 if gate_data.get("success") is not True:
+                    continue
+                if not source_in_scope(gate_data, root, cfg):
                     continue
                 examined += 1
                 try:

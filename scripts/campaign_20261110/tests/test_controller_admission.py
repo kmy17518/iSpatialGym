@@ -153,6 +153,17 @@ def test_category_admission_requires_its_own_proof_and_one_template_per_task(tmp
     assert groups.next_work(template, counts) is None
 
 
+def test_scope_filter_skips_unowned_history_without_replacing_full_proof(tmp_path, monkeypatch):
+    f, template, _ = anchor_fixture(tmp_path, monkeypatch, split='eval_model')
+    gate = json.loads(f.gate.read_text())
+    cfg = {'admission_split': 'eval_model', 'admitted_classes': [template.class_id]}
+    assert admission.source_in_scope(gate, tmp_path, cfg)
+    assert not admission.source_in_scope(gate, tmp_path, {**cfg, 'admission_split': 'train'})
+    assert not admission.source_in_scope(gate, tmp_path, {**cfg, 'admitted_classes': ['different']})
+    assert admission.source_in_scope({**gate, 'instance': '/outside/missing'}, tmp_path, cfg)
+    assert admission.source_in_scope({}, tmp_path, cfg)
+
+
 def test_author_upgrade_reopens_only_the_fixed_gap_and_retains_previous_evidence():
     previous = {"sha256": "a"*64, "reason": next(iter(admission.FIXED_AUTHOR_GAPS)), "observed_at": 123}
     state = {"checked_gates": {"tray": dict(previous), "other": {"sha256": "b"*64, "reason": "replay QA missing"}}}
