@@ -164,7 +164,8 @@ def main():
     from ispatialgym.sampling.bddl_from_iddl import RoleGrounding, render
     from ispatialgym.sampling.iddl import parse_file
     from ispatialgym.sampling.knowledge import synset_of_category
-    from ispatialgym.sampling.v2.problem import GroundedProblem
+    from ispatialgym.sampling.v2.problem import GroundedProblem, iter_template_choices
+    import numpy as np
     iddl = parse_file(str(ROOT / 'ispatialgym/assets/iddl' / original['iddl']))
     by_instance = {o.instance: o for o in template.objects}
     fixed_roles = {b['role']: by_instance[b['name']] for b in source_meta['bindings'] if b['name'] in by_instance and by_instance[b['name']].role == 'support'}
@@ -181,7 +182,8 @@ def main():
                 entry['roles'][name].update(representative=obj.model, scale={obj.model_key: list(obj.default_scale)})
         entry['roles']['distractors']['scale'] = {obj.model_key: list(obj.default_scale) for obj, _ in active}
         members = {obj.category: count for obj, count in active}
-        entry['generation']['groups']['distractors'] = {'size': variant['n_distractors'], 'draw': 'unique', 'members': members}
+        require(len(members) == len(active), 'one exact model per distractor category is required')
+        entry['generation']['groups']['distractors'] = {'size': variant['n_distractors'], 'draw': 'same_model', 'members': members}
         entry['generation']['distractor_budget'] = {'budget_fraction': budget, 'n_distractors': variant['n_distractors'],
             'source': 'native hull/rest/floor measurements; physical packing remains required', 'native_coverage_profile_sha256': sha(a.coverage_profile)}
         entry['generation'].update(templates_max=1, instances_per_template=1)
@@ -237,6 +239,10 @@ def main():
         templates.append({**asdict(physical), 'fingerprint': physical.fingerprint})
         gp = GroundedProblem.load(native_alias, str(customs), str(directory / 'bddl'))
         require(gp.rooms(template.scene) == list(pool.task_rooms), 'count variant native room mismatch')
+        choices = list(iter_template_choices(gp, template.scene, np.random.default_rng(20261110), max_templates=1))
+        require(len(choices) == 1, 'native count variant enumerates no template')
+        actual_members = [(x.category, x.model) for x in choices[0].groups['distractors']]
+        require(actual_members == [(obj.category, obj.model) for obj, count in active for _ in range(count)], 'native count/model enumeration differs')
         jobs.append(dict(candidate_id=physical.template_id, class_id=template.class_id, task=template.task, alias=native_alias,
             scene=template.scene, room=template.room, split=template.split, template_fingerprint=physical.fingerprint,
             count_variant=variant, production_released=False, source_manifest=str((a.out / 'validation_jobs.json').resolve()),

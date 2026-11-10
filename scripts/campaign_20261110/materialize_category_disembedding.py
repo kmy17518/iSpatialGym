@@ -25,7 +25,7 @@ from ispatialgym.grasping.schema import entry_id
 from ispatialgym.sampling.bddl_from_iddl import RoleGrounding, render
 from ispatialgym.sampling.iddl import parse_file
 from ispatialgym.sampling.knowledge import synset_of_category
-from ispatialgym.sampling.v2.problem import GroundedProblem
+from ispatialgym.sampling.v2.problem import GroundedProblem, iter_template_choices
 
 
 def sha(path):
@@ -84,7 +84,7 @@ def main():
     entry['roles']['support']['category'] = support['category']
     target = role_rows['target']; gkey = entry_id(target['category'], target['model'], target['default_scale'], 'tabletop')
     entry['roles']['target']['grasp_keys'] = {'rubber_eraser/cungod': gkey}
-    entry['generation']['groups']['distractors'] = {'size': 3, 'draw': 'unique', 'members': {'crayon': 3}}
+    entry['generation']['groups']['distractors'] = {'size': 3, 'draw': 'same_model', 'members': {'crayon': 3}}
     entry['generation']['distractor_budget'] = {'budget_fraction': .85, 'n_distractors': 3, 'source': 'initial exact native measurement candidate; coverage unmeasured'}
     for name in list(entry['generation']):
         if name.startswith('_') or name in ('remove_objects', 'fixed_layout'):
@@ -139,6 +139,10 @@ def main():
     check_reservations(template, policy, hashes)
     custom = a.out / 'candidate_customs.json'; custom.write_text(json.dumps({alias: entry}, indent=2) + '\n')
     native = GroundedProblem.load(alias, str(custom), str(a.out / 'bddl')); require(native.rooms(scene) == [room], 'native category room mismatch')
+    import numpy as np
+    choices = list(iter_template_choices(native, scene, np.random.default_rng(20261110), max_templates=1))
+    require(len(choices) == 1 and [(x.category, x.model) for x in choices[0].groups['distractors']] == [('crayon', 'coapeh')] * 3,
+        'native repeated-model category enumeration differs')
     job = dict(candidate_id=template.template_id, class_id=cls, task='disembedding', alias=alias, scene=scene, room=room, split='eval_category',
         template_fingerprint=template.fingerprint, source_manifest=str((a.out / 'validation_jobs.json').resolve()), required_new_grasp_key=gkey,
         environment={'ISPATIALGYM_STABLE_SCENE_DIR': str(scene_path.parent)}, production_released=False, required_tray_floor_height_key='native measurement pending',

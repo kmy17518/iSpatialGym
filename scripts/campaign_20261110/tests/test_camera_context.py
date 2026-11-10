@@ -142,3 +142,24 @@ def test_actual_runtime_replay_verifies_context_without_campaign_environment(tmp
     landmarks["chair"].model="unapproved"
     with pytest.raises(c.ContractError,match="missing at runtime"):
         runtime.verify_loaded(meta,physical,scene=scene)
+
+
+def test_separate_rerender_can_replace_bad_framing_only_for_exact_proven_scene(tmp_path):
+    template,args=fixture(tmp_path)
+    geometry_sha=c.file_digest(args['geometry_proof'])
+    image=tmp_path/'proofs/inside_room.png';image.write_bytes(b'exact-private-scene-new-camera')
+    images=[{'path':str(image),'sha256':c.file_digest(image)}]
+    rendered=tmp_path/'proofs/render_report.json'
+    report={'status':'exact_private_scene_rendered','context_probe_sha256':geometry_sha,
+        'native_scene_sha256':c.file_digest(args['scene_path']),'native_scene_path':str(args['scene_path']),'images':images}
+    c.write_json_atomic(rendered,report)
+    visual=context._read(args['visual_proof'])
+    visual.update(images=images,render_proof={'path':str(rendered),'sha256':c.file_digest(rendered)})
+    c.write_json_atomic(args['visual_proof'],visual)
+    bound=context.bind_camera_context(template,**args)
+    assert len(context.load_camera_context(bound,root=tmp_path))==3
+    assert c.file_digest(args['geometry_proof'])==geometry_sha
+    report['native_scene_sha256']=c.digest('changed-scene');c.write_json_atomic(rendered,report)
+    visual['render_proof']['sha256']=c.file_digest(rendered);c.write_json_atomic(args['visual_proof'],visual)
+    with pytest.raises(c.ContractError,match='another private scene'):
+        context.bind_camera_context(template,**args)

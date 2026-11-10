@@ -60,6 +60,16 @@ def load_camera_context(template, *, root=None):
     images = visual.get("images", [])
     require(isinstance(images,list) and bool(images), "camera context visual review has no images")
     measured_images = {(row["path"],row["sha256"]) for row in proof["images"]}
+    if visual.get('render_proof') is not None:
+        rendered=_read(_checked(visual['render_proof'],root))
+        require(rendered.get('status')=='exact_private_scene_rendered'
+                and rendered.get('context_probe_sha256')==file_digest(proof_path),
+                'camera context rerender lacks the original geometry proof')
+        require(rendered.get('native_scene_sha256')==context['scene']['sha256']
+                and Path(rendered.get('native_scene_path','')).resolve()==scene_path.resolve(),
+                'camera context rerender used another private scene')
+        require(isinstance(rendered.get('images'),list) and rendered['images'],'camera context rerender has no images')
+        measured_images={(row['path'],row['sha256']) for row in rendered['images']}
     for image in images:
         require((image["path"],image["sha256"]) in measured_images, "visual review uses an unrelated context image")
         _checked(image, root)

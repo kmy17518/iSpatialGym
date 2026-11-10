@@ -27,6 +27,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     for name in ('campaign-root', 'defaults', 'reservations', 'asset-hashes', 'source-scene', 'output'):
         p.add_argument('--' + name, type=Path, required=True)
+    p.add_argument('--model-keys', nargs='+', default=['armchair/pmrcex', 'footstool/sghekm'])
+    p.add_argument('--probe-joint-sweeps', action='store_true')
     a = p.parse_args()
     out = a.output.resolve()
     require(not out.exists() and out.is_relative_to(a.campaign_root.resolve()), 'new private output required')
@@ -35,7 +37,8 @@ def main():
     require(defaults['status'] == 'native_defaults_and_geometry_recorded', 'native default measurement incomplete')
     # Native measurements may precede a monotonic policy extension. Check every
     # selected model/hash against the current full policy, rather than relabeling it.
-    keys = ('armchair/pmrcex', 'footstool/sghekm')
+    keys = tuple(a.model_keys)
+    require(bool(keys) and len(keys) == len(set(keys)), 'context model keys must be nonempty and unique')
     rows = [next(r for r in defaults['objects'] if r['category'] + '/' + r['model'] == key) for key in keys]
     for key, row in zip(keys, rows):
         require(row['ready'] and key in policy['category_holdout_models'] and row['category'] in policy['category_holdout_categories'], 'context must be ready and category-reserved')
@@ -76,6 +79,31 @@ def main():
             return [other.name for other in world.scene.objects if other.name != obj.name and other.category != 'floors'
                     and max((overlap(x, y) for x in pieces for y in _collision_piece_aabbs(other)), default=-1.) > .002]
 
+        def joint_sweeps(obj, row):
+            if not a.probe_joint_sweeps:
+                return []
+            require(bool(row['joints']), 'articulated context requested without measured native joints')
+            records = []
+            for joint_name, evidence in row['joints'].items():
+                joint = next((j for name, j in obj.joints.items() if name == joint_name or name.endswith('joint_' + joint_name)), None)
+                require(joint is not None, 'measured native context joint absent')
+                original = joint.get_state()[0].clone()
+                try:
+                    for fraction in (0., .25, .5, .75, 1.):
+                        position = evidence['lower_limit'] + fraction * (evidence['upper_limit'] - evidence['lower_limit'])
+                        joint.set_pos(th.tensor([position]), drive=False)
+                        # set_pos synchronizes PhysX to Fabric. Inspect these
+                        # exact kinematic poses without stepping gravity/drives.
+                        actual = float(joint.get_state()[0][0])
+                        require(abs(actual - position) < 1e-5, 'joint sweep did not reach requested native pose')
+                        bad = blockers(obj)
+                        records.append(dict(joint=joint_name, fraction=fraction, position=actual, blockers=bad))
+                        if bad:
+                            return records
+                finally:
+                    joint.set_pos(original, drive=False)
+            return records
+
         for index, row in enumerate(rows):
             name = 'campaign_context_' + row['category'] + '_' + row['model'] + '_0'
             require(name not in source['objects_info']['init_info'], 'context name already exists')
@@ -105,7 +133,8 @@ def main():
                     continue
                 tested.append(xy)
                 obj.set_position_orientation(th.tensor([*xy, float(world.floor_z) - local_bottom + .001]), orientation)
-                if not blockers(obj):
+                sweep = joint_sweeps(obj, row) if not blockers(obj) else None
+                if sweep is not None and not any(record['blockers'] for record in sweep):
                     selected = xy
                     break
                 if len(tested) >= 200:
@@ -122,7 +151,7 @@ def main():
                 default_scale=row['default_scale'], readiness_source=row['readiness_source'], source_scene_sha256=source_hash,
                 room=room, blocked_footprints=blocked_footprints([(lo.tolist(), hi.tolist())]), production_released=False)
             metadata.append(meta); added.append(obj)
-            report['objects'].append({**meta, 'position': obj.get_position_orientation()[0].tolist(), 'orientation': obj.get_position_orientation()[1].tolist(), 'tested_placements': len(tested)})
+            report['objects'].append({**meta, 'position': obj.get_position_orientation()[0].tolist(), 'orientation': obj.get_position_orientation()[1].tolist(), 'tested_placements': len(tested), 'joint_sweeps': sweep})
         live = json.loads(json.dumps(world.scene.save(as_dict=True), cls=TorchEncoder))
         changed = copy.deepcopy(source)
         for obj in added:
@@ -138,6 +167,9 @@ def main():
             obj = world.obj(meta['name']); lo, hi = obj.aabb
             require(all(abs(float(x) - y) < 1e-6 for x, y in zip(obj.scale, meta['default_scale'])), 'context scale changed on reload')
             require(abs(float(lo[2]) - float(world.floor_z)) < .004 and not blockers(obj), 'reloaded context geometry failed')
+            if a.probe_joint_sweeps:
+                row = next(row for row in rows if row['category'] + '/' + row['model'] == meta['model_key'])
+                require(not any(record['blockers'] for record in joint_sweeps(obj, row)), 'reloaded joint sweep intersects scene')
         for name, value in source['objects_info']['init_info'].items():
             require(changed['objects_info']['init_info'][name] == value, 'existing object definition altered')
         for name, value in source['state']['registry']['object_registry'].items():
