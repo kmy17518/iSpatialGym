@@ -257,6 +257,10 @@ LYING_YAW_FINAL_MIN_DEG = 3.0
 #: is refused at C ('lying drop near the wrist singularity'): every lying demo's lower_drop failed on 0.20-0.29 rad joint jumps and on4 360001's
 #: up-retreat on a 0.31 rad one
 LYING_SCREEN_LOWER_M = 0.10
+#: lead #92d (owner, option (b)): the lowering check is OFF by default (``generation.push_under_lying_screen_lower`` true turns it on) - over the
+#: cancelled r2_ul02_lying jobs it removed every one of 270 drops that reached it (0 passed: a horizontal-hand drop never tracks a lowering) while
+#: every lying demo landed flat from 0.22-0.25 m without one; the up-retreat check (on4 360001's failure) stays
+LYING_SCREEN_LOWER_DEFAULT = False
 
 
 def briefcase_lying_on() -> bool:
@@ -1849,14 +1853,15 @@ class IORSLarge(SamplerV2):
         :meth:`IKChecker.track_chain` (the oracle's dense differential IK, joint step cap, half-spacing retry on a jump), the floor out of the
         world. None when both track, else why. Kit ``briefcase_lying.screen.pass`` / ``.lower`` / ``.retreat``."""
         p, q = G.t(place_eef[0]).float(), G.t(place_eef[1]).float()
-        down = (p - th.tensor([0.0, 0.0, float(self.num("push_under_lying_screen_lower_m", LYING_SCREEN_LOWER_M))]), q)
         up = (p + th.tensor([0.0, 0.0, float(self.num("push_under_lying_retreat_up_m", LYING_DROP_RETREAT_UP_M))]), q)
         floor = [self.obj("floor")]
-        with attached(self.kit, arm, target, eef_in_object=eef_in_object):
-            q_end, why = self.ikc.track_chain(q_drop, [(p, q), down], arm, ignore=floor, refine_jumps=True)
-        if q_end is None:
-            TT._count(self, "briefcase_lying.screen.lower")
-            return f"the {LYING_SCREEN_LOWER_M:.2f} m lowering: {why}"
+        if bool(self.gp.gen("push_under_lying_screen_lower", LYING_SCREEN_LOWER_DEFAULT)):
+            down = (p - th.tensor([0.0, 0.0, float(self.num("push_under_lying_screen_lower_m", LYING_SCREEN_LOWER_M))]), q)
+            with attached(self.kit, arm, target, eef_in_object=eef_in_object):
+                q_end, why = self.ikc.track_chain(q_drop, [(p, q), down], arm, ignore=floor, refine_jumps=True)
+            if q_end is None:
+                TT._count(self, "briefcase_lying.screen.lower")
+                return f"the {LYING_SCREEN_LOWER_M:.2f} m lowering: {why}"
         q_end, why = self.ikc.track_chain(q_drop, [(p, q), up], arm, ignore=floor, refine_jumps=True)
         if q_end is None:
             TT._count(self, "briefcase_lying.screen.retreat")
