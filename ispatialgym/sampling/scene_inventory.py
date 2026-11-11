@@ -485,7 +485,7 @@ class Inventory:
             out.append((cm_name, (verts * scale) @ R.T + pos.numpy().astype(np.float64), faces))
         return out
 
-    def _artic_record(self, obj, reviews) -> dict:
+    def _artic_record(self, obj, reviews, *, include_fixed_handles=False) -> dict:
         import omnigibson as og
         import omnigibson.utils.transform_utils as T
 
@@ -583,18 +583,26 @@ class Inventory:
             allv = np.concatenate([v for _, v in pieces_obj]) if pieces_obj else np.zeros((1, 3))
             entry.update({"n_pieces": len(pieces_obj), "link_bbox_min": allv.min(0).round(4).tolist(), "link_bbox_max": allv.max(0).round(4).tolist()})
             subs = []
-            for jn2, j2 in obj.joints.items():
-                if j2.body0.split("/")[-1] == child:
-                    sname = j2.body1.split("/")[-1]
-                    if sname not in obj.links:
-                        continue
-                    sl = obj.links[sname]
-                    sp = self._link_pieces_local(sl)
-                    slp, slq = to_obj(*sl.get_position_orientation(), rp, rq)
-                    Rs = T.quat2mat(th.as_tensor(slq, dtype=th.float32)).numpy()
-                    if sp:
-                        sv = np.concatenate([v @ Rs.T + slp for _, v, _ in sp])
-                        subs.append({"link": sname, "joint": jn2, "bbox_min": sv.min(0).round(4).tolist(), "bbox_max": sv.max(0).round(4).tolist()})
+            children = {j2.body1.split("/")[-1]: jn2 for jn2, j2 in obj.joints.items()
+                        if j2.body0.split("/")[-1] == child}
+            if include_fixed_handles:
+                # OmniGibson exposes only DoFs in obj.joints. Real handle
+                # geometry on fixed child links needs the native USD graph.
+                # Opt in for freshly measured campaign annotations only.
+                from ispatialgym.sampling.v2.tasks.articulation_hybrid import leaf_links
+                for sname in leaf_links(obj, {"child_link": child}, j):
+                    if sname != child:
+                        children.setdefault(sname, "native_fixed_descendant")
+            for sname, jn2 in children.items():
+                if sname not in obj.links:
+                    continue
+                sl = obj.links[sname]
+                sp = self._link_pieces_local(sl)
+                slp, slq = to_obj(*sl.get_position_orientation(), rp, rq)
+                Rs = T.quat2mat(th.as_tensor(slq, dtype=th.float32)).numpy()
+                if sp:
+                    sv = np.concatenate([v @ Rs.T + slp for _, v, _ in sp])
+                    subs.append({"link": sname, "joint": jn2, "bbox_min": sv.min(0).round(4).tolist(), "bbox_max": sv.max(0).round(4).tolist()})
             entry["sub_links"] = subs
             raw_joints.append((entry, pieces_obj))
         info["joints"] = [e for e, _ in raw_joints]

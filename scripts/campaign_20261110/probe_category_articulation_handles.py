@@ -50,7 +50,7 @@ def main():
         inv._prim_to_obj={link.prim_path:o for o in world.scene.objects for link in o.links.values()}
         for name in ['artic','artic/renders','artic/strips']:(a.output/name).mkdir(exist_ok=True)
         state=og.sim.dump_state()
-        record=inv._artic_record(obj,prior_reviews())
+        record=inv._artic_record(obj,prior_reviews(),include_fixed_handles=True)
         assert {x['joint'] for x in record['joints']} >= {'j_leftdoor','j_rightdoor'}
         record['campaign_provenance']=report.copy()
         target=a.output/'artic'/f'{obj.name}.json'
