@@ -6,8 +6,10 @@ from scripts.campaign_20261110 import controller_lifecycle as lifecycle
 
 import argparse
 from collections import Counter
+from contextlib import ExitStack, contextmanager
 from dataclasses import replace
 import json
+import random
 from pathlib import Path
 import shutil
 import sqlite3
@@ -28,6 +30,29 @@ from scripts.campaign_20261110.storage import atomic_directory_lock
 
 RANGES = {"object_scaling": ((.05, .10), (.10, .15), (.15, .30)),
           "mental_rotation": ((30., 45.), (45., 75.), (75., 120.))}
+
+
+@contextmanager
+def planning_lock(path, *, timeout=30.):
+    """Wait briefly for a live planner; never remove or steal its lock.
+
+    Single-seed recovery owners otherwise repeatedly lose their entire pass
+    while larger controllers acquire this lock for successive quota scans.
+    Retry acquisition only: an exception inside the planning transaction must
+    propagate without repeating any authoring or reservation side effect.
+    """
+    deadline = time.monotonic() + timeout
+    with ExitStack() as stack:
+        while True:
+            try:
+                stack.enter_context(atomic_directory_lock(path))
+                break
+            except FileExistsError:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise
+                time.sleep(min(remaining, random.uniform(.15, .65)))
+        yield
 
 
 def job_terminal(allocation, root, queue):
@@ -418,7 +443,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
     if zero_tail >= cfg.get("maximum_empty_queues", 3):
         state["status"] = "needs_feasibility_diagnosis"
         return 0
-    with atomic_directory_lock(root/'controllers/held_planning.lockdir'):
+    with planning_lock(root/'controllers/held_planning.lockdir'):
         if adapter is None:
             counts = read_counts(root, template, read(cfg["standard_contracts"])["templates"], read(cfg["room_plan"]))
             reserved=reserve_pending_counts(counts,template,pending_held(root))
