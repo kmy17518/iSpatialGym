@@ -118,7 +118,7 @@ def reserve_pending_counts(counts, template, records):
 
 
 def next_work(template, counts, *, max_groups=6, training_validated=False, mode="eval_then_train"):
-    require(mode in ("eval_then_train", "train_only"), "unknown group controller phase policy")
+    require(mode in ("eval_only", "eval_then_train", "train_only"), "unknown group controller phase policy")
     split = template.split
     if split != "train" and mode != "train_only":
         deficits = [max(0, n - counts["evaluation"].get(i, 0)) for i, n in enumerate(quotas(template))]
@@ -133,7 +133,7 @@ def next_work(template, counts, *, max_groups=6, training_validated=False, mode=
             if split == "eval_standard":
                 groups = min(groups, counts["class_remaining"], counts["task_remaining"])
             return {"phase": split, "bucket": bucket, "groups": groups, "needs_new_gate": False} if groups else None
-    if split not in ("train", "eval_standard"):
+    if mode == "eval_only" or split not in ("train", "eval_standard"):
         return None
     reserve = counts.get("evaluation_sibling_reserve", 0)
     spare = min(max(0, counts["class_remaining"] - reserve), counts["task_remaining"])

@@ -160,6 +160,15 @@ def admission_decision(template, counts, cfg):
     return decision
 
 
+def refill_mode(cfg):
+    split = cfg.get("admission_split", "train")
+    mode = cfg.get("refill_mode", "eval_then_train" if split.startswith("eval_") else "train_only")
+    require(mode in (("eval_only", "eval_then_train") if split == "eval_standard"
+                     else ("eval_then_train",) if split.startswith("eval_") else ("train_only",)),
+            "refill mode is incompatible with admission split")
+    return mode
+
+
 def model_class_pin(template, state, cfg, *, commit=False):
     """One conceptual model template per class or category template per task."""
     split = cfg.get('admission_split')
@@ -312,7 +321,7 @@ def refresh(record, cfg, root, rows, queue):
         "source_gate": str(gate), "source_gate_sha256": file_digest(gate), "anchor_job": allocation["job_dir"],
         "anchor_ledger": allocation["ledger"], "snapshot": cfg["snapshot"], "v2_root": record.get("v2_root", cfg["v2_root"]),
         "max_candidates": cfg.get("max_candidates_per_seed", 1500), "groups_per_batch": 6,
-        "mode": "eval_then_train" if cfg.get("admission_split", "train").startswith("eval_") else "train_only",
+        "mode": refill_mode(cfg),
         "seed_offset": int(record["admission_id"][:8], 16), "group_budget_seconds": group_budget(cfg, template.task),
         "existing_queues": [record["queue"]], "admission_review": {"path": str(proof_path), "sha256": file_digest(proof_path)}}
     if record.get('dispatch_backends'):

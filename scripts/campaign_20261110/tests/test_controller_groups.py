@@ -26,6 +26,16 @@ def test_holdouts_never_spill_into_training_and_count_three_members_per_group():
     assert next_work(category, counts(evaluation={0: 4})) is None
 
 
+def test_eval_only_preserves_pending_capacity_and_never_launches_train_only():
+    template = SimpleNamespace(task="inter_object_relation_satisfaction-inside_small_scale",
+                               class_id="inside", split="eval_standard")
+    assert next_work(template, counts(evaluation={0: 9}), mode="eval_only")["groups"] == 1
+    reserved = reserve_pending_counts(counts(evaluation={0: 9}), template,
+        [{"task": template.task, "class_id": "inside", "phase": "eval_standard", "bucket": 0, "groups": 1}])
+    assert next_work(template, reserved, mode="eval_only") is None
+    assert next_work(template, counts(evaluation={0: 10}), mode="eval_only", training_validated=True) is None
+
+
 def test_strict_joint_buckets_and_soft_training_use_their_own_weights():
     template = SimpleNamespace(task="configuration_matching-articulation_close_small_scale", split="eval_standard")
     assert next_work(template, counts(evaluation={0: 5, 1: 2}))["bucket"] == 1

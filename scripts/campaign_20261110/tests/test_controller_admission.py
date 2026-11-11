@@ -326,3 +326,14 @@ def test_catalog_consumer_reaudits_new_key_and_pins_existing_seed(tmp_path, monk
     raw = json.loads(catalog.read_text()); raw["seeds"][0]["source_gate"] = "different"; c.write_json_atomic(catalog, raw)
     with pytest.raises(c.ContractError, match="removed or changed"):
         groups.load_seeds(cfg, state)
+def test_refill_mode_is_explicit_and_preserves_historical_defaults():
+    import pytest
+    from scripts.campaign_20261110 import controller_admission as admission
+    from scripts.campaign_20261110.contracts import ContractError
+    assert admission.refill_mode({}) == "train_only"
+    assert admission.refill_mode({"admission_split": "eval_standard"}) == "eval_then_train"
+    assert admission.refill_mode({"admission_split": "eval_standard", "refill_mode": "eval_only"}) == "eval_only"
+    for split in ("train", "eval_model", "eval_category"):
+        with pytest.raises(ContractError):
+            admission.refill_mode({"admission_split": split, "refill_mode": "eval_only"})
+
