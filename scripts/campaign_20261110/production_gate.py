@@ -13,11 +13,9 @@ from scripts.campaign_20261110.contracts import file_digest
 
 SCHEMA = 'isg-training-production-gate-v1'
 CAMPAIGN = 'campaign_20261110'
-PARKED_CLASSES = {'inter_object_relation_satisfaction-touching_03',
-    'inter_object_relation_satisfaction-under_large_scale_01',
-    'inter_object_relation_satisfaction-under_large_scale_02',
-    'inter_object_relation_satisfaction-under_large_scale_03',
-    'inter_object_relation_satisfaction-nextto_04'}
+# Latest owner clarification: the other four promised updates are available.
+# Availability removes the hold; their exact native/demo/replay gates still apply.
+PARKED_CLASSES = {'inter_object_relation_satisfaction-under_large_scale_01'}
 
 
 def read_policy(root):

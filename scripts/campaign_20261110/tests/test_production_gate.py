@@ -150,16 +150,38 @@ def test_replay_checks_true_source_scope_but_not_exhausted_eval_quota(tmp_path):
     assert not check_job(tmp_path,replay,kind='physics_replay')['allowed']
     config=tmp_path/'config.json';value=json.loads(config.read_text());value['template']['split']='eval_standard';config.write_text(json.dumps(value))
     assert check_job(tmp_path,replay,kind='physics_replay')['allowed']
-    value['template']['class_id']='inter_object_relation_satisfaction-under_large_scale_02';config.write_text(json.dumps(value))
+    value['template']['class_id']='inter_object_relation_satisfaction-under_large_scale_01';config.write_text(json.dumps(value))
     assert not check_job(tmp_path,replay,kind='physics_replay')['allowed']
 
 
 def test_native_dependency_cannot_resume_owner_parked_class(tmp_path):
     job=tmp_path/'native';job.mkdir();p=job/'native_inputs.json'
-    value={'campaign_root':str(tmp_path),'original_entry':{'class_id':'inter_object_relation_satisfaction-under_large_scale_02'}}
+    value={'campaign_root':str(tmp_path),'original_entry':{'class_id':'inter_object_relation_satisfaction-under_large_scale_01'}}
     p.write_text(json.dumps(value));assert not check_job(tmp_path,job,kind='native_dependency')['allowed']
     value['original_entry']['class_id']='inter_object_relation_satisfaction-inside_large_scale_01'
     p.write_text(json.dumps(value));assert check_job(tmp_path,job,kind='native_dependency')['allowed']
+
+
+def test_available_owner_updates_resume_validation_without_releasing_training(tmp_path):
+    from scripts.campaign_20261110.production_gate import PARKED_CLASSES
+    assert PARKED_CLASSES == {'inter_object_relation_satisfaction-under_large_scale_01'}
+    env,cmd,job=setup(tmp_path,'eval_standard')
+    native=tmp_path/'native';native.mkdir()
+    replay=tmp_path/'replay';replay.mkdir()
+    (replay/'replay_inputs.json').write_text(json.dumps({'source_job':str(job)}))
+    config=tmp_path/'config.json'
+    value=json.loads(config.read_text())
+    for suffix in ('touching_03','under_large_scale_02','under_large_scale_03','nextto_04'):
+        cls='inter_object_relation_satisfaction-'+suffix
+        value['template'].update(class_id=cls,split='eval_standard')
+        config.write_text(json.dumps(value))
+        (native/'native_inputs.json').write_text(json.dumps({'campaign_root':str(tmp_path),'original_entry':{'class_id':cls}}))
+        assert check_dispatch(tmp_path,cmd)['allowed']
+        assert check_job(tmp_path,replay,kind='physics_replay')['allowed']
+        assert check_job(tmp_path,native,kind='native_dependency')['allowed']
+        value['template']['split']='train';config.write_text(json.dumps(value))
+        assert not check_dispatch(tmp_path,cmd)['allowed']
+        assert not check_job(tmp_path,replay,kind='physics_replay')['allowed']
 
 
 def test_deferred_successful_members_cannot_be_reclassified_as_singleton():
