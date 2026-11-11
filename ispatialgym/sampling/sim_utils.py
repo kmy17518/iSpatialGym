@@ -234,6 +234,10 @@ class SimWorld:
         self.n_scene_objects = len(self.scene.objects)
         self.scene_object_names = {o.name for o in self.scene.objects}
         self.spawned: Dict[str, DatasetObject] = {}
+        self.model_pool = None
+        self._pool_objects = {}
+        self._pool_baselines = {}
+        self._pool_physics_rebuilds = 0
         #: the traversability map's nominal floor height (OmniGibson's default 0.0 in every scene) — only a fallback: the
         #: task room's actual floor surface is measured below (``measure_floor_z``) and drives every robot height
         self.floor_z_default = float(self.scene.trav_map.floor_heights[0]) if getattr(self.scene, "trav_map", None) is not None else 0.0
@@ -303,6 +307,8 @@ class SimWorld:
     def obstacle_filter(self, obj) -> bool:
         """Whether ``obj`` is loaded into the IK collision world: spawned task objects always, scene objects when their
         AABB intersects the task rooms' extent (walls / doors / furniture of neighbours near a doorway included)."""
+        if obj.name in self._pool_objects and obj.name not in self.spawned:
+            return False
         if self.task_bounds is None or obj.name in self.spawned or obj is self.robot:
             return True
         lo, hi = obj.aabb
@@ -319,6 +325,8 @@ class SimWorld:
 
     def spawn(self, name: str, category: str, model: str, dataset: str = "behavior-1k-assets", scale=None, fixed_base: bool = False,
               extra_abilities: Optional[Dict[str, dict]] = None) -> DatasetObject:
+        if self.model_pool is not None:
+            return self.model_pool.acquire(name, category, model, dataset, scale, fixed_base, extra_abilities)
         kwargs = {}
         if scale is not None:
             kwargs["scale"] = th.tensor(scale, dtype=th.float32)
@@ -352,6 +360,8 @@ class SimWorld:
         return obj
 
     def remove(self, obj):
+        if obj.name in self._pool_objects:
+            raise RuntimeError('Pooled objects must be released through template cleanup, not removed')
         self.spawned.pop(obj.name, None)
         # never remove an object the robot still holds with assisted grasping: the robot's state would keep referring to it
         try:
@@ -369,6 +379,92 @@ class SimWorld:
         except Exception:
             pass
         og.sim.step()
+
+    def preload_pool_objects(self, specs):
+        """Add a declared batch in one stop/play; no template is active yet."""
+        from ispatialgym.sampling import knowledge as K
+        from ispatialgym.sampling.model_pool import require
+        require(not self.spawned and not self._pool_objects, 'preload must precede template sampling')
+        objects = []
+        for spec in specs:
+            key, source = spec['key'], spec['source']
+            require(K.is_ready(key['model']), 'model is no longer ready')
+            asset = os.path.join(get_dataset_path(key['dataset']), 'objects', key['category'], key['model'],
+                                 'usd', key['model']+'.encrypted.usd')
+            import hashlib
+            require(os.path.isfile(asset) and hashlib.sha256(open(asset, 'rb').read()).hexdigest() == source['asset_sha256'],
+                    'the native asset differs from the declared pool input')
+            abilities = K.abilities_of_category(key['category'])
+            abilities.update(key['extra_abilities'])
+            obj = DatasetObject(name=spec['name'], category=key['category'], model=key['model'],
+                                dataset_name=key['dataset'], scale=th.tensor(key['scale'], dtype=th.float32),
+                                fixed_base=key['fixed_base'], in_rooms=list(self.rooms or []), abilities=abilities)
+            objects.append(obj)
+        before = og.sim.dump_state()
+        og.sim.stop()
+        for obj in objects:
+            self.scene.add_object(obj)
+        og.sim.play(); self._pool_physics_rebuilds += 1
+        og.sim.load_state(before)
+        self._pool_objects = {obj.name: obj for obj in objects}
+        for obj in objects:
+            self._pool_baselines[obj.name] = {
+                'state': copy.deepcopy(obj.dump_state(serialized=False)),
+                'joints': {name: {key: copy.deepcopy(getattr(joint, key)) for key in
+                           ('max_effort', 'stiffness', 'damping', 'friction', 'lower_limit', 'upper_limit')}
+                           for name, joint in obj.joints.items()},
+                'collisions': [(api, api.GetCollisionEnabledAttr().Get()) for link in obj.links.values()
+                               for api in getattr(link, '_collision_apis', [])]}
+            self.park_pool_object(obj)
+        og.sim.step()
+        return dict(self._pool_objects)
+
+    def park_pool_object(self, obj):
+        """Disable inactive contacts/rendering and remove assisted attachments."""
+        for arm, held in list(getattr(self.robot, '_ag_obj_in_hand', {}).items()):
+            if held is obj:
+                self.robot.release_grasp_immediately(arm)
+        from omnigibson.object_states import AttachedTo
+        attached = getattr(obj, 'states', {}).get(AttachedTo)
+        parent = getattr(attached, 'parent', None)
+        if parent is not None:
+            attached.set_value(parent, False)
+        self.park(obj, list(self._pool_objects).index(obj.name))
+        obj.visible = False
+        for link in obj.links.values():
+            link.disable_collisions()
+
+    def reset_pool_object(self, obj):
+        """Restore the physical baseline before handing the object to a sampler."""
+        self.park_pool_object(obj)
+        baseline = self._pool_baselines[obj.name]
+        obj.load_state(copy.deepcopy(baseline['state']), serialized=False)
+        for name, values in baseline['joints'].items():
+            for key, value in values.items():
+                setattr(obj.joints[name], key, copy.deepcopy(value))
+        with og.sim.editing_usd():
+            for api, enabled in baseline['collisions']:
+                api.GetCollisionEnabledAttr().Set(enabled)
+        self.park(obj, list(self._pool_objects).index(obj.name))
+        obj.visible = True
+
+    def observe_model_pool(self, members, active):
+        """Native identities/state and allocation counters, never a pass label."""
+        observed = {}
+        for name, obj in members.items():
+            pos, quat = obj.get_position_orientation()
+            observed[name] = {'category': obj.category, 'model': obj.model, 'scale': obj.scale.tolist(),
+                              'position': pos.tolist(), 'orientation': quat.tolist(), 'visible': bool(obj.visible),
+                              'active': name in active, 'planner_included': self.obstacle_filter(obj),
+                              'joint_positions': obj.get_joint_positions().tolist() if obj.n_joints else [],
+                              'joint_velocities': obj.get_joint_velocities().tolist() if obj.n_joints else [],
+                              'collision_enabled': [bool(api.GetCollisionEnabledAttr().Get())
+                                  for link in obj.links.values() for api in getattr(link, '_collision_apis', [])]}
+        return {'objects': observed, 'pool_physics_rebuilds': self._pool_physics_rebuilds,
+                'live_scene_objects': len(self.scene.objects),
+                'torch_cuda_allocated_bytes': th.cuda.memory_allocated() if th.cuda.is_available() else None,
+                'torch_cuda_reserved_bytes': th.cuda.memory_reserved() if th.cuda.is_available() else None,
+                'memory_scope': 'PyTorch allocator only; total process/device VRAM must be measured separately.'}
 
     def park(self, obj, index: int = 0):
         """Move ``obj`` far away with gravity disabled (there is no floor there: partial-room loading). Gravity is
@@ -1316,13 +1412,21 @@ class SimWorld:
         partial = os.path.join(out_dir, "template-partial_rooms.json")
         for o in self.render_hidden:  # the template must not record the render workaround
             o.visible = True
+        raw_partial = partial + '.pool-unfiltered.json' if self.model_pool is not None else partial
         try:
-            self.scene.save(json_path=partial)
+            self.scene.save(json_path=raw_partial)
         finally:
             for o in self.render_hidden:
                 o.visible = False
-        with open(partial) as f:
+        with open(raw_partial) as f:
             scene_b = json.load(f)
+        if self.model_pool is not None:
+            try:
+                scene_b = self.model_pool.filter_scene(scene_b, inst_to_name)
+                with open(partial, 'w') as f:
+                    json.dump(scene_b, f, cls=TorchEncoder, indent=2)
+            finally:
+                os.unlink(raw_partial)
         merged = merge_scene_files(copy.deepcopy(self.stable_scene), scene_b, keep_robot_from="b")
         variant_meta = (self.stable_scene.get("metadata") or {}).get("ispatialgym") or {}
         for key in ("campaign_added_support", "campaign_added_context_objects"):

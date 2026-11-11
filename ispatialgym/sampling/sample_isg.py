@@ -302,6 +302,7 @@ class WorldPool:
         self.last_action = None
         self.n_loads = 0
         self.load_time_s = 0.0
+        self.model_pool_key = None
 
     def get(self, problem: GroundedProblem, scene: str):
         from ispatialgym.sampling.robot_utils import RobotKit
@@ -314,12 +315,19 @@ class WorldPool:
         key = world_key(problem, scene, stable)
         removed = list(key[2])
         rooms = list(key[1])
+        from ispatialgym.sampling.model_pool import ENV as POOL_ENV, ModelPool, read_manifest
+        pool_path = os.environ.get(POOL_ENV)
+        pool_manifest = pool_reference = None
+        if pool_path:
+            pool_manifest, pool_reference = read_manifest(pool_path, scene=scene, rooms=rooms,
+                                                         fixed_bindings=problem.bindings(scene))
+        pool_key = pool_reference['sha256'] if pool_reference else None
         cameras = world_cameras_required(getattr(problem, "subtask", None))
         from ispatialgym.sampling import scene_crop as SCROP
 
         crop_mode, crop_bindings, crop_radius = scene_crop_request(problem, scene)
         wanted_crop = SCROP.request_key(crop_mode, crop_bindings, crop_radius)
-        if self.key == key and self.world is not None and (getattr(self.world, "cameras", True) or not cameras) and SCROP.covers(self.crop_key, wanted_crop):
+        if self.key == key and self.model_pool_key == pool_key and self.world is not None and (getattr(self.world, "cameras", True) or not cameras) and SCROP.covers(self.crop_key, wanted_crop):
             self.last_action = "reused"
             log.info("world reused for %s: %s%s (SCENE_CROP of the live world: %s)", problem.variant, world_key_str(key),
                      "" if getattr(self.world, "cameras", True) else " (camera-free)", (self.crop_key or ("full",))[0])
@@ -352,6 +360,10 @@ class WorldPool:
         else:
             log.info("%s", plan.describe())
         self.world = SimWorld(scene, rooms, scene_variant=scene_variant, cameras=cameras, usd_camera_model=not cameras, scene_crop=crop)
+        if pool_manifest:
+            self.world.model_pool = ModelPool(self.world, pool_manifest, pool_reference,
+                os.path.join(self.out_root, 'model_pool', pool_manifest['batch_id']+'.json'))
+        self.model_pool_key = pool_key
         self.crop_key = plan.key()
         if not cameras:
             log.info("SAMPLER_CAMERAS: world for %s (%s) built without the head camera: no rgb / seg_instance buffers; camera_model from the USD "
@@ -371,8 +383,11 @@ class WorldPool:
     def cleanup_template(self):
         if self.world is None:
             return
-        for o in list(self.world.spawned.values()):
-            self.world.remove(o)
+        if self.world.model_pool is not None:
+            self.world.model_pool.release_template()
+        else:
+            for o in list(self.world.spawned.values()):
+                self.world.remove(o)
         self.kit.sync_world()
 
 
