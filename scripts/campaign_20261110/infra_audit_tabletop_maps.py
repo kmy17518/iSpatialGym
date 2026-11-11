@@ -11,6 +11,17 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def require_declared_coverage(sources, maps):
+    """Reused libraries declare every exact surface, rest, and arm to build."""
+    expected = {(entry, height, rest, arm)
+                for entry, source in sources.items() if 'height_keys' in source
+                for height in source['height_keys'] for rest in source['rest_ids']
+                for arm in source['arms']}
+    if expected:
+        actual = {(row['entry'], f"{row['height']:.4f}", row['rest_id'], row['arm']) for row in maps}
+        assert actual == expected, f'declared map coverage differs: missing={sorted(expected-actual)}, extra={sorted(actual-expected)}'
+
+
 def audit(admission, layers, output, root='/vision/u/shiyuc/minyeong/campaign_20261110'):
     from ispatialgym.grasping import schema as S
     from ispatialgym.sampling import reach_maps as R
@@ -61,6 +72,11 @@ def audit(admission, layers, output, root='/vision/u/shiyuc/minyeong/campaign_20
             text = log.read_text(); assert 'GB_MAP_DONE' in text and 'Simulation App Shutting Down' in text
             add(log,'evidence/'+layer.name+'_'+log.name)
     assert maps and all(arms == {'left','right'} for arms in coverage.values()), 'both exact native arm maps required'
+    require_declared_coverage(sources, maps)
+    if document.get('height_proof'):
+        proof = document['height_proof']
+        assert sha(proof['path']) == proof['sha256'], 'native height proof changed'
+        add(proof['path'], 'evidence/height_proof.json')
     add(admission,'evidence/library_admission.json')
     result = {'schema':'isg-exact-tabletop-transfer-v1','source_admission':str(admission),
               'source_admission_sha256':sha(admission),'active_policy_sha256':document['active_policy_sha256'],
