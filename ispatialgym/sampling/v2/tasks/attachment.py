@@ -775,14 +775,21 @@ class Attachment(SamplerV2):
         collision, trunk sweep), the Phase-2 survivors that leave the partner a cell. Sets ``edge_frame`` / ``init_stance`` /
         ``manip_candidates`` and returns True on the first edge that passes; failures go to ``errors``. ``sample_template`` runs it with the
         template seed, :meth:`spa_redraw_start` with the attempt's rng."""
-        for edge, st in TT.edge_candidates(self, self.top, rng):
+        from ispatialgym.sampling import campaign_tabletop_starts as CTS
+        plan = getattr(self, '_campaign_attachment_active', None)
+        anchor = getattr(plan, 'anchor_base_pose2d', None)
+        for edge, st in CTS.ordered_edges(TT.edge_candidates(self, self.top, rng), anchor):
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
                 self.attach_bands = self._attach_band(attach_spec, edge, attach_view)
                 # A1: the left contact band of the partner's height class (partner brace face); §4.4 margins over the union
                 self.left_bands = TT.load_left_contact_band(self, self.height[self.p_role], top=self.top, edge=edge, compute=TT.left_band_compute())
                 init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top, left_bands=self.left_bands)
-                init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
+                lateral = None
+                if anchor is not None:
+                    bounds, _, _ = TT.phase1c_bounds(self, init, margins, top=self.top, strict=True)
+                    lateral = CTS.near_lateral(rng, float(bounds[0]), float(bounds[1]), CTS.edge_lateral(edge, anchor))
+                init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands, lateral=lateral)
                 init.name = "init"
                 # D-009 (prepared, owner 2026-09-16 21:54; defaults = the tabletop classes, 20 / 30 deg since owner 2026-10-11): A
                 # ``generation.phase2_loose_class_deg`` / B ``generation.phase2_class1_when_deep_m`` (class-1 survivors admitted
@@ -1089,6 +1096,10 @@ class Attachment(SamplerV2):
             return max(0.0, depth - FOCUS_DEPTH_PREFERRED) + 0.3 * trunk_pen + CANDIDATE_REJECT_PENALTY * rejects.get(Attachment._candidate_key(c), 0)
 
         order.sort(key=score)
+        plan = getattr(self, '_campaign_attachment_active', None)
+        if plan is not None:
+            xy = th.tensor(plan.partner[0][:2], dtype=th.float32)
+            order.sort(key=lambda k: not TT.in_band(self.attach_bands, self.manip_candidates[k], xy, TT.CELL_TOLERANCE)[0])
         return order
 
     @staticmethod
@@ -1134,6 +1145,11 @@ class Attachment(SamplerV2):
         raise Reject("target_placement", "attach fallback: no route")  # not reached
 
     def _sample_instance_route(self, rng: np.random.Generator) -> Draft:
+        if getattr(self, '_campaign_attachment_active', None) is not None and getattr(self, '_split_cone_cands', None):
+            # The fixed goal is independent of the split cone's random focus.
+            # Restore only the already checked native Phase-2 pool, then rank
+            # by exact partner-map membership before trying the usual six.
+            self.manip_candidates = list(self._split_cone_cands)
         init = self.init_stance
         errors = []
         self._deadline = time.time() + float(self.gen("attempt_budget_s", ATTEMPT_BUDGET_S))

@@ -2483,7 +2483,10 @@ class IORSSmall(SamplerV2):
         errors: List[str] = []
         last_reject: Optional[str] = None
         n_tried = 0
-        for edge, init in TT.edge_frames(self, self.top, rng):
+        from ispatialgym.sampling import campaign_tabletop_starts as CTS
+        plan = self.campaign_pair_plan() if os.environ.get(CPG.ENV) else None
+        anchor = getattr(plan, 'anchor_base_pose2d', None)
+        for edge, init in CTS.ordered_edges(TT.edge_frames(self, self.top, rng), anchor):
             trunk = self._spa_edge_trunk(edge, init, H_max)
             if isinstance(trunk, Reject):
                 errors.append(f"{edge.name}: {trunk}")
@@ -2497,7 +2500,8 @@ class IORSSmall(SamplerV2):
                 raise
             lo, hi = float(bounds[0]), float(bounds[1])
             n_cells = max(1, int(math.ceil((hi - lo) / cell_m - 1e-9)))
-            lat = float(rng.uniform(lo, hi))  # the plain draw's first Phase-1c draw: the same call on the same stream
+            lat = (float(rng.uniform(lo, hi)) if anchor is None else
+                   CTS.near_lateral(rng, lo, hi, CTS.edge_lateral(edge, anchor)))
             order = sorted(range(n_cells), key=lambda k: (abs(self._spa_cell_centre(lo, hi, cell_m, k) - lat), k))[:tries]
             for i in order:
                 n_tried += 1
@@ -2700,7 +2704,10 @@ class IORSSmall(SamplerV2):
         self.sidecar.add_stance(init)
         cam_init = self.camera_pose_at(init)
         # A1: the target starts in the start region of the attempt's partner side (7e: never on a candidate dropped for its travel)
-        cands = [c for c in self.manip_candidates if TT.in_start_region(c, self.region_side) and TRAVEL_DROPPED not in c.extras]
+        checked = self.manip_candidates
+        if getattr(self, '_campaign_pair_active', None) is not None and getattr(self, '_split_cone_cands', None):
+            checked = self._split_cone_cands
+        cands = [c for c in checked if TT.in_start_region(c, self.region_side) and TRAVEL_DROPPED not in c.extras]
         # owner 3.6 (2026-11-08, ISPATIALGYM_PLACE_DEPTH_CAP): the touching place depth capped by the push map's reach - before the draw
         self._pdc_shadow_drafted = False
         if getattr(self, "_lift_screen_shadow", False):  # the previous attempt was drafted past a would-be lift rejection and not rejected
@@ -2713,7 +2720,7 @@ class IORSSmall(SamplerV2):
         order = rng.permutation(len(cands))
         from ispatialgym.sampling import campaign_runtime
         frame_recovery = self.relation == "inside" and campaign_runtime.inside_frame_recovery()
-        if (os.environ.get("ISPATIALGYM_STANCE_FRAME_AIM", "") == "1" or frame_recovery) and self.shelf_pose is None and self.relation != "touching" and cands:
+        if (os.environ.get("ISPATIALGYM_STANCE_FRAME_AIM", "") == "1" or frame_recovery or getattr(self, '_campaign_pair_active', None) is not None) and self.shelf_pose is None and self.relation != "touching" and cands:
             # oracle-fix 2026-11-07 (owner prompt E 2, opt-in): the candidates whose expected place sits deepest in their manipulation image first
             # (stance_frame_aim: the head camera from base + trunk, no IK); the random order breaks ties
             aim = {int(i): self.stance_frame_aim(cands[int(i)]) for i in order}
@@ -3379,6 +3386,10 @@ class IORSSmall(SamplerV2):
         an upright eef box at the EXPECTED place - the partner's centre at the mid gap of the candidate's start-region interval on the attempt's
         side (focus + left x side x (mid gap + both half extents)), at the partner's top + the target's height - in the candidate's head
         image; -inf without a focus. A ranking proxy (the grasp's place orientation is not known yet), not a rule."""
+        plan = getattr(self, '_campaign_pair_active', None)
+        if plan is not None:
+            aim = (G.t(plan.release[0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+            return self.ikc.eef_frame_margin(aim, self.camera_pose_at(cand))
         if cand.focus is None:
             return float("-inf")
         side = self.region_side if self.region_side is not None else self.template_sides()[0]

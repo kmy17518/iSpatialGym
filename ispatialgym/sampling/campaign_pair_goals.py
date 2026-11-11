@@ -38,6 +38,7 @@ class PairGoalPlan:
     base_push: dict | None = None
     placement_mode: str | None = None
     release_policy: str = "fixed"
+    anchor_base_pose2d: tuple | None = None
 
     @property
     def orientation_required(self):
@@ -168,8 +169,9 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     count = raw.get("max_members", 3)
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid group size")
     fingerprint = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    from ispatialgym.sampling.campaign_tabletop_starts import anchor_base
     return PairGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, relation,
-                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push, placement_mode, release_policy)
+                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push, placement_mode, release_policy, anchor_base(raw))
 
 
 def load_pair_plan(*, template_id, scene, rooms, relation, activated_at, expected_sha256=None, scale="small"):

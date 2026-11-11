@@ -23,6 +23,15 @@ def test_disabled_pair_plan_never_accesses_runtime_context(monkeypatch):
     assert I.IORSSmall.campaign_pair_plan(SimpleNamespace()) is None
 
 
+def test_campaign_frame_ranking_uses_fixed_release_instead_of_random_focus():
+    p=plan('inside');observed=[];candidate=SimpleNamespace(focus=None)
+    s=SimpleNamespace(_campaign_pair_active=p,camera_pose_at=lambda c:'camera',
+                      ikc=SimpleNamespace(eef_frame_margin=lambda pose,camera:(observed.append((pose,camera)) or 4.)))
+    assert I.IORSSmall.stance_frame_aim(s,candidate)==4.
+    assert observed[0][0][0].tolist()==pytest.approx(p.release[0])
+    assert observed[0][1]=='camera'
+
+
 def test_pair_start_keeps_full_yaw_range_independent_of_goal_alignment(monkeypatch):
     calls = []
     monkeypatch.setattr(I.TT, "phase3_target", lambda *a, **kw: (calls.append(kw) or (None, SimpleNamespace(grasp_name="g"))))
