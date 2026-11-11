@@ -90,3 +90,21 @@ def test_per_part_clearance_separates_the_frame_from_the_light_inner_part(parts)
     # top_5 stands on the frame (heavy: 173 g vs the target's 29 g); top_8 / the old top_3 on none
     assert per["top_5"]["isgefb"] < -0.002
     assert all(d > -0.002 for d in per["top_8"].values()) and all(d > -0.002 for d in per["old_top_3"].values())
+
+
+def test_campaign_clutter_screen_uses_actual_grasp_and_existing_penetration(parts):
+    # The same measured hand geometry distinguishes a blocked approach from a
+    # clear one without changing any obstacle footprint or adding a gap.
+    for row in ROWS[:3]:
+        grasp = SimpleNamespace(grasp_name=row.name, eef_in_object=row.pose, arm='right')
+        proof = D.clutter_approach_proof(grasp, row.meta['width'], parts)
+        assert bool(proof['blocked_by']) == (row.name in ('top_5', 'top_10'))
+        assert set(proof['finger_clearance_m']) == set(parts)
+
+
+def test_campaign_clutter_screen_cannot_pass_missing_geometry():
+    row = ROWS[0]
+    grasp = SimpleNamespace(grasp_name=row.name, eef_in_object=row.pose, arm='right')
+    for parts in ({}, {'missing_carton': []}):
+        with pytest.raises(D.Reject, match='missing native distractor'):
+            D.clutter_approach_proof(grasp, row.meta['width'], parts)

@@ -60,3 +60,13 @@ def test_spoon_pad_policy_only_caps_audited_campaign_speed(monkeypatch):
     template.class_id = 'alignment-axial_04'
     with pytest.raises(ContractError, match='another audited class'):
         EX.push_speed_of(NS(extra={}))
+
+
+def test_clutter_approach_is_only_enabled_for_audited_milk_class(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    assert not CR.contact_recovery('milk_clutter_approach')
+    template = bind(monkeypatch, 'disembedding_04', 'disembedding', {'milk_clutter_approach': True})
+    assert CR.contact_recovery('milk_clutter_approach')
+    template.class_id = 'disembedding_06'
+    with pytest.raises(ContractError, match='another audited class'):
+        CR.contact_recovery('milk_clutter_approach')

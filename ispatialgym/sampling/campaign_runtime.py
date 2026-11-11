@@ -84,6 +84,7 @@ def contact_recovery(option: str) -> bool:
     contact construction or grasp closure, never goal poses or tolerances.
     """
     classes = {
+        'milk_clutter_approach': ('disembedding_04', 'disembedding'),
         'axial_spoon_slow_pad': ('alignment-axial_05', 'alignment-axial'),
         'touching_push_mass_center': ('inter_object_relation_satisfaction-touching_04',
                                      'inter_object_relation_satisfaction-touching_small_scale'),

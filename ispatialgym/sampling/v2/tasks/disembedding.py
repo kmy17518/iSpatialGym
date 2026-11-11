@@ -44,6 +44,7 @@ import logging
 import math
 import os
 import time
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -54,6 +55,7 @@ from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import campaign_tray_goals as CTG
+from ispatialgym.sampling import campaign_runtime as CR
 from ispatialgym.sampling.constraints import apply_mass
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
@@ -205,6 +207,26 @@ def layout_pad_clearance(grasps: Sequence[Any], parts: Dict[str, List[HullObstac
         who = min(per, key=per.get) if per else None
         out[n] = (per[who] if who is not None else float("inf"), who)
     return out
+
+
+def clutter_approach_proof(grasp, width, parts):
+    """Measure the actual selected fingers against unchanged clutter geometry.
+
+    This proposal screen uses the existing hand policy, with its permitted
+    penetration. It adds no spacing envelope and does not alter tray occupancy.
+    """
+    from ispatialgym.grasping import contact_policy as CP
+
+    if not parts or any(not pieces for pieces in parts.values()):
+        raise Reject('distractor_approach_geometry', 'missing native distractor collision pieces')
+    row = SimpleNamespace(name=str(grasp.grasp_name), pose=grasp.eef_in_object, meta={'width': width})
+    per = layout_pad_clearances([row], parts, grasp.arm)[row.name]
+    if set(per) != set(parts) or not all(math.isfinite(v) for v in per.values()):
+        raise Reject('distractor_approach_geometry', 'incomplete or nonfinite finger-clearance measurement')
+    allowed = float(CP.DEFAULT.finger_support_max_penetration_m)
+    blocked = sorted(name for name, distance in per.items() if distance < -allowed - 1e-9)
+    return {'grasp': row.name, 'arm': grasp.arm, 'pinch_width_m': width,
+            'finger_clearance_m': per, 'allowed_penetration_m': allowed, 'blocked_by': blocked}
 
 
 #: a model already lies / stands in its canonical orientation when its vertical extent is within this fraction of the wanted one
@@ -1463,10 +1485,27 @@ class Disembedding(SamplerV2):
             # 2026-10-12 (A2b): no spacing along the drawn grasp's pinch axis and no pad-clearance growth of the budgeted footprints - the
             # grasp may touch them, the demo checks they are still on the source tray
             items = [(n, self.hull[n], self.rest[n]) for n in dnames]
-            dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, margin=float(self.g("tray_footprint_margin_m")), gap=0.01,
+            screen_approach = CR.contact_recovery('milk_clutter_approach')
+            approach_draws = []
+            for clutter_draw in range(3 if screen_approach else 1):
+                dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, margin=float(self.g("tray_footprint_margin_m")), gap=0.01,
                                               cam=cam_init, budget=self._tray_budget(), n_tries=int(self.g("distractor_place_tries") or 80),
                                               max_backtracks=24 if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG") else 0,
                                               search_seconds=15 if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG") else None)
+                if not screen_approach:
+                    break
+                parts = {name: self._part_pieces_in(name, pose, t_pose) for name, pose in dist_poses.items()}
+                proof = clutter_approach_proof(grasp, width, parts)
+                approach_draws.append(proof)
+                TT._count(self, 'campaign_clutter_approach.draws')
+                if not proof['blocked_by']:
+                    TT._count(self, 'campaign_clutter_approach.passed')
+                    d.summary['campaign_clutter_approach'] = {'draws': approach_draws, 'selected_draw': clutter_draw}
+                    break
+                TT._count(self, 'campaign_clutter_approach.obstructed')
+                log.info('%s: campaign clutter approach obstructed: %s', self.gp.variant, json.dumps(proof))
+            else:
+                raise Reject('distractor_approach_blocked', 'three bounded clutter proposals obstruct the selected fingers: ' + json.dumps(approach_draws))
         objects = {tname: t_pose, sname: s_pose, dname: d_pose, **dist_poses}
         if campaign_plan is not None:
             self._campaign_latest_proposal = {"start_poses": objects, "goal_poses": {tname: campaign_plan.goal},
