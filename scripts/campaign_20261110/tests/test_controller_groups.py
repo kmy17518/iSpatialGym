@@ -66,6 +66,31 @@ def test_training_cannot_consume_unfinished_standard_evaluation_siblings():
                      training_validated=True, mode="train_only")["groups"] == 1
 
 
+def test_retired_runtime_reconciles_existing_work_but_never_authors_more(tmp_path, monkeypatch):
+    import pytest
+    from dataclasses import asdict
+    from scripts.campaign_20261110 import controller_held as held, controller_migration, contracts as c
+    from scripts.campaign_20261110.tests.test_goal_groups import GoalGroupControllerTests
+    _,_,_,template,_=GoalGroupControllerTests().fixture(tmp_path)
+    config=tmp_path/'config.json';gate=tmp_path/'gate.json'
+    c.write_json_atomic(config,{'template':asdict(template),'validation_key':{}})
+    c.write_json_atomic(gate,{'success':True})
+    spec={'class_id':template.class_id,'seed_config':str(config),'seed_config_sha256':c.file_digest(config),
+          'source_gate':str(gate),'source_gate_sha256':c.file_digest(gate),'snapshot':'/native'}
+    record={'queue':'q','phase':template.split,'status':'external_submission','index':1,'count':3}
+    state={'queues':[record]};claims=[]
+    monkeypatch.setattr(controller_migration,'controller_check',lambda *a,**k:None)
+    monkeypatch.setattr(held,'reconcile',lambda *a,**k:{'key':template.class_id,'jobid':'job','job_dir':'/owned/job'})
+    monkeypatch.setattr(held,'job_terminal',lambda *a:True)
+    monkeypatch.setattr(held,'claim_finished_groups',lambda *a,**k:claims.append(k['job_terminal']))
+    monkeypatch.setattr(held,'queue_closures',lambda *a:{})
+    monkeypatch.setattr(held,'record_runtime_failure',lambda *a:None)
+    adapter=SimpleNamespace(supports=lambda task:True,read_counts=lambda *a:pytest.fail('retired runtime must not plan'))
+    assert held.advance(spec,state,{'retired_classes':[template.class_id]},tmp_path,[],{},1,lambda:None,adapter=adapter)==0
+    assert claims==[True] and record['status']=='complete'
+    assert state['status']=='retired_runtime_no_new_groups'
+
+
 def test_fresh_alignment_anchor_confirms_frozen_policy_without_rekeying(tmp_path):
     from dataclasses import replace
     import pytest

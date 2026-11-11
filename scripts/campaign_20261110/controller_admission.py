@@ -314,6 +314,12 @@ def refresh(record, cfg, root, rows, queue):
         return
     held.claim_finished_groups(record, allocation, str(gate), cfg, root, job_terminal=True)
     require(record.get("groups"), "admission lacks a durable closed goal group")
+    if held.retired_class(cfg, template.class_id):
+        require(template.class_id in cfg.get('excluded_classes', []), 'retired source class can still be rediscovered')
+        record.update(status='retired_after_claim', retired_at=time.time(),
+                      retirement={'reason':'Exact native runtime replaced; preserve claim and suppress new refill seed',
+                                  'gate':str(gate),'gate_sha256':file_digest(gate)})
+        return
     gid = record["prepared"]["group_ids"][0]
     review = audit_job(allocation["job_dir"], gate, root=root, started_at=cfg["started_at"], group_closed=True, group_id=gid)
     require(review["validation_key"] == record["validation_key"], "new admission key differs from replay proof")
@@ -337,7 +343,7 @@ def refresh(record, cfg, root, rows, queue):
 
 def refreshable(record, root):
     """A repaired replay must supply new successful evidence before re-audit."""
-    if record["status"] == "admitted":
+    if record["status"] in ("admitted", "retired_after_claim"):
         return False
     if record["status"] != "failed":
         return True

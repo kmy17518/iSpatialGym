@@ -303,6 +303,13 @@ def completed_empty_tail(records):
     return count
 
 
+def retired_class(cfg, class_id):
+    values = cfg.get('retired_classes', [])
+    require(isinstance(values, list) and all(isinstance(v, str) and v for v in values)
+            and len(values) == len(set(values)), 'invalid retired runtime class scope')
+    return class_id in values
+
+
 def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=None):
     require(file_digest(spec["seed_config"]) == spec["seed_config_sha256"], "held seed config changed")
     seed_config = read(spec["seed_config"])
@@ -372,6 +379,10 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
         return 0
     save()
     inflight=[record for record in records if record['status']!='complete']
+    if retired_class(cfg, spec['class_id']):
+        state['status'] = 'retired_runtime_reconciling' if inflight else 'retired_runtime_no_new_groups'
+        save()
+        return 0
     if len(inflight)>=cfg.get('maximum_inflight_per_seed',1):
         return 0
     if any(record.get('needs_new_gate') and record['phase'] not in gates for record in inflight):
