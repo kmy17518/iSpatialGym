@@ -1486,6 +1486,8 @@ class ArticulationSmall(SamplerV2):
             if not getattr(self, "_pair_drawn", False):
                 self._redraw_with_pair(rng, "sample_instance")
             self._pair_drawn = False
+        if getattr(self, "_campaign_joint_active", None) is not None and self.campaign_handle_options() == []:
+            raise Reject("campaign_group_complete", "all distinct handle assignments have been written")
         init = self.init_stance
         errors = []
         # per-attempt budget (0916-205838: one attempt took 2356 s in the second-stance search + diagnostics)
@@ -1517,7 +1519,8 @@ class ArticulationSmall(SamplerV2):
                 self.world.park(o, list(self.world.spawned).index(o.name))
             self.kit.sync_world()
             try:
-                d = self._sample_with(rng, init, manip, int(k))
+                sample = self._sample_with_campaign_handle if getattr(self, "_campaign_joint_active", None) is not None else self._sample_with
+                d = sample(rng, init, manip, int(k))
                 if pairs:
                     d.summary["artsmall_draw"] = {kk: self._pair[kk] for kk in ("key", "q_init", "q_goal", "required", "passive_from")}
                 return d
@@ -1525,6 +1528,46 @@ class ArticulationSmall(SamplerV2):
                 errors.append(f"candidate {int(k)}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
+
+    def campaign_handle_start(self, handle):
+        """Physical handle grasp identity; a changed robot viewpoint is not a new grasp."""
+        joints = dict(self._campaign_joint_active.joints)
+        joints[self.joint_name] = float(self.q_init)
+        return {"joints": joints, "grasps": [], "contacts": {}, "articulation_grasp": {
+            "object": self.tname, "arm": self.handle_arm,
+            "contact_obj": [float(v) for v in handle["contact"]],
+            "approach_dir_obj": [float(v) for v in handle["approach_dir"]],
+            "pinch_axis_obj": [float(v) for v in handle["pinch_axis"]],
+            "width_m": float(handle["width"]), "preshape_q": self.grasp_fingers}}
+
+    def campaign_handle_options(self):
+        # Prefix pull-open motions already offer both finger assignments. Only
+        # the simple handle-only path is missing that same proposal choice.
+        if (getattr(self, "_campaign_joint_active", None) is None or self.direction != "open"
+                or getattr(self, "v2", False) or getattr(self, "close_push", False)
+                or self.gen("brace_search", True) or self.gen("stage2_push", False)
+                or self.gen("prep_push", None)):
+            return None
+        return [h for h in self._pinch_variants(self.handle)
+                if not CJG.start_was_written(self, self.campaign_handle_start(h))]
+
+    def _sample_with_campaign_handle(self, rng, init, manip, k):
+        options = self.campaign_handle_options()
+        if options is None:
+            return self._sample_with(rng, init, manip, k)
+        base, errors = self.handle, []
+        try:
+            for i in rng.permutation(len(options)):
+                self.handle = options[int(i)]
+                try:
+                    return self._sample_with(rng, init, manip, k)
+                except Reject as exc:
+                    errors.append(str(exc))
+        finally:
+            # Prefix-map identity always uses the original annotation, whose
+            # validated motion includes both assignments, on the next draw.
+            self.handle = base
+        raise Reject("handle_unreachable", "; ".join(errors)[-1500:])
 
     def _sample_with(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
         d = Draft()
@@ -1799,6 +1842,8 @@ class ArticulationSmall(SamplerV2):
                 "contacts": {key: {field: data.get(field) for field in ("object", "arm", "kind", "contact", "init")}
                              for key, data in ((key, value.to_sidecar()) for key, value in self.sidecar.contacts.items())},
             }
+            if self.campaign_handle_options() is not None:
+                d.summary["campaign_goal_group"]["requested_start"]["articulation_grasp"] = self.campaign_handle_start(self.handle)["articulation_grasp"]
             self.campaign_verify_articulation(d)
         return d
 
