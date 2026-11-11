@@ -65,3 +65,36 @@ def test_array_tasks_keep_authored_identity_when_pending_running_and_completed(m
     assert states['18440875_0']['worker_status']=='COMPLETED'
     assert states['18440875_1']['worker_status']=='RUNNING'
     assert states['18440875_2']['pending_reason']=='Priority'
+
+
+def test_vast_assignment_requires_fresh_exact_execution_heartbeat():
+    from scripts.campaign_20261110.heldout_recovery import vast_execution
+    import copy
+    state={'status':'assigned','instance':'42','tries':1}
+    mirror={'schema':'isg-vast-worker-heartbeat-mirror-v1','campaign_id':'campaign_20261110',
+        'instance_id':'42','observed_at_unix':995,'heartbeat':{'time':990,
+        'running':{'900001':{'phase':'run','runtime_started_unix':980}}}}
+    assert vast_execution('900001',state,now=1000)['worker_status']=='assigned_unverified'
+    good=vast_execution('900001',state,mirror,1000)
+    assert good['worker_status']=='running'and good['execution_verified']
+    assert good['worker_heartbeat_at']!=good['heartbeat_observed_at']
+    for key,value in [('time',800),('running',{})]:
+        bad=copy.deepcopy(mirror);bad['heartbeat'][key]=value
+        assert not vast_execution('900001',state,bad,1000)['execution_verified']
+    bad=copy.deepcopy(mirror);bad['instance_id']='43'
+    assert not vast_execution('900001',state,bad,1000)['execution_verified']
+    assert vast_execution('900002',state,mirror,1000)['worker_status']=='assigned_unverified'
+    assert vast_execution('900001',dict(state,status='synced'),mirror,1000)['worker_status']=='synced'
+
+
+@pytest.mark.parametrize('phase,status',[('fetch','fetching'),('upload','uploading')])
+def test_vast_fetch_upload_and_assignment_are_not_running_gpus(phase,status):
+    from scripts.campaign_20261110.heldout_recovery import vast_execution
+    state={'status':'assigned','instance':'42'}
+    mirror={'schema':'isg-vast-worker-heartbeat-mirror-v1','campaign_id':'campaign_20261110',
+        'instance_id':'42','observed_at_unix':995,'heartbeat':{'time':990,
+        'running':{'1':{'phase':phase,'runtime_started_unix':980}}}}
+    row=vast_execution('1',state,mirror,1000)
+    assert row['worker_status']==status and not row['execution_verified']
+    assert recovery_state(1,[row],{})=='awaiting_observation'
+    assert recovery_state(1,[{'worker_status':'assigned'}],{})=='awaiting_observation'

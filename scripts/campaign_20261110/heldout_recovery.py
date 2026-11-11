@@ -18,7 +18,7 @@ def read(p):return json.loads(pathlib.Path(p).read_text())
 def recovery_state(remaining,jobs,latest):
     if not remaining:return 'complete'
     states={j.get('worker_status')for j in jobs}
-    if states & {'assigned','running','RUNNING','COMPLETING'}:return 'running'
+    if states & {'running','RUNNING','COMPLETING'}:return 'running'
     if states & {'queued','staging','PENDING','CONFIGURING'}:return 'queued'
     if jobs:return 'awaiting_observation'
     status=(latest or{}).get('status')
@@ -28,6 +28,31 @@ def recovery_state(remaining,jobs,latest):
     if status in ('external_submission','awaiting_replay','awaiting_gate'):return 'awaiting_acceptance'
     if status=='failed' or (latest or{}).get('reason'):return 'failed'
     return 'unattempted'
+
+def vast_execution(jobid,state,mirror=None,now=None):
+    """Assignment is allocation evidence; only a fresh exact worker heartbeat proves execution."""
+    now=time.time()if now is None else now
+    status=state['status'];instance=str(state.get('instance')or state.get('instance_id')or '')
+    out={'worker_status':'assigned_unverified'if status=='assigned'else status,
+         'allocation_status':status,'instance_id':instance,'tries':state.get('tries',0),
+         'active':status not in ('synced','failed','cancelled'),'execution_verified':False}
+    if not mirror:return out
+    hb=mirror.get('heartbeat')or{};stamp=hb.get('time');observed=mirror.get('observed_at_unix')
+    row=(hb.get('running')or{}).get(str(jobid));out.update(worker_heartbeat_at=iso(stamp)if isinstance(stamp,(int,float))else None,
+        heartbeat_observed_at=iso(observed)if isinstance(observed,(int,float))else None,
+        heartbeat_source_payload_sha256=mirror.get('source_payload_sha256'))
+    fresh=(mirror.get('schema')=='isg-vast-worker-heartbeat-mirror-v1'
+        and mirror.get('campaign_id')=='campaign_20261110'and str(mirror.get('instance_id'))==instance
+        and isinstance(stamp,(int,float))and isinstance(observed,(int,float))
+        and -5<=now-stamp<=180 and -5<=now-observed<=180)
+    out['heartbeat_fresh']=fresh
+    if not fresh or not isinstance(row,dict)or not out['active']:return out
+    phase=row.get('phase');started=row.get('runtime_started_unix');out['worker_phase']=phase
+    if phase=='run'and isinstance(started,(int,float))and 0<started<=stamp+5:
+        out.update(worker_status='running',execution_verified=True,runtime_started_at=iso(started))
+    elif phase in ('fetch','upload'):
+        out['worker_status']={'fetch':'fetching','upload':'uploading'}[phase]
+    return out
 
 def scheduler_states(ids):
     """Read exact Slurm states; submission receipts never imply pending GPUs."""
@@ -99,6 +124,13 @@ def publish(root):
         if str(p)not in cache:
             value,source=observed_json(p,kind);cache[str(p)]=value;sources.append(source)
         return cache[str(p)]
+    def vast_job(jobid,state):
+        instance=str(state.get('instance')or state.get('instance_id')or '')
+        hp=root/'vast/worker_heartbeats'/(instance+'.json')
+        mirror=load(hp,'vast_worker_heartbeat')if instance.isdigit()and hp.exists()else None
+        result=vast_execution(jobid,state,mirror,now)
+        if mirror:result['heartbeat_source']=str(hp)
+        return result
     catalogpath=root/'manifests/dashboard_standard_catalog.json';catalog=standard_catalog(catalogpath);sources.append(ref(catalogpath));rows=targets(catalog)
     accepted,groups,snapshot_sources=snapshot(root);ledger,lref=read_ledger(root);eligible,_=assess(root,accepted,groups,ledger);counts=Counter();rawcounts=Counter();last=defaultdict(float)
     quotas={q.task:q for q in task_quotas()}
@@ -128,7 +160,8 @@ def publish(root):
                      'prepared_axial_passed_groups_r1.json','prepared_under_model_stance86_r1.json',
                      'prepared_under_category_remaining390_r1.json',
                      'prepared_under_category_stancef9_r1.json','prepared_under_model_refill86_r1.json',
-                     'prepared_held_jar_grid390_r1.json','prepared_held_blender_open_high390_r1.json'):
+                     'prepared_held_jar_grid390_r1.json','prepared_held_blender_open_high390_r1.json',
+                     'prepared_held_blender_open_highd03_r2.json','prepared_under_model_refill86_r2.json'):
         receipt=root/'infra/heldout_recovery'/filename
         if receipt.exists():
             directory=pathlib.Path(load(receipt)['controller'])
@@ -154,7 +187,7 @@ def publish(root):
         if a:
             job=dict(job_id=a['jobid'],job_dir=a['job_dir'],runtime=a['code'],controller_status=status)
             vp=root/'vast/state/jobs'/(a['jobid']+'.json')
-            if vp.exists():v=load(vp,'vast_job_state');job.update(worker_status=v['status'],tries=v.get('tries',0));job['active']=v['status']not in ('synced','failed','cancelled')
+            if vp.exists():job.update(vast_job(a['jobid'],load(vp,'vast_job_state')))
             else:job.update(worker_status='scheduler_state_not_observed',active=status not in ('complete','admitted','failed','retired_after_claim'))
         failure=record.get('error')or record.get('reason')or state.get('runtime_failure')or state.get('error');progress=max(float(v)for v in [pathlib.Path(path).stat().st_mtime,record.get('admitted_at',0),record.get('accepted_at',0),record.get('terminal_observed_at',0)]if isinstance(v,(int,float)))
         detail=[]
@@ -193,7 +226,7 @@ def publish(root):
                     job=dict(job,active=True,worker_status='scheduler_state_not_observed')
                     vp=root/'vast/state/jobs'/(job['job_id']+'.json')
                     if vp.exists():
-                        v=load(vp);job.update(worker_status=v['status'],active=v['status']not in ('synced','failed','cancelled'))
+                        job.update(vast_job(job['job_id'],load(vp)))
                 observations[key].append({'controller':'owned_native_engineering','controller_state':str(engineering),
                     'controller_config':str(engineering),'configuration':entry.get('configuration'),
                     'runtime':entry.get('runtime'),'bucket':entry.get('bucket'),'job':job,'failures':[],
