@@ -1754,9 +1754,37 @@ def closure_for_width(width: Optional[float], cfg, library: bool = True) -> Tupl
     return cfg.gripper_close_rate, None, False
 
 
+def campaign_pregrasp_transit(action, motions, targets, ctx, arm, supports, ignore_links):
+    """Try a complete checked path before the audited kielbasa's failed lift.
+
+    The existing Cartesian routine checks the world, protected objects, witness
+    branch and subsequent approach before moving. A failed motion never falls
+    through to a second plan from an assumed unchanged start.
+    """
+    from ispatialgym.sampling import campaign_runtime
+    if (getattr(action, "kind", None) != "library" or ignore_links or not supports
+            or not campaign_runtime.contact_recovery('kielbasa_cartesian_pregrasp')):
+        return False
+    moved = [0]
+    try:
+        yield from _counted(motions.cartesian_transit(arm, targets["pre_grasp"], _witness(ctx, "pre_grasp"),
+                           approach=targets.get("approach") or (), ignore_objects=()), moved)
+    except SkillError as exc:
+        ctx["pre_grasp_cartesian"] = {"ran": bool(moved[0]), "policy": "audited_kielbasa_first",
+                                      "why": exc.message[:240]}
+        if moved[0] or exc.reason != "plan_failed" or exc.details.get("stage") != "cartesian_transit":
+            raise
+        return False
+    ctx["pre_grasp_cartesian"] = {"ran": True, "policy": "audited_kielbasa_first"}
+    ctx["pre_grasp_transit"] = "checked Cartesian, supports and protected objects present"
+    return True
+
+
 def _grasp_transit(action: Grasp, motions: Motions, state, targets, ctx, arm: str, supports: Sequence[Any], ignore_links: Sequence[Any]) -> Iterator[th.Tensor]:
     """The free move to the pre-grasp (``execute_grasp``): through a recorded standoff, a lever grasp's Cartesian detour, or
     the supports-present plan of ``reach_pre_pose`` (the supports-ignored plan as its fallback)."""
+    if (yield from campaign_pregrasp_transit(action, motions, targets, ctx, arm, supports, ignore_links)):
+        return
     standoff_m = _grasp_extra_float(action, "approach_standoff_m")
     if standoff_m:
         yield from reach_via_standoff(motions, arm, targets["pre_grasp"], standoff_m, _witness(ctx, "pre_grasp"), supports, ctx)

@@ -84,6 +84,8 @@ def contact_recovery(option: str) -> bool:
     contact construction or grasp closure, never goal poses or tolerances.
     """
     classes = {
+        'kielbasa_cartesian_pregrasp': ('inter_object_relation_satisfaction-ontop_small_scale_01',
+                                      'inter_object_relation_satisfaction-ontop_small_scale'),
         'carton_press_slide_envelope': ('configuration_matching-articulation_open_small_scale_02',
                                        'configuration_matching-articulation_open_small_scale'),
         'milk_clutter_approach': ('disembedding_04', 'disembedding'),
