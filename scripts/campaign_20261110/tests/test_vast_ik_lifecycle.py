@@ -74,3 +74,24 @@ def test_optin_never_assigns_to_old_worker_but_normal_work_continues():
     hb['3']['exact_ik_exchange_version']=1
     plan,_=assignment_plan([jobs[0]],live,hb,{}, {},10)
     assert plan[0][2]['id']=='1'
+
+
+def test_staging_verifies_manifest_in_native_interpreter_without_rewriting(tmp_path,monkeypatch):
+    root,spec=fixture(tmp_path);job=Path(spec['job_dir']);manifest=Path(spec['exact_ik_exchange']['manifest_path']);native=tmp_path/'native-python';native.touch();monkeypatch.setattr(ik_transport,'NATIVE_PYTHON',native)
+    env={'ISGE_CODE':'/native','ISPATIALGYM_CAMPAIGN_CONFIG':'/config'};seen=[]
+    def run(command,**kwargs):
+        seen.append((command,json.loads(kwargs['input'])))
+        return SimpleNamespace(returncode=0,stdout=json.dumps({'verified':True,'manifest_sha256':ik_transport.sha(manifest),'native_interpreter':str(native)}))
+    monkeypatch.setattr(ik_transport.subprocess,'run',run);before=manifest.read_bytes()
+    ik_transport.verify_native_manifest(job,manifest,env,root/'helper')
+    assert seen[0][0][0]==str(native) and seen[0][1]['environment']==env
+    assert manifest.read_bytes()==before
+    assert (job/'exact_ik_native_verification.json').exists()
+
+
+def test_staging_native_mismatch_cannot_become_a_receipt(tmp_path,monkeypatch):
+    root,spec=fixture(tmp_path);job=Path(spec['job_dir']);manifest=Path(spec['exact_ik_exchange']['manifest_path']);native=tmp_path/'native-python';native.touch();monkeypatch.setattr(ik_transport,'NATIVE_PYTHON',native)
+    monkeypatch.setattr(ik_transport.subprocess,'run',lambda *a,**k:SimpleNamespace(returncode=1,stderr='semantic modules differ'))
+    with pytest.raises(ValueError,match='semantic modules differ'):
+        ik_transport.verify_native_manifest(job,manifest,{'ISGE_CODE':'/native','ISPATIALGYM_CAMPAIGN_CONFIG':'/config'},root/'helper')
+    assert not(job/'exact_ik_native_verification.json').exists()

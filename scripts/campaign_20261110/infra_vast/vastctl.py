@@ -443,12 +443,23 @@ def stage(s3, rec, state):
 def stage_native_dependency(s3, rec, state):
     """Use the existing private worker transport for an exact native canary."""
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-    from scripts.campaign_20261110 import vast_native_dependency as native
+    typed=json.loads((Path(rec['job_dir'])/'native_inputs.json').read_text())
+    diagnostic=typed.get('schema')=='isg-vast-ik-native-probe-v1'
+    if diagnostic:
+        from scripts.campaign_20261110 import vast_ik_probe as native
+    else:
+        from scripts.campaign_20261110 import vast_native_dependency as native
     jd=rec['job_dir'];value=native.verify(jd,OFH)
     if native.sha(Path(jd)/'native_inputs.json') != rec['native_inputs_sha256']:
         raise ValueError('native dependency manifest changed after enqueue')
     code=value['snapshot'];b1k=os.path.dirname(os.path.realpath(os.path.join(code,'Behavior-1K','OmniGibson')))
     code_keys=['bundle/tools/rsync.tar.zst',ensure_code(s3,code,state)]
+    exact_ik=None
+    if diagnostic:
+        helper_code=value['helper_snapshot']
+        code_keys.append(ensure_code(s3,helper_code,state))
+        exact_ik=ik_transport.prepare(OFH,jd,read_env(jd),s3,BUCKET,PREFIX,helper_code)
+        if not exact_ik:raise ValueError('native cache probe requires typed exchange context')
     if not under(b1k,[code]):code_keys.append(ensure_code(s3,b1k,state))
     listing=Lister([code,b1k]+list(STORES)+list(CACHES)+list(NOT_SHIPPED));listing.add_tree(jd)
     for name in value['files']:listing.add_file(name)
@@ -467,6 +478,7 @@ def stage_native_dependency(s3, rec, state):
     spec.update(code=[{'key':key} for key in code_keys],jobdata=f"jobs/{rec['id']}/jobdata.tar.zst",
                 scenes=value['scenes'],git_roots=roots,staged=now(),
                 inputs={'entries':len(listing.items),'bytes':listing.bytes,'native_manifest_sha256':rec['native_inputs_sha256']})
+    if exact_ik:spec['exact_ik_exchange']=exact_ik
     log(f"STAGED_NATIVE {rec['id']} {listing.bytes / 2**20:.1f} MB; original runtime {os.path.basename(code)}")
     return spec
 

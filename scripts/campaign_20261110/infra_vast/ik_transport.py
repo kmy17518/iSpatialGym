@@ -8,6 +8,7 @@ import time
 import re
 import sys
 import tempfile
+import subprocess
 
 _CODE = str(Path(__file__).resolve().parents[3])
 if _CODE not in sys.path:
@@ -24,17 +25,52 @@ def atomic(path,value):
     tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(value,sort_keys=True)+'\n');tmp.replace(path)
 
 
+NATIVE_PYTHON = Path('/vision/u/minyeong/miniconda3/envs/ispatialgym-vectorized-envs/bin/python')
+
+
+def verify_native_manifest(job, manifest_path, environment, helper_code):
+    """AST semantic hashes must be checked by the actual native Python version.
+
+    Only pure read-only compatibility code runs here; no simulator or cache is
+    loaded. The immutable manifest is compared, never rebuilt or weakened.
+    """
+    if not NATIVE_PYTHON.is_file():
+        raise ValueError('native interpreter unavailable for exact-IK verification')
+    request = {'helper': str(helper_code), 'manifest': str(manifest_path),
+               'code': environment['ISGE_CODE'],
+               'config': environment['ISPATIALGYM_CAMPAIGN_CONFIG'],
+               'environment': environment}
+    code = """import json,sys,pathlib,hashlib
+r=json.load(sys.stdin);sys.path.insert(0,r['helper'])
+from scripts.campaign_20261110.ik_compatibility import verify_running
+p=pathlib.Path(r['manifest']);m=json.loads(p.read_text())
+verify_running(m,r['code'],r['config'],r['environment'])
+print(json.dumps({'verified':True,'compatibility_id':m['compatibility_sha256'],
+ 'manifest_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+ 'native_interpreter':sys.executable,'python_version':sys.version}))
+"""
+    result = subprocess.run([str(NATIVE_PYTHON), '-c', code], input=json.dumps(request),
+                            text=True, capture_output=True, timeout=120)
+    if result.returncode:
+        raise ValueError('native exact-IK compatibility failed: ' + result.stderr[-1200:])
+    proof = json.loads(result.stdout)
+    if proof.get('verified') is not True or proof.get('manifest_sha256') != sha(manifest_path):
+        raise ValueError('native exact-IK verification receipt differs')
+    atomic(Path(job)/'exact_ik_native_verification.json', proof)
+    return proof
+
+
 def prepare(root,job,env,s3,bucket,prefix,helper_code):
     """Only explicitly instrumented new jobs opt in; old native jobs stay intact."""
     manifest_path=env.get('ISPATIALGYM_EXACT_IK_MANIFEST')
     if not manifest_path:return None
     root,job,manifest_path=Path(root).resolve(),Path(job).resolve(),Path(manifest_path).resolve()
     if root.name!=CAMPAIGN or not job.is_relative_to(root/'out') or not manifest_path.is_relative_to(root):raise ValueError('foreign IK exchange input')
-    from scripts.campaign_20261110.ik_compatibility import validate_manifest,verify_running
+    from scripts.campaign_20261110.ik_compatibility import validate_manifest
     from scripts.campaign_20261110.ik_exchange import pack_delta
     manifest=validate_manifest(json.loads(manifest_path.read_text()))
     effective={**manifest.get('provenance',{}).get('environment',{}),**env}
-    verify_running(manifest,env['ISGE_CODE'],env['ISPATIALGYM_CAMPAIGN_CONFIG'],effective)
+    verify_native_manifest(job,manifest_path,effective,helper_code)
     native=Path(env['ISGE_CODE'])/'ispatialgym/sampling/v2/ik.py'
     if 'register_query' not in native.read_text():raise ValueError('native runtime has no validated exact witness writer')
     exchange=root/'ik_exchange';identity=manifest['compatibility_sha256'];ms=sha(manifest_path)
