@@ -180,7 +180,10 @@ def coverage_facts(row, raw, template=None):
     requested_removed = perturb.get('removed_objects')
     moved = runtime.get('augmentation', {}).get('moved_objects')
     lighting = runtime.get('augmentation', {}).get('lighting')
-    return {'scene': scene.get('model'), 'room': row.get('room'), 'models': sorted(set(models)),
+    room = row.get('room')
+    if not room and template is not None and template.get('room') in scene.get('task_rooms', []):
+        room = str(scene.get('model'))+'/'+template['room']
+    return {'scene': scene.get('model'), 'room': room, 'models': sorted(set(models)),
         'supports': sorted(set(supports)) if template is not None else None,
         'scales': scales, 'scale_objects_without_observation': len(models)-len(scales),
         'lighting': lighting, 'lighting_requested': perturb.get('lighting'),
@@ -234,6 +237,7 @@ def build_projection(root):
     now = datetime.now(timezone.utc).isoformat()
     cohorts, records, checked = {}, {}, set()
     coverage, templates = [], {}
+    coverage_tasks, coverage_classes = defaultdict(list), defaultdict(list)
     tasks, classes, totals = Counter(), Counter(), Counter()
     for row in rows:
         if row['split'] != 'train': continue
@@ -257,6 +261,8 @@ def build_projection(root):
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 fact = {'error': str(exc)}
             coverage.append(fact)
+            coverage_tasks[row['task']].append(fact)
+            coverage_classes[row.get('class_id', row['task'])].append(fact)
             proof['coverage'] = fact
         key = (row['task'], row.get('class_id', row['task']), decision['status'], decision['category'], tuple(decision['reasons']))
         cohort_id = digest(key)[:20]
@@ -279,7 +285,9 @@ def build_projection(root):
         'tasks': [{'task': task, 'eligible_accepted': n} for task,n in sorted(tasks.items())],
         'classes': [{'class_id': cls, 'eligible_accepted': n} for cls,n in sorted(classes.items())],
         'coverage': {**coverage_summary(coverage), 'excluded_historical_instances_not_counted': totals['excluded'],
-                     'unverified_instances_not_counted': totals['unverified']},
+                     'unverified_instances_not_counted': totals['unverified'],
+                     'by_task': {task:coverage_summary(coverage_tasks[task]) for task in sorted(tasks)},
+                     'by_class': {cls:coverage_summary(coverage_classes[cls]) for cls in sorted(classes)}},
         'cohorts': list(cohorts.values()), 'records': records,
         'raw_generated': None, 'raw_generated_note': 'not inferred from accepted totals; see native attempt accounting',
         'policy': 'standalone blocked; preserve historical acceptance; eligible standard siblings/singletons only'}
