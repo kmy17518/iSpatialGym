@@ -1,5 +1,5 @@
 """i7-ul02guide (owner 2026-11-10, under_large_02): the desk's leg panel as a guide wall for the standing briefcase's floor push -
-``ISPATIALGYM_PUSH_GUIDE_WALL`` (default off): the wall scan's reduction, the lanes beside a wall, the goal-yaw snap, the switch's scope, the
+``ISPATIALGYM_PUSH_GUIDE_WALL`` (default on since lead #99f): the wall scan's reduction, the lanes beside a wall, the goal-yaw snap, the switch's scope, the
 ``"endwise"`` yaw lock, the push record and the oracle's lean / aim in the strokes (no simulator)."""
 
 from __future__ import annotations
@@ -97,7 +97,14 @@ def _s(variant=UL02, hull=None, partner_yaw=-math.pi / 2, **gen):
     return s
 
 
+def test_switch_default_on(monkeypatch):
+    assert IL.push_guide_wall_on() and _s().guide_wall_active()
+    monkeypatch.setenv(IL.PUSH_GUIDE_WALL_ENV, "0")
+    assert not IL.push_guide_wall_on() and not _s().guide_wall_active()
+
+
 def test_switch_scope(monkeypatch):
+    monkeypatch.setenv(IL.PUSH_GUIDE_WALL_ENV, "0")
     assert not _s().guide_wall_active() and _s().push_yaw_lock() is None and _s().init_yaw_jitter() == IL.TARGET_JITTER
     assert _s().end_aligned_init_yaw(0.3, 0.0) is None
     monkeypatch.setenv(IL.PUSH_GUIDE_WALL_ENV, "1")

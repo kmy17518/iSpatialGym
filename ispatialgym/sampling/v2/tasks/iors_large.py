@@ -527,7 +527,7 @@ def floorpush_switches(env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
 # lever 0.165 m) and topples once the hand reaches the end face's corner. desk_mdhelw_0 (office_cubicles_right) stands on two full-depth
 # side panels, floor to top (its B4 under-clearance raster: 0.01 m clearance in the rows x 15.32-15.47 and 16.77-16.92 across every
 # column): a briefcase pushed ALONG such a panel with its broad face against it cannot turn about the vertical (the wall takes the torque)
-# and cannot topple toward it. ``ISPATIALGYM_PUSH_GUIDE_WALL=1`` (default OFF; only the variants in :data:`PUSH_GUIDE_WALL_VARIANTS` -
+# and cannot topple toward it. ``ISPATIALGYM_PUSH_GUIDE_WALL`` (default ON since lead #99f; ``=0`` off; only the variants in :data:`PUSH_GUIDE_WALL_VARIANTS` -
 # under_large_02 - with a pitched floor push of an elongated footprint): (1) stance C's push lanes are the lanes beside a guide wall the
 # horizontal ray scan finds (:meth:`IORSLarge.guide_walls`, :func:`guide_faces_from_hits`) - the target's broad face
 # :data:`PUSH_GUIDE_GAP_M` off the wall - with the drop either just outside the edge or ALONGSIDE the panel (:data:`PUSH_GUIDE_DROP_OUTS_M`);
@@ -581,8 +581,9 @@ PUSH_GUIDE_HAND_AHEAD_M = (0.49, 0.875)
 
 
 def push_guide_wall_on() -> bool:
-    """:data:`PUSH_GUIDE_WALL_ENV` (default off)."""
-    return os.environ.get(PUSH_GUIDE_WALL_ENV, "0").strip().lower() in _ON
+    """:data:`PUSH_GUIDE_WALL_ENV` (default ON since lead #99f, 2026-11-10: ug2_ul02_on 22/8/6 at 0.89 GPU-h/ok, 0 topples, end yaw <= 3.9 deg
+    vs ug_ul02_off 0 ok in 6 demos, 2 topples; "0" / "off" restores today's push)."""
+    return os.environ.get(PUSH_GUIDE_WALL_ENV, "1").strip().lower() in _ON
 
 
 def guide_push_in_reach(stand_off: float, out: float, inside: float, half: float, window: Tuple[float, float] = PUSH_GUIDE_HAND_AHEAD_M) -> bool:
