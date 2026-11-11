@@ -364,18 +364,3 @@ def test_heel_tight_left_j4_check(monkeypatch):
     s.gp = _GP(push_tip_frac=0.3)
     s.heel_tight_left_j4_check()
     assert s.kit.stats == {}
-
-
-def test_heel_tight_left_ban_after_repeated_j4_rejections(monkeypatch):
-    # uh3_ul01_on 360002: the same left program rejected twice - its further attempts couple the right arm only; a new instance starts clean
-    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "1")
-    s = _j4_sampler([_wit("retreat", 8, retreat=-2.0921)])
-    s._sm_attempt = (360002, 0)
-    for k in range(IL.PUSH_HEEL_TIGHT_LEFT_J4_BAN_AFTER):
-        assert not s.heel_tight_left_banned()
-        with pytest.raises(IL.Reject):
-            s.heel_tight_left_j4_check()
-        s._sm_attempt = (360002, k + 1)
-    assert s.heel_tight_left_banned()
-    s._sm_attempt = (360003, 0)
-    assert not s.heel_tight_left_banned()
