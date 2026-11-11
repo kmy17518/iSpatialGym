@@ -26,6 +26,7 @@ SOURCES = {
     'capacity': 'infra/capacity_recovery/ledger.json',
     'eligibility': 'accounting/current_eligibility.json',
     'production_gate': 'controllers/training_production_gate.json',
+    'assignments': 'infra/execution_assignments.json',
 }
 STAGES = ('implemented', 'submitted', 'native', 'demo', 'physics_replay', 'rendering', 'accepted')
 
@@ -96,6 +97,20 @@ def build(root, now=None):
     result = []; requirements = values['requirements'].get('requirements', [])
     def reqs(task):
         return [r['id'] for r in requirements if task in (r.get('tasks') or []) or r.get('scope') == 'all']
+    for assignment in values['assignments'].get('workstreams', []):
+        activity = worker_activity({'worker_observed_at': assignment.get('observed_at'),
+                                    'active_jobs': assignment.get('jobs', [])}, now)
+        result.append(row('workstream:'+assignment['id'], 'workstream', assignment['owner'], refs['assignments'],
+            status=assignment.get('status', 'assigned'), **activity,
+            requirement_ids=assignment.get('requirement_ids', []),
+            responsibilities=assignment.get('responsibilities', []),
+            dependencies=assignment.get('dependencies', []), artifacts=assignment.get('evidence', []),
+            controller=assignment.get('controllers', []),
+            engineering_activity=assignment.get('engineering_activity'),
+            next_artifact=assignment.get('next_artifact'), next_action=assignment.get('next_action'),
+            exit_criteria=assignment.get('exit_criteria'),
+            verification={'status': 'assignment_only', 'verification_requires_original_artifacts': True},
+            acceptance={'status': 'not_applicable', 'assignment_does_not_authorize_release': True}))
     for r in requirements:
         chain = r.get('chain') or {}
         result.append(row('requirement:'+r['id'], 'requirement', chain.get('owner', r.get('owners', 'unassigned')),

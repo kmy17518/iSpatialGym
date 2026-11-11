@@ -101,5 +101,21 @@ class ExecutionLedgerTests(unittest.TestCase):
         self.assertEqual(r['activity_observation']['nonactive_or_unverified_reports'], len(history))
         self.assertEqual(r['acceptance']['accepted_standard'], 1)
 
+    def test_assignments_link_owned_work_without_granting_validation(self):
+        job = {'job_id': '2397', 'status': 'queued'}
+        self.put('assignments', {'workstreams': [{'id': 'canonical', 'owner': '/root',
+            'observed_at': 1000, 'jobs': [job], 'dependencies': [{'path': 'reader.json', 'sha256': 'exact'}],
+            'next_action': 'Validate native result, then fresh annotated group.',
+            'next_artifact': 'own_replay.json', 'requirement_ids': ['strict_sibling']} ]})
+        value = build(self.root, 1001); assignment = value['rows'][0]
+        self.assertEqual(assignment['id'], 'workstream:canonical')
+        self.assertEqual(assignment['active_work'], [job])
+        self.assertEqual(assignment['verification']['status'], 'assignment_only')
+        self.assertTrue(assignment['acceptance']['assignment_does_not_authorize_release'])
+        self.assertTrue(assignment['sources'][0]['sha256'])
+        self.assertTrue(all(s['status'] == 'unobserved' for s in assignment['stages'].values()))
+        self.assertIsNone(value['accepted']['counts'])
+        self.assertEqual(build(self.root, 1701)['rows'][0]['active_work'], [])
+
 
 if __name__=='__main__':unittest.main()
