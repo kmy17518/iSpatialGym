@@ -18,7 +18,7 @@ def source_stance_hint_enabled(relation, scale, class_id):
         'ontop': {'inter_object_relation_satisfaction-ontop_small_scale_'+suffix
                   for suffix in ('01', '02', '04')},
         'under': {'inter_object_relation_satisfaction-under_small_scale_'+suffix
-                  for suffix in ('01', '03', '04')},
+                  for suffix in ('01', '02', '03', '04')},
     }
     return scale == 'small' and (relation == 'inside' or
         class_id in recovered_pairs.get(relation, set()))

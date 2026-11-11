@@ -71,16 +71,31 @@ def test_source_stance_nextto_scope_does_not_enable_other_pair_classes():
 
 def test_measured_small_pair_scope_preserves_unmeasured_and_large_classes():
     from ispatialgym.sampling.campaign_tabletop_starts import source_stance_hint_enabled
-    for relation, suffixes in [('under', ('01','03','04')), ('ontop', ('01','02','04'))]:
+    for relation, suffixes in [('under', ('01','02','03','04')), ('ontop', ('01','02','04'))]:
         for suffix in suffixes:
             cls='inter_object_relation_satisfaction-'+relation+'_small_scale_'+suffix
             assert source_stance_hint_enabled(relation, 'small', cls)
             assert not source_stance_hint_enabled(relation, 'large', cls)
             assert not source_stance_hint_enabled('touching', 'small', cls)
     assert source_stance_hint_enabled('nextto','small','inter_object_relation_satisfaction-nextto_03')
-    for relation, suffix in [('under','02'),('ontop','03')]:
+    for relation, suffix in [('ontop','03')]:
         cls='inter_object_relation_satisfaction-'+relation+'_small_scale_'+suffix
         assert not source_stance_hint_enabled(relation,'small',cls)
+    assert not source_stance_hint_enabled('under','small',
+        'inter_object_relation_satisfaction-under_small_scale-rubber_eraser-notepad')
+
+
+def test_under_model_source_torso_survives_frame_ranked_shortlist():
+    from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
+    # Exact source1720 succeeds with this torso. Group1730 omitted the source
+    # hint and repeatedly tried .75/-.19 or .25/-.53, failing45 place draws.
+    source={'base_pose2d':[.736221,.396588,.013213],
+            'focus':[1.486156,.406497,.802645],'translate':.5,'tilt':-.6813}
+    candidates=[SimpleNamespace(**{**source,'translate':.75,'tilt':-.19}) for _ in range(8)]
+    candidates.append(SimpleNamespace(**source))
+    order=list(range(9));ranked=prioritize_written_stances(order,candidates,[source])
+    assert ranked[:4]==order[:4] and ranked[4]==8
+    assert sorted(ranked)==order and len(set(ranked))==len(order)
 
 
 def test_under_source_torso_and_focus_ranking_retains_checked_pool():
