@@ -33,6 +33,7 @@ class SurfaceGoalPlan:
     deadline_at: float
     max_members: int
     sha256: str
+    anchor_base_pose2d: tuple | None = None
 
     def summary(self):
         return {"campaign_id": self.campaign_id, "group_id": self.group_id, "split": self.split,
@@ -68,9 +69,11 @@ def validate_surface_plan(raw, *, template_id, scene, rooms, activated_at, now=N
         raise GoalGroupTimeout("surface goal-group time budget expired")
     count = raw.get("max_members", 3)
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid group size")
+    from ispatialgym.sampling.campaign_tabletop_starts import anchor_base
+    anchor = anchor_base(raw)
     fingerprint = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     return SurfaceGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], raw["task"], template_id, sha, position,
-                           orientation, (lo, hi), deadline, count, fingerprint)
+                           orientation, (lo, hi), deadline, count, fingerprint, anchor)
 
 
 def load_surface_plan(*, template_id, scene, rooms, activated_at, expected_sha256=None):

@@ -104,3 +104,33 @@ def test_fixed_goal_ranks_checked_pool_and_deduplicates_stance_not_focus():
     assert [c.tag for c in result] == ['near','third','second']
     assert all(any(c is original for original in [far,second,near,third]) for c in result)
     assert far.focus[0] == 4  # source pool and physical stance geometry stay intact
+
+
+def test_anchor_lateral_proposals_still_use_native_checks_then_random_fallback(monkeypatch):
+    import numpy as np
+    s = ax.AlignmentAxial.__new__(ax.AlignmentAxial)
+    s._campaign_surface_active = SimpleNamespace(orientation=[0.,0.,0.,1.], anchor_base_pose2d=(.6,-1.,0.))
+    edge = SimpleNamespace(name='front', mid=th.tensor([0.,0.]), tangent=th.tensor([1.,0.]), length=2.,
+        base_xy=lambda distance, lateral: th.tensor([lateral,-distance]))
+    initial = SimpleNamespace(stand_off=1., base_pose2d=(0.,-1.,0.))
+    s.g = lambda key: {}; s.top=object(); s.band_spec=object(); s.gp=SimpleNamespace(variant='fixture')
+    s._campaign_edge_matches_goal = lambda st: True
+    s.axial_maps = lambda: None
+    monkeypatch.setattr(ax.TT,'edge_candidates',lambda *a:[(edge,initial)])
+    monkeypatch.setattr(ax.TT,'ensure_bands',lambda *a,**kw:None)
+    monkeypatch.setattr(ax.TT,'contact_maps_on',lambda:True)
+    monkeypatch.setattr(ax.TT,'phase1b_init_trunk',lambda *a,**kw:initial)
+    monkeypatch.setattr(ax.TT,'phase1c_bounds',lambda *a,**kw:((-.8,.8),{},None))
+    proposals=[]
+    def native(*a, **kw):
+        proposals.append(kw['lateral'])
+        raise Reject('stance_collision','native collision gate')
+    monkeypatch.setattr(ax.TT,'phase1c_lateral',native)
+    errors=[]
+    assert not s._start_search(np.random.default_rng(3),{'H_max':.02,'w_diag':.1},errors)
+    assert len(proposals)==6 and all(.52<=v<=.68 for v in proposals[:5]) and proposals[-1] is None
+    assert 'native collision gate' in errors[-1]
+    # An unconfigured sampler follows its original random proposal directly.
+    s._campaign_surface_active=None; proposals.clear()
+    assert not s._start_search(np.random.default_rng(3),{'H_max':.02,'w_diag':.1},[])
+    assert proposals==[None]

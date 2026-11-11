@@ -34,6 +34,13 @@ class SurfacePlanTests(unittest.TestCase):
             validate(raw(), now=501)
         self.assertEqual(validate(raw(task="alignment-axial")).task, "alignment-axial")
 
+    def test_optional_anchor_guides_proposals_without_pinning_the_base(self):
+        p = validate(raw(anchor_base_pose2d=[1., 2., .3]))
+        self.assertEqual(p.anchor_base_pose2d, (1., 2., .3))
+        self.assertNotIn('base_pose2d', p.summary())
+        with self.assertRaises(s.GoalPlanError):
+            validate(raw(anchor_base_pose2d=[1., float('nan'), .3]))
+
     def test_training_buckets_do_not_relax_physical_bounds_or_block_sampling(self):
         allowed = tuple(math.radians(v) for v in [15, 25])
         train = validate(raw(split="train", magnitude_range_deg=[30, 40]))

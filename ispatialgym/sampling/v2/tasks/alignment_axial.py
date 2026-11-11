@@ -208,7 +208,10 @@ class AlignmentAxial(SamplerV2):
         edges' failures go to ``errors``. ``sample_template`` runs it with the template seed, :meth:`spa_redraw_start` with the attempt's rng."""
         ez, w_diag = float(margins["H_max"]), float(margins["w_diag"])
         ev = self.g("edge_visibility") or {}
-        for edge, st in TT.edge_candidates(self, self.top, rng):
+        from ispatialgym.sampling import campaign_tabletop_starts as CTS
+        campaign_plan = getattr(self, "_campaign_surface_active", None)
+        anchor = getattr(campaign_plan, "anchor_base_pose2d", None)
+        for edge, st in CTS.ordered_edges(TT.edge_candidates(self, self.top, rng), anchor):
             try:
                 campaign_plan = getattr(self, "_campaign_surface_active", None)
                 if campaign_plan is not None and not self._campaign_edge_matches_goal(st):
@@ -224,8 +227,21 @@ class AlignmentAxial(SamplerV2):
                     self.left_bands = TT.load_left_contact_band(self, ez, top=self.top, edge=edge, compute=TT.left_band_compute())
                 init0 = TT.phase1b_init_trunk(self, st, ez, bands=bands, top=self.top, left_bands=self.left_bands)
                 init = None
-                for _ in range(8):  # §6.10: retry the next lateral position before the next edge (8 draws: the rule is sensitive to the lateral)
-                    cand = TT.phase1c_lateral(self, init0, margins, rng, top=self.top, bands=bands)
+                for lateral_try in range(8):  # §6.10: retry the next lateral position before the next edge
+                    # A fixed world goal cannot follow a random far-away base.
+                    # Prefer its proven viewpoint, then retain ordinary draws;
+                    # every proposal still runs the original Phase-1c checks.
+                    preferred = anchor is not None and lateral_try < 5
+                    lateral = None
+                    if preferred:
+                        bounds, _, _ = TT.phase1c_bounds(self, init0, margins, top=self.top, strict=True)
+                        lateral = CTS.near_lateral(rng, float(bounds[0]), float(bounds[1]), CTS.edge_lateral(edge, anchor))
+                    try:
+                        cand = TT.phase1c_lateral(self, init0, margins, rng, top=self.top, bands=bands, lateral=lateral)
+                    except Reject:
+                        if preferred:
+                            continue
+                        raise
                     cand.name = "init"
                     # the reference edge must be in frame from the init camera: with the recomputed (deeper) bands Δ_aim
                     # puts the camera high enough for the near edge to leave the image bottom, so the init translate is
