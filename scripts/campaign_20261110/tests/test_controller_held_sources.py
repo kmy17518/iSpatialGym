@@ -63,3 +63,39 @@ def test_model_catalog_is_reaudited_then_pinned_against_rewrite(tmp_path, monkey
     c.write_json_atomic(cfg['seed_catalog'],raw)
     with pytest.raises(c.ContractError,match='removed or changed'):
         sources.load_seeds(cfg,state)
+
+
+def test_category_source_requires_explicit_task_and_preserves_held_split(tmp_path, monkeypatch):
+    cfg, proof, allocation, library = fixture(tmp_path, monkeypatch)
+    cfg.update(source_split='eval_category', admitted_tasks=['object_scaling'])
+    proof['template'].update(split='eval_category', class_id='object_scaling-tennis_ball')
+    spec = sources.make_seed(proof, allocation, cfg, tmp_path)
+    assert spec['id'].startswith('held_category_') and spec['task'] == 'object_scaling'
+    assert spec['class_id'] == 'object_scaling-tennis_ball' and spec['v2_root'] == str(library)
+    assert spec['seed_config'] == proof['config']['path'] and spec['existing_queues'] == []
+    with pytest.raises(c.ContractError, match='explicit held task ownership'):
+        sources.make_seed(proof, allocation, {**cfg, 'admitted_tasks': []}, tmp_path)
+    with pytest.raises(c.ContractError, match='outside owned tasks'):
+        sources.make_seed(proof, allocation, {**cfg, 'admitted_tasks': ['mental_rotation']}, tmp_path)
+    proof['template']['split'] = 'train'
+    with pytest.raises(c.ContractError, match='requires category evaluation'):
+        sources.make_seed(proof, allocation, cfg, tmp_path)
+
+
+def test_category_catalog_reaudits_category_proof_and_pins_one_source_per_task(tmp_path, monkeypatch):
+    cfg, proof, allocation, _ = fixture(tmp_path, monkeypatch)
+    cfg.update(source_split='eval_category', admitted_tasks=['object_scaling'])
+    proof['template'].update(split='eval_category', class_id='object_scaling-tennis_ball')
+    spec = sources.make_seed(proof, allocation, cfg, tmp_path)
+    sources.append_seed(cfg['seed_catalog'], spec, 'campaign')
+    observed = []
+    def audit(*args, **kwargs):
+        observed.append(kwargs['permitted_split'])
+        return proof
+    monkeypatch.setattr(sources, 'source_proof', audit)
+    monkeypatch.setattr(sources, 'allocations', lambda root: [allocation])
+    assert sources.load_seeds(cfg, {}) == [spec] and observed == ['eval_category']
+    second = {**spec, 'id': spec['id'] + '_different', 'class_id': 'object_scaling-another'}
+    sources.append_seed(cfg['seed_catalog'], second, 'campaign')
+    with pytest.raises(c.ContractError, match='multiple pinned sources'):
+        sources.load_seeds(cfg, {})
