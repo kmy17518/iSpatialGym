@@ -50,6 +50,7 @@ try:
     from .fleet_accounting import observe as observe_rentals
     from .fleet_policy import rental_ceiling
     from . import ik_transport
+    from . import cluster_return
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision, preserved_instances
     from bounded_process import run_bounded
@@ -62,6 +63,7 @@ except ImportError:
     from fleet_accounting import observe as observe_rentals
     from fleet_policy import rental_ceiling
     import ik_transport
+    import cluster_return
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -1067,6 +1069,11 @@ def tick(c, s3, state):
     publish_metrics(C, states, live, hbs, assigned_observed, t, list_ok, tot, committed_observed,
                     sum(float(i.get("dph_total") or 0) for i in live.values()), "dispatching")
     # 3. Prefer explicitly prioritized ready production; otherwise preserve FIFO.
+    # Only the coordinator may remove a never-assigned typed map from this queue.
+    # Account submitters wait for its durable acknowledgement before submitting.
+    if cluster_return.has_pending(F):
+        remote_jobs = {Path(key).stem for key in r2_list(s3, 'assign/')}
+        cluster_return.reconcile(F, states, STAGER.active(), hbs, remote_jobs, save_state)
     queued = dispatch_order(states.values(), C)
     for job in queued:
         job['compatible_gpus'] = compatible_gpus(job.get('gpu') or C['default_gpu'], C)
