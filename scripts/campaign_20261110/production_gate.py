@@ -203,8 +203,6 @@ def check_environment(root, environment, *, kind='collection', start=None, count
         if split != 'train': raise ValueError('unknown campaign split')
         result.update(category='standalone_training', reason='standalone training production blocked')
         if policy is None: return result
-        if not canonical_training_ready(root):
-            return {**result,'category':'eval_validation_hold','reason':'owner hold: all100 exact canonical eval classes must validate before standalone training or new instance-generation canaries'}
         # Reopening is intentionally unsupported until the required complete
         # pipeline has an implemented evidence verifier. A hand-edited flag
         # must never act as a production release.
@@ -225,6 +223,8 @@ def check_environment(root, environment, *, kind='collection', start=None, count
             result['heldout_parallel_work'] = heldout_parallel_ready(root,config,result['config_sha256'],proof)
             return {**result, 'allowed': True, 'category': 'validation_canary',
                     'reason': 'exact bounded pipeline canary', 'authorization': authorization}
+        if not canonical_training_ready(root):
+            return {**result,'category':'eval_validation_hold','reason':'bulk standalone training requires all100 exact canonical eval classes; only separately authorized bounded pipeline canaries may run earlier'}
         return result
     except (OSError, ValueError, TypeError, KeyError, StopIteration, sqlite3.Error) as exc:
         return {**result, 'allowed': False, 'reason': 'unverified collection scope: ' + str(exc)}
