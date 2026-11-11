@@ -75,7 +75,18 @@ def publish(root):
         p=root/'dataset/groups'/(r.get('group_id','')+'.json')
         if p.is_file():last[key]=max(last[key],p.stat().st_mtime)
     # The active supervisor manifest selects the precise configs during helper handoff.
-    manifest=root/'infra/handoffs/eval100_impact9a/manifest.json';workers=load(manifest)['workers'];observations=defaultdict(list);ownership=defaultdict(list)
+    manifest=root/'infra/handoffs/eval100_impact9a/manifest.json';workers=list(load(manifest)['workers']);observations=defaultdict(list);ownership=defaultdict(list)
+    # Fresh, narrowly owned recovery lanes may be handed off separately from
+    # the main supervisor. Read their exact prepared manifest without treating
+    # preparation or a queue receipt as successful validation.
+    recovery=root/'infra/heldout_recovery/prepared_source_recovery_r2.json'
+    if recovery.exists():
+        known={str(pathlib.Path(w['config']).resolve())for w in workers}
+        for directory in sorted({r['controller']for r in load(recovery)['records']}):
+            directory=pathlib.Path(directory);config=directory/'config.json'
+            if str(config.resolve())not in known:
+                workers.append({'name':directory.name,'config':str(config),'state':str(directory/'state.json')})
+                known.add(str(config.resolve()))
     pipeline=load(root/'manifests/pipeline_status.json');prepared=defaultdict(list)
     for r in pipeline['rows']:
         if r['split']in SPLITS:prepared[(r['split'],r['class_id']if r['split']=='eval_model'else r['task'])].append(r)
@@ -90,6 +101,10 @@ def publish(root):
         cc,t,key=scope_of(path)
         if key[0]not in SPLITS:return
         a=record.get('allocation');status=record.get('status',state.get('status','unobserved'));job=None
+        receipt=record.get('dispatch_receipt')
+        if not a and receipt and pathlib.Path(receipt).exists():
+            routed=load(receipt,'dispatch_receipt');a=routed.get('allocation')
+            if a:status=routed.get('status',status)
         if a:
             job=dict(job_id=a['jobid'],job_dir=a['job_dir'],runtime=a['code'],controller_status=status)
             vp=root/'vast/state/jobs'/(a['jobid']+'.json')
@@ -109,7 +124,8 @@ def publish(root):
         try:
             cfg=load(worker['config'],'controller_config');st=load(worker['state'],'controller_state')if pathlib.Path(worker['state']).exists()else{};split=cfg.get('admission_split')or cfg.get('source_split')
             if split in SPLITS:
-                for cls in cfg.get('admitted_classes',[])if split=='eval_model'else cfg.get('admitted_tasks',[]):ownership[(split,cls)].append(worker['name'])
+                for cls in cfg.get('admitted_classes',[])if split=='eval_model'else cfg.get('admitted_tasks',[]):
+                    if cls not in cfg.get('retired_classes',[]) and cls not in cfg.get('excluded_classes',[]):ownership[(split,cls)].append(worker['name'])
             seeds=list(cfg.get('seeds',[]))
             if cfg.get('seed_catalog'):seeds+=load(cfg['seed_catalog'],'seed_catalog').get('seeds',[])
             for seed in seeds:
