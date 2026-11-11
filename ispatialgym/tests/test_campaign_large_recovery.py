@@ -16,7 +16,11 @@ def test_candidate_screen_retains_original_sidecar_after_rejection_and_success(m
     monkeypatch.setattr(runtime, 'configuration', lambda: (None, template, None, None))
     original = SimpleNamespace(ik_witnesses=[{'q': [-1.98]}], paths=['checked_original'])
     sampler = SimpleNamespace(sidecar=original, gp=SimpleNamespace(variant='sandal'), subtask='under',
-        _floor_relaxed=nullcontext)
+        _floor_relaxed=nullcontext,
+        world=SimpleNamespace(snapshot=lambda: {}, restore=lambda state: None),
+        objects={}, kit=SimpleNamespace(apply=lambda *args: None, sync_world=lambda: None),
+        goal=lambda draft: None)
+    draft = SimpleNamespace(object_poses={}, object_joints={}, robot_q=[], base_pose2d=(0, 0, 0))
     calls = []
 
     def check(variant, sidecar, current, subtask):
@@ -31,16 +35,16 @@ def test_candidate_screen_retains_original_sidecar_after_rejection_and_success(m
 
     monkeypatch.setattr(program_check, 'run', check)
     sampler.heel_tight_left_j4_check = heel_gate
-    assert 'retreat8' in candidate_program_rejection(sampler)
+    assert 'retreat8' in candidate_program_rejection(sampler, draft)
     assert sampler.sidecar is original and original.paths == ['checked_original']
     assert original.ik_witnesses == [{'q': [-1.98]}]
     sampler.heel_tight_left_j4_check = lambda: None
-    assert candidate_program_rejection(sampler) is None
+    assert candidate_program_rejection(sampler, draft) is None
     assert sampler.sidecar is original and original.paths == ['checked_original']
     assert calls == [('sandal', 'under'), ('sandal', 'under')]
     monkeypatch.setattr(program_check, 'run', lambda *a, **kw: (_ for _ in ()).throw(RuntimeError('unexpected failure')))
     with pytest.raises(RuntimeError, match='unexpected failure'):
-        candidate_program_rejection(sampler)
+        candidate_program_rejection(sampler, draft)
     assert sampler.sidecar is original
 
 
@@ -174,3 +178,73 @@ def test_soap_early_lift_uses_existing_program_projection(monkeypatch, floor_ali
     sampler.gp.variant = 'inter_object_relation_satisfaction-ontop_large_scale-mouse-desk-floor'
     with pytest.raises(ValueError, match='audited soap class'):
         soap_lift_frame_rejection(sampler, stance, grasp, lift)
+
+@pytest.mark.parametrize('failure', [None, 'reject', 'unexpected'])
+def test_candidate_screen_uses_draft_live_pose_and_restores_world(monkeypatch, failure):
+    """Reproduce the parked-target frame error using the real state accessor."""
+    import copy
+    import torch
+    from contextlib import nullcontext
+    from ispatialgym.sampling import campaign_large_recovery as recovery
+    from ispatialgym.sampling.v2 import program_check
+    from ispatialgym.sampling.sim_utils import Reject
+
+    monkeypatch.setattr(recovery, 'candidate_program_screen', lambda plan: True)
+    live = {'position': torch.tensor([0., 0., -5.35]),
+            'orientation': torch.tensor([0., 0., 0., 1.]),
+            'velocity': torch.tensor([.2, .3, .4]),
+            'joint': torch.tensor([.4]), 'joint_velocity': torch.tensor([.1]),
+            'robot_q': torch.tensor([.7]), 'base': (3., 4., .5),
+            'partner_position': torch.tensor([2., 3., 4.])}
+    before = copy.deepcopy(live)
+    class Object:
+        def get_position_orientation(self):
+            return live['position'], live['orientation']
+        def set_position_orientation(self, p, q):
+            live['position'], live['orientation'] = p.clone(), q.clone()
+        def set_joint_positions(self, q): live['joint'] = q.clone()
+        def set_joint_velocities(self, q): live['joint_velocity'] = q.clone()
+        def keep_still(self): live['velocity'] = torch.zeros(3)
+    class World:
+        def snapshot(self): return copy.deepcopy(live)
+        def restore(self, state):
+            live.clear(); live.update(copy.deepcopy(state))
+    syncs = []
+    def apply(q, base): live.update(robot_q=q.clone(), base=base)
+    original = SimpleNamespace(goal=None, ik_witnesses=[])
+    sampler = SimpleNamespace(sidecar=original, world=World(), objects={'target': Object()},
+        kit=SimpleNamespace(apply=apply, sync_world=lambda: syncs.append(copy.deepcopy(live))),
+        gp=SimpleNamespace(variant='exact_under'), subtask='under',
+        _floor_relaxed=nullcontext, heel_tight_left_j4_check=lambda: None)
+    def goal(draft):
+        sampler.sidecar.goal = {'candidate': True}
+        draft.goal_poses['target'] = ('provisional',)
+    sampler.goal = goal
+    draft = SimpleNamespace(object_poses={'target': (torch.tensor([0., 0., 1.2]), torch.tensor([0., 0., 0., 1.]))},
+        object_joints={'target': torch.tensor([.8])}, robot_q=torch.tensor([.9]),
+        base_pose2d=(.5, -1.2, 0.), goal_poses={})
+    # The old helper queried this negative depth directly.
+    assert program_check._SamplerState(sampler).object_pose('target')[0][2] < 0
+    def check(*args, **kwargs):
+        assert program_check._SamplerState(sampler).object_pose('target')[0][2] == pytest.approx(1.2)
+        assert live['joint'].item() == pytest.approx(.8)
+        assert live['robot_q'].item() == pytest.approx(.9)
+        assert live['base'] == draft.base_pose2d
+        assert sampler.sidecar.goal == {'candidate': True}
+        # Even effects on a non-draft object from a native attachment/step must
+        # be restored on rejection, unexpected error, and a successful screen.
+        live['partner_position'] += 9
+        if failure == 'reject': raise Reject('program_check_failed', 'actual collision retained')
+        if failure == 'unexpected': raise RuntimeError('test interruption')
+    monkeypatch.setattr(program_check, 'run', check)
+    if failure == 'unexpected':
+        with pytest.raises(RuntimeError, match='test interruption'):
+            recovery.candidate_program_rejection(sampler, draft)
+    else:
+        result = recovery.candidate_program_rejection(sampler, draft)
+        assert result is None if failure is None else 'actual collision retained' in result
+    assert sampler.sidecar is original and original.goal is None
+    assert draft.goal_poses == {}
+    assert len(syncs) == 2
+    for key, value in before.items():
+        assert torch.equal(live[key], value) if isinstance(value, torch.Tensor) else live[key] == value

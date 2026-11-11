@@ -31,7 +31,7 @@ def candidate_program_screen(plan=None):
     return False
 
 
-def candidate_program_rejection(sampler, plan=None):
+def candidate_program_rejection(sampler, draft, plan=None):
     """Screen a complete candidate without retaining provisional witness edits.
 
     Both audited classes repeatedly reached the late checker only after the
@@ -44,9 +44,32 @@ def candidate_program_rejection(sampler, plan=None):
     from ispatialgym.sampling.sim_utils import Reject
     from ispatialgym.sampling.v2 import program_check
 
+    # sample_instance precedes core.apply_draft and goal(). In particular,
+    # program_check._SamplerState reads live object poses; checking here with
+    # a parked target invents behind-camera grasp targets. Install this draft
+    # only for the kinematic pre-screen, without activating bodies or settling.
+    # The saved whole-world state also protects against the checker's attachment
+    # helpers stepping physics. All post-settle/final gates still run normally.
+    from ispatialgym.sampling import geometry as G
+    import torch
+
     original = sampler.sidecar
+    state = sampler.world.snapshot()
     sampler.sidecar = copy.deepcopy(original)
+    provisional = copy.deepcopy(draft)
     try:
+        for name, pose in provisional.object_poses.items():
+            obj = sampler.objects[name]
+            obj.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
+            obj.keep_still()
+        for name, q in provisional.object_joints.items():
+            obj = sampler.objects[name]
+            obj.set_joint_positions(G.t(q))
+            obj.set_joint_velocities(torch.zeros_like(G.t(q)))
+            obj.keep_still()
+        sampler.kit.apply(provisional.robot_q, provisional.base_pose2d)
+        sampler.goal(provisional)
+        sampler.kit.sync_world()
         with sampler._floor_relaxed():
             program_check.run(sampler.gp.variant, sampler.sidecar, sampler,
                               subtask=sampler.subtask)
@@ -55,6 +78,8 @@ def candidate_program_rejection(sampler, plan=None):
         return f'{exc.reason}: {exc}'
     finally:
         sampler.sidecar = original
+        sampler.world.restore(state)
+        sampler.kit.sync_world()
     return None
 
 

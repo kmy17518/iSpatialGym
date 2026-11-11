@@ -8185,7 +8185,7 @@ class IORSLarge(SamplerV2):
                                  "translate %.2f) failed", self.gp.variant, place.translate, place.tilt, place.stand_off or 0.0, i_c, least_translate)
                 from ispatialgym.sampling.campaign_large_recovery import candidate_program_screen, candidate_program_rejection
                 if candidate_program_screen(campaign_plan):
-                    early_failure = candidate_program_rejection(self, campaign_plan)
+                    early_failure = candidate_program_rejection(self, d, campaign_plan)
                     if early_failure is not None:
                         TT._count(self, "candidate_program.rejected")
                         errors.append(f"C: complete candidate program: {early_failure}")
