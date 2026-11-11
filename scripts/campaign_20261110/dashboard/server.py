@@ -40,6 +40,34 @@ def read_source(path, *, mapping=True):
         return {}, {'available': False, 'error': type(exc).__name__ + ': ' + str(exc)}
 
 
+def proof_refs(values):
+    """Keep exact references in the refresh payload; full audits have own URLs."""
+    if not isinstance(values,list): return values
+    return [{k:v for k,v in r.items() if k in ('path','sha256','observed_at','scope','stage','status','source_ref')}
+            if isinstance(r,dict) else r for r in values]
+
+
+def compact_requirements(value):
+    return {**{k:v for k,v in value.items() if k not in ('requirements','sources')},
+        'detail_report':'/reports/training-requirements',
+        'requirements':[{k:(proof_refs(v) if k=='evidence' else v) for k,v in r.items()
+                         if k in ('id','tasks','family','requirement','status','implementation','evidence','next_action','owners','last_observed_progress')}
+                        for r in value.get('requirements',[])]}
+
+
+def compact_execution(value):
+    rows=[]
+    for r in value.get('rows',[]):
+        if r.get('kind')=='requirement':continue
+        row={k:v for k,v in r.items() if k not in ('verification','artifacts','inputs')}
+        row['stages']={k:{**{a:b for a,b in v.items() if a!='evidence'},
+            'evidence':{a:b for a,b in v.get('evidence',{}).items() if a in
+                ('path','sha256','status','success','written','attempts','successful_members','source_job_id','validated_at','count','remaining','last_accepted_at')}}
+            if isinstance(v,dict) and isinstance(v.get('evidence',{}),dict) else v for k,v in r.get('stages',{}).items()}
+        rows.append(row)
+    return {**{k:v for k,v in value.items() if k not in ('rows','capacity')},'rows':rows,'detail_report':'/reports/execution-ledger'}
+
+
 def snapshot(root, inventory):
     live, ls = read_source(root / 'live.json')
     cluster, cs = read_source(root / 'infra/cluster_snapshot.json')
@@ -141,10 +169,10 @@ def snapshot(root, inventory):
             'cohorts': [{k:v for k,v in row.items() if k!='instance_ids'} for row in training.get('cohorts',[])]} if training else {},
         'training_production_gate': production_gate,
         'training_containment': containment,
-        'training_requirements': requirements,
+        'training_requirements': compact_requirements(requirements) if requirements else {},
         'training_stream': training_stream,
         'pipeline_status': pipeline_status,
-        'execution_ledger': execution, 'execution_source': exs,
+        'execution_ledger': compact_execution(execution) if execution else {}, 'execution_source': exs,
         'preparation_status': preparation, 'preparation_source': prs,
         'pipeline_status_source': pss,
         'ik_observation': ik_observation,
