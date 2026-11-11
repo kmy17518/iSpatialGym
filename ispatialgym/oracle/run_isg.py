@@ -1912,6 +1912,12 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         if episode.get("forced_failure"):
             episode.update({"success": False, "reason": episode.get("reason") or "forced_failure"})
         meta["final_target_poses"] = final_target_poses(task, loader.tro.meta)
+        from ispatialgym.eval.round_symmetry import scoring_provenance
+        meta["scoring_revision"] = scoring_provenance()
+        # i7-measure (owner A4): the targets whose rotation about their round axis the success measure freed (ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC)
+        yf = getattr(loader.tro.meta, "yaw_free_report", None)
+        if yf:
+            meta["success_yaw_free"] = yf
         joints_end = loader.joint_positions_report()  # the TRO's joint_positions constraints (a door opened at init) as the episode leaves them
         if joints_end:
             meta["joint_positions"] = joints_end

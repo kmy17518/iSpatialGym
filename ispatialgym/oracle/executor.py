@@ -64,6 +64,7 @@ from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import QA, RULE_METRICS, ArmStutter, CameraModel, Monitors, QAStats, Verdict, category_of, is_hard_qa
 from ispatialgym.oracle.recorder import PHASE_GOAL, PHASE_ORACLE, PHASE_SETTLE, Recorder, to_uint8_rgb
 from ispatialgym.robot import conventions as C
+from ispatialgym.eval import round_symmetry as RS
 
 log = logging.getLogger(__name__)
 
@@ -421,7 +422,7 @@ NOTE_KEYS = NOTE_KEYS + ("push_transit",)
 NOTE_KEYS = NOTE_KEYS + ("axis_leg",)
 #: owner 2026-10-14: a push's recorded pad speed (``execute.push_speed_of``) and, per base nudge with a brace standing, the brace hand held
 #: in the world (``execute._NudgeBraceHold``: its drift, the IK misses, why the nudge stopped)
-NOTE_KEYS = NOTE_KEYS + ("push_speed_m_s", "push_nudge_brace_hold")
+NOTE_KEYS = NOTE_KEYS + ("push_speed_m_s", "push_nudge_brace_hold", "push_nudge_stall")
 NOTE_KEYS = NOTE_KEYS + ("preshape_set", "preshape_kept_from_transition_m")  # oracle-fix 2026-11-06: the shelf back-off's pre-shape (transition / grasp)
 NOTE_KEYS = NOTE_KEYS + ("push_gripper",)  # oracle-fix 2026-11-06: an open-hand push's opening (execute_push; touching's generation.push_gripper_open)
 NOTE_KEYS = NOTE_KEYS + ("overpath", "transit_book_clearance")  # i7-overpath 2026-11-08: the overhang pick's recorded transit / its book clearance
@@ -2044,6 +2045,10 @@ class Executor:
         if not cat or not model:
             return None
         entry = revolution_axis(str(cat), str(model))
+        if entry is None and RS.yaw_free_on():
+            # i7-measure (owner 2026-11-09 A4): with ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC the QA frees what the success measure frees - the
+            # round-axis table (eval.round_symmetry; a superset of the cylinder table with the same axes: round cans, plates, bowls, lids)
+            entry = RS.round_axis(str(cat), str(model))
         if entry is None:
             return None
         return {**entry, "key": f"{cat}/{model}"}

@@ -87,22 +87,81 @@ def derive(survey: Dict[str, dict], ratio: float) -> Dict[str, dict]:
     return out
 
 
+#: ``--rule round`` reads the ICL's reviewed ``symmetry`` column (``assets/icl/README.md``: the rotations under which geometry AND texture are
+#: identical, the review round's verdicts applied - "every orientation-evaluated target gets them as ``orientation_equivalences``"), the
+#: notion the success measure already uses wherever a customs role carries its tags. The geometry-only survey lists :func:`derive` also
+#: reads are left out: a wall clock's face (jerval: survey geom ``xinf``, ICL symmetry ``none``) or a printed marker rolls like a wheel in
+#: the fingers, but its turn is visible - not free in a success measure.
+ICL_CANDIDATES = os.path.join(REPO, "ispatialgym", "assets", "icl", "roles", "candidates.csv")
+
+
+def derive_round(icl_csv: str, ratio: float) -> Dict[str, dict]:
+    """i7-measure 2026-11-09 (owner A4, ``--rule round``): every model whose ICL ``symmetry`` (:data:`ICL_CANDIDATES`, one value per model)
+    holds a body-of-revolution tag (``xinf`` / ``yinf`` / ``zinf``), without :func:`derive`'s long-axis rule (a round can, a plate, a bowl, a
+    lid). The axis: the model's long axis (its ICL bbox) when it is a tagged one, else the one tagged axis (the first listed when several);
+    a model tagged only ``full`` is left out."""
+    import csv
+
+    tags_of: Dict[str, set] = {}
+    bbox_of: Dict[str, List[float]] = {}
+    uses_of: Dict[str, set] = {}
+    with open(icl_csv) as f:
+        for row in csv.DictReader(f):
+            key = f"{row.get('category')}/{row.get('model')}"
+            tags = [t.strip() for t in (row.get("symmetry") or "").split(",") if t.strip() and t.strip() != "none"]
+            tags_of.setdefault(key, set()).update(tags)
+            uses_of.setdefault(key, set()).add(f"{row.get('subtask')}/{row.get('role')}")
+            try:
+                bbox_of.setdefault(key, [float(row["bbox_x"]), float(row["bbox_y"]), float(row["bbox_z"])])
+            except (KeyError, TypeError, ValueError):
+                pass
+    out: Dict[str, dict] = {}
+    for key in sorted(tags_of):
+        tags = sorted(tags_of[key])
+        axes = [t[0] for t in tags if len(t) == 4 and t[1:] == "inf" and t[0] in AXES]
+        if not axes:
+            continue
+        bb = bbox_of.get(key) or [0.0, 0.0, 0.0]
+        long_ax = long_axis(bb, ratio)
+        axis = long_ax if long_ax in axes else axes[0]
+        order = sorted(bb)
+        out[key] = {"axis": axis, "ratio": round(order[2] / order[1], 3) if order[1] > 0 else None, "tags": tags, "sources": ["icl symmetry"],
+                    "bbox": [round(v, 5) for v in bb], "uses": sorted(uses_of.get(key) or []), "long_axis": long_ax == axis}
+    return out
+
+
+ROUND_OUT = os.path.join(REPO, "ispatialgym", "assets", "icl", "round_axes.json")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--survey", default=SURVEY)
-    ap.add_argument("--out", default=OUT)
+    ap.add_argument("--icl", default=ICL_CANDIDATES, help="--rule round: the ICL candidates table whose symmetry column it reads")
+    ap.add_argument("--out", default=None, help=f"default {os.path.relpath(OUT, REPO)} (--rule long) / {os.path.relpath(ROUND_OUT, REPO)} (--rule round)")
     ap.add_argument("--long-ratio", type=float, default=1.5, help="largest / middle native extent for a 'long axis'")
+    ap.add_argument("--rule", choices=("long", "round"), default="long",
+                    help="long: the placed_orientation cylinders (revolution_axes.json); round: every body of revolution (i7-measure, owner A4: "
+                         "round_axes.json, read by ispatialgym.eval.round_symmetry under ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC)")
     args = ap.parse_args()
+    args.out = args.out or (ROUND_OUT if args.rule == "round" else OUT)
     with open(args.survey) as f:
         survey = json.load(f)
-    table = derive(survey, args.long_ratio)
+    table = derive_round(args.icl, args.long_ratio) if args.rule == "round" else derive(survey, args.long_ratio)
+    if args.rule == "round":
+        rule = (f"a body-of-revolution tag (xinf / yinf / zinf) in the ICL's reviewed symmetry column ({os.path.relpath(args.icl, REPO)}: geometry and "
+                f"texture identical; no long-axis rule; the axis: the long axis - largest native extent >= {args.long_ratio} x the middle one - when tagged, else "
+                "the tagged one); with ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC the success measure (every pose_reached target of such a model: demo QA, "
+                "replay, policy eval) and the placed_orientation demo gate compare it modulo rotation about that axis - the yaw of a round object "
+                "standing upright (owner 2026-11-09 A4)")
+    else:
+        rule = (f"a body-of-revolution tag (xinf / yinf / zinf) about the model's long axis (largest native extent >= "
+                f"{args.long_ratio} x the middle one) in any of {list(TAG_LISTS)}; the placed_orientation demo gate compares such an "
+                "object modulo rotation about that axis (owner 2026-09-16 17:10 item 4 fallback), every other object keeps the full error")
     meta = {
         "_meta": {
             "built": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "survey": os.path.relpath(args.survey, REPO),
-            "rule": (f"a body-of-revolution tag (xinf / yinf / zinf) about the model's long axis (largest native extent >= "
-                     f"{args.long_ratio} x the middle one) in any of {list(TAG_LISTS)}; the placed_orientation demo gate compares such an "
-                     "object modulo rotation about that axis (owner 2026-09-16 17:10 item 4 fallback), every other object keeps the full error"),
+            "survey": os.path.relpath(args.icl if args.rule == "round" else args.survey, REPO),
+            "rule": rule,
             "n_models": len(table),
             "categories": dict(sorted(collections.Counter(k.split("/")[0] for k in table).items())),
         }
@@ -113,7 +172,7 @@ def main() -> int:
         json.dump(meta, f, indent=1, sort_keys=False)
         f.write("\n")
     cats = meta["_meta"]["categories"]
-    print(f"{len(table)} models with a revolution axis about their long axis -> {os.path.relpath(args.out, REPO)}")
+    print(f"{len(table)} models with a revolution axis ({args.rule}) -> {os.path.relpath(args.out, REPO)}")
     print(", ".join(f"{c} {n}" for c, n in sorted(cats.items(), key=lambda kv: -kv[1])[:40]))
     return 0
 

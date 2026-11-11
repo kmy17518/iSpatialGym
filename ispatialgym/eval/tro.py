@@ -163,6 +163,16 @@ def apply_targets_to_scope(meta: ISGTroMeta, object_scope: Dict[str, Any]) -> No
     from omnigibson.object_states import LayoutReached, PoseReached
 
     from ispatialgym.eval.group_entity import GroupEntity
+    from ispatialgym.eval.round_symmetry import apply_yaw_free
+
+    # i7-measure (owner 2026-11-09 A4, ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC, default on): a round object's rotation about its axis is free in
+    # the success measure - its targets' equivalences gain that rotation before PoseReached is configured (a no-op with the switch off)
+    yaw_free = apply_yaw_free(meta, object_scope)
+    if yaw_free:
+        try:
+            meta.yaw_free_report = yaw_free
+        except Exception:  # noqa: BLE001 - a frozen / slotted meta keeps no report
+            pass
 
     for inst, target in meta.pose_targets.items():
         entity = object_scope.get(inst)
