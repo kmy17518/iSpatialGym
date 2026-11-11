@@ -1,0 +1,63 @@
+from types import SimpleNamespace
+import pytest
+from ispatialgym.sampling import campaign_visibility as C
+
+
+def template(value=False, class_id=C.CLASS_ID, task=C.TASK):
+    return SimpleNamespace(class_id=class_id, task=task, scene_setup={'recovery_options': {C.OPTION: value}})
+
+
+def test_scope_and_typed_opt_in():
+    assert C.required(template(True))
+    assert not C.required(template())
+    for value in ('true', 1, None):
+        with pytest.raises(ValueError): C.required(template(value))
+    with pytest.raises(ValueError): C.required(template(True, class_id='another_class'))
+    with pytest.raises(ValueError): C.required(template(True, task='another_task'))
+
+
+@pytest.mark.parametrize('missing', ['enabled','judged','checked_program','camera','exempt'])
+def test_missing_native_evidence_fails_closed(missing):
+    inputs=dict(enabled=True,exempt=False,judged=True,checked_program=True,camera=True)
+    C.preflight(**inputs)
+    inputs[missing]=not inputs[missing]
+    with pytest.raises(ValueError): C.preflight(**inputs)
+
+
+def test_measured_occlusion_remains_a_failure_for_original_screen():
+    report={'objects': {'target': {'status':'ok','occluded':.6147}}, 'occluded':True}
+    C.verify_report(report)
+    assert report['occluded'] is True
+    report['occluded']=False;report['objects']['target']['occluded']=.4128
+    C.verify_report(report)
+
+
+@pytest.mark.parametrize('report', [{}, {'error':'camera render failed','occluded':False},
+    {'occluded':False,'objects':{'target':{'status':'out_of_frame'}}},
+    {'occluded':False,'objects':{'target':{'status':'ok','occluded':float('nan')}}},
+    {'occluded':False,'objects':{'target':{'status':'ok','occluded':True}}}])
+def test_failed_prediction_cannot_pass_as_unoccluded(report):
+    with pytest.raises(ValueError): C.verify_report(report)
+
+
+def test_required_screen_cannot_publish_without_camera(monkeypatch):
+    from ispatialgym.sampling.v2 import core
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.eval import goal_occlusion as G
+    sampler=object.__new__(core.SamplerV2)
+    sampler.subtask=C.TASK
+    sampler.objects={'target':SimpleNamespace(name='target_spatula')}
+    # dict.fromkeys in the core screen requires hashable simulator objects.
+    class Obj:
+        name='target_spatula'
+    sampler.objects={'target':Obj()}
+    sampler.world=SimpleNamespace(cam=None)
+    sampler.final_configuration=lambda: ('q','base','source')
+    removed=[];withheld=[]
+    sampler._count_withheld=lambda:withheld.append(True)
+    monkeypatch.setattr(C,'required',lambda:True)
+    monkeypatch.setattr(G,'enabled',lambda:True)
+    monkeypatch.setattr(core,'remove_instance_files',removed.append)
+    with pytest.raises(Reject,match='camera'):
+        sampler.check_goal_occlusion(SimpleNamespace(summary={}),'/candidate/tro.json')
+    assert removed==['/candidate/tro.json'] and withheld==[True]

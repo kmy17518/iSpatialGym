@@ -1592,10 +1592,26 @@ class SamplerV2(TaskSampler):
 
         from ispatialgym.eval import goal_occlusion as GO
 
-        if not GO.enabled() or GO.exempt(self.subtask):
+        from ispatialgym.sampling import campaign_visibility as CV
+
+        try:
+            required = CV.required()
+        except ValueError as exc:
+            remove_instance_files(tro_path)
+            self._count_withheld()
+            raise Reject("goal_occlusion_unavailable", str(exc)) from exc
+        if not required and (not GO.enabled() or GO.exempt(self.subtask)):
             return
         judged = [o for o in dict.fromkeys(self.objects.values()) if GO.role(o.name)]
         final = self.final_configuration()
+        if required:
+            try:
+                CV.preflight(enabled=GO.enabled(), exempt=GO.exempt(self.subtask), judged=bool(judged),
+                             checked_program=final is not None, camera=self.world.cam is not None)
+            except ValueError as exc:
+                remove_instance_files(tro_path)
+                self._count_withheld()
+                raise Reject("goal_occlusion_unavailable", str(exc)) from exc
         if not judged or final is None or self.world.cam is None:
             draft.summary["goal_occlusion"] = {"skipped": "no judged object" if not judged else ("no checked program" if final is None else "no camera")}
             return
@@ -1644,6 +1660,14 @@ class SamplerV2(TaskSampler):
             self.robot.keep_still()
             self.kit.sync_world()
             self.configure_targets(draft)
+        if required:
+            try:
+                CV.verify_report(rep)
+            except ValueError as exc:
+                remove_instance_files(tro_path)
+                self._count_withheld()
+                raise Reject("goal_occlusion_unavailable", str(exc)) from exc
+            rep["required_by_campaign_configuration"] = True
         draft.summary["goal_occlusion"] = rep
         summary_path = instance_summary_path(tro_path)
         if rep["occluded"]:
