@@ -59,27 +59,53 @@ def reconcile(rows, *, key, index, count, snapshot, tag):
     return row
 
 
+def _allocation_signature(root):
+    rows = []
+    for path in sorted((root / "manifests").glob("*allocations.tsv")):
+        target = path.resolve(strict=True)
+        stat = target.stat()
+        rows.append((str(path), str(target), stat.st_dev, stat.st_ino,
+                     stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns))
+    return tuple(rows)
+
+
 def reserve_indices(root, token, count):
-    """One campaign-wide disjoint namespace, checked against all existing ledgers."""
+    """Reserve a disjoint interval; parse allocation ledgers outside the lock."""
     require(isinstance(count, int) and count > 0, "reservation count must be positive")
     path = root / "manifests/family_index_reservations.json"
-    with atomic_directory_lock(path.with_suffix(".lockdir")):
-        state = read(path, {"next": 50000000, "reservations": {}})
-        if token in state["reservations"]:
-            prior = state["reservations"][token]
-            require(prior["n"] == count, "index reservation changed")
+    for _ in range(8):
+        # An idempotent retry needs no allocation scan. The actual entry and
+        # count are still checked under the common reservation lock.
+        peek = read(path, {"next": 50000000, "reservations": {}})
+        signature, historical = None, []
+        if token not in peek["reservations"]:
+            signature = _allocation_signature(root)
+            historical = [(int(row["start"]), int(row["start"]) + int(row["n"]))
+                          for row in allocations(root)]
+            if signature != _allocation_signature(root):
+                continue
+        with atomic_directory_lock(path.with_suffix(".lockdir")):
+            state = read(path, {"next": 50000000, "reservations": {}})
+            if token in state["reservations"]:
+                prior = state["reservations"][token]
+                require(prior["n"] == count, "index reservation changed")
+                os.chmod(path, path.stat().st_mode | 0o040)
+                return prior["start"]
+            # New/changed ledgers invalidate the preview; release before
+            # re-reading any bytes. Reservations are never committed from it.
+            if signature is None or signature != _allocation_signature(root):
+                continue
+            intervals = historical + [(int(row["start"]), int(row["start"]) + int(row["n"]))
+                                      for row in state["reservations"].values()]
+            start = state["next"]
+            while any(start < hi and lo < start + count for lo, hi in intervals):
+                start += 100
+            state["reservations"][token] = {"start": start, "n": count, "created_at": time.time()}
+            state["next"] = start + max(100, ((count + 99) // 100) * 100)
+            write_json_atomic(path, state)
             os.chmod(path, path.stat().st_mode | 0o040)
-            return prior["start"]
-        start = state["next"]
-        intervals = [(int(row["start"]), int(row["start"]) + int(row["n"]))
-                     for row in [*allocations(root), *state["reservations"].values()]]
-        while any(start < hi and lo < start + count for lo, hi in intervals):
-            start += 100
-        state["reservations"][token] = {"start": start, "n": count, "created_at": time.time()}
-        state["next"] = start + max(100, ((count + 99) // 100) * 100)
-        write_json_atomic(path, state)
-        os.chmod(path, path.stat().st_mode | 0o040)
-        return start
+            return start
+    raise FileExistsError("allocation ledgers kept changing during index reservation preparation")
 
 
 def accepted_counts(root, class_id):
