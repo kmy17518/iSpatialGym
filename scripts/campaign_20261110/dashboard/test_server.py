@@ -114,6 +114,18 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         data = snapshot(self.root, self.root / 'inventory')
         self.assertEqual([j['id'] for j in data['cluster']['jobs']], ['101', '18423963'])
 
+    def test_heldout_ledger_is_campaign_scoped_read_only_and_sanitized(self):
+        value={'campaign_id':'campaign_20261110','owner':'/root/templates_assets',
+            'rows':[{'split':'eval_model','remaining':3,'api_key':'HIDDEN','active_jobs':[{'job_id':'123','state':'PENDING'}]}]}
+        self.write('dashboard/heldout_recovery.json',value)
+        before=self.hashes();code,raw=self.request('GET','/reports/heldout-recovery')
+        self.assertEqual(code,200);self.assertNotIn(b'HIDDEN',raw)
+        self.assertEqual(snapshot(self.root,self.root/'inventory')['heldout_recovery']['rows'][0]['remaining'],3)
+        self.assertEqual(self.hashes(),before)
+        self.write('dashboard/heldout_recovery.json',{'campaign_id':'older'})
+        self.assertEqual(self.request('GET','/reports/heldout-recovery')[0],404)
+        self.assertFalse(snapshot(self.root,self.root/'inventory')['sources']['heldout_recovery']['available'])
+
     def test_standard_recovery_is_read_only_sanitized_and_campaign_scoped(self):
         value={'campaign_id':'campaign_20261110','zero_classes':59,
                'classes':[{'class_id':'inside_01','accepted_standard':0,'api_key':'HIDDEN'}]}

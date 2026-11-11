@@ -13,7 +13,7 @@ REMOTE = '/vision/u/minyeong/projects/isg_home/campaign_20261110/infra'
 FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group_yield.json', 'goal_group_yield_error.json')
 FLEET_FILE = 'vast_fleet_gpu_time.json'
 CLUSTER_FLEET_FILE = 'cluster_fleet_gpu_time.json'
-AUDIT_FILES = {'canonical_validation.json': 'infra/standard_recovery/canonical_validation.json','gate_quality_audit.json': 'validation/gate_quality_audit.json',
+AUDIT_FILES = {'heldout_recovery.json': 'infra/heldout_recovery/ledger.json','canonical_validation.json': 'infra/standard_recovery/canonical_validation.json','gate_quality_audit.json': 'validation/gate_quality_audit.json',
                'training_eligibility.json': 'accounting/training_eligibility.json',
                'training_production_gate.json': 'controllers/training_production_gate.json',
                'training_containment.json': 'infra/training_production_gate/containment_status.json',
@@ -81,8 +81,15 @@ def return_report(output):
         'Accepted counts come from locked SQL and three camera ledgers.']
     names = {'eval_standard': 'Standard eval', 'eval_model': 'Model holdout',
         'eval_category': 'Category/room holdout', 'train': 'Training'}
+    projection_path=output/'current_eligibility.json'
+    projection=json.loads(projection_path.read_text()) if projection_path.exists() else {}
+    current=projection.get('counts',{}).get('current_eligible') if projection.get('campaign_id')=='campaign_20261110' else None
     for key, title in names.items():
         value, target = evidence['counts'][key], evidence['targets'][key]
+        if current is not None:
+            eligible=current.get(key)
+            lines.append(f'{title}: '+(f'{eligible:,} / {target:,}; {max(0,target-eligible):,} remaining' if isinstance(eligible,int) else 'UNAVAILABLE')+f'; historical: {value:,}')
+            continue
         if key == 'train':
             eligibility_path=output/'training_eligibility.json'
             eligibility=json.loads(eligibility_path.read_text()) if eligibility_path.exists() else {}
@@ -91,6 +98,19 @@ def return_report(output):
             lines.append('Training excluded/flagged: '+str(eligibility.get('excluded','unavailable'))+'; unverified: '+str(eligibility.get('unverified','unavailable'))+'; replacements: '+str(eligibility.get('replacement_count','unavailable')))
             continue
         lines.append(f'{title}: {value:,} / {target:,}; {max(0, target-value):,} remaining')
+    held_path=output/'heldout_recovery.json'
+    if held_path.exists():
+        held=json.loads(held_path.read_text())
+        if held.get('campaign_id')=='campaign_20261110':
+            lines += ['','HELD-OUT EVAL — INDEPENDENT RECOVERY WORKSTREAM','Observed: '+chicago(held.get('observed_at')),
+                'Owner: '+str(held.get('owner','unavailable')),'Summary: '+json.dumps(held.get('summary',{})),
+                'Training generation tests must advance related unfinished model and category/room holdouts in parallel; current standalone training hold remains.',
+                'Exact ledger: http://127.0.0.1:8765/#heldout-recovery']
+            for row in held.get('rows',[]):
+                if row.get('remaining',0)>0:
+                    lines += [str(row.get('split'))+' '+str(row.get('class_id',row.get('task')))+' bucket '+str(row.get('bucket'))+': '+str(row.get('accepted'))+'/'+str(row.get('target'))+'; '+str(row.get('state')),
+                        'Owner: '+str(row.get('owner'))+'; blocker: '+str(row.get('blocker'))+'; next: '+str(row.get('next_action')),
+                        'Jobs/controllers: '+json.dumps([row.get('active_jobs'),row.get('controller')])+'; last acceptance: '+chicago(row.get('last_accepted_at'))]
     gate_path=output/'training_production_gate.json'
     gate=json.loads(gate_path.read_text()) if gate_path.exists() else {}
     lines += ['','STANDALONE TRAINING PRODUCTION GATE',json.dumps(gate) if gate else 'Gate observation unavailable; training remains ineligible without proof.',
