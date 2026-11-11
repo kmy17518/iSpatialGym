@@ -106,6 +106,20 @@ class ProbeFinished(BaseException):
     pass
 
 
+def observe_native_shutdown(before):
+    # multiply_isg imports og locally inside main(), so it has no module-level
+    # og attribute. Observe the actual module shared by that local import.
+    import omnigibson
+    original = omnigibson.shutdown
+
+    def shutdown(*args, **kwargs):
+        before()
+        return original(*args, **kwargs)
+
+    omnigibson.shutdown = shutdown
+    return lambda: setattr(omnigibson, 'shutdown', original)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--spec', type=Path, required=True)
@@ -172,7 +186,6 @@ def main():
     original_exact = IKChecker.exact
     original_register = exact_exchange.register_query
     original_write = SamplerV2.write_instance
-    original_shutdown = multiply_isg.og.shutdown
     current_keys = []
 
     def register(key, *values, **kwargs):
@@ -209,7 +222,7 @@ def main():
         save()
         raise ProbeFinished()
 
-    def shutdown(*values, **kwargs):
+    def before_shutdown():
         # Kit can exit the process from shutdown, bypassing our outer finally.
         # Flush measured evidence before the unchanged native shutdown call.
         if report['status'] == 'running_native_prefix':
@@ -221,12 +234,11 @@ def main():
         report['native_shutdown_observed_at'] = datetime.now(timezone.utc).isoformat()
         exact_exchange.record_event('probe_flush', 0, force=True)
         save()
-        return original_shutdown(*values, **kwargs)
 
     IKChecker.exact = exact
     exact_exchange.register_query = register
     SamplerV2.write_instance = no_publication
-    multiply_isg.og.shutdown = shutdown
+    restore_shutdown = observe_native_shutdown(before_shutdown)
     argv = ['--split', 'train', '--template', str(paths['template']), '--instances', '1',
             '--start-index', str(spec['reference_index']), '--max-attempts', '1',
             '--customs', str(paths['customs']), '--keep-template-scene', '--no-write-back',
@@ -253,7 +265,7 @@ def main():
         IKChecker.exact = original_exact
         exact_exchange.register_query = original_register
         SamplerV2.write_instance = original_write
-        multiply_isg.og.shutdown = original_shutdown
+        restore_shutdown()
         exact_exchange.record_event('probe_flush', 0, force=True)
         report['counters'] = dict(exact_exchange._COUNTERS)
         report['published_tro_files'] = len(list(output.rglob('*-tro_state.json')))

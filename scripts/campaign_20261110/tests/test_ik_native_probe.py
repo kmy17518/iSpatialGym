@@ -2,9 +2,11 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 
 from scripts.campaign_20261110.ik_native_probe import (CAMPAIGN, SCHEMA, sha, validate_spec,
-    compatibility_difference, write_observation_environment)
+    compatibility_difference, write_observation_environment, observe_native_shutdown)
 
 
 class ProbeBoundaryTests(unittest.TestCase):
@@ -72,6 +74,24 @@ class ProbeBoundaryTests(unittest.TestCase):
         self.assertNotIn('do-not-record', text)
         with self.assertRaises(FileExistsError):
             write_observation_environment(self.output, self.spec['snapshot'], {})
+
+    def test_local_native_import_flushes_before_process_exiting_shutdown(self):
+        events = []
+        def original(*args, **kwargs):
+            events.append(('native_shutdown', args, kwargs))
+            raise SystemExit(0)
+        module = SimpleNamespace(shutdown=original)
+        with patch.dict('sys.modules', {'omnigibson': module}):
+            restore = observe_native_shutdown(lambda: events.append('flushed'))
+            # Same import scope as multiply_isg.main: no caller.og attribute.
+            def native_main():
+                import omnigibson as og
+                og.shutdown('argument', flag=True)
+            with self.assertRaises(SystemExit):
+                native_main()
+            self.assertEqual(events, ['flushed', ('native_shutdown', ('argument',), {'flag': True})])
+            restore()
+            self.assertIs(module.shutdown, original)
 
 
 if __name__ == '__main__':
