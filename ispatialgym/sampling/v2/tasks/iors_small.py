@@ -2662,14 +2662,14 @@ class IORSSmall(SamplerV2):
                 plan.verify_settled(actual, partner, position_tol=position_tol, orientation_tol=orientation_tol, partner_position_tol=partner_tol)
             except CPG.GoalPlanError as exc:
                 raise Reject("campaign_goal_drift", str(exc)) from exc
-        if plan.release_policy in ("native_grasp_height", "native_raised_height"):
+        if plan.release_policy in ("native_grasp_height", "native_raised_height", "native_ontop_clearance"):
             # This is the per-grasp execution release, not the fixed settled
             # goal. Keep the native rim-clearance pose already checked by IK.
             release = draft.goal_poses.get(plan.target_name)
             if release is None:
                 raise Reject("campaign_release_missing", "native per-grasp release was not recorded")
             group["actual_release"] = {"position": [float(v) for v in release[0]], "orientation": [float(v) for v in release[1]]}
-            if plan.release_policy == "native_raised_height":
+            if plan.release_policy in ("native_raised_height", "native_ontop_clearance"):
                 facts = getattr(self, 'raised_release_facts', None)
                 if facts is None:
                     raise Reject('campaign_release_missing', 'native raised release lacks open-jaw clearance evidence')
@@ -5811,7 +5811,7 @@ class IORSSmall(SamplerV2):
                 # unchanged native release_pose computes and checks its needed
                 # clearance; a different grasp must be allowed a different z.
                 dp = float(th.linalg.norm(G.t(native[0])[:2] - G.t(campaign_plan.release[0])[:2]))
-            if campaign_plan.release_policy == 'native_raised_height':
+            if campaign_plan.release_policy in ('native_raised_height', 'native_ontop_clearance'):
                 # Nextto03's source raises the spoon 23 mm, but another grasp
                 # can need only 8 mm. Re-run native jaw clearance at the fixed
                 # goal XY and release attitude; keep the settled goal exact.
@@ -5829,7 +5829,7 @@ class IORSSmall(SamplerV2):
                 raise Reject("campaign_release_drift", f"release differs from native pair geometry by {dp:.6f} m / {dq:.6f} rad; "
                              f"native_z={float(native[0][2]):.6f} planned_z={campaign_plan.release[0][2]:.6f} "
                              f"surface_z={getattr(self, 'release_surface_z', None)} above={getattr(self, 'release_above_m', None)}")
-            if campaign_plan.release_policy in ("native_grasp_height", "native_raised_height"):
+            if campaign_plan.release_policy in ("native_grasp_height", "native_raised_height", "native_ontop_clearance"):
                 return native
             return tuple(G.t(v) for v in campaign_plan.release)
         st = self.sidecar.stance("manipulation")
@@ -5901,10 +5901,11 @@ class IORSSmall(SamplerV2):
     #    the chopstick ... not too high - just so that the fingers don't touch") --
 
     def campaign_raised_release(self, plan) -> G.Pose:
-        """Native per-grasp jaw clearance above the immutable nextto goal."""
+        """Native per-grasp jaw clearance above the immutable settled goal."""
         raised = self.raised_release()
-        if self.relation != 'nextto' or raised is None or getattr(self, 'shelf_start', None) is not None:
-            raise Reject('campaign_release_policy', 'raised release requires the native tabletop nextto policy')
+        ontop = self.relation == 'ontop' and plan.release_policy == 'native_ontop_clearance'
+        if (self.relation != 'nextto' and not ontop) or raised is None or getattr(self, 'shelf_start', None) is not None:
+            raise Reject('campaign_release_policy', 'raised release requires an enabled native tabletop clearance policy')
         base = th.tensor([plan.release[0][0], plan.release[0][1], plan.goal[0][2]], dtype=th.float32)
         quat = G.t(plan.release[1])
         partner_hull = self.world.hull_at(self.hull['partner'], tuple(G.t(v) for v in plan.partner))
@@ -5916,6 +5917,14 @@ class IORSSmall(SamplerV2):
         (defaults :data:`RAISED_RELEASE_DEFAULTS`). The release stays the open command (+1); the place rises over the resting goal to the
         lowest height at which the fully open jaw clears the partner (:meth:`release_raise`), the goal check drops the target from there
         and the settled pose is the recorded goal. None when unset or for another relation."""
+        if self.relation == 'ontop':
+            from ispatialgym.sampling.campaign_release_clearance import settings, POLICY
+            policy = settings()
+            if policy is not None:
+                plan = getattr(self, '_campaign_pair_active', None)
+                if plan is None or plan.release_policy != POLICY:
+                    raise Reject('campaign_release_policy', 'ontop clearance requires its explicit fixed-goal policy')
+                return policy
         v = self.gen("raised_release", None)
         if self.relation != "nextto" or v is None or v is False:
             return None
@@ -6446,7 +6455,8 @@ class IORSSmall(SamplerV2):
         manip = self.sidecar.stance("manipulation")
         goal_pos = th.tensor(draft.pose_targets[tname]["position"])
         goal_quat = draft.goal_poses[tname][1] if draft.pose_targets[tname].get("orientation") is None else th.tensor(draft.pose_targets[tname]["orientation"])
-        raised = self.raised_release() if self.relation == "nextto" else None
+        raised = self.raised_release() if self.relation == "nextto" or getattr(
+            getattr(self, '_campaign_pair_active', None), 'release_policy', None) == 'native_ontop_clearance' else None
         if self.relation == "inside":
             # the place is the release above the rim (``draft.goal_poses`` = the release pose of :meth:`release_pose`); the
             # recorded goal is what the drop settled to. The gripper never reaches into the partner, so it is not ignored.
