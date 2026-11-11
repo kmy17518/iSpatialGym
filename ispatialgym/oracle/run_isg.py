@@ -689,6 +689,12 @@ class InstanceLoader:
         self.report["tro_pose_check"] = self._check_tro_poses()
         if self.report["controller_targets_restored"]:
             robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action
+        if self.tro.meta.raw.get("campaign"):
+            from ispatialgym.oracle.campaign_restore import restore_serialized_root_motion
+
+            restored = restore_serialized_root_motion(self.tro.meta.raw["campaign"], self.physical, self.tro.object_states)
+            if restored is not None:
+                self.report["campaign_restoration"]["serialized_root_motion"] = restored
         return obs, info
 
     def _tro_pose_pairs(self) -> Dict[str, Tuple[Any, Any]]:
