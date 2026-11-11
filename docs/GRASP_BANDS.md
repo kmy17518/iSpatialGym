@@ -3491,6 +3491,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 60 | i7-measure 491fc9b9 (owner #100) | 8a5f0137 | lying push integral yaw re-aim (lying-only; BRIEFCASE_LYING stays off) |
 | 60b | i7-measure 491fc9b9..b92da540 (docs + comments) | 7d10224a | no behaviour change |
 | 61 | i7-evalbundle a3cfbd9d..f0b2d1d0 (owner #100) | 8dab09c9 | EVAL-MEASURE BUNDLE, one merge: DEFAULT SUCCESS_YAW_FREE_SYMMETRIC 1 (A4) + GROUP_ASSIGN_POSE_TIEBREAK 1; BRIEFCASE_LYING (A2) stays off - scores change at this commit |
+| 62 | i7-ul01reach b413aab9..c0a37d77 (lead #100j) | c6910519 | DEFAULT PUSH_HEEL_TIGHT 1 (heel_first locks only: under_large_01). Note: the i7-ul01reach section's r3b text (27ff96ac, left-arm ban) is historical - 1cc0b458 reverted r3b before the flip; the default is exactly r3 (24e642f1), what the A/B ran |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
