@@ -3,7 +3,7 @@ import json
 import pytest
 from scripts.campaign_20261110.contracts import ContractError,file_digest
 from scripts.campaign_20261110.training_restoration import same_loaded_state
-from scripts.campaign_20261110.training_batch_probe import inputs
+from scripts.campaign_20261110.training_batch_probe import inputs,verify_runtime_compatibility
 
 
 def state():
@@ -39,3 +39,33 @@ def test_probe_rejects_same_instance_and_configuration_mixing(tmp_path):
     p=tmp_path/'review1.json';row=json.loads(p.read_text());row['export_record']['render_compatibility_sha256']='other'
     p.write_text(json.dumps(row));refs[1]['sha256']=file_digest(p);request.write_text(json.dumps(value))
     with pytest.raises(ContractError,match='configuration isolation'):inputs(tmp_path,request)
+
+
+def test_observational_runtime_requires_actual_unchanged_native_code(tmp_path):
+    base=tmp_path/'code'/('trunk_'+'a'*12);observed=tmp_path/'code'/('trunk_'+'b'*12)
+    paths={'ispatialgym/sampling/campaign_runtime.py':('def physical(): return 1\ndef verify_loaded(): return 1\n',
+             'def physical(): return 1\ndef verify_loaded(): return 2\ndef restoration_observation(): return {}\n'),
+           'ispatialgym/multienv/campaign_rendering.py':('def select(): return 1\n','def select(): return 2\n'),
+           'scripts/campaign_20261110/training_batch_probe.py':(None,'def probe(): return 1\n'),
+           'ispatialgym/oracle/execute.py':('def physics(): return 3\n','def physics(): return 3\n')}
+    for folder,index,commit in ((base,0,'a'*40),(observed,1,'b'*40)):
+        folder.mkdir(parents=True);(folder/'.snapshot_commit').write_text(commit+'\n')
+        for relative,values in paths.items():
+            if values[index] is not None:
+                p=folder/relative;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(values[index])
+    changed=list(paths)[:3];proof={'schema':'isg-observational-runtime-compatibility-v1',
+        'base_commit':'a'*40,'observational_commit':'b'*40,'changed_files':changed,
+        'changed_payloads':{p:file_digest(observed/p) for p in changed}}
+    p=tmp_path/'proof.json';p.write_text(json.dumps(proof))
+    request={'runtime_compatibility':{'path':str(p),'sha256':file_digest(p)}}
+    records=[{'validation_key':{'code_sha256':file_digest(base/'.snapshot_commit')}}]
+    assert verify_runtime_compatibility(tmp_path,request,records,observed)==request['runtime_compatibility']
+    (observed/'ispatialgym/oracle/execute.py').write_text('def physics(): return 4\n')
+    with pytest.raises(ContractError,match='outside observation-only'):
+        verify_runtime_compatibility(tmp_path,request,records,observed)
+    (observed/'ispatialgym/oracle/execute.py').write_text(paths['ispatialgym/oracle/execute.py'][0])
+    records[0]['validation_key']['code_sha256']='wrong'
+    with pytest.raises(ContractError,match='canaries native runtime'):
+        verify_runtime_compatibility(tmp_path,request,records,observed)
+    with pytest.raises(ContractError,match='missing exact'):
+        verify_runtime_compatibility(tmp_path,{},records,observed)

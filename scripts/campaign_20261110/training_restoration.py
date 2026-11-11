@@ -11,6 +11,7 @@ import json
 from scripts.campaign_20261110.acceptance import audit_job,report_passed
 from scripts.campaign_20261110.contracts import digest,file_digest,require
 from scripts.campaign_20261110.training_canaries import audit_canary
+from scripts.campaign_20261110.training_batch_probe import inputs,verify_runtime_compatibility
 
 
 def checked(root,reference):
@@ -67,6 +68,13 @@ def verify_batch(root,reference,started_at,kind):
     probe=checked(root,reference)
     require(probe['schema']=='isg-training-restoration-probe-v1' and probe['kind']==kind,
             'missing real production-path batch probe')
+    checked(root,probe['request'])
+    request,records=inputs(root,probe['request']['path'])
+    runtime=Path(probe['probe_runtime']['path'])
+    require(file_digest(runtime)==probe['probe_runtime']['sha256']==request['probe_runtime_sha256'],
+            'batch runtime identity changed')
+    compatibility=verify_runtime_compatibility(root,request,records,runtime.parent)
+    require(probe.get('runtime_compatibility')==compatibility,'batch omitted its physical compatibility proof')
     entries=probe['entries'];require(len(entries)==3,'batch probe must execute A/B/A')
     observations=[];instances=[];tasks=set()
     for entry in entries:
@@ -103,6 +111,8 @@ def verify_batch(root,reference,started_at,kind):
             len({o['sim_runtime_id'] for o in observations})==1 and
             len({o['scene_runtime_id'] for o in observations})==1,'batch did not exercise one reused native world')
     require(observations[0]['sequence']<observations[1]['sequence']<observations[2]['sequence'],'batch observation order differs')
+    require(digest(observations[0]['loaded_state'])!=digest(observations[1]['loaded_state']),
+            'different instance IDs did not exercise different native states')
     same_loaded_state(observations[0]['loaded_state'],observations[2]['loaded_state'])
     return {'reference':reference,'tasks':sorted(tasks),'instances':instances,'process_session':observations[0]['process_session']}
 

@@ -4,10 +4,52 @@ Inputs are separate validated canaries. Outputs never allocate benchmark quota.
 A modern CPU helper must re-audit the resulting evidence before any release.
 """
 import argparse
+import ast
 import json
 import os
 from pathlib import Path
 from scripts.campaign_20261110.contracts import file_digest,require,write_json_atomic
+
+
+def verify_runtime_compatibility(root, request, records, runtime):
+    """Recheck the narrow observation-only runtime against native source bytes."""
+    root=Path(root).resolve();runtime=Path(runtime).resolve()
+    ref=request.get('runtime_compatibility') or {}
+    proof_path=Path(ref.get('path','')).resolve()
+    require(proof_path.is_relative_to(root) and proof_path.is_file() and
+            file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
+    proof=json.loads(proof_path.read_text())
+    require(proof.get('schema')=='isg-observational-runtime-compatibility-v1', 'invalid observational runtime proof')
+    base=root/'code'/('trunk_'+proof['base_commit'][:12])
+    require(runtime.is_relative_to(root/'code') and
+            (runtime/'.snapshot_commit').read_text().strip()==proof['observational_commit'] and
+            (base/'.snapshot_commit').read_text().strip()==proof['base_commit'], 'observational runtime identity changed')
+    require(all(r['validation_key']['code_sha256']==file_digest(base/'.snapshot_commit') for r in records),
+            'observational runtime does not preserve these canaries native runtime')
+    allowed={'ispatialgym/sampling/campaign_runtime.py','ispatialgym/multienv/campaign_rendering.py',
+             'scripts/campaign_20261110/training_batch_probe.py'}
+    require(set(proof['changed_files'])==allowed and set(proof['changed_payloads'])==allowed,
+            'observational runtime changes exceed the approved instrumentation')
+    changed=set()
+    for folder in ('ispatialgym','scripts'):
+        paths={str(p.relative_to(tree)) for tree in (base,runtime) for p in (tree/folder).rglob('*.py')}
+        for relative in paths:
+            a,b=base/relative,runtime/relative
+            if not a.is_file() or not b.is_file() or file_digest(a)!=file_digest(b):changed.add(relative)
+    require(changed==allowed,'native implementation changed outside observation-only files')
+    for relative in allowed:
+        require(file_digest(runtime/relative)==proof['changed_payloads'][relative],'observational payload changed')
+    def physical_ast(path):
+        tree=ast.parse(path.read_text())
+        tree.body=[node for node in tree.body if not
+            (isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)) and node.name in ('verify_loaded','restoration_observation'))
+            and not (isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and
+                t.id.startswith('_RESTORATION_PROBE_') for t in node.targets))]
+        return ast.dump(tree,include_attributes=False)
+    require(physical_ast(base/'ispatialgym/sampling/campaign_runtime.py')==
+            physical_ast(runtime/'ispatialgym/sampling/campaign_runtime.py'),
+            'physical campaign runtime changed alongside instrumentation')
+    return {'path':str(proof_path),'sha256':ref['sha256']}
 
 
 def inputs(root,request):
@@ -35,11 +77,13 @@ def run(root,request,output,kind):
     value,records=inputs(root,request);output.mkdir(parents=True)
     runtime=Path(__file__).resolve().parents[2]/'.snapshot_commit'
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
+    compatibility=verify_runtime_compatibility(root,value,records,runtime.parent)
     os.environ['ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE']='1'
     order=[0,1,0];entries=[]
     common={'schema':'isg-training-restoration-probe-v1','campaign_id':'campaign_20261110','kind':kind,
             'request':{'path':str(Path(request).resolve()),'sha256':file_digest(request)},
             'probe_runtime':{'path':str(runtime),'sha256':file_digest(runtime)},'entries':entries,
+            'runtime_compatibility':compatibility,
             'accepted':False,'eligible_for_goal':False,'quota_consumed':0}
     if kind=='physics_action_open_loop':
         from ispatialgym.oracle import run_isg
