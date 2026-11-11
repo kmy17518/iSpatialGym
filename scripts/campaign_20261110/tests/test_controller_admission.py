@@ -306,13 +306,16 @@ def test_archiving_gate_during_admission_scan_does_not_stop_controller(tmp_path,
 
 
 def test_pending_admission_canary_reserves_class_capacity_before_catalog_admission(tmp_path):
-    record = {"admission_id": "a", "status": "external_submission", "phase": "train", "prepared": {"group_ids": ["new"]},
+    record = {"admission_id": "a", "status": "external_submission", "phase": "eval_standard", "prepared": {"group_ids": ["new"]},
               "decision": {"bucket": 0}}
     c.write_json_atomic(tmp_path / "controllers/admission/state.json", {"records": {"a": record}})
     c.write_json_atomic(tmp_path / "groups/new/campaign_config.json", {"template": {
         "task": "inter_object_relation_satisfaction-ontop_small_scale", "class_id": "soap"}})
     rows = groups.pending(tmp_path)
     assert len(rows) == 1 and rows[0]["groups"] == 1 and rows[0]["class_id"] == "soap"
+    record['phase']='train'
+    c.write_json_atomic(tmp_path / "controllers/admission/state.json", {"records": {"a": record}})
+    assert groups.pending(tmp_path)==[]  # Held standalone attempts never reserve eligible quota.
     record["status"] = "admitted"
     c.write_json_atomic(tmp_path / "controllers/admission/state.json", {"records": {"a": record}})
     assert groups.pending(tmp_path) == []
@@ -362,3 +365,36 @@ def test_transient_reserved_capacity_does_not_permanently_hide_valid_source():
     for reason in ('ContractError: source identity differs','ContractError: replay QA missing'):
         assert admission.gate_observation_cached({**row,'reason':reason},'a'*64,now=10000.)
     assert admission.gate_observation_cached({'sha256':'a'*64,'admission_id':'kept'},'a'*64,now=10000.)
+
+
+def test_planning_contention_waits_without_removing_live_owner(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    calls=[]; released=[]; now=[0.]
+    @contextmanager
+    def lock(path):
+        calls.append(path)
+        if len(calls)<3:raise FileExistsError('live owner')
+        try:yield
+        finally:released.append(path)
+    monkeypatch.setattr(admission,'atomic_directory_lock',lock)
+    monkeypatch.setattr(admission.time,'monotonic',lambda:now[0])
+    monkeypatch.setattr(admission.time,'sleep',lambda t:now.__setitem__(0,now[0]+t))
+    with pytest.raises(FileExistsError,match='authoring failure'):
+        with admission.admission_planning_lock(tmp_path):
+            raise FileExistsError('authoring failure')
+    assert len(calls)==3 and released==[tmp_path/'controllers/held_planning.lockdir']
+
+
+def test_planning_wait_has_a_finite_deadline(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    now=[0.]
+    @contextmanager
+    def busy(path):
+        raise FileExistsError('still live')
+        yield
+    monkeypatch.setattr(admission,'atomic_directory_lock',busy)
+    monkeypatch.setattr(admission.time,'monotonic',lambda:now[0])
+    monkeypatch.setattr(admission.time,'sleep',lambda t:now.__setitem__(0,now[0]+t))
+    with pytest.raises(FileExistsError,match='still live'):
+        with admission.admission_planning_lock(tmp_path,wait_seconds=1):pass
+    assert now[0]==1

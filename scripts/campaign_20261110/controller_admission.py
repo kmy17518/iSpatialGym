@@ -4,6 +4,7 @@ from __future__ import annotations
 from scripts.campaign_20261110 import controller_lifecycle as lifecycle
 
 import argparse
+from contextlib import contextmanager
 from dataclasses import asdict, replace
 import datetime
 from pathlib import Path
@@ -26,6 +27,30 @@ AUTHOR_RECONCILIATION = "tray_anchor_goal_reuse_v1"
 FIXED_AUTHOR_GAPS = {
     "ContractError: disembedding needs a fresh anchor with verified destination-floor goal candidates",
 }
+
+
+@contextmanager
+def admission_planning_lock(root, *, wait_seconds=30):
+    """Give a freshly verified source a bounded chance between refill passes.
+
+    A busy live owner is never removed. Only acquisition contention is retried;
+    failures after entering the lock remain ordinary authoring failures.
+    """
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        lock = atomic_directory_lock(Path(root) / 'controllers/held_planning.lockdir')
+        try:
+            lock.__enter__()
+            break
+        except FileExistsError:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            time.sleep(min(.25, remaining))
+    try:
+        yield
+    finally:
+        lock.__exit__(None, None, None)
 
 
 def reconcile_author_gaps(state):
@@ -489,7 +514,7 @@ def main():
                     if not held.job_terminal(found[0], root, queue):
                         continue  # Freeze source template metadata only after its job ends.
                     if identity not in state["records"]:
-                        with atomic_directory_lock(root / "controllers/held_planning.lockdir"):
+                        with admission_planning_lock(root):
                             record = prepare(proof, found[0], cfg, root)
                             state["records"][identity] = record
                             model_class_pin(template, state, cfg, commit=True)
