@@ -2981,12 +2981,34 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             except SkillError as e:
                 if e.details.get("stage") != "protected":
                     raise
-                torso = _carry_torso_record(action, ctx)
-                if torso is not None:
+                if (os.environ.get("ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY", "0") == "1"
+                        and os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG")):
+                    # Standard touching01: a fixed 12 cm arm rise stalls before
+                    # the carry and its 34 cm remainder cannot be treated as a
+                    # small finishing motion. Prove a bounded detour from the
+                    # still-unmoved hand before executing any prefix.
+                    from ispatialgym.oracle.campaign_carry import choose
+
+                    legs, candidates = choose(motions, arm, as_world_pose(targets["pre_place"]),
+                        ignore=on, monitor=ctx.get("monitors"))
+                    ctx["campaign_protected_carry"] = {"candidates": candidates, "chosen": legs is not None}
+                    if legs is None:
+                        raise SkillError("plan_failed", "no complete, collision-free, protected-clear carry detour in camera",
+                                         stage="campaign_protected_carry", candidates=candidates) from e
+                    # Keep protection in raise mode and all ordinary execution
+                    # monitors active; a partial prefix has no finish fallback.
+                    yield from motions.arm_along(arm, legs, check_collisions=True, ignore_objects=on,
+                                                 soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+                    ctx["carry_leg"] = {"kind": "campaign checked detour", "candidates": candidates}
+                    continue_carry = False  # the original fixed-rise fallback is unnecessary
+                else:
+                    continue_carry = True
+                torso = _carry_torso_record(action, ctx) if continue_carry else None
+                if continue_carry and torso is not None:
                     # i7-framing (owner 2026-11-08 5.1; ISPATIALGYM_CARRY_TORSO_LIFT=1 and the sampler's grasps[].carry_torso): the protective
                     # rise made by the TORSO, arm joints held (the arm's rise took the fingertips out of the head camera's frame)
                     yield from _carry_torso_lift(action, motions, state, targets, ctx, cfg, arm, on, carry, torso, e)
-                else:
+                elif continue_carry:
                     here = as_world_pose(state.eef_pose(arm))
                     pre_p, pre_q = as_world_pose(targets["pre_place"])
                     z_top = max(float(here[0][2]), float(pre_p[2])) + float(motions.cfg.protect_above_m)
