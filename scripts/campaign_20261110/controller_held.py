@@ -269,6 +269,23 @@ def source_environment(job, *, root):
         require(path.is_relative_to(Path(root).resolve()) and path.is_file(), "held private customs outside campaign")
         require(file_digest(path) == env.get("ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256"), "held native private customs changed")
     keys = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR")
+    classroom_keys = ("ISPATIALGYM_HELD_BOUND_FLOOR_START", "ISGF_TRANSPORT_ASSET_CLOSURE")
+    if any(env.get(key) for key in classroom_keys):
+        config_path = Path(env.get("ISPATIALGYM_CAMPAIGN_CONFIG", "")).resolve()
+        require(config_path.is_relative_to(Path(root).resolve()) and config_path.is_file(),
+                "held classroom source config outside campaign")
+        config = read(config_path)
+        template = config.get("template", {})
+        targets = [obj for obj in template.get("objects", []) if obj.get("role") == "target"]
+        require(config.get("split") == "eval_model" and template.get("task") == "mental_rotation"
+                and template.get("class_id") == "mental_rotation-classroom_mock_up"
+                and len(targets) == 1 and targets[0].get("category") == "classroom_mock_up"
+                and targets[0].get("model") == "isgm10", "held classroom flags outside exact source scope")
+        require(env.get(classroom_keys[0]) == "1", "held classroom bound-floor flag differs")
+        provider = Path(root).resolve() / "assets/custom_mental_v1/objects/classroom_mock_up/isgm10"
+        require(env.get(classroom_keys[1]) == str(provider) and provider.resolve() == provider
+                and (provider / "usd/isgm10.usd").is_file(), "held classroom provider closure differs")
+        keys += classroom_keys
     return [key + "=" + env[key] for key in keys if env.get(key)], env.get("START_PER_ATTEMPT") == "0"
 
 
