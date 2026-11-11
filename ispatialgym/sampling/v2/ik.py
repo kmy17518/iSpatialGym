@@ -1510,9 +1510,11 @@ class IKChecker:
                         break
                     q = q_alt
                     self._last_track_start = q_pre2.clone()
-                qs.append(q)
-                if qs and len(qs) >= 2:
-                    qs[-2] = self._last_track_start.clone()
+                # The tracked approach may revise its start witness. Replace
+                # that pose's entry; the common append below records the end
+                # exactly once. Duplicating it made every approach chain
+                # longer than its query and therefore unusable as a cache hit.
+                qs[-1] = self._last_track_start.clone()
                 self.solutions[(arm, self._pose_key(poses[i - 1]))] = self._last_track_start.clone()
             else:
                 with self.ignoring(ign):
@@ -1654,6 +1656,18 @@ class IKChecker:
         """``old`` (a cache entry or None) with ``new``'s chain added as an alternative when it is another branch (:data:`BRANCH_MIN_RAD`)."""
         if not old or not old.get("qs"):
             return new
+        def complete(chain):
+            return isinstance(chain, list) and len(chain) == len(new["qs"]) and all(
+                isinstance(q, list) and len(q) == len(new["q"]) for q in chain)
+
+        # Old local caches can contain the duplicated approach endpoint. They
+        # already fail current-world replay; do not let same-branch growth keep
+        # such an entry in preference to the newly solved complete chain.
+        if not complete(old["qs"]):
+            return new
+        alternatives = [c for c in (old.get("alts") or []) if complete(c)]
+        if alternatives != (old.get("alts") or []):
+            old = {**old, "alts": alternatives}
         idx = [int(i) for i in self.kit.robot.arm_control_idx[arm].tolist()]
         chains = [old["qs"]] + [c for c in (old.get("alts") or []) if c]
 
