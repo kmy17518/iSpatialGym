@@ -130,3 +130,59 @@ def test_fresh_binding_keeps_immutable_pool_and_rejects_renamed_active_binding(t
     write(metadata, meta)
     with pytest.raises(ValueError, match='active bindings'):
         bind_one(template, job, metadata, code, policy, hashes, pointer)
+
+
+def bddl_only_relocation_fixture(tmp_path):
+    import shutil
+    args = fixture(tmp_path)
+    metadata = args[2]
+    customs = write(tmp_path / 'customs.json', {'object_scaling-apple': {}})
+    meta = json.loads(metadata.read_text())
+    meta.update(customs=str(customs), activity_definition='activity_definitions/object_scaling/problem1.bddl')
+    write(metadata, meta)
+    original = tmp_path / 'original'
+    shutil.copytree(metadata.parent, original)
+    relocated = metadata.parent / 'relocated_definition/problem1.bddl'
+    relocated.parent.mkdir()
+    shutil.copyfile(original / meta['activity_definition'], relocated)
+    meta['activity_definition'] = str(relocated.relative_to(metadata.parent))
+    write(metadata, meta)
+    sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+    proof = {'schema': 'isg-native-source-relocation-v1', 'changed_fields': ['activity_definition'],
+             'original_metadata': str(original / 'template_meta.json'),
+             'original_metadata_sha256': sha(original / 'template_meta.json'),
+             'metadata_sha256': sha(metadata), 'original_customs': str(customs), 'customs': str(customs),
+             'customs_sha256': sha(customs), 'activity_definition': meta['activity_definition'],
+             'native_bddl_sha256': meta['bddl_sha256'],
+             'copied_files': [{'relative_path': str(p.relative_to(original)), 'sha256': sha(p)}
+                              for p in original.rglob('*') if p.is_file()]}
+    path = write(metadata.parent / 'native_source_relocation.json', proof)
+    return args, path
+
+
+def test_exact_bddl_only_relocation_keeps_unchanged_receipt(tmp_path):
+    args, proof = bddl_only_relocation_fixture(tmp_path)
+    before = proof.read_bytes()
+    result = bind_one(*args)
+    assert result.scene_setup['fresh_demo'] == 'pending'
+    assert proof.read_bytes() == before
+
+
+@pytest.mark.parametrize('mutation', ['customs_locator', 'definition_bytes', 'unlisted_metadata'])
+def test_bddl_only_relocation_rejects_unlisted_or_changed_sources(tmp_path, mutation):
+    args, path = bddl_only_relocation_fixture(tmp_path)
+    proof = json.loads(path.read_text())
+    metadata = args[2]
+    meta = json.loads(metadata.read_text())
+    if mutation == 'customs_locator':
+        replacement = write(tmp_path / 'other_customs.json', {'object_scaling-apple': {}})
+        proof['customs'] = meta['customs'] = str(replacement)
+    elif mutation == 'definition_bytes':
+        (metadata.parent / proof['activity_definition']).write_text('changed physical definition')
+    else:
+        meta['scene'] = 'different_scene'
+    write(metadata, meta)
+    proof['metadata_sha256'] = hashlib.sha256(metadata.read_bytes()).hexdigest()
+    write(path, proof)
+    with pytest.raises(ValueError):
+        bind_one(*args)

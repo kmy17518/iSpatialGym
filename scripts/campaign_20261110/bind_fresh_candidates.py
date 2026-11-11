@@ -56,10 +56,15 @@ def bind_one(template, job, metadata_path, code, reservations, hashes, policy_po
     if relocation_path.is_file():
         proof = json.loads(relocation_path.read_text())
         original_path = Path(proof['original_metadata'])
-        require(proof['schema'] == 'isg-native-source-relocation-v1' and proof['changed_fields'] in (['customs'], ['customs', 'activity_definition']), 'invalid native source relocation')
+        require(proof['schema'] == 'isg-native-source-relocation-v1' and proof['changed_fields'] in
+                (['customs'], ['activity_definition'], ['customs', 'activity_definition']),
+                'invalid native source relocation')
         require(sha(original_path) == proof['original_metadata_sha256'] and sha(metadata_path) == proof['metadata_sha256'], 'relocated metadata bytes changed')
         original = json.loads(original_path.read_text())
         require(original['customs'] == proof['original_customs'], 'relocation original customs locator differs')
+        if 'customs' not in proof['changed_fields']:
+            require(proof['customs'] == original['customs'],
+                    'BDDL-only relocation must preserve the exact customs locator')
         expected_meta = {**original, 'customs': proof['customs']}
         if 'activity_definition' in proof['changed_fields']:
             definition = (directory / proof['activity_definition']).resolve()
