@@ -76,6 +76,24 @@ def test_shelf_refill_rejects_drawn_start_as_fixed_release_reference(tmp_path):
         audit_authored_source_context({'queue':str(queue)},anchor,SimpleNamespace(class_id=CLASS),tmp_path)
 
 
+def test_explicit_own_group_replay_never_uses_previous_template_gate(tmp_path):
+    import pytest
+    from scripts.campaign_20261110 import contracts as c
+    from scripts.campaign_20261110.controller_held import claim_gate_for_record
+    allocation = {'key':'class','jobid':'123','job_dir':str(tmp_path/'out/current')}
+    record = {'phase':'eval_standard'}
+    previous = {'eval_standard':str(tmp_path/'older/gate.json')}
+    assert claim_gate_for_record({},record,allocation,previous,tmp_path) == previous['eval_standard']
+    spec = {'require_own_group_gate':True}
+    assert claim_gate_for_record(spec,record,allocation,previous,tmp_path) is None
+    own = tmp_path/'validation/open_loop/class/123/gate.json'
+    c.write_json_atomic(own,{'source_job':str(tmp_path/'out/older')})
+    with pytest.raises(c.ContractError,match='another job'):
+        claim_gate_for_record(spec,record,allocation,previous,tmp_path)
+    c.write_json_atomic(own,{'source_job':allocation['job_dir']})
+    assert claim_gate_for_record(spec,record,allocation,previous,tmp_path) == str(own)
+
+
 def counts(**kwargs):
     return {"evaluation": {}, "train_buckets": {}, "class_remaining": 1000, "task_remaining": 4000, **kwargs}
 

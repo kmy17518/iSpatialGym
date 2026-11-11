@@ -237,6 +237,18 @@ def claim_finished_groups(record, allocation, gate, cfg, root, *, job_terminal=F
         done[gid] = {"accepted": result["accepted"], "review_sha256": digest(review)}
 
 
+def claim_gate_for_record(spec, record, allocation, gates, root):
+    """An explicitly scoped own-replay policy cannot borrow another job's gate."""
+    if not spec.get('require_own_group_gate', False):
+        return gates.get(record['phase'])
+    path = Path(root) / 'validation/open_loop' / allocation['key'] / allocation['jobid'] / 'gate.json'
+    if not path.exists():
+        return None
+    require(Path(read(path)['source_job']).resolve() == Path(allocation['job_dir']).resolve(),
+            'required own group gate belongs to another job')
+    return str(path)
+
+
 def prepare_queue(spec, state, decision, cfg, root, template, save):
     from scripts.campaign_20261110.goal_groups import successful_anchor
     from scripts.campaign_20261110.held_goal_batches import prepare_batch, submission_command
@@ -403,7 +415,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
             if gate.exists() and read(gate).get("success") is True:
                 gates[record["phase"]] = str(gate)
         is_terminal = job_terminal(allocation, root, queue)
-        claim_finished_groups(record, allocation, gates.get(record["phase"]), cfg, root, job_terminal=is_terminal)
+        claim_finished_groups(record, allocation, claim_gate_for_record(spec, record, allocation, gates, root),
+                              cfg, root, job_terminal=is_terminal)
         if not is_terminal:
             state["status"] = "queue_running"
             continue
