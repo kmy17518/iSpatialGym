@@ -164,6 +164,21 @@ def test_scope_filter_skips_unowned_history_without_replacing_full_proof(tmp_pat
     assert admission.source_in_scope({}, tmp_path, cfg)
 
 
+def test_runtime_exclusion_keeps_other_repaired_classes_eligible(tmp_path, monkeypatch):
+    f, template, _ = anchor_fixture(tmp_path, monkeypatch)
+    cfg = {'excluded_classes': ['disembedding_02']}
+    assert admission.scoped_template(template, cfg).split == 'train'
+    assert admission.source_in_scope(json.loads(f.gate.read_text()), tmp_path, cfg)
+    repaired = replace(template, class_id='newly_ready_existing_class')
+    assert admission.scoped_template(repaired, cfg).class_id == repaired.class_id
+    with pytest.raises(c.ContractError, match='excluded from this admission runtime'):
+        admission.scoped_template(replace(template, class_id='disembedding_02'), cfg)
+    assert not admission.source_in_scope(json.loads(f.gate.read_text()), tmp_path,
+                                         {'excluded_classes': [template.class_id]})
+    with pytest.raises(c.ContractError, match='invalid excluded admission classes'):
+        admission.scoped_template(template, {'excluded_classes': 'disembedding_02'})
+
+
 def test_author_upgrade_reopens_only_the_fixed_gap_and_retains_previous_evidence():
     previous = {"sha256": "a"*64, "reason": next(iter(admission.FIXED_AUTHOR_GAPS)), "observed_at": 123}
     state = {"checked_gates": {"tray": dict(previous), "other": {"sha256": "b"*64, "reason": "replay QA missing"}}}

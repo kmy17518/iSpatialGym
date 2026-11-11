@@ -122,6 +122,10 @@ def task_allowed(task, cfg):
 
 def scoped_template(template, cfg):
     require(task_allowed(template.task, cfg), "task outside immutable admission scope")
+    excluded = cfg.get("excluded_classes", [])
+    require(isinstance(excluded, list) and all(isinstance(value, str) and value for value in excluded)
+            and len(excluded) == len(set(excluded)), "invalid excluded admission classes")
+    require(template.class_id not in excluded, "class excluded from this admission runtime")
     classes = cfg.get("admitted_classes")
     if classes is not None:
         require(isinstance(classes, list) and classes and all(isinstance(value, str) and value for value in classes)
@@ -337,6 +341,8 @@ def source_in_scope(gate, root, cfg):
         split = cfg.get('admission_split', 'train')
         allowed = (split,) if split in ('eval_model', 'eval_category') else ('train', 'eval_standard')
         if block.get('split') not in allowed:
+            return False
+        if block.get('class_id') in cfg.get('excluded_classes', []):
             return False
         if cfg.get('admitted_classes') is not None and block.get('class_id') not in cfg['admitted_classes']:
             return False
