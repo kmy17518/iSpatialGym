@@ -12,7 +12,7 @@ from dataclasses import asdict, replace
 import json
 from pathlib import Path
 
-from scripts.campaign_20261110.bind_fresh_candidates import load_contract, bind_one
+from scripts.campaign_20261110.bind_fresh_candidates import load_contract, bind_one, native_scale_equal
 from scripts.campaign_20261110.contracts import ScaleState, Perturbations, digest, file_digest, require, write_json_atomic
 from scripts.campaign_20261110.group_lane import check_reservations
 from scripts.campaign_20261110.reservation_policy import active_policy
@@ -64,7 +64,7 @@ def bind_training_candidate(template, job, metadata_path, code, reservations, ha
     for o in bound.objects:
         original=originals[(o.role,o.category,o.model)]
         state=states[original.instance]
-        require(tuple(o.default_scale)==state.applied, 'fresh native applied scale differs')
+        require(native_scale_equal(state.applied, o.default_scale), 'fresh native applied scale differs')
         refs.append(replace(o,default_scale=original.default_scale));mapped[o.instance]=state
     setup={**bound.scene_setup,'candidate_fingerprint':template.fingerprint,
         'training_scale_plan_sha256':digest(plan),'training_original_defaults_preserved':True}

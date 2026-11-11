@@ -53,10 +53,14 @@ def native_scene_binding_equal(before, after):
     """
     if any(before.get(k) != after.get(k) for k in ('category', 'model')):
         return False
-    a,b=before.get('scale'),after.get('scale')
-    if a==b:return True
-    if not isinstance(a,list) or not isinstance(b,list) or len(a)!=3 or len(b)!=3:return False
-    return all(x==y or struct.unpack('f',struct.pack('f',x))[0]==y for x,y in zip(a,b))
+    return native_scale_equal(before.get('scale'),after.get('scale'))
+
+
+def native_scale_equal(before, after):
+    if before==after:return True
+    if not isinstance(before,(list,tuple)) or not isinstance(after,(list,tuple)) or len(before)!=3 or len(after)!=3:return False
+    return all(x==y or struct.unpack('f',struct.pack('f',x))[0]==y for x,y in zip(before,after))
+
 
 
 def bind_one(template, job, metadata_path, code, reservations, hashes, policy_pointer):
