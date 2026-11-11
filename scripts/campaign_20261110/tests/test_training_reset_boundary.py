@@ -64,9 +64,11 @@ class ResetBoundaryTests(unittest.TestCase):
                 sim.step_physics();sim.step_physics();sim.value=42
                 return ('native-observation','native-info')
         runner=SimpleNamespace(InstanceLoader=Loader,og=SimpleNamespace(sim=sim))
-        loader=Loader();loader.task=task;loader.env=SimpleNamespace(scene=scene)
+        loader=Loader();loader.task=task;loader.env=SimpleNamespace(scene=scene,step=sim.step_physics)
         loader.report={};loader.tro=SimpleNamespace(meta=SimpleNamespace(raw={'campaign':{}}))
-        original=install_reset_boundary_probe(runner,final_pre_action=True,
+        cleanups=[]
+        original=install_reset_boundary_probe(runner,final_pre_action=True,next_native_control_step=True,
+            pending_cleanups=cleanups,
             observer=lambda *_:{'value':sim.value,'steps':sim.steps})
         try:result=loader.restore()
         finally:Loader.restore=original
@@ -76,6 +78,13 @@ class ResetBoundaryTests(unittest.TestCase):
         self.assertEqual(report['native_observation'],{'value':8})
         self.assertEqual(report['native_final_pre_action_observation']['observation'],{'value':42,'steps':3})
         self.assertEqual(sim.steps,3)
+        self.assertEqual(report['next_native_control_step_observation'],{})
+        loader.env.step()
+        control=report['next_native_control_step_observation']
+        self.assertEqual(control['before'],{'value':42,'steps':3})
+        self.assertEqual(control['after'],{'value':43,'steps':4})
+        self.assertEqual(len(cleanups),1)
+        cleanups.pop()()
         self.assertNotIn('load_tro_instance',vars(task))
         self.assertNotIn('reset',vars(scene))
 

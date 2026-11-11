@@ -37,3 +37,43 @@ def test_next_step_native_error_propagates_and_restores_method():
     observe_next_native_step(sim,lambda:{},result)
     with pytest.raises(RuntimeError,match='native failure'):sim.step_physics()
     assert sim.step_physics is step and result=={}
+
+
+def test_control_step_observes_existing_action_and_not_each_physics_substep():
+    from scripts.campaign_20261110.training_batch_probe import observe_next_native_control_step
+    class Env:
+        physics_steps=0
+        calls=[]
+        def step(self, action, *, n_render_iterations):
+            self.calls.append((action,n_render_iterations))
+            self.physics_steps+=4
+            return 'unchanged native result'
+    env=Env();result={};action=object()
+    cleanup=observe_next_native_control_step(env,lambda:{'steps':env.physics_steps},result)
+    assert env.physics_steps==0 and not result
+    assert env.step(action,n_render_iterations=2)=='unchanged native result'
+    assert env.calls==[(action,2)] and 'step' not in vars(env)
+    assert result['before']=={'steps':0} and result['after']=={'steps':4}
+    assert result['method']=='env.step' and result['physics_steps_added']==0
+    env.step(action,n_render_iterations=3);cleanup()
+    assert result['after']=={'steps':4} and env.physics_steps==8
+
+
+@pytest.mark.parametrize('failure', ['observation','native','unused'])
+def test_control_step_cleanup_preserves_original_override_on_all_exit_paths(failure):
+    from types import SimpleNamespace
+    from scripts.campaign_20261110.training_batch_probe import observe_next_native_control_step
+    calls=[]
+    def step(*args,**kwargs):
+        calls.append((args,kwargs))
+        if failure=='native':raise RuntimeError('native failure')
+    def observe():
+        if failure=='observation':raise RuntimeError('observation failure')
+        return {}
+    env=SimpleNamespace(step=step);result={}
+    cleanup=observe_next_native_control_step(env,observe,result)
+    if failure!='unused':
+        with pytest.raises(RuntimeError,match=failure+' failure'):env.step('action')
+    cleanup();cleanup()
+    assert env.step is step and result=={}
+    assert len(calls)==(1 if failure=='native' else 0)

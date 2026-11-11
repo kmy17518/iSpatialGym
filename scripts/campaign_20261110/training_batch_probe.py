@@ -133,7 +133,32 @@ def observe_next_native_step(sim, observe, destination):
     sim.step_physics=observed
 
 
-def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_step=False, observer=None):
+def observe_next_native_control_step(env, observe, destination):
+    """Observe the first existing env.step, which may contain several physics steps.
+
+    Remove the one-shot wrapper before calling native code. The returned cleanup
+    also removes an unused wrapper if an episode exits before its first action.
+    """
+    step=env.step;raw_step=vars(env).get('step');had_step='step' in vars(env)
+    def cleanup():
+        if vars(env).get('step') is observed:
+            if had_step:env.step=raw_step
+            else:del env.step
+    def observed(*args, **kwargs):
+        cleanup()
+        before=observe()
+        result=step(*args, **kwargs)
+        after=observe()
+        destination.update(phase='first_native_control_step_after_completed_loader',
+            method='env.step',before=before,after=after,physics_steps_added=0,
+            native_control_calls_observed=1,diagnostic_only=True)
+        return result
+    env.step=observed
+    return cleanup
+
+
+def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_step=False,
+                                 next_native_control_step=False, pending_cleanups=None, observer=None):
     """Instrument only this diagnostic process; the ordinary loader is unchanged."""
     restore=runner.InstanceLoader.restore
     def observed_restore(loader, *args, **kwargs):
@@ -178,6 +203,12 @@ def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_
             loader.report['campaign_restoration']['next_native_physics_step_observation']=destination
             observe_next_native_step(runner.og.sim,
                 lambda:restoration_observation(loader.tro.meta.raw['campaign'],loader.env.scene,runner.og.sim),destination)
+        if next_native_control_step:
+            destination={}
+            loader.report['campaign_restoration']['next_native_control_step_observation']=destination
+            cleanup=observe_next_native_control_step(loader.env,
+                lambda:restoration_observation(loader.tro.meta.raw['campaign'],loader.env.scene,runner.og.sim),destination)
+            if pending_cleanups is not None:pending_cleanups.append(cleanup)
         return result
     runner.InstanceLoader.restore=observed_restore
     return restore
@@ -219,10 +250,13 @@ def run(root,request,output,kind):
         from ispatialgym.oracle import run_isg
         from ispatialgym.fastflags import fast_on
         require(fast_on('COLLECTOR_PREBUILD'),'production template compatibility is disabled')
+        pending_cleanups=[]
         if value.get('observe_reset_boundary') is True:
             install_reset_boundary_probe(run_isg,
                 final_pre_action=value.get('observe_final_pre_action') is True,
-                next_native_step=value.get('observe_next_native_physics_step') is True)
+                next_native_step=value.get('observe_next_native_physics_step') is True,
+                next_native_control_step=value.get('observe_next_native_control_step') is True,
+                pending_cleanups=pending_cleanups)
             common['reset_boundary_diagnostic']=True
             common['final_pre_action_diagnostic']=value.get('observe_final_pre_action') is True
         world=shared_world_proof(run_isg,records)
@@ -233,7 +267,11 @@ def run(root,request,output,kind):
             row=records[index];destination=output/('episode_'+str(ordinal))
             argv=['--instance',row['artifacts']['tro']['path'],'--mode','replay',
                   '--replay',row['artifacts']['demo']['path'],'--record','hdf5','--no-goal-override','--out',str(destination)]
-            args=run_isg.parse_args(argv);code,result=run_isg.run_instance(args,argv[1],shared)
+            args=run_isg.parse_args(argv)
+            try:
+                code,result=run_isg.run_instance(args,argv[1],shared)
+            finally:
+                while pending_cleanups:pending_cleanups.pop()()
             report=destination/row['instance_id']/'meta.json'
             entries.append({'canary_review':value['canaries'][index],'returncode':code,'result':result,
                             'report':{'path':str(report),'sha256':file_digest(report)}})
