@@ -99,3 +99,18 @@ def test_mouse02_reference_occlusion_requires_new_measured_native_goal():
     from ispatialgym.eval import goal_occlusion as GO
     result=GO.report(report['objects'],method='measured')
     assert result['occluded'] and result['threshold']==.5
+
+
+def test_required_native_screen_retains_real_camera_before_sampling(monkeypatch):
+    from ispatialgym.sampling import sample_isg as S
+    monkeypatch.setattr(S,'fast_on',lambda name:True)
+    monkeypatch.setattr(C,'required',lambda:False)
+    assert not S.world_cameras_required('inter_object_relation_satisfaction-inside_small_scale')
+    assert S.world_cameras_required('camera_relocalization-standard')
+    assert S.world_cameras_required(None)
+    monkeypatch.setattr(C,'required',lambda:True)
+    assert S.world_cameras_required('inter_object_relation_satisfaction-inside_small_scale')
+    assert S.world_cameras_required('inter_object_relation_satisfaction-under_large_scale')
+    monkeypatch.setattr(C,'required',lambda:False)
+    monkeypatch.setattr(S,'fast_on',lambda name:False)
+    assert S.world_cameras_required('inter_object_relation_satisfaction-inside_small_scale')

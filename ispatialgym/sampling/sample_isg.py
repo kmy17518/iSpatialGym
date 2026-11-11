@@ -235,6 +235,17 @@ def needs_pixels(subtask: Optional[str]) -> bool:
     return any(str(subtask).startswith(p) for p in PIXEL_SUBTASK_PREFIXES)
 
 
+
+def world_cameras_required(subtask: Optional[str]) -> bool:
+    """Retain the real sensor when an exact campaign requires rendered QA.
+
+    The usual family optimization remains unchanged for unconfigured runs.
+    Required visibility cannot be established with the camera's FK model alone.
+    """
+    from ispatialgym.sampling import campaign_visibility
+    return campaign_visibility.required() or not (fast_on("SAMPLER_CAMERAS") and not needs_pixels(subtask))
+
+
 def scene_crop_request(problem: GroundedProblem, scene: str) -> Tuple[str, Dict[str, Any], float]:
     """train-fast SCENE_CROP (2026-11-01): ``(requested mode, the scene block's bindings, radius m)`` of ``problem`` in ``scene``
     (``scene_crop.requested_mode``: ``ISPATIALGYM_FAST_SCENE_CROP``, default per family, ``full`` with ``ISPATIALGYM_FAST=0``)."""
@@ -303,7 +314,7 @@ class WorldPool:
         key = world_key(problem, scene, stable)
         removed = list(key[2])
         rooms = list(key[1])
-        cameras = not (fast_on("SAMPLER_CAMERAS") and not needs_pixels(getattr(problem, "subtask", None)))
+        cameras = world_cameras_required(getattr(problem, "subtask", None))
         from ispatialgym.sampling import scene_crop as SCROP
 
         crop_mode, crop_bindings, crop_radius = scene_crop_request(problem, scene)
