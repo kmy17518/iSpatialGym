@@ -60,6 +60,15 @@ def verify_registration(path, root):
     require(row['native_inputs']['path'] == str(job/'native_inputs.json'), 'native manifest locator differs')
     checked = native.verify(job, root)
     require(checked == manifest, 'native verification differs')
+    require(checked['original_wrapper'] == row['wrapper']['path']
+            and checked['files'].get(row['wrapper']['path']) == row['wrapper']['sha256'],
+            'native source is not bound to the submitted wrapper')
+    require(restriction.get('native_inputs') == row['native_inputs'],
+            'secondary restriction belongs to another native source')
+    closure = set(checked['files']) | set(checked.get('library_files', {}))
+    require(set(restriction['failed_paths']) <= closure, 'secondary failure outside native closure')
+    require(0 <= row['registered_at']-restriction['observed_at'] <= 300,
+            'secondary restriction was not fresh at registration')
     return row, job
 
 
@@ -94,6 +103,8 @@ def recover(path, root, *, proof_fn=scheduler_proof, capacity_fn=cluster_return_
         row, job = verify_registration(path, root)
         state_path = path.parent/'state.json'
         state = json.loads(state_path.read_text()) if state_path.exists() else {'status': 'registered'}
+        if state.get('cancel_requested') or state['status'] in ('cancelled_never_started', 'active'):
+            require(state.get('registration') == reference(path), 'saved owner registration changed')
         if state['status'] in ('active', 'cluster_started_or_terminal'):
             return state
         queued_receipt = job/'vast_submission.json'
@@ -114,6 +125,9 @@ def recover(path, root, *, proof_fn=scheduler_proof, capacity_fn=cluster_return_
                     native.write(state_path, state)
                     return state
             else:
+                restriction = read_reference(row['secondary_transport_proof'])
+                require(0 <= time.time()-restriction['observed_at'] <= 300,
+                        'refresh exact secondary transport observation before cancellation')
                 capacity = capacity_fn()  # Actual two-account scheduler query, never periodic inventory alone.
                 budget = overflow_readiness.check(root, funded_scheduler(job, proof['scheduler']))
                 state.update(cancel_requested=True, before=proof, capacity=capacity, budget=budget,

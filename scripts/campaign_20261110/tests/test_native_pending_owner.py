@@ -1,5 +1,6 @@
 import copy
 import json
+import time
 
 import pytest
 
@@ -20,6 +21,9 @@ def registered(tmp_path, monkeypatch):
     wrapper.write_text('exact registered command')
     row = {'account': 'minyeong', 'job_id': '12345', 'wrapper': owner.reference(wrapper),
            'native_inputs': {'path': str(job/'native_inputs.json'), 'sha256': 'pinned'}}
+    restriction = root/'secondary.json'
+    restriction.write_text(json.dumps({'observed_at': time.time()}))
+    row['secondary_transport_proof'] = owner.reference(restriction)
     path.write_text(json.dumps(row))
     monkeypatch.setattr(owner, 'verify_registration', lambda p, r: (row, job))
     monkeypatch.setattr(owner.native, 'verify', lambda *a: {})
@@ -125,7 +129,8 @@ def test_swapped_saved_cancel_proof_rejected(registered):
     wrong = state_proof(proof, 'CANCELLED')
     wrong['scheduler']['JobId'] = wrong['job_id'] = '99999'
     owner.native.write(path.parent/'state.json', {'status': 'cancelled_never_started',
-                                                 'before': proof, 'after': wrong})
+                                                 'before': proof, 'after': wrong,
+                                                 'registration': owner.reference(path)})
     with pytest.raises(ValueError, match='identity'):
         run(registered, [state_proof(proof, 'CANCELLED')], activate_fn=lambda *a: pytest.fail('wrong proof'))
 
@@ -145,8 +150,71 @@ def test_crash_after_activation_recovers_running_output_without_duplicate(regist
     owner.native.write(job/'vast_submission.json', {'id': '900000123', 'record_sha256': owner.native.sha(queue)})
     owner.native.write(root/'vast/config.json', {'dispatch_job_ids': ['900000123']})
     owner.native.write(path.parent/'state.json', {'status': 'cancelled_never_started',
-                    'before': proof, 'after': state_proof(proof, 'CANCELLED')})
+                    'before': proof, 'after': state_proof(proof, 'CANCELLED'),
+                    'registration': owner.reference(path)})
     (job/'result').mkdir()
     result = run(registered, [state_proof(proof, 'CANCELLED')],
                  activate_fn=lambda *a: pytest.fail('duplicate activation'))
     assert result['recovered_after_activation'] is True
+
+
+def test_changed_registration_rejected_after_cancel(registered):
+    root, path, row, job, proof = registered
+    owner.native.write(path.parent/'state.json', {'status': 'cancelled_never_started',
+                    'before': proof, 'after': state_proof(proof, 'CANCELLED'),
+                    'registration': {'path': str(path), 'sha256': 'another-source'}})
+    with pytest.raises(ValueError, match='registration changed'):
+        run(registered, [], activate_fn=lambda *a: pytest.fail('changed source'))
+
+
+def test_stale_secondary_observation_blocks_cancellation(registered):
+    root, path, row, job, proof = registered
+    restriction = root/'stale_secondary.json'
+    restriction.write_text(json.dumps({'observed_at': time.time()-301}))
+    row['secondary_transport_proof'] = owner.reference(restriction)
+    with pytest.raises(ValueError, match='refresh exact secondary'):
+        run(registered, [proof], cancel_fn=lambda j: pytest.fail('stale private transport'))
+
+
+@pytest.mark.parametrize('change', [None, 'wrapper_path', 'wrapper_hash', 'restriction_input',
+                                    'restriction_path', 'restriction_age'])
+def test_registration_binds_native_wrapper_and_exact_secondary_proof(tmp_path, monkeypatch, change):
+    root = tmp_path
+    wrapper = root/'job.sh'
+    wrapper.write_text('native wrapper')
+    dependency = root/'private.json'
+    dependency.write_text('{}')
+    job = root/'out/vast_native_dependency/jar'
+    job.mkdir(parents=True)
+    manifest = {'job_dir': str(job), 'original_wrapper': str(wrapper),
+                'files': {str(wrapper): owner.native.sha(wrapper), str(dependency): owner.native.sha(dependency)}}
+    if change == 'wrapper_path':
+        manifest['original_wrapper'] = str(root/'other.sh')
+    if change == 'wrapper_hash':
+        manifest['files'][str(wrapper)] = 'wrong'
+    owner.native.write(job/'native_inputs.json', manifest)
+    native_ref = owner.reference(job/'native_inputs.json')
+    restriction = {'account': 'shiyuc', 'compatible': False, 'failed_paths': [str(dependency)],
+                   'native_inputs': native_ref, 'observed_at': time.time()}
+    if change == 'restriction_input':
+        restriction['native_inputs'] = {'path': '/other', 'sha256': 'other'}
+    if change == 'restriction_path':
+        restriction['failed_paths'] = ['/unrelated/private.json']
+    if change == 'restriction_age':
+        restriction['observed_at'] -= 301
+    owner.native.write(root/'secondary.json', restriction)
+    command = ['sbatch', '--gres=gpu:titanrtx:1', '--exclude=svl9', '-c', '8',
+               '--mem', '48G', '-p', 'svl,viscam', str(wrapper)]
+    owner.native.write(root/'submission.json', {'job_id': '12345', 'returncode': 0, 'command': command})
+    row = {'schema': 'isg-native-pending-owner-v1', 'account': 'minyeong', 'job_id': '12345',
+           'cluster_routes': ['minyeong_svl', 'minyeong_viscam'], 'secondary_transport_blocker': 'private input',
+           'secondary_transport_proof': owner.reference(root/'secondary.json'), 'registered_at': time.time(),
+           'submission': owner.reference(root/'submission.json'), 'wrapper': owner.reference(wrapper),
+           'native_inputs': native_ref}
+    owner.native.write(root/'registration.json', row)
+    monkeypatch.setattr(owner.native, 'verify', lambda *a: manifest)
+    if change:
+        with pytest.raises(ValueError):
+            owner.verify_registration(root/'registration.json', root)
+    else:
+        assert owner.verify_registration(root/'registration.json', root) == (row, job)
