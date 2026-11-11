@@ -469,6 +469,14 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                 joints[joint] = float(limits[0])+fraction*(float(limits[1])-float(limits[0]))
         plan.update(schema=JOINT_SCHEMA, target=target, joint=joint, goal_joints=joints, fraction_range=plan.pop("magnitude_range"))
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
+        if template.class_id == 'configuration_matching-articulation_open_small_scale_02':
+            proof = anchor['sources']['summary']
+            require(file_digest(proof['path']) == proof['sha256'], 'carton source summary changed after audit')
+            source_stance = anchor['summary'].get('stances', {}).get('manipulation')
+            require(isinstance(source_stance, dict), 'carton source lacks recorded manipulation stance')
+            plan['anchor_manipulation_stance'] = {
+                **{k: source_stance[k] for k in ('base_pose2d', 'focus', 'translate', 'tilt')},
+                'source_summary_sha256': proof['sha256']}
         validate_joint_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room],
                             target=target, joint=joint, activated_at=now, now=now)
     elif template.task in pair_tasks:

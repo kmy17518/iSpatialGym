@@ -648,7 +648,10 @@ class ArticulationSmall(SamplerV2):
         passes; failures go to ``errors`` (a v2-only ``missing_map`` raises). ``sample_template`` runs it with the template seed,
         :meth:`spa_redraw_start` with the attempt's rng. The joint's init / goal values stay the template's."""
         H_max, w_a = float(margins["H_max"]), float(margins["w_a"])
-        for edge, st in TT.edge_candidates(self, self.top, rng):
+        from ispatialgym.sampling import campaign_tabletop_starts as CTS
+        plan = self.campaign_carton_source_plan()
+        anchor = plan.anchor_base_pose2d if plan is not None else None
+        for edge, st in CTS.ordered_edges(TT.edge_candidates(self, self.top, rng), anchor):
             try:
                 self.face_yaw = C.wrap_angle(math.atan2(float(-edge.inward[1]), float(-edge.inward[0])) - math.atan2(float(self.facing_local[1]), float(self.facing_local[0])))
                 self.bands = self._brace_band(edge, st)
@@ -659,7 +662,11 @@ class ArticulationSmall(SamplerV2):
                     if self.left_bands is None:
                         log.info("%s: no left contact band for height %.2f: brace by the exact IK alone", self.gp.variant, H_max)
                 init = TT.phase1b_init_trunk(self, st, H_max, bands=self.bands, top=self.top, left_bands=self.left_bands)
-                init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=self.bands)
+                lateral = None
+                if anchor is not None:
+                    bounds, _, _ = TT.phase1c_bounds(self, init, margins, top=self.top, strict=True)
+                    lateral = CTS.near_lateral(rng, float(bounds[0]), float(bounds[1]), CTS.edge_lateral(edge, anchor))
+                init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=self.bands, lateral=lateral)
                 init.name = "init"
                 # §6.7 (owner 2026-09-16 17:10): the Phase-2 loose class is relaxed / focus-in-frame for small articulation (the same
                 # shape as the ontop-large C rule; the hinged jar's best focus lies 24° off the optical axis from the tall trunks
@@ -1429,6 +1436,13 @@ class ArticulationSmall(SamplerV2):
 
     # ------------------------------------------------------------------ instance (§5.4 Phase 3)
 
+    def campaign_carton_source_plan(self):
+        plan = getattr(self, '_campaign_joint_active', None)
+        if plan is None or plan.anchor_base_pose2d is None or plan.anchor_manipulation_stance is None:
+            return None
+        from ispatialgym.sampling import campaign_runtime
+        return plan if CJG.carton_source_hint_enabled(plan, campaign_runtime.configuration()[1].class_id) else None
+
     def campaign_joint_plan(self):
         if not os.environ.get(CJG.ENV):
             return None
@@ -1488,6 +1502,11 @@ class ArticulationSmall(SamplerV2):
             self._pair_drawn = False
         if getattr(self, "_campaign_joint_active", None) is not None and self.campaign_handle_options() == []:
             raise Reject("campaign_group_complete", "all distinct handle assignments have been written")
+        carton_plan = self.campaign_carton_source_plan()
+        if carton_plan is not None and getattr(self, '_split_cone_cands', None):
+            # A fixed root may lie outside the split cone's random focus.
+            # Restore only the native Phase-2 pool that already passed its checks.
+            self.manip_candidates = list(self._split_cone_cands)
         init = self.init_stance
         errors = []
         # per-attempt budget (0916-205838: one attempt took 2356 s in the second-stance search + diagnostics)
@@ -1506,6 +1525,9 @@ class ArticulationSmall(SamplerV2):
         # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the handle arm's manipulation stances (alias_memory.reorder_pick:
         # a flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
         order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: self.handle_arm, rng)
+        if carton_plan is not None:
+            order = CJG.order_carton_stances(carton_plan, 'configuration_matching-articulation_open_small_scale_02',
+                                             order, self.manip_candidates)
         for k in order[:int(self.gen("candidates_per_attempt", 6))]:
             if time.time() > self._deadline:
                 errors.append(f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")

@@ -52,6 +52,8 @@ class JointGoalPlan:
     deadline_at: float
     max_members: int
     sha256: str
+    anchor_base_pose2d: tuple | None = None
+    anchor_manipulation_stance: dict | None = None
 
     def summary(self):
         return {"campaign_id": self.campaign_id, "group_id": self.group_id, "split": self.split,
@@ -150,9 +152,25 @@ def validate_joint_plan(raw, *, template_id, scene, rooms, target, joint, activa
         raise GoalGroupTimeout("articulation goal-group time budget expired")
     count = raw.get("max_members", 3)
     _require(isinstance(count,int) and not isinstance(count,bool) and 2 <= count <= 3, "invalid articulation group size")
+    from ispatialgym.sampling.campaign_tabletop_starts import anchor_base, anchor_manipulation
+    base, manipulation = anchor_base(raw), anchor_manipulation(raw)
     fingerprint = hashlib.sha256(json.dumps(raw,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
     return JointGoalPlan(raw["campaign_id"],raw["group_id"],raw["split"],template_id,sha,target,joint,(pos,quat),
-                         {n:float(v) for n,v in joints.items()},bounds,deadline,count,fingerprint)
+                         {n:float(v) for n,v in joints.items()},bounds,deadline,count,fingerprint,
+                         base, manipulation)
+
+
+def carton_source_hint_enabled(plan, class_id):
+    """Only the measured carton fixed-root recovery may use these proposals."""
+    return (plan is not None and class_id == 'configuration_matching-articulation_open_small_scale_02'
+            and plan.anchor_base_pose2d is not None and plan.anchor_manipulation_stance is not None)
+
+
+def order_carton_stances(plan, class_id, order, candidates):
+    if not carton_source_hint_enabled(plan, class_id):
+        return order
+    from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
+    return prioritize_written_stances(order, candidates, [plan.anchor_manipulation_stance])
 
 
 def load_joint_plan(*, expected_sha256=None, **kwargs):

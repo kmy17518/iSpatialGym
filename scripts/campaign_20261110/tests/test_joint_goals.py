@@ -112,3 +112,34 @@ def test_missing_eval_bucket_proposes_values_for_native_physical_testing_only():
     assert p.closing_probe_values(direction='close', lower=0, upper=2, stable=[1.2]) == []
     assert replace(p, split='train').closing_probe_values(direction='close', lower=0, upper=2, stable=[.4]) == []
     assert p.closing_probe_values(direction='open', lower=0, upper=2, stable=[]) == []
+
+
+def test_carton_viewpoint_hint_requires_audited_source_and_preserves_goal():
+    raw={"schema":j.SCHEMA,"campaign_id":"fresh","group_id":"g","split":"eval_standard","template_id":"t",
+         "contract_template_sha256":"a"*64,"scene":"scene","room":"room","target":"target","joint":"hinge",
+         "goal_pose":{"position":[15.85,-8.22,.84],"orientation":[0,0,0,1]},"goal_joints":{"hinge":.738},
+         "fraction_range":[0,.5],"created_at":1,"budget_seconds":30,"max_members":3,
+         "anchor_base_pose2d":[15.87,-7.49,-1.57],"anchor_sources":{"summary":{"sha256":"c"*64}},
+         "anchor_manipulation_stance":{"base_pose2d":[15.87,-7.49,-1.57],"focus":[15.87,-8.24,.97],
+                                      "translate":.75,"tilt":0.,"source_summary_sha256":"c"*64}}
+    kwargs=dict(template_id="t",scene="scene",rooms=["room"],target="target",joint="hinge",activated_at=100,now=110)
+    p=j.validate_joint_plan(raw,**kwargs)
+    assert p.pose==((15.85,-8.22,.84),(0.,0.,0.,1.)) and p.joints=={'hinge':.738}
+    assert j.carton_source_hint_enabled(p,'configuration_matching-articulation_open_small_scale_02')
+    assert not j.carton_source_hint_enabled(p,'configuration_matching-articulation_open_small_scale_01')
+    assert not j.carton_source_hint_enabled(plan(),'configuration_matching-articulation_open_small_scale_02')
+    with pytest.raises(j.GoalPlanError,match='summary provenance'):
+        j.validate_joint_plan({**raw,'anchor_sources':{'summary':{'sha256':'d'*64}}},**kwargs)
+    with pytest.raises(j.GoalPlanError,match='anchor base'):
+        j.validate_joint_plan({**raw,'anchor_base_pose2d':[float('nan'),0,0]},**kwargs)
+
+
+def test_carton_ranking_retains_exploration_full_native_pool_and_other_classes():
+    hint={'base_pose2d':[0.,0.,0.],'focus':[0.,.75,1.],'translate':.75,'tilt':0.}
+    p=replace(plan(),anchor_base_pose2d=(0.,0.,0.),anchor_manipulation_stance=hint)
+    candidates=[SimpleNamespace(base_pose2d=(float(i),0.,0.),focus=(0.,.75,1.),translate=.75,tilt=0.) for i in range(8)]
+    order=[7,6,5,4,3,2,1,0]
+    ranked=j.order_carton_stances(p,'configuration_matching-articulation_open_small_scale_02',order,candidates)
+    assert ranked[:4]==order[:4] and ranked[4:6]==[0,1]
+    assert sorted(ranked)==sorted(order)
+    assert j.order_carton_stances(p,'configuration_matching-articulation_close_small_scale_02',order,candidates)==order
