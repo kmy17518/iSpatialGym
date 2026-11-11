@@ -74,14 +74,41 @@ def positive_library(job, path, reservations):
     return library
 
 
-def build(root, *, only_classes=(), only_bindings=()):
+def selected_libraries(path):
+    """Consume exact positive native-reader rows, preserving each source manifest."""
+    report = read(path)
+    require(report.get('schema') == 'isg-native-library-harvest-v1', 'unknown selected-library audit')
+    jobs, libraries = {}, {}
+    for row in report['verified']:
+        job = row['job']
+        if job['constraint'] != 'tabletop':
+            continue
+        require(row.get('status') == 'verified' and row.get('native_reader_passed') is True,
+                'selected library lacks a positive native reader audit')
+        source = row['source_manifest']
+        require(file_digest(source['path']) == source['sha256'], 'selected source manifest changed')
+        require(read(source['path'])[row['source_index']] == job, 'selected source job differs')
+        library = row['library']
+        require(file_digest(library['path']) == library['sha256'], 'audited positive library changed')
+        require(job['id'] not in jobs or (jobs[job['id']] == job and libraries[job['id']] == library),
+                'conflicting physical library identity')
+        jobs[job['id']], libraries[job['id']] = job, library
+    return list(jobs.values()), libraries
+
+
+def build(root, *, only_classes=(), only_bindings=(), selected_library_audit=None):
     root = Path(root).resolve()
     profile_path = root/'manifests/support_height_profiles.json'
     manifest_path = root/'manifests/train_scale_glib_jobs.json'
     profiles = read(profile_path); profile_sha = file_digest(profile_path)
     pointer, reservations, _ = active_policy(root) or (None, None, None)
     require(pointer is not None, 'active holdout reservation policy unavailable')
-    jobs = read(manifest_path)
+    if selected_library_audit is None:
+        jobs, library_paths = read(manifest_path), {}
+    else:
+        manifest_path = Path(selected_library_audit).resolve()
+        require(manifest_path.is_relative_to(root), 'selected audit outside campaign')
+        jobs, library_paths = selected_libraries(manifest_path)
     probes, failures, requests = {}, [], []
     # A later successful re-probe supersedes an earlier rejected attempt, while
     # both remain in the evidence report. No analytic prediction enters a map.
@@ -99,7 +126,8 @@ def build(root, *, only_classes=(), only_bindings=()):
     selected, by_id, anchors, surfaces = {}, {}, {}, []
     for job in jobs:
         if only_classes and not set(job['campaign_classes']).intersection(only_classes): continue
-        library_path = root/'scale_prebuild/glib/models'/job['id']/'library.json'
+        library_path = Path(library_paths[job['id']]['path']) if job['id'] in library_paths else \
+            root/'scale_prebuild/glib/models'/job['id']/'library.json'
         try:
             library = positive_library(job, library_path, reservations)
         except (OSError, ValueError, KeyError, TypeError) as exc:
@@ -139,10 +167,13 @@ def build(root, *, only_classes=(), only_bindings=()):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--root',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True);p.add_argument('--class-id',action='append',default=[])
-    p.add_argument('--binding',action='append',default=[]);a=p.parse_args()
+    p.add_argument('--binding',action='append',default=[])
+    p.add_argument('--selected-library-audit',type=Path)
+    a=p.parse_args()
     require(a.output.resolve().is_relative_to(a.root.resolve()), 'dependency output outside campaign')
     require(not a.output.exists(), 'immutable dependency release already exists')
-    value=build(a.root, only_classes=a.class_id, only_bindings=a.binding)
+    value=build(a.root, only_classes=a.class_id, only_bindings=a.binding,
+                selected_library_audit=a.selected_library_audit)
     require(value['jobs'], 'no verified scaled target/support dependencies')
     a.output.mkdir(parents=True)
     for name,key in [('jobs.json','jobs'),('heights_by_id.json','heights_by_id'),('anchors.json','anchors')]:
