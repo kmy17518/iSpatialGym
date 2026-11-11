@@ -186,6 +186,16 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                 output = Path(request['output']).resolve()
                 require(output.is_relative_to(base), 'native output outside pipeline scope')
                 submitted_path = path.parent/'submission.json'
+                submitted_pointer = path.parent/'submission_current.json'
+                if submitted_pointer.exists():
+                    pointer = read(submitted_pointer)
+                    selected_ref = pointer.get('current', pointer)
+                    selected = Path(selected_ref['path']).resolve()
+                    require(selected.parent == path.parent.resolve() and
+                            file_digest(selected) == selected_ref['sha256'], 'native submission revision changed')
+                    row['native_submission_pointer'] = ref(submitted_pointer)
+                    if submitted_path.exists(): row['original_native_submission'] = ref(submitted_path)
+                    submitted_path = selected
                 if submitted_path.exists():
                     submitted = read(submitted_path)
                     if all(k in submitted for k in ('job_id','native_runtime','request')) and ('start' in submitted or 'members' in submitted):

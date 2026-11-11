@@ -229,3 +229,16 @@ def test_repeated_a_control_is_separate_from_restoration_release_evidence(tmp_pa
     control=observed['diagnostic_controls'][0]
     assert control['successful_episodes']==2 and control['release_eligible'] is False
     assert observed['benchmark_credit']==0
+
+
+def test_native_submission_normalization_preserves_original_and_checks_pointer(tmp_path):
+    folder,row=request(tmp_path,'normalized',22)
+    original={'request':status.ref(folder/'requests.json'),'start':22,'native_runtime':'/native','job_id':'44'}
+    write_json_atomic(folder/'submission.json',original);original_ref=status.ref(folder/'submission.json')
+    write_json_atomic(folder/'submission_normalized.json',{**original,'returncode':0,'original_submission':original_ref})
+    write_json_atomic(folder/'submission_current.json',status.ref(folder/'submission_normalized.json'))
+    record=status.observe(tmp_path)['records'][0]
+    assert record['status']=='native_submitted' and record['original_native_submission']==original_ref
+    assert record['native_submission']['evidence']==status.ref(folder/'submission_normalized.json')
+    write_json_atomic(folder/'submission_current.json',{'path':str(folder/'submission_normalized.json'),'sha256':'b'*64})
+    assert 'native submission revision changed' in status.observe(tmp_path)['errors'][0]['error']
