@@ -378,7 +378,19 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
         state['status'] = 'retired_runtime_reconciling' if inflight else 'retired_runtime_no_new_groups'
         save()
         return 0
-    if len(inflight)>=cfg.get('maximum_inflight_per_seed',1):
+    maximum_groups = spec.get("groups_per_batch", 6)
+    maximum_inflight = cfg.get('maximum_inflight_per_seed', 1)
+    if template.split == 'eval_standard':
+        from scripts.campaign_20261110.training_eligibility import standard_group_proof
+        proof = standard_group_proof(root, template.class_id, seed_config['validation_key'])
+        state['standard_group_production_proof'] = proof
+        if proof is None:
+            maximum_groups = 1
+            maximum_inflight = 1
+            state['production_limit_reason'] = 'Exact runtime/template needs successful distinct eval group with sibling; bounded validation only'
+        else:
+            state.pop('production_limit_reason', None)
+    if len(inflight) >= maximum_inflight:
         return 0
     if any(record.get('needs_new_gate') and record['phase'] not in gates for record in inflight):
         state['status']='waiting_for_new_phase_gate'
@@ -391,12 +403,12 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
         if adapter is None:
             counts = read_counts(root, template, read(cfg["standard_contracts"])["templates"], read(cfg["room_plan"]))
             reserved=reserve_pending_counts(counts,template,pending_held(root))
-            decision = next_work(template, reserved, max_groups=spec.get("groups_per_batch", 6),
+            decision = next_work(template, reserved, max_groups=maximum_groups,
                                  training_validated="train" in gates, mode=spec.get("mode", "eval_then_train"))
         else:
             counts = adapter.read_counts(root, template)
             reserved = adapter.reserve_pending_counts(counts, template, adapter.pending(root))
-            decision = adapter.next_work(template, reserved, max_groups=spec.get("groups_per_batch", 6),
+            decision = adapter.next_work(template, reserved, max_groups=maximum_groups,
                 training_validated="train" in gates, mode=spec.get("mode", "eval_then_train"))
         state.update(counts=counts,counts_after_pending_reservations=reserved)
         from scripts.campaign_20261110.controller_spool import candidate_budget_used

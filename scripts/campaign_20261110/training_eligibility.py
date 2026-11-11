@@ -54,7 +54,7 @@ def projection_records(root):
     return records
 
 
-def eligible_training_records(db, task=None, *, root=None):
+def eligible_training_records(db, task=None, *, root=None, class_id=None):
     """Quota basis: only proved eval siblings/singletons, never flagged capacity.
 
     Committed allocator records already carry their independently audited native,
@@ -62,9 +62,12 @@ def eligible_training_records(db, task=None, *, root=None):
     """
     projection = projection_records(root) if root is not None else {}
     groups = {}
-    query = "SELECT record FROM members WHERE split='train'" + (' AND task=?' if task else '')
+    query = "SELECT record FROM members WHERE split='train'"
+    parameters = []
+    if task: query += ' AND task=?'; parameters.append(task)
+    if class_id: query += ' AND class_id=?'; parameters.append(class_id)
     result = []
-    for value, in db.execute(query, (task,) if task else ()):
+    for value, in db.execute(query, parameters):
         row = json.loads(value)
         if row.get('sampling_split') != 'eval_standard' or row.get('split') != 'train': continue
         projected = projection.get(row.get('instance_id'))
@@ -111,6 +114,31 @@ def audit_eligible(row, checked):
             'room': row.get('room'), 'perturbations': block.get('perturbations')}
 
 
+def standard_group_proof(root, class_id, validation_key):
+    """Exact-key accepted eval+successful sibling proof, never a historical label."""
+    import shutil
+    import sqlite3
+    import tempfile
+    source = Path(root)/'dataset/allocations.sqlite'
+    if not source.exists(): return None
+    checked = set()
+    with tempfile.TemporaryDirectory(prefix='isg-group-proof-', dir='/tmp') as temporary:
+        local = Path(temporary)/'state.sqlite'
+        shutil.copyfile(source, local)
+        with sqlite3.connect(f'file:{local}?mode=ro', uri=True) as db:
+            records = eligible_training_records(db, root=root, class_id=class_id)
+            for row in records:
+                if row.get('class_id') != class_id or row.get('validation_key') != validation_key: continue
+                group_raw = db.execute('SELECT record FROM groups WHERE id=?', (row['group_id'],)).fetchone()
+                group = json.loads(group_raw[0]) if group_raw else None
+                if classify_record(row, group)['category'] != 'eval_sibling': continue
+                try: audit_eligible(row, checked)
+                except (OSError, ValueError, KeyError, TypeError): continue
+                return {'group_id': row['group_id'], 'release_review_sha256': group['release_review_sha256'],
+                        'validation_key': validation_key, 'gate': row['gate']}
+    return None
+
+
 def build_projection(root):
     from scripts.campaign_20261110.export_release import snapshot_allocations
     root = Path(root)
@@ -145,7 +173,7 @@ def build_projection(root):
     for q in task_quotas(): tasks.setdefault(q.task, 0)
     for row in rows: classes.setdefault(row.get('class_id', row['task']), 0)
     return {'schema': 'isg-training-eligibility-v1', 'campaign_id': 'campaign_20261110', 'observed_at': now,
-        'status': 'complete', 'historically_accepted': sum(totals.values()), 'eligible_accepted': totals['eligible'],
+        'status': 'complete', 'coverage_complete': True, 'historically_accepted': sum(totals.values()), 'eligible_accepted': totals['eligible'],
         'excluded': totals['excluded'], 'unverified': totals['unverified'], 'replacement_count': 0,
         'remaining': 100000-totals['eligible'], 'replacement_links': [], 'inputs': inputs,
         'tasks': [{'task': task, 'eligible_accepted': n} for task,n in sorted(tasks.items())],

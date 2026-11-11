@@ -114,6 +114,12 @@ def check_environment(root, environment, *, kind='collection', start=None, count
         if template['class_id'] in PARKED_CLASSES:
             return {**result, 'reason': 'owner artifact dependency remains parked', 'category': 'owner_blocked'}
         if split in ('eval_standard', 'eval_model', 'eval_category'):
+            if kind == 'collection' and split == 'eval_standard' and not template['task'].startswith('camera_relocalization') and count is not None and count > 3:
+                from scripts.campaign_20261110.training_eligibility import standard_group_proof
+                proof = standard_group_proof(root, template['class_id'], config['validation_key'])
+                if proof is None:
+                    return {**result, 'reason': 'bulk standard collection requires exact accepted eval group with distinct sibling; use one bounded group'}
+                result['standard_group_production_proof'] = proof
             if kind == 'collection' and (queue is not None or environment.get('ISPATIALGYM_CAMPAIGN_GOAL_PLAN') or template['task'].startswith('camera_relocalization')):
                 if evaluation_exhausted(root, template):
                     return {**result, 'reason': 'evaluation quota exhausted; cannot produce training by relabeling'}

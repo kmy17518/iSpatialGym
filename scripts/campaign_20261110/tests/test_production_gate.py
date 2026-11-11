@@ -159,3 +159,22 @@ def test_deferred_successful_members_cannot_be_reclassified_as_singleton():
     row=member('t')
     group={'accepted':{'t':'train'},'members':[row],'deferred':['successful_but_over_quota']}
     assert classify_record(row,group)['status']=='excluded'
+
+
+def test_bulk_eval_requires_exact_successful_group_proof_and_bounded_group_remains_allowed(tmp_path):
+    env,cmd,job=setup(tmp_path,'eval_standard')
+    raw=json.loads((tmp_path/'config.json').read_text());raw['validation_key']={'code':'new-runtime'}
+    (tmp_path/'config.json').write_text(json.dumps(raw))
+    assert check_dispatch(tmp_path,cmd)['allowed']
+    cmd[4]='18'
+    assert not check_dispatch(tmp_path,cmd)['allowed']
+
+
+def test_exact_group_proof_requires_real_sibling_and_preserves_runtime_identity(tmp_path):
+    import shutil
+    from scripts.campaign_20261110.tests.test_group_lane import candidate,claim
+    from scripts.campaign_20261110.training_eligibility import standard_group_proof
+    f,review=candidate(tmp_path,0);claim(tmp_path,f,review)
+    shutil.copyfile(tmp_path/'dataset/quotas.sqlite3',tmp_path/'dataset/allocations.sqlite')
+    assert standard_group_proof(tmp_path,f.template.class_id,review['validation_key'])['group_id']==review['group_id']
+    assert standard_group_proof(tmp_path,f.template.class_id,{**review['validation_key'],'code_sha256':'a'*64}) is None
