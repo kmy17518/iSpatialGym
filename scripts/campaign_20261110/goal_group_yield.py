@@ -196,7 +196,8 @@ def snapshot(root):
         gate_states[jid].append({'status': rec.get('status'), 'reason': rec.get('error') or rec.get('reason'),
                                 'retry': bool(rec.get('attempt_history') or rec.get('retry_request'))})
         gate = rec.get('gate') or {}
-        if gate.get('success') is not True or gate.get('replay_mode') != 'physics_action_open_loop': continue
+        if (gate.get('success') is not True or gate.get('replay_mode') != 'physics_action_open_loop'
+                or rec.get('gate_quality',{}).get('passed') is False): continue
         try:
             block = ev.read(gate['instance'], 'gate_source_tro')['ispatialgym'].get('campaign')
             if not block: continue  # Ungrouped baseline gates are outside this metric.
