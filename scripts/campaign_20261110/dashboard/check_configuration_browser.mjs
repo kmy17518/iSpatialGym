@@ -1,0 +1,36 @@
+// Read-only browser verification of the full preparation index and in-page refresh.
+import {readFile,writeFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const [indexPath,output]=process.argv.slice(2);
+assert.ok(indexPath&&output,'Pass the synchronized source index and result path');
+const source=JSON.parse(await readFile(indexPath,'utf8'));
+const expected=source.rows??source.configurations;
+const rows=Array.isArray(expected)?expected:Object.values(expected);
+const tabs=await(await fetch('http://127.0.0.1:9227/json/list')).json();
+const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);
+await new Promise(r=>ws.addEventListener('open',r,{once:true}));
+let id=0;const pending=new Map(),requests=[],errors=[];
+ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.id){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(m.error):p.resolve(m.result);}if(m.method==='Network.requestWillBeSent')requests.push(m.params.request);if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails);});
+const call=(method,params={})=>new Promise((resolve,reject)=>{const n=++id;pending.set(n,{resolve,reject});ws.send(JSON.stringify({id:n,method,params}));});
+const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert.ok(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result.value;};
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+await call('Runtime.enable');await call('Network.enable');await call('Page.enable');
+await call('Page.navigate',{url:'http://127.0.0.1:8765/'});
+for(let i=0;i<120;i++){await delay(250);if(await evaluate("document.querySelectorAll('#preparation-index-rows tr').length>0"))break;}
+const initial=await evaluate("({origin:performance.timeOrigin,refreshes:+document.body.dataset.refreshCount,rows:document.querySelectorAll('#preparation-index-rows tr').length,status:document.querySelector('#preparation-index-status').innerText,summary:document.querySelector('#preparation-summary').innerText})");
+assert.equal(initial.rows,Math.min(100,rows.length));assert.ok(initial.status.includes('CST'));assert.ok(initial.status.includes(new Intl.NumberFormat('en-US').format(rows.length)));
+const query=rows[0].class_id;
+await evaluate(`document.querySelector('#preparation-search').value=${JSON.stringify(query)};preparationOffset=0;loadPreparationIndex()`);
+const filtered=await(await fetch('http://127.0.0.1:8765/api/configurations?q='+encodeURIComponent(query))).json();
+assert.equal(filtered.required_configurations_in_index,rows.length);
+assert.equal(filtered.matching,rows.filter(r=>JSON.stringify(r).toLowerCase().includes(query.toLowerCase())).length);
+assert.deepEqual(filtered.rows.map(r=>r.id),rows.filter(r=>JSON.stringify(r).toLowerCase().includes(query.toLowerCase())).slice(0,100).map(r=>r.id));
+const page2=await(await fetch('http://127.0.0.1:8765/api/configurations?offset=100')).json();
+assert.deepEqual(page2.rows.map(r=>r.id),rows.slice(100,200).map(r=>r.id));
+await delay(31500);
+const refreshed=await evaluate("({origin:performance.timeOrigin,refreshes:+document.body.dataset.refreshCount,query:document.querySelector('#preparation-search').value,status:document.querySelector('#preparation-index-status').innerText,rows:document.querySelectorAll('#preparation-index-rows tr').length})");
+assert.equal(refreshed.origin,initial.origin);assert.ok(refreshed.refreshes>initial.refreshes);assert.equal(refreshed.query,query);assert.equal(refreshed.rows,Math.min(100,filtered.matching));
+assert.ok(requests.filter(r=>r.url.includes('/api/configurations')).length>=3,'Index refreshed with the normal 30-second observation');
+assert.ok(requests.filter(r=>r.url.startsWith('http://127.0.0.1:8765')).every(r=>r.method==='GET'));assert.equal(errors.length,0);
+await writeFile(output,JSON.stringify({passed:true,observed_at:new Date().toISOString(),source:indexPath,selected_configurations:rows.length,query,matching:filtered.matching,initial,refreshed,requests:requests.length,errors},null,2)+'\n');
+console.log(JSON.stringify({passed:true,selected_configurations:rows.length,matching:filtered.matching,output}));ws.close();
