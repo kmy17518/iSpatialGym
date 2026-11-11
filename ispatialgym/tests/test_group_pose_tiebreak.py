@@ -54,7 +54,7 @@ def _bd_entity(final=FINAL):
 @pytest.mark.parametrize("fast", ["", "1"])
 def test_block_design_320101_flipped_assignment(monkeypatch, fast):
     monkeypatch.setattr(GE, "FAST_ASSIGN", fast)
-    monkeypatch.delenv(SW, raising=False)
+    monkeypatch.setenv(SW, "0")
     ev = _bd_entity().evaluate()
     assert ev.layout_reached is True and ev.pose_reached is False  # the recorded symbolic_only verdict
     assert ev.assignment == {"toy_dice.n.01_1": "slot_2", "toy_dice.n.01_2": "slot_3", "toy_dice.n.01_3": "slot_0", "toy_dice.n.01_4": "slot_1"}
@@ -79,7 +79,7 @@ def test_layout_outside_keeps_the_layout_choice(monkeypatch):
     dz = th.tensor([0.0, 0.0, math.sin(a / 2), math.cos(a / 2)])
     from ispatialgym.eval.geometry import quat_multiply
     final["toy_dice.n.01_1"] = p + quat_multiply(dz, q).tolist()
-    monkeypatch.delenv(SW, raising=False)
+    monkeypatch.setenv(SW, "0")
     off = _bd_entity(final).evaluate()
     monkeypatch.setenv(SW, "1")
     GE.pose_tiebreak_reset()
@@ -94,7 +94,7 @@ def test_no_symmetric_tie_no_change(monkeypatch, seed):
     members = _members(seed)
     ent_off = GE.GroupEntity("blocks_group.n.01_1", sorted(members), members.get)
     ent_off.set_target(_target([]))
-    monkeypatch.delenv(SW, raising=False)
+    monkeypatch.setenv(SW, "0")
     off = ent_off.evaluate()
     monkeypatch.setenv(SW, "1")
     ent_on = GE.GroupEntity("blocks_group.n.01_1", sorted(members), members.get)
@@ -104,5 +104,12 @@ def test_no_symmetric_tie_no_change(monkeypatch, seed):
 
 
 def test_report_absent_when_off(monkeypatch):
-    monkeypatch.delenv(SW, raising=False)
+    monkeypatch.setenv(SW, "0")
     assert GE.pose_tiebreak_report() is None
+
+
+def test_switch_default_on(monkeypatch):
+    monkeypatch.delenv(SW, raising=False)
+    assert GE.pose_tiebreak_on()  # default on since lead #100
+    monkeypatch.setenv(SW, "0")
+    assert not GE.pose_tiebreak_on()

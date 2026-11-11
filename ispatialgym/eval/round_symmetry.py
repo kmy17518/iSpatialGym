@@ -42,8 +42,9 @@ import torch as th
 log = logging.getLogger(__name__)
 
 SUCCESS_YAW_FREE_ENV = "ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC"
-#: owner #100: ships in the eval bundle with the block_design pose tiebreak (not with A2); the flip commit sets the default
-SUCCESS_YAW_FREE_DEFAULT = "0"
+#: default ON since lead #100 (owner 2026-11-10: "ship both together" - A4 with the block_design pose tiebreak, one eval-measure
+#: change without A2's lying briefcase, which stays off); "0" restores the pre-change measure
+SUCCESS_YAW_FREE_DEFAULT = "1"
 _ON = ("1", "true", "yes", "on")
 
 _ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
