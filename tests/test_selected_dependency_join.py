@@ -36,5 +36,13 @@ class SelectedDependencyJoinTests(unittest.TestCase):
         m,a=self.fixture();m['artifact_requests'][0]['unresolved_inputs'].append('exact native geometry')
         self.assertEqual(join(m,a,{}, {})['artifact_requests'][0]['status'],'blocked')
 
+    def test_repaired_grasp_does_not_leave_unmeasured_arm_as_a_failed_new_trial(self):
+        m,a=self.fixture();m['artifact_requests'][2].update(status='failed',last_failure='old library had zero grasps')
+        v=join(m,a,{}, {})['artifact_requests'][2]
+        self.assertEqual(v['status'],'blocked')
+        self.assertIsNone(v['physical_artifact_id'])
+        self.assertIn('left-arm',v['unresolved_inputs'][0])
+        self.assertEqual(v['superseded_prerequisite_failure'],'old library had zero grasps')
+
 
 if __name__=='__main__':unittest.main()

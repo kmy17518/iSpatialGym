@@ -36,6 +36,13 @@ def join(manifest, audit, audit_ref, component_ref):
             # proposals themselves can subsequently be tried with either arm.
             if kind == 'floating_native_motion_validation':
                 if request['inputs'].get('arm') != row.get('validated_arm'):
+                    if request['status'] == 'failed':
+                        request.update(status='blocked', physical_artifact_id=None, artifact=None,
+                            unresolved_inputs=['exact '+str(request['inputs'].get('arm'))+'-arm native held-motion validation'],
+                            evidence=[*request.get('evidence', []), audit_ref, row['library']],
+                            superseded_prerequisite_failure=request.get('last_failure'),
+                            next_action='Grasp prerequisite repaired; execute the still-unmeasured exact arm motion',
+                            observed_at=audit['observed_at'])
                     continue
                 task_names = {c.split('-', 1)[0] for c in request['required_by_classes']}
                 if not task_names.issubset(row['job'].get('held_tasks', [])):
