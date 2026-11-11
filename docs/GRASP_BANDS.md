@@ -3485,6 +3485,13 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 54 | i7-t04push up to 26d001ef (lead #85b) | aa431704 | PUSH_TIP_SCREEN / TOUCH_PUSH_STROKE_M off; execute reads contact_band_m only when recorded |
 | 55 | i7-ul03 up to 9e155787 (lead #79b) | acbb0642 | DEFAULT LARGE_EARLY_FRAME 1 + CARRY_FLOOR_CLEARANCE 1 |
 | 56 | i7-sink up to 68c4c560 (lead #83b) | f24ea424 | plate-in-sink customs, vekaaf basin interior spec, registry sinkvekaaf / sinkcounter080; layers i7sink_s08 (plate__luhkiz__s0.8 entry) + i7sink_vekaaf (8 map files) into v2maps_int2, all new names |
+| 57 | i7-t03both r4 up to 1a4864b0 (lead #94b) | 0ec27af3 | SHELF_OTHER_ARM off; no layer |
+| 58 | i7-measure up to ceb99806 (lead #92f) | d90e3530 | DEFAULT PUSH_NUDGE_STALL_STOP 1 + PUSH_NUDGE_MIN_SPEED 1 (0.025 m/s); BRIEFCASE_LYING / SUCCESS_YAW_FREE_SYMMETRIC off, LYING_TILT_DEG unset (eval bundle held) |
+| 59 | i7-ul02guide 968fa99e..1f50c325 (lead #99f) | 0c57161d | DEFAULT PUSH_GUIDE_WALL 1 (under_large_02 only); not i7-ul02guide-ab |
+| 60 | i7-measure 491fc9b9 (owner #100) | 8a5f0137 | lying push integral yaw re-aim (lying-only; BRIEFCASE_LYING stays off) |
+| 60b | i7-measure 491fc9b9..b92da540 (docs + comments) | 7d10224a | no behaviour change |
+| 61 | i7-evalbundle a3cfbd9d..f0b2d1d0 (owner #100) | 8dab09c9 | EVAL-MEASURE BUNDLE, one merge: DEFAULT SUCCESS_YAW_FREE_SYMMETRIC 1 (A4) + GROUP_ASSIGN_POSE_TIEBREAK 1; BRIEFCASE_LYING (A2) stays off - scores change at this commit |
+| 62 | i7-ul01reach b413aab9..c0a37d77 (lead #100j) | c6910519 | DEFAULT PUSH_HEEL_TIGHT 1 (heel_first locks only: under_large_01). Note: the i7-ul01reach section's r3b text (27ff96ac, left-arm ban) is historical - 1cc0b458 reverted r3b before the flip; the default is exactly r3 (24e642f1), what the A/B ran |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -6614,6 +6621,99 @@ run's first attempt failed `[place_unreachable]` (joint limit at the goal check)
 the success measure are unchanged; every plate in (b) rests 7-12 deg tilted on the basin walls, within the rule. No defaults flipped (no new
 behaviour: customs, an interior spec, a v2 library entry and maps only).
 
+### r4: the far-side arm and the hand-hull fallback for the 15 deg rest (owner item 3, 2026-11-10)
+
+- **`ISPATIALGYM_SHELF_OTHER_ARM` (321981ab, default off):** with the board draw, the arm is drawn among the near and the far one where the
+  far arm's interior map serves; every check and the place / retreat records follow the drawn arm; no rule changed. kmuacd drawn, 2 seeds:
+  off 274 / 6 / 6 (0.21-0.23 GPU-h per ok), on 517 / 4 / 4 (0.57-0.68). Right board: 0 writes with either arm; the left arm on the right
+  board (260 attempts) fails at the start cell, the pre-grasp IK, the 1.6 rad transit rule (1.63-4.12 rad) and joint limits.
+- **`ISPATIALGYM_WITNESS_HULL_FALLBACK` on the left board with lean_left_15 (3 seeds):** off 165 / 12 / 12 (0.092 per ok), on 165 / 12 / 12
+  (0.098); the fallback passes 169 hand judgements and moves ~14 lean_left_15 attempts past the grasp, which then fail the tip release's
+  place (descent IK, joint 2 at its limit); lean_left_15 still writes 0. Not a default (the owner's call).
+
+## The eval-measure change: the lying briefcase and free yaw for round objects (branch `i7-measure`, owner A2 + A4, 2026-11-09)
+
+The owner decided two success-measure changes on 2026-11-09 (`tmp/outputs/owner_review_20261109.md` A2 option (b), A4) and asked for them
+to ship together, so that scores change once. Both were built behind default-OFF switches. **Owner #100 (2026-11-10):** A2 stays off
+(under_large_02 keeps the standing guide-wall push, which beat lying), and A4 ships in the eval bundle with the block_design pose
+tiebreak instead (branch i7-evalbundle). The success measure is the one the demo QA, replay and policy eval all read (`pose_reached` through
+`eval.tro.apply_targets_to_scope`).
+
+**A2: `ISPATIALGYM_BRIEFCASE_LYING` (iors_large).** under_large_02's briefcase (lwbctq) stands on its 0.12 x 0.33 edge, 0.27 m tall. In the
+floor push its yaw grows within a stroke, the hand meets the end face's corner and it topples (84-93 deg; DECISIONS #60 / #72), so 1 demo
+in 4 is kept. The switch acts only where the customs set `generation.push_under_goal_rest = "lying"` (under_large_02's
+`...briefcase-desk_mdhelw_0-floor_pitched` alone) and the push is the pitched hand's. There it builds the three parts the owner named:
+- **the 90 deg tilt in the hand**: at stance C the carried object is turned onto its largest face (`lying_rest`: the thinnest object axis
+  to the vertical). The F_goal screen at the drop cell, the attached drop IK, the carry leg tracked to the tilted pre-place, the push chain
+  and the drop record all use `IORSLarge.c_quat`. The pick at B is unchanged: the briefcase still starts standing;
+- **the lying goal orientation**: `summary.goal_quat`, which becomes the TRO pose target, is the lying orientation at the carried yaw
+  (`summary.goal_rest = "lying"`). The task therefore asks for the briefcase lying flat under the desk;
+- **the contact rule of the pitched hand**: lying, the centre of mass is 0.06 m up and the fingertips 0.08 m, so today's rule (the leading
+  edge below the centre of mass) refuses every turn. The lying rule (`push_contact_cap`) keeps the edge on the back face (2 cm below the
+  top) and below the no-tip bound 0.75 x (centre of mass to the front bottom edge along the push) / 0.8. For the lying briefcase the back
+  face binds (0.10 m).
+
+Kit counters: `briefcase_lying.rest` / `.release` / `.contact_cap` / `.coupled`.
+
+**A4: `ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC` (eval.round_symmetry).** The measure gated a round object's yaw: under_large_03's trash can
+(trash_can/jlawet) ended `symbolic_only` after turning 0.22 rad in the push. The QA's `placed_orientation` already called that yaw free, but
+through its push-under rule (any pushed object, round or not), not through a symmetry notion. Its only symmetry notion is the cylinder table
+`assets/icl/revolution_axes.json` (the ICL symmetry survey's body-of-revolution tags about the long axis), and that table lacks the can
+(0.28 x 0.28 x 0.28: no long axis). One notion now serves both, and both read it only with the switch on:
+- the table `assets/icl/round_axes.json` (`scripts/symmetry/revolution_axes.py --rule round`): every model whose ICL `symmetry` column holds
+  a body-of-revolution tag. That column is the reviewed notion "geometry and texture identical", and the customs roles' equivalences already
+  come from it. It has 166 models: round cans, plates, bowls, glasses, lids, caps and plain cylinders. The survey's geometry-only lists, which
+  the cylinder table also reads, are left out, because a wall clock's face (jerval) or a printed marker turns visibly;
+- the measure: a pose target whose object is in the table gets the continuous rotation about that axis added to its
+  `orientation_equivalences`. This is the survey's own enumeration, 72 rotations at 5 deg, so a pure turn leaves at most 0.044 rad. It is
+  composed with the target's recorded equivalences. The TRO file is not changed;
+- the QA: `Executor.revolution_axis_of` reads the same table for a model the cylinder table lacks. Where both tables hold a model they
+  have the same axis.
+
+Kit counts `round_symmetry.COUNTS`; `meta.success_yaw_free` per demo.
+
+**Results (2026-11-09 / 11-10; index 360000, N 4, svl titanrtx, own ledger + empty cache per arm).**
+- **A4, offline re-score of every recorded under_large_03 demo** (`$OFH/measure_20261109/rescore_ul03.py`, 113 unique demos):
+  - Recomputing with the full error reproduces the recorded per-step error and `geometric_within` at every step.
+  - 27 of 29 symbolic_only demos become success (full error 0.10-0.40 rad, yaw-free <= 0.014 rad); 2 stay symbolic_only on position.
+  - ok goes from 31 to 58 of 113.
+- **A4, where it acts** (`affected.py`): 4 targets in 4 aliases - under_large_03's can, inside_large_03's plate luhkiz, disembedding_05's
+  beaker, disembedding_07's tape. 7 more round targets are already free through customs `zinf`.
+- **A4, under_large_03 A/B:** OFF 42 att / 3 wr / 1 ok (4.08 GPU-h per ok), ON 35 / 3 / 0. The switch acted but decided no verdict: every
+  failure was a hard one (robot_wobble, collision).
+- **A2, under_large_02 OFF** (standing): 12 / 4 / 1, 6.60 GPU-h per ok.
+- **A2, the lying arms built up in four steps, 2 lying demos each:**
+  1. No drop was reachable at 0.15 m (fixed by cf37dc01).
+  2. Backing off the drop along -a hit the torso or a joint jump (fixed by cf8c0375).
+  3. All actions were ok, but the yaw drifted to 72-78 deg in 0.10 m strokes (fixed by b13771ab, which held the yaw within +-13 deg).
+  4. The remaining failures:
+     - the push's arm-locked base nudge trips the QA pause (pre-existing: fpr2_base, ul02_lb_sd0);
+     - the place's up-retreat hits a joint jump at the near-singular horizontal-hand drop configuration (lower_drop never lowers a lying
+       drop for the same reason);
+     - 0.046 rad of yaw over tolerance.
+  - The lying briefcase always landed flat (tilt <= 0.1 deg) and never toppled. 0 ok in 4 lying demos, so **no default is flipped**; the
+    lead cancelled the arms. The proposed fixes wait for the owner (DECISIONS 2026-11-10 i7-measure).
+
+
+**Round 2 (2026-11-10, lead #90-#92e).**
+- **Push nudge switches.** The QA pause rule counts base motion; the R1Pro's 6 virtual base joints are in `get_joint_positions`. Every pause
+  after a push nudge was the base not moving while the tracker commanded about 6 mm/s, the base's breakaway: in 529 recorded samples a
+  command below 0.012 m/s never moved it, and 0.03 m/s or more always did. Two switches fix it:
+  - `ISPATIALGYM_PUSH_NUDGE_STALL_STOP`: a plain push nudge stops when the base stalls.
+  - `ISPATIALGYM_PUSH_NUDGE_MIN_SPEED`: the nudge commands at least 0.025 m/s.
+  Both are default ON (829d0050 / 98ef3819). The evidence is a recollect of r2_ul02_stand 360102, the same instance on the same snapshot:
+  each switch acted, with the same verdict and 16-43 s less per demo. In the A/Bs on under_large_01, under_large_03 and nextto_04 no demo had a
+  nudge.
+- **Push symmetry.** The strokes aim at the root line, which is within 4-6 mm of the mass-centre plane. Over 47 lying strokes, each 5 cm
+  pushed turned the briefcase by 11.2 deg minus 1.95 deg per cm of contact offset: a constant bias, not a centring error.
+- **Lying, in order:**
+  - Singularity screen: dropped. Its lowering check rejected every drop it saw; only the up-retreat check is kept (1993f666).
+  - Partial-tilt release: `ISPATIALGYM_BRIEFCASE_LYING_TILT_DEG`, f949556b.
+  - Final yaw stroke: failed at the reach edge.
+  - Integral yaw re-aim (491fc9b9): r4_lying_a ended every push within 1.6 deg; 9 attempts / 5 written / 3 ok, about 1.69 GPU-h per ok.
+- **Verdict.** The standing push with the guide wall (ug2_ul02_on: 22 / 8 / 6, 0.89 GPU-h per ok) beats lying, so A2 and A4 stay off. The
+  owner decides.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
@@ -6645,3 +6745,158 @@ behaviour: customs, an interior spec, a v2 library entry and maps only).
 | close_02 (carton; BASE_SIG on both) | 5/4/4, 0.40 | 5/4/4, 0.43 | start 1.6493 -> 1.71-2.06 |
 
 N 4, index 361000, svl titanrtx, own ledger and empty sampling cache per arm. BASE_SIG A/B: close_01/02 off 46/1/1 each (45 missing_map) vs on 11/4/3 and 5/4/4.
+
+## under_large_02: the desk's leg panel as a guide wall for the standing briefcase (branch `i7-ul02guide`, owner 2026-11-10)
+
+Owner: "if the desk has wall-like legs can we make standing briefcase kind of lean against it during push & place so it doesn't rotate".
+The standing goal and the success measure stay as they are.
+
+### The geometry (desk_mdhelw_0, office_cubicles_right)
+
+desk_mdhelw_0 was loaded alone at its scene pose, and its 7 collision pieces were scanned with horizontal and vertical rays
+(`$OFH/ul02guide_20261110/desk_probe.py`; only derived numbers are kept, no asset is written). The desk's AABB is x 14.699-17.510,
+y -13.190..-12.259, and its top is at 0.785 m.
+
+- **Side panels.** Two full-depth panels run from the floor to 0.62 m:
+  - left panel: x 15.265-15.483;
+  - right panel: x 16.70-16.936;
+  - both span y -13.165..-12.279, so they end 2.5 cm inside the AABB edges, with a 2 cm chamfer up to ~6 cm in;
+  - each has a recessed plinth, 2-3 cm deep at 2 cm up.
+- **Face flatness.**
+  - The outer faces (15.265 and 16.933-16.936) are flat to 3 mm.
+  - The left inner face (15.475-15.483) is flat to 8 mm.
+  - The right inner face is slanted from 16.738 to 16.678 over 0.55 m. This is the convex hull of its joint with the modesty panel, so it is no guide.
+- **Modesty panel.** It spans x 15.485-16.674 and y -12.547..-12.450, from 0.119 m up.
+- **Free space around the panels:**
+  - left end: 0.565 m;
+  - right end: 0.574 m;
+  - knee space: 1.22 m wide, from the front edge to the modesty panel.
+- **Today's lanes (124 recorded instances).**
+  - The +x edge pushes -x toward the right panel's outer face. That face stands 0.5 m ahead of the goal and square to the push, so it does not guide.
+  - The +y edge pushes -y at x 16.964 / 17.064 / 17.164. The 16.964 lane overlaps the outer face by 3.2 cm for an end push; the other two run beside it, unused.
+
+### The switch: `ISPATIALGYM_PUSH_GUIDE_WALL` (default off)
+
+The switch acts only on the under_large_02 variant's pitched floor push of an elongated footprint.
+
+- **Lanes** (`iors_large.guide_scan_rays` / `guide_faces_from_hits` / `guide_lanes`).
+  - A horizontal ray scan of the partner runs along each edge's tangent. It samples 3 depths: the target's back, middle and front at the guide goal. It samples 3 heights: 0.06 m, half the target's height, and its height minus 3 cm.
+  - A face qualifies as a wall when:
+    - it is hit in every cell;
+    - the rays reaching it crossed at least the target's width + gap + 1 cm of free space;
+    - its hits spread at most 1.5 cm.
+  - The lane is the target's centre line, placed 6 + 1.5 cm off the face.
+  - The scan finds 5 lanes on this desk (checked against the real meshes, lambda `scan_probe.py`):
+    - +y edge: x 15.190 and 17.011;
+    - -y edge: x 15.190, 15.555 and 17.010.
+- **Goal.** The target's whole length lies along the flat wall: its centre is 0.10 + 0.165 = 0.265 m inside the edge, against today's 0.07 m. With only one end beside the wall, the briefcase still turns. The centre stays under the desk.
+- **Footprint check.** The footprint at the goal is checked on the B4 clearance raster. From the back, the knee space is closed by the modesty panel.
+- **Drop.** The drop is either just outside the edge (front 3 cm out) or alongside the panel (centre 3 cm out).
+- **Stand-offs.** The frontal stand-offs (0.6-1.0 m) are filtered so that the hand's push stays 0.35-0.90 m ahead of the base.
+- **Yaw.**
+  - Yaw lock `"endwise"`: the long axis must be within 11.25 deg of the push.
+  - The carried goal yaw is snapped onto the desk's axes, with no init-yaw jitter.
+  - The goal orientation is still the carried one, now parallel to the wall.
+- **Oracle** (`execute._push_strokes`, the record's `guide_wall`).
+  - Each stroke moves the hand into the wall by 0.10 m per m of travel.
+  - Each stroke aims 1 cm away from the wall.
+  - Why: take a box flush on a wall, pushed at lateral offset e (+ away from the wall) with a lateral force k x F into the wall. It slides without turning when -k mu w/2 <= e <= k (L - mu w/2), with L = 0.33, w = 0.12, mu = 0.5. An aim toward the wall turns it away unless k is large; an aim at or away from the centre line holds it once k > 0.
+- **QA.** Briefcase-desk contact is object-object, so no QA rule needed changing:
+  - `robot_touching_objects` and `protected_contact` count only robot links and held objects (`qa._check_collision` / `_protected_pairs`);
+  - the desk is not a protected (task-placed) object.
+- **Kit counters:** `push_guide_wall.scan`, `.walls`, `.edge_without_wall`, `.recorded`.
+
+### i7-ul02guide r2 (2026-11-10): why the first ON arm wrote nothing, and the fix (commit 6cd642f0; A/B snapshot trunk_0f1315a1)
+
+- **Run.** ug_ul02_on (trunk_b30097bd, N 8 at 360000 + 360100): 8 attempts, 0 written; the lead cancelled it. The baseline arm ug_ul02_off kept running.
+- **Root cause 1: the front drop was out of the pitched hand's reach.** This was the dominant cause, found from the logs without GPU.
+  - The front drop sits 0.195 m outside the edge. With the goal 0.265 m inside, the push is 0.49 m long.
+  - The pitched hand's reach window ahead of the base, measured over every pitched chain of r2_ul02_stand + ug_ul02_off + ug_ul02_on:
+    - eef start below 0.47 m: 0 of 1395 chains solved. Every one failed with `exact IK failed at pose 1 of 4`: the pre-pose, back and up from the start, is too close to the body.
+    - eef start 0.47-0.49 m: 273 of 1036 solved.
+    - eef goal 0.89-0.91 m: 5 of 726 solved. Goal at 0.91 m or more: 0 of 721 (`approach_untrackable`).
+  - The window is therefore about 0.385 m long, so a 0.49 m push cannot fit at any stand-off. The r1 bound `PUSH_GUIDE_HAND_AHEAD_M` (0.35, 0.90) still admitted these stances.
+  - Effect on the ON arm: 1363 of its 1765 unsolved chains (77 %) were these front drops. Its eef starts were 0.36-0.42 m and none solved.
+  - Fix: `PUSH_GUIDE_HAND_AHEAD_M` = (0.49, 0.875), checked by `guide_push_in_reach`, and `PUSH_GUIDE_DROP_OUTS_M` = (0.03, 0.06).
+  - Both drops are now alongside the panel: the briefcase's front half is beside the panel from the start. The stand-offs that fit are 0.725-0.775 m and 0.75-0.775 m.
+- **Root cause 2: the endwise yaw often had no pair of F that could release it.**
+  - Of the 166 C stances with a solved chain, 76 then failed with `the push-under yaw lock endwise keeps none of F's yaws`.
+  - At the endwise carried yaws, the drop releases with one hand orientation only. The cached F_goal sets show top_2 at yaw 0 and top_0 at yaw pi, which is often not the pair B took.
+  - Fix: `guide_endwise_pairs` screens the drop release at the locked yaws before the chain is solved. A C with no such pair is skipped.
+- **Ruled out.**
+  - The panel: the failing pose is the pre-pose, 0.2 m outside the edge, and the short pushes on the lanes solve 39 %.
+  - A too-narrow contact face: the contact offsets are 0.166-0.172 m and the band is never empty.
+  - The largest-offset yaw order: both ends have equal offsets.
+  - The goal depth on its own: eef goals of 0.82-0.88 m solve.
+- **Not changed.**
+  - Lane 17.01 seen from the front: 22 of its C stances fail the B -> C carry because the C base is "disconnected on the eroded map". This is the generic carry check.
+  - The A -> B transit failures near (18.1, -11.57) come from the drawn robot start, not from the lanes.
+- **New kit counters:** `push_guide_wall.c_out_of_reach`, `.c_no_endwise_pair`, `.c_endwise_pair`. One INFO line per C: 'guide-wall endwise pairs at C'.
+- **A/B result (r2).**
+  - ug2_ul02_on (trunk_0f1315a1): 22 attempts, 8 written, 6 ok out of 8 demos. 5.32 GPU-h, i.e. 0.89 GPU-h per ok.
+    - Every pushed demo was guided. The end-of-push yaw stayed within 3.9 deg, with tilt 0 and no topples.
+    - The 2 failures are not the push: arm_stutter in the final retreat, and the wheel touching the briefcase in the first navigate.
+  - Baseline ug_ul02_off (partial, one job still running): 6 demos, 0 ok. End yaw 0.4-20.9 deg, 2 topples.
+  - Flip recommended by the standard rule; not flipped on this branch.
+
+## under_large_01: not_reached is the heel-first lock's -22.5 deg yaw (branch `i7-ul01reach`, round 4, 2026-11-10)
+
+Task: under_large_01 (the sandal chgcrm pushed under bed_rrcvaq_0, the flat floor blade in 3 strokes of ~0.10 m) failed as
+oracle_failed:not_reached in about half its written demos (int2_31: 4 written, 2 ok, 2 not_reached).
+
+### Evidence (every under_large_01 demo under $OFH/out, 2026-11-06..10: 138 written demos, 38 tags)
+
+- **28 not_reached, all the same failure.** The 3 strokes run to the end (`push_stop` leg_end); the sandal ends 0.18-0.19 m short
+  of the goal line (`push_residual`), position error 0.20-0.21 m, orientation error 0.22-0.30 rad (tolerances 0.05 / 0.15).
+  - Stroke 1: the hand travels 0.112 m, the sandal advances 0.035-0.042 m (a good stroke: 0.094) and slides ~26 mm sideways; yaw
+    unchanged (+-3 deg).
+  - Stroke 2: the root is 25-37 mm off the line, the re-aim follows (cap 30 mm); the sandal advances 0.052-0.060 m and turns +5..+9 deg.
+  - Stroke 3: the root is ~75 mm off the line, past the 30 mm re-aim cap: the blade meets only the sandal's edge (contact +37 mm), the
+    sandal advances 4-10 mm and turns to +13..+17 deg.
+  - No base nudge or place phase is involved: the place ends normally and the push stops at leg_end, not on a stall.
+- **The cause is the carried yaw** (the instance summary's `grasp.yaw`, which the place keeps as the goal orientation):
+
+  | carried yaw | written demos | outcome |
+  |---|---|---|
+  | 0 / -0.03 / -0.04 rad | 96 | 78 ok; the rest unrelated (pause 5, wobble 4, touching 5, stutter 2, plan 1, collision 1) |
+  | -0.12 .. -0.24 rad (jittered) | 7 | 7 symbolic_only (orientation error 0.19-0.31 rad) |
+  | -0.35 .. -0.39 rad (jittered), 5.89 rad (= -22.5 deg grid) | 34 | 28 not_reached, 6 plan_failed, 0 ok |
+  | -0.48 rad | 1 | execution |
+
+  Every not_reached instance has the sandal placed at -20..-22.4 deg to the push. It is deterministic per instance: 360002 failed in
+  all 17 tags that wrote it at -22.5 deg (14 not_reached + 3 plan_failed); the one tag that drew yaw 0 for it (fp_def, right arm from
+  B (0.0, -1.22)) succeeded.
+- **Why that yaw is sampled.** `generation.push_under_yaw` = `heel_first` keeps the yaws at which the heel points back within one step of
+  the 16-yaw grid (22.5 deg): the grid yaws 0 and 5.89 rad ('push-under yaw lock heel_first: kept 2 of N yaws ... [0.0, 5.89]'), and the
+  B IK's retries jitter the drawn yaw by up to 22.5 deg (`TARGET_JITTER`). Of 186 written instances 43 carry 5.89 rad and 18 another
+  jittered yaw beyond 0.04 rad.
+
+### The switch: `ISPATIALGYM_PUSH_HEEL_TIGHT` (default off; commit b413aab9)
+
+- "1" = heel_first's tolerance 5 deg (`PUSH_HEEL_TIGHT_TOL_DEG`), a number = that many degrees; never wider than the spec's
+  `push_under_yaw_tol_deg`. The init-yaw jitter is capped at 0.8 of it (4 deg), so the B IK's retries stay inside the lock.
+- Acts only where the heel_first lock is set (the two sandal-under-bed variants); the oracle is unchanged.
+- Kit counters `push_heel_tight.dropped` (a yaw today's tolerance keeps and the tight one does not) and `push_heel_tight.jitter_capped`;
+  `template_facts.push_under_yaw.heel_angle_rest_deg` and one INFO line 'push-under yaw lock heel_first: tolerance ...'.
+- r2 (3a6dcc5e): the 5 deg window is centred on the grid yaw nearest heel-back (the sandal's heel stands 6 deg off heel-back at yaw 0;
+  r1's window around heel-back itself kept none of the 16 yaws).
+- r3 (24e642f1): keep the right arm.
+  - Under r2, 360002 and 360003 grasped with the LEFT arm and failed robot_touching_itself (left_arm_link3 / link5, left j4 -2.081 /
+    -2.087). Cause: the right arm's F_init at the first B held no heel-back yaw, and the segment coupled the left arm at that same B
+    before the right arm was tried at any other B.
+  - Now the default arm runs at every B whose pre-screen shows a kept yaw first, then each B's other arms (`heel_tight_couple_plan`,
+    kit `push_heel_tight.arm_deferred`).
+  - A program whose planned left j4 comes within 30 mrad of its limit is rejected (`PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD`, kit
+    `push_heel_tight.left_j4_checked` / `.left_j4_rejected`). Over the 23 left-arm demos, the 3 self-touches planned 2.1-2.3 mrad from
+    the limit, and the other 20 planned 57 mrad or more.
+- r3b (27ff96ac): after 2 left-j4 rejections of one instance, its later attempts couple the default arm only. Not exercised by the A/B.
+- **A/B result (r3)**, N 8 (360000 + 360100), svl titanrtx, own caches:
+
+  | arm | attempts / written / ok | GPU-h per ok | arms | failures |
+  |---|---|---|---|---|
+  | OFF uh_ul01_off (b413aab9) | 26 / 8 / 6 | 1.35 | 8 right | not_reached (360002, -22.5 deg), robot_touching_objects |
+  | ON r2 uh2_ul01_on (3a6dcc5e) | 17 / 8 / 6 | 0.66 | 5 right, 3 left | 2 robot_touching_itself (left) |
+  | ON r3 uh3_ul01_on (24e642f1) | 20 / 8 / 7 | 0.575 | 7 right, 1 left (planned -2.0324) | symbolic_only (360003, carried -3.5 deg, ori 0.173) |
+
+  - 360002 succeeded right-arm at yaw 0 under r3, after the guard rejected 2 left programs.
+  - The flip rule passes: the switch acts, ok is 7 vs 6, and GPU-h per ok is 0.575 vs 1.35. Not flipped; the lead decides.

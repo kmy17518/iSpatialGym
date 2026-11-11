@@ -203,7 +203,7 @@ def test_c_dead_at_b_narrows_to_the_push_under_lock_kept_yaws():
         def push_yaw_lock(self):
             return self._lock
 
-        def guide_wall_active(self):
+        def guide_wall_active(self):  # PUSH_GUIDE_WALL default on (lead #99f): this stub tests today's push, not the guide lanes
             return False
 
         def push_contact_offset(self, q, d):

@@ -470,3 +470,33 @@ def test_program_check_two_point_fingers():
     assert PC._two_point_fingers(push_action(), "push", None) is None
     assert PC._two_point_fingers(push_action({"push_contact_form": "closed_turned"}), "push", None) is None
     assert PC._two_point_fingers(SimpleNamespace(after=None), "retreat", "place") is None
+
+
+def test_final_yaw_stroke_only_with_the_plan_key():
+    # i7-measure (lead #90 item 2): without yaw_final_m the strokes are unchanged; with it (the lying briefcase's record) one more stroke turns the
+    # object while its yaw is beyond yaw_final_min_rad, pushed yaw_final_m past its back without the stop at the goal
+    env, robot, sandal, goal, _ = sandal_world()
+    ctx, _ = run_push(env, robot, push_action({"strokes": plan()}))
+    assert "yaw_final" not in ctx["push_strokes"]
+    env, robot, sandal, goal, _ = sandal_world()
+    pl = dict(plan(gain=0.15), yaw_final_m=0.02, yaw_final_min_rad=0.0)
+    ctx, _ = run_push(env, robot, push_action({"strokes": pl}))
+    yf = ctx["push_strokes"]["yaw_final"]
+    assert yf["stroke"] == "yaw_final" and "yaw_after_deg" in yf and "failed" not in yf
+    assert yf["end_along_m"] - yf["start_along_m"] == pytest.approx(0.02, abs=1e-4)
+
+
+def test_integral_yaw_term_only_with_the_plan_key():
+    # i7-measure (lead 2026-11-10): without yaw_integral_m_per_rad no stroke records an integral; with it each stroke's target adds ki x the sum
+    # of the yaw errors so far
+    env, robot, sandal, goal, _ = sandal_world()
+    ctx, _ = run_push(env, robot, push_action({"strokes": plan(gain=0.15)}))
+    assert all("yaw_integral_m" not in s for s in ctx["push_strokes"]["strokes"])
+    env, robot, sandal, goal, _ = sandal_world()
+    ctx, _ = run_push(env, robot, push_action({"strokes": dict(plan(gain=0.15), yaw_integral_m_per_rad=0.1)}))
+    st = ctx["push_strokes"]["strokes"]
+    e_sum = 0.0
+    for s in st:
+        e_sum += math.radians(s["yaw_before_deg"])
+        assert s["yaw_integral_m"] == pytest.approx(0.1 * e_sum, abs=2e-4)
+        assert s["target_m"] == pytest.approx(s["root_off_line_m"] + s["yaw_term_m"] + s["yaw_integral_m"], abs=3e-4)

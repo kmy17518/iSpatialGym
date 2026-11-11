@@ -18,6 +18,13 @@ from ispatialgym.sampling.v2.stances import Stance
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 
 VARIANT = "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl"
+
+
+@pytest.fixture(autouse=True)
+def _heel_tight_off(monkeypatch):
+    """ISPATIALGYM_PUSH_HEEL_TIGHT is default on since lead #100j; the tests of the former heel_first behaviour run with it off, and the
+    switch's own tests set it themselves."""
+    monkeypatch.setenv("ISPATIALGYM_PUSH_HEEL_TIGHT", "0")
 HEEL, TOE = 0.128, 0.117
 YAWS = [k * 2.0 * math.pi / 16 for k in range(16)]
 PUSH = (1.0, 0.0)  # the push along +x: the robot behind the target at -x
@@ -232,3 +239,140 @@ def test_the_heel_is_memoised_per_target():
     s.obj = lambda role: SimpleNamespace(name="sandal_chgcrm_1")
     s.hull = _sandal()
     assert s.push_heel() is not first
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# i7-ul01reach: ISPATIALGYM_PUSH_HEEL_TIGHT (default off) - heel_first's tolerance and the init-yaw jitter narrowed
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def test_heel_tight_default_on(monkeypatch):
+    monkeypatch.delenv(IL.PUSH_HEEL_TIGHT_ENV, raising=False)
+    assert IL.push_heel_tight_tol_deg() == pytest.approx(IL.PUSH_HEEL_TIGHT_TOL_DEG)
+
+
+def test_heel_tight_off(monkeypatch):
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "0")
+    s = _sampler(push_under_yaw="heel_first")
+    assert IL.push_heel_tight_tol_deg() is None and s.push_heel_tight() is None
+    assert s.push_yaw_tol_deg() == pytest.approx(22.5) and s.init_yaw_jitter() == pytest.approx(IL.TARGET_JITTER)
+    assert s.push_yaw_kept(_q(s, YAWS[15]), PUSH)  # today: the grid's -22.5 deg is kept next to 0
+    assert "push_heel_tight.dropped" not in s.kit.stats and "push_heel_tight.jitter_capped" not in s.kit.stats
+    for v in ("0", "off", ""):
+        monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, v)
+        assert IL.push_heel_tight_tol_deg() is None
+
+
+def test_heel_tight_drops_the_off_grid_neighbours_and_caps_the_jitter(monkeypatch):
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "1")
+    s = _sampler(push_under_yaw="heel_first")
+    assert s.push_yaw_tol_deg() == pytest.approx(22.5)  # today's tolerance; the tight window is applied inside it
+    assert s.push_yaw_kept(_q(s, 0.0), PUSH) and s.push_yaw_kept(_q(s, math.radians(-4.0)), PUSH)
+    assert not s.push_yaw_kept(_q(s, YAWS[15]), PUSH) and not s.push_yaw_kept(_q(s, -0.12), PUSH)
+    assert s.kit.stats["push_heel_tight.dropped"] == 2
+    assert not s.push_yaw_kept(_q(s, math.pi), PUSH) and s.kit.stats["push_heel_tight.dropped"] == 2  # the toe: today drops it too
+    assert s.init_yaw_jitter() == pytest.approx(math.radians(IL.PUSH_HEEL_TIGHT_TOL_DEG) * IL.PUSH_HEEL_TIGHT_JITTER_FRAC)
+    assert s.kit.stats["push_heel_tight.jitter_capped"] == 1
+    assert s.template_facts["push_under_yaw"]["tight_tol_deg"] == pytest.approx(IL.PUSH_HEEL_TIGHT_TOL_DEG)
+    assert abs(s.template_facts["push_under_yaw"]["heel_angle_rest_deg"]) == pytest.approx(180.0, abs=1e-3)
+    # the chain-first screen keeps the heel-back grid yaw only
+    assert _chain_first(s, YAWS)[2] == [0.0]
+    # a number is the window in degrees; inside the spec's tolerance
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "8")
+    s8 = _sampler(push_under_yaw="heel_first")
+    assert s8.push_heel_tight() == pytest.approx(8.0) and s8.push_yaw_kept(_q(s8, math.radians(-7.0)), PUSH)
+    s3 = _sampler(push_under_yaw="heel_first", push_under_yaw_tol_deg=3.0)
+    assert not s3.push_yaw_kept(_q(s3, math.radians(-5.0)), PUSH)
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "-2")
+    with pytest.raises(ValueError):
+        IL.push_heel_tight_tol_deg()
+
+
+def test_heel_tight_acts_only_on_the_heel_first_lock(monkeypatch):
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "1")
+    s = _sampler()
+    assert s.push_heel_tight() is None and s.push_yaw_tol_deg() == pytest.approx(22.5) and s.init_yaw_jitter() == pytest.approx(IL.TARGET_JITTER)
+    assert s.kit.stats == {}
+
+
+def test_heel_tight_window_is_around_the_grid_yaw_nearest_heel_back(monkeypatch):
+    # uh_ul01_on r1: the sandal chgcrm's heel stands 6 deg off heel-back at yaw 0 - a window around heel-back kept none of the 16 yaws
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "1")
+    pts = G.local_points_world(_sandal(), (th.zeros(3), G.quat_from_yaw(math.radians(6.0))))
+    s = _sampler(hull=pts, push_under_yaw="heel_first")
+    assert s.push_yaw_kept(_q(s, 0.0), PUSH) and s.push_yaw_kept(_q(s, math.radians(4.0)), PUSH) and s.push_yaw_kept(_q(s, math.radians(-4.0)), PUSH)
+    assert not s.push_yaw_kept(_q(s, YAWS[15]), PUSH) and not s.push_yaw_kept(_q(s, math.radians(-8.0)), PUSH)
+    assert _chain_first(s, YAWS)[2] == [0.0]
+    assert abs(abs(s.template_facts["push_under_yaw"]["heel_angle_rest_deg"]) - 174.0) < 0.6
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# i7-ul01reach r3: the right arm first under the switch, the left elbow's j4 margin
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def test_heel_tight_couple_plan_runs_the_default_arm_at_every_kept_b_first():
+    # uh2_ul01_on 360002: B0's right-arm F_init held no heel-back yaw, its left arm did - today the left arm coupled at B0 before B1's right arm
+    arms = [["right", "left"], ["right", "left"], ["right"], ["left"]]
+    kept = {(0, "right"): False, (0, "left"): True, (1, "right"): True, (1, "left"): True, (2, "right"): True, (3, "left"): True}
+    plan, deferred = IL.heel_tight_couple_plan(arms, "right", lambda i, a: kept[(i, a)])
+    assert plan == [(1, ["right"]), (2, ["right"]), (0, ["right", "left"]), (1, ["left"]), (3, ["left"])]
+    assert deferred == 2  # B0's and B1's left couplings come after B2's right arm
+    # every right arm kept at the first B: the first B's right coupling first, its left after the other right arms
+    plan, deferred = IL.heel_tight_couple_plan([["right", "left"], ["right"]], "right", lambda i, a: True)
+    assert plan == [(0, ["right"]), (1, ["right"]), (0, ["left"])] and deferred == 1
+    # no B with a kept right-arm yaw: today's order
+    plan, deferred = IL.heel_tight_couple_plan([["right", "left"], ["left"]], "right", lambda i, a: a == "left")
+    assert plan == [(0, ["right", "left"]), (1, ["left"])] and deferred == 0
+
+
+def _wit(name, action, **targets):
+    return {"name": name, "action": action, "arm": "left", "targets": {k: {"q": [0.0] * 16 + [v] + [0.0] * 11} for k, v in targets.items()}}
+
+
+LO = -2.0944
+
+
+def test_left_j4_margin_separates_the_measured_failures():
+    # uh2_ul01_on 360002 (robot_touching_itself): the retreat witness at -2.0921; recollect 300022 (ok): the place's carry at -1.984
+    fail = [_wit("grasp", 2, pre_grasp=-1.930, grasp=-1.469), _wit("place", 7, carry=-1.959), _wit("retreat", 8, retreat=-2.0921)]
+    ok = [_wit("grasp", 2, pre_grasp=-1.340), _wit("place", 8, carry=-1.984, retreat=-1.983), _wit("push", 11, pre=-1.862)]
+    m, where = IL.left_j4_margin(fail, 16, LO)
+    assert m == pytest.approx(0.0023, abs=1e-4) and where == "retreat8.retreat" and m < IL.PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD
+    m, where = IL.left_j4_margin(ok, 16, LO)
+    assert m == pytest.approx(0.1104, abs=1e-4) and where == "place8.carry" and m >= IL.PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD
+    # the measured extremes: failures 2.1-2.3 mrad, the closest non-failing left program 57 mrad (-2.0374), the closest ok 62 mrad (-2.0320)
+    for v, bad in ((-2.0923, True), (-2.0921, True), (-2.0374, False), (-2.0320, False)):
+        assert (IL.left_j4_margin([_wit("retreat", 9, retreat=v)], 16, LO)[0] < IL.PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD) is bad
+    assert IL.left_j4_margin([], 16, LO) is None and IL.left_j4_margin([{"name": "x", "action": 0, "targets": {"a": {"pose": 1}}}], 16, LO) is None
+
+
+def _j4_sampler(witnesses, **gen):
+    s = _sampler(push_under_yaw="heel_first", **gen)
+    s.kit = SimpleNamespace(stats={}, robot=SimpleNamespace(arm_control_idx={"left": th.tensor([10, 12, 14, 16, 18, 20, 22])},
+                                                         joint_lower_limits=th.full((28,), LO)))
+    s.sidecar = SimpleNamespace(ik_witnesses=witnesses)
+    return s
+
+
+def test_heel_tight_left_j4_check(monkeypatch):
+    fail = [_wit("retreat", 8, retreat=-2.0921)]
+    ok = [_wit("place", 8, carry=-2.0320)]
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "0")
+    s = _j4_sampler(fail)
+    s.heel_tight_left_j4_check()  # off: nothing judged
+    assert s.kit.stats == {}
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "1")
+    s = _j4_sampler(ok)
+    s.heel_tight_left_j4_check()
+    assert s.kit.stats == {"push_heel_tight.left_j4_checked": 1}
+    s = _j4_sampler(fail)
+    with pytest.raises(IL.Reject) as e:
+        s.heel_tight_left_j4_check()
+    assert e.value.reason == "program_check_failed" and "left_arm_joint4 planned -2.0921 rad at retreat8.retreat, 2.3 mrad" in str(e.value)
+    assert s.kit.stats["push_heel_tight.left_j4_rejected"] == 1
+    # the switch on but no heel_first lock: not judged
+    s = _j4_sampler(fail)
+    s.gp = _GP(push_tip_frac=0.3)
+    s.heel_tight_left_j4_check()
+    assert s.kit.stats == {}

@@ -5108,6 +5108,11 @@ def push_stroke_plan(extra: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]
     for k, v in PUSH_STROKE_DEFAULTS.items():
         r = raw.get(k)
         out[k] = float(r) if isinstance(r, (int, float)) and not isinstance(r, bool) and math.isfinite(float(r)) else v
+    # i7-measure (lead #90 item 2): the optional final yaw stroke of the lying briefcase's record (absent everywhere else: no final stroke)
+    for k in ("yaw_final_m", "yaw_final_min_rad", "yaw_final_gain_m_per_rad", "yaw_integral_m_per_rad"):
+        r = raw.get(k)
+        if isinstance(r, (int, float)) and not isinstance(r, bool) and math.isfinite(float(r)):
+            out[k] = float(r)
     return out
 
 
@@ -5284,6 +5289,11 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
     rep.update({"yaw_reference": ref, "yaw_start_deg": round(math.degrees(e0), 2)})
     if guide is not None:
         rep["guide_wall"] = dict(guide)
+    # i7-measure (lead 2026-11-10, the lying briefcase; only a plan carrying ``yaw_integral_m_per_rad``): an integral term on the yaw errors of the
+    # strokes so far - the pitched hand turns the lying briefcase ~+11 deg per 5 cm pushed through its mass centre (47 recorded strokes:
+    # dyaw = 11.2 deg - 1.95 deg per cm of contact offset), so the proportional re-aim alone settled 10-17 deg off (r3_lying_a / _b)
+    ki = float(plan.get("yaw_integral_m_per_rad", 0.0) or 0.0)
+    e_sum = 0.0
     for k in range(1, int(plan["n"]) + 1):
         if k > 1:
             p_e, q_e = (C.as_tensor(x).float() for x in motions.eef_pose(arm))
@@ -5294,6 +5304,11 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
         target, off, term = push_stroke_aim(p_o[:2], p_init[:2], d3[:2], e, plan)
         g_aim = 0.0 if guide is None else -guide["side"] * guide["aim_away_m"]
         target += g_aim
+        integ = 0.0
+        if ki:
+            e_sum += float(e)
+            integ = ki * e_sum
+            target += integ
         pts = _object_points_world(state, obj)
         hit = push_contact_aim(pts, p_init[:2], d3[:2], target, strips, *band) if pts is not None else None
         cap = abs(float(plan["reaim_max_m"]))
@@ -5322,6 +5337,8 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
                                "start_along_m": round(start_along, 4), "end_along_m": round(end_along, 4)}
         if guide is not None:
             rec.update({"guide_aim_m": round(g_aim, 4), "guide_lean_m": round(lean, 4)})
+        if ki:
+            rec["yaw_integral_m"] = round(integ, 4)
         try:
             yield from motions.arm_along(arm, [pose_at(start_along, aim)], loaded=False)
         except SkillError as err:
@@ -5343,6 +5360,45 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
                  source, rec["pushed_m"] * 1000, math.degrees(e1))
         if len(ctx.get("push_stopped") or []) > n_stop:
             break
+    # i7-measure (lead #90 item 2, the lying briefcase; only a plan carrying ``yaw_final_m`` - iors_large writes it under ISPATIALGYM_BRIEFCASE_LYING):
+    # one more stroke after the planned ones while the yaw is still beyond ``yaw_final_min_rad`` - re-aimed by the same rule (root line + yaw term,
+    # within the re-aim cap), pushed ``yaw_final_m`` beyond the object's back WITHOUT the stop at the goal (the object stands at its goal line:
+    # the stroke is there to turn it, the extra travel stays inside the position tolerance)
+    yf = plan.get("yaw_final_m")
+    e_fin, _ = push_yaw_error(state, obj, pose0)
+    if yf and abs(float(e_fin)) > float(plan.get("yaw_final_min_rad", 0.05)):
+        p_e, q_e = (C.as_tensor(x).float() for x in motions.eef_pose(arm))
+        yield from motions.arm_along(arm, [(p_e - d3 * float(plan["backoff_m"]), q_e)], loaded=True, **_speed_kw(ctx))
+        yield from _hold_until_still(motions, state, obj, cfg)
+        p_o = C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:3].float()
+        e, _ = push_yaw_error(state, obj, pose0)
+        fplan = dict(plan, yaw_gain_m_per_rad=float(plan.get("yaw_final_gain_m_per_rad", plan["yaw_gain_m_per_rad"])), yaw_deadband_rad=0.0)
+        target, off, term = push_stroke_aim(p_o[:2], p_init[:2], d3[:2], e, fplan)
+        pts = _object_points_world(state, obj)
+        cap = abs(float(plan["reaim_max_m"]))
+        hit = push_contact_aim(pts, p_init[:2], d3[:2], target, strips, *band) if pts is not None else None
+        if hit is not None:
+            aim = max(-cap, min(cap, hit[0]))
+            back = push_back_contact(pts, p_init[:2], d3[:2], aim, strips, *band) if aim != hit[0] else hit[1:]
+            hit = (aim, *back) if back is not None else None
+        rec = {"stroke": "yaw_final", "yaw_before_deg": round(math.degrees(e), 2), "root_off_line_m": round(off, 4), "yaw_term_m": round(term, 4), "target_m": round(target, 4)}
+        if hit is None:
+            rec["skipped"] = "the hand meets nothing of the object's back"
+        else:
+            aim, rear, contact_lat = hit
+            pose_at = lambda along, lat: (p_init + d3 * along + n3 * lat, q_blade)  # noqa: E731
+            start_along, end_along = rear - standoff, rear - standoff + float(yf)
+            rec.update({"aim_m": round(aim, 4), "contact_lateral_m": round(contact_lat, 4), "start_along_m": round(start_along, 4), "end_along_m": round(end_along, 4)})
+            try:
+                yield from motions.arm_along(arm, [pose_at(start_along, aim)], loaded=False)
+                yield from motions.arm_along(arm, [pose_at(end_along, aim)], loaded=True, **_speed_kw(ctx))
+            except SkillError as err:
+                rec["failed"] = (err.message or err.reason)[:160]
+            yield from _hold_until_still(motions, state, obj, cfg)
+            e1, _ = push_yaw_error(state, obj, pose0)
+            rec["yaw_after_deg"] = round(math.degrees(e1), 2)
+        rep["yaw_final"] = rec
+        log.info("push(%s): final yaw stroke: %s", obj, rec)
     e_end, _ = push_yaw_error(state, obj, pose0)
     rep["yaw_end_deg"] = round(math.degrees(e_end), 2)
     log.info("push(%s): %d of %d strokes, yaw %+.1f -> %+.1f deg vs the %s", obj, len(rep["strokes"]), int(plan["n"]), rep["yaw_start_deg"], rep["yaw_end_deg"], ref)
