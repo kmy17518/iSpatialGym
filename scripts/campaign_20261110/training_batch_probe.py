@@ -83,6 +83,71 @@ def shared_world_proof(runner, records):
             'scene_check':reason,'method':'native instance_signature + template_compatible'}
 
 
+def observe_reset_boundary(scene, sim, load, observe):
+    """Read immediately before the existing reset step, without changing it.
+
+    This diagnostic checkpoint does not replace the post-step restoration
+    checks. Both the native call and its arguments are preserved exactly.
+    """
+    observations=[]
+    reset=scene.reset
+    raw_reset=vars(scene).get('reset')
+    had_reset='reset' in vars(scene)
+    def observed_reset(*args, **kwargs):
+        step=sim.step_physics
+        raw_step=vars(sim).get('step_physics')
+        had_step='step_physics' in vars(sim)
+        def observed_step(*step_args, **step_kwargs):
+            observations.append(observe())
+            return step(*step_args, **step_kwargs)
+        sim.step_physics=observed_step
+        try:
+            return reset(*args, **kwargs)
+        finally:
+            if had_step: sim.step_physics=raw_step
+            else: del sim.step_physics
+    scene.reset=observed_reset
+    try:
+        result=load()
+    finally:
+        if had_reset: scene.reset=raw_reset
+        else: del scene.reset
+    require(len(observations)==1, 'diagnostic expected exactly one native reset physics step')
+    return result, observations[0]
+
+
+def install_reset_boundary_probe(runner):
+    """Instrument only this diagnostic process; the ordinary loader is unchanged."""
+    restore=runner.InstanceLoader.restore
+    def observed_restore(loader, *args, **kwargs):
+        from ispatialgym.sampling.campaign_runtime import restoration_observation
+        task=loader.task
+        load=task.load_tro_instance
+        raw_load=vars(task).get('load_tro_instance')
+        had_load='load_tro_instance' in vars(task)
+        checkpoints=[]
+        def observed_load(*load_args, **load_kwargs):
+            result, checkpoint=observe_reset_boundary(loader.env.scene, runner.og.sim,
+                lambda:load(*load_args, **load_kwargs),
+                lambda:restoration_observation(loader.tro.meta.raw['campaign'], loader.env.scene, runner.og.sim))
+            checkpoints.append(checkpoint)
+            return result
+        task.load_tro_instance=observed_load
+        try:
+            result=restore(loader, *args, **kwargs)
+        finally:
+            if had_load: task.load_tro_instance=raw_load
+            else: del task.load_tro_instance
+        require(len(checkpoints)==1, 'diagnostic did not observe exactly one instance load')
+        loader.report['campaign_restoration']['native_reset_boundary_observation']={
+            'phase':'after_scene_restore_before_existing_reset_physics_step',
+            'diagnostic_only':True, 'post_step_checks_unchanged':True,
+            'observation':checkpoints[0]}
+        return result
+    runner.InstanceLoader.restore=observed_restore
+    return restore
+
+
 def run(root,request,output,kind):
     root=Path(root).resolve();output=Path(output).resolve()
     require(output.is_relative_to(root) and not output.exists(),'probe output must be new and private')
@@ -104,6 +169,9 @@ def run(root,request,output,kind):
         from ispatialgym.oracle import run_isg
         from ispatialgym.fastflags import fast_on
         require(fast_on('COLLECTOR_PREBUILD'),'production template compatibility is disabled')
+        if value.get('observe_reset_boundary') is True:
+            install_reset_boundary_probe(run_isg)
+            common['reset_boundary_diagnostic']=True
         world=shared_world_proof(run_isg,records)
         common['world_compatibility']=world
         shared={'signature':world['signature'],
