@@ -107,3 +107,26 @@ def test_terminal_allocation_does_not_stay_submitted_or_imply_probe_success(tmp_
     assert value['stages'][1]['status']=='completed_without_complete_probe'
     assert value['status']!='batch_restoration_verified'
     assert value['benchmark_credit']==0
+
+
+def test_reporting_cache_keeps_audit_time_and_invalidates_changed_nested_artifacts(tmp_path,monkeypatch):
+    from scripts.campaign_20261110 import training_restoration
+    artifact=tmp_path/'demo.hdf5';artifact.write_bytes(b'original')
+    report=tmp_path/'report.json';write_json_atomic(report,{'demo':status.ref(artifact)})
+    probe=tmp_path/'probe.json';write_json_atomic(probe,{'report':status.ref(report)})
+    calls=[]
+    def verify(*args):
+        calls.append(args)
+        if artifact.read_bytes()!=b'original':raise ValueError('changed native artifact')
+    monkeypatch.setattr(training_restoration,'verify_batch',verify)
+    first=status.observed_batch_verification(tmp_path,status.ref(probe),'physics_action_open_loop')
+    cached=status.observed_batch_verification(tmp_path,status.ref(probe),'physics_action_open_loop')
+    assert len(calls)==1 and first['status']==cached['status']=='verified'
+    assert not first['verification_cached'] and cached['verification_cached']
+    assert first['verification_observed_at']==cached['verification_observed_at']
+    artifact.write_bytes(b'changed')
+    failed=status.observed_batch_verification(tmp_path,status.ref(probe),'physics_action_open_loop')
+    assert len(calls)==2 and failed['status']=='failed_validation'
+    assert 'changed native artifact' in failed['error']
+    assert status.observed_batch_verification(tmp_path,status.ref(probe),'physics_action_open_loop')['status']=='failed_validation'
+    assert len(calls)==2

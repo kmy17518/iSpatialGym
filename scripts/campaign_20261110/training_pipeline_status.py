@@ -14,6 +14,75 @@ def ref(path): return {'path': str(path), 'sha256': file_digest(path)}
 def timestamp(path): return datetime.fromtimestamp(Path(path).stat().st_mtime, timezone.utc).isoformat()
 
 
+_BATCH_OBSERVATION_CACHE = {}
+
+
+def _evidence_stamps(root, probe):
+    """Track transitive proof files and frozen source trees without rehashing videos.
+
+    This is a read-only reporting cache. Release verifiers continue to hash and
+    audit the original artifacts directly; they never consume this cache.
+    """
+    root=Path(root).resolve(); watched=set(); visited=set()
+    def visit(value):
+        if isinstance(value,dict):
+            for item in value.values(): visit(item)
+        elif isinstance(value,list):
+            for item in value: visit(item)
+        elif isinstance(value,str) and value.startswith(str(root)+'/'):
+            path=Path(value)
+            if not path.exists():
+                watched.add(path)
+                return
+            if path.is_dir():
+                if path.parent==root/'code':
+                    watched.add(path/'.snapshot_commit')
+                    for folder in ('ispatialgym','scripts'):
+                        watched.add(path/folder)
+                        watched.update(p for p in (path/folder).rglob('*') if p.is_dir() or p.suffix=='.py')
+                return
+            watched.add(path)
+            if path.suffix=='.json' and path not in visited:
+                visited.add(path); visit(read(path))
+    visit(str(probe))
+    # The compatibility proof names its base by commit instead of by path.
+    for path in list(visited):
+        value=read(path)
+        if isinstance(value,dict) and value.get('schema')=='isg-observational-runtime-compatibility-v1':
+            for key in ('base_commit','observational_commit'):
+                visit(str(root/'code'/('trunk_'+value[key][:12])))
+    return {str(path):_stamp(path) for path in watched}
+
+
+def _stamp(path):
+    try:
+        s=Path(path).stat()
+        return (s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns,s.st_mode)
+    except FileNotFoundError:
+        return None
+
+
+def observed_batch_verification(root, reference, kind):
+    """Reuse a dated audit only while every observed input identity is unchanged."""
+    key=(str(Path(root).resolve()),reference['path'],reference['sha256'],kind)
+    previous=_BATCH_OBSERVATION_CACHE.get(key)
+    if previous and all(_stamp(path)==stamp for path,stamp in previous['stamps'].items()):
+        return {**previous['result'],'verification_cached':True}
+    from scripts.campaign_20261110.training_restoration import verify_batch
+    before=_evidence_stamps(root,reference['path'])
+    result={'verification_observed_at':datetime.now(timezone.utc).isoformat(),
+            'verification_cached':False,'verification_scope':'reporting only; release rechecks original evidence'}
+    try:
+        verify_batch(root,reference,1794321600,kind)
+        result['status']='verified'
+    except Exception as error:
+        result.update(status='failed_validation',error=f'{type(error).__name__}: {error}')
+    after={path:_stamp(path) for path in before}
+    require(after==before,'batch evidence changed during observation')
+    _BATCH_OBSERVATION_CACHE[key]={'stamps':after,'result':result}
+    return result
+
+
 def observe(root, *, now=None):
     root = Path(root).resolve(); base = root/'training_pipeline_canaries'
     result = {'schema': 'isg-training-pipeline-status-v1', 'campaign_id': 'campaign_20261110',
@@ -196,9 +265,7 @@ def observe(root, *, now=None):
                            for entry in native.get('entries', [])):
                         stage['status'] = 'failed_execution'
                     if stage['episodes_observed'] == 3:
-                        from scripts.campaign_20261110.training_restoration import verify_batch
-                        verify_batch(root, ref(probe), 1794321600, kind)
-                        stage['status'] = 'verified'
+                        stage.update(observed_batch_verification(root,ref(probe),kind))
                 except Exception as error:
                     stage.update(status='failed_validation', error=f'{type(error).__name__}: {error}')
             job_id=str(submissions.get(kind,{}).get('job_id',''))
