@@ -55,7 +55,15 @@ function nativeDrawEvidence(r){
   if(num(r.native_attempted_draws)!==null)return `${n(r.distinct_successful_members)} / ${n(r.native_attempted_draws)} native draws (${pct(r.distinct_successful_members,r.native_attempted_draws)}); includes retries and interrupted draws.`;
   return `${num(r.observed_native_draws)===null?'Unavailable':'≥'+n(r.observed_native_draws)} observed native draws; exact retry-inclusive ratio unavailable.`;
 }
+function renderFleetTime(d){
+  const f=d.fleet_gpu_time??{}, source=d.sources.fleet_gpu_time??{};
+  const observed=observation('Vast rental accounting',f.observed_at_unix,source.available,source.error,300);
+  if(!source.available){$('fleet-gpu-time').innerHTML='<h3>Whole-fleet GPU time</h3>'+observed+'<p>Rental-time evidence is unavailable. No rate is inferred.</p>';return;}
+  const unknown=(f.window_unknown_gpu_count_instances??[]).length+(f.provider_instances_without_creation??[]).length;
+  $('fleet-gpu-time').innerHTML='<h3>Whole-fleet GPU time</h3>'+observed+`<p>Window begins ${date(f.instrumentation_epoch_unix)}. Provider observation: ${date(f.provider_observed_at_unix)}.</p><div class="stats-inline"><div><div class="value">${decimal(num(f.fleet_window_estimated_gpu_seconds)===null?null:f.fleet_window_estimated_gpu_seconds/3600)}</div><div class="small-label">Rental GPU-hours · observation estimate</div></div><div><div class="value">${decimal(num(f.fleet_window_measured_attributed_worker_gpu_seconds)===null?null:f.fleet_window_measured_attributed_worker_gpu_seconds/3600)}</div><div class="small-label">Attributed worker GPU-hours</div></div><div><div class="value">${decimal(num(f.fleet_window_unattributed_gpu_seconds)===null?null:f.fleet_window_unattributed_gpu_seconds/3600)}</div><div class="small-label">Not yet attributed to worker intervals</div></div></div><p class="caption">${esc(f.scope)} Active workers can remain unattributed until their retained interval is complete.</p><p class="caption">${esc(f.boundary_precision)} ${n(unknown)} unresolved rental identities/counts in this window; ${n((f.historical_unknown_gpu_count_instances??[]).length)} historical rentals lack GPU counts.</p><p>Completed-group end-to-end accepted/GPU-hour remains unavailable: this window includes active work, while earlier rental and retry evidence is incomplete. Campaign-total acceptance is not divided by this partial time window.</p><a href="/reports/fleet-gpu-time" target="_blank" rel="noopener">Rental boundaries and accounting evidence ↗</a>`;
+}
 function renderYield(d){
+  renderFleetTime(d);
   const y=d.group_yield??{}, source=d.sources.group_yield??{};
   const newerError=stamp(d.yield_error?.observed_at)>stamp(y.observed_at)?d.yield_error.error:null;
   $('yield-observation').innerHTML=observation('Group audit',y.observed_at,source.available,newerError??source.error,300)+observation('GPU accounting',y.gpu_accounting_observed_at,!!y.gpu_accounting_observed_at,null,300);

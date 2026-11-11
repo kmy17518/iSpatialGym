@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 REMOTE = '/vision/u/minyeong/projects/isg_home/campaign_20261110/infra'
 FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group_yield.json', 'goal_group_yield_error.json')
+FLEET_FILE = 'vast_fleet_gpu_time.json'
 
 
 def atomic(path, data):
@@ -20,7 +21,7 @@ def atomic(path, data):
 
 
 def sync(output):
-    remote = "import json,pathlib; p=pathlib.Path(%r); names=%r; data={n:json.loads((p/n).read_text()) for n in names if (p/n).exists()}; report=p/'GOAL_GROUP_YIELD.md'; data['goal_yield_report']=report.read_text() if report.exists() else None; print(json.dumps(data))" % (REMOTE, FILES)
+    remote = "import json,pathlib; p=pathlib.Path(%r); names=%r; data={n:json.loads((p/n).read_text()) for n in names if (p/n).exists()}; report=p/'GOAL_GROUP_YIELD.md'; data['goal_yield_report']=report.read_text() if report.exists() else None; fleet=p.parent/'accounting'/%r; data[%r]=json.loads(fleet.read_text()) if fleet.exists() else {}; print(json.dumps(data))" % (REMOTE, FILES, FLEET_FILE, FLEET_FILE)
     # The fixed remote program reads only the allowlisted campaign audit files.
     command = "python3 - <<'PY'\n" + remote + "\nPY"
     result = subprocess.run(['ssh', '-oBatchMode=yes', '-oConnectTimeout=15',
@@ -32,6 +33,9 @@ def sync(output):
     for name in FILES:
         if name in bundle:
             atomic(output / name, bundle[name])
+    fleet = bundle.get(FLEET_FILE) or {}
+    if fleet.get('campaign_id') == 'campaign_20261110':
+        atomic(output / FLEET_FILE, fleet)
     if bundle.get('goal_yield_report'):
         target=output.parent/'GOAL_GROUP_YIELD.md';temporary=target.with_suffix('.tmp')
         temporary.write_text(bundle['goal_yield_report']);temporary.replace(target)
@@ -81,6 +85,16 @@ def return_report(output):
         lines += ['All-backend GPU-hour yield is unavailable where historical startup/retry intervals are missing.',
             'Exact collection-only Slurm rates, class/runtime breakdowns and evidence: http://127.0.0.1:8765/#goal-yield']
     vast = live.get('campaign_vast_metrics') or {}
+    fleet_path = output / FLEET_FILE
+    if fleet_path.exists():
+        f = json.loads(fleet_path.read_text())
+        if f.get('campaign_id') == 'campaign_20261110':
+            lines += ['', 'Vast fleet GPU-time observation: ' + chicago(datetime.fromtimestamp(f['observed_at_unix'], timezone.utc).isoformat()),
+                f"Post-instrumentation rental window: {f['fleet_window_estimated_gpu_seconds']/3600:.3f} GPU-hours; "
+                f"{f['fleet_window_measured_attributed_worker_gpu_seconds']/3600:.3f} attributed to retained worker intervals; "
+                f"{f['fleet_window_unattributed_gpu_seconds']/3600:.3f} not yet attributed.",
+                f.get('boundary_precision', ''),
+                'This includes fleet startup, idle and failed attempts. It is not a completed-group yield denominator; active work and historical gaps remain separate.']
     lines += ['Vast observation: ' + chicago(live.get('vast_observed_at')),
         f"Vast: {vast.get('running_gpus', 'unavailable')} provider GPUs running; "
         f"{vast.get('worker_ready_gpus', 'unavailable')} ready/running workers; "

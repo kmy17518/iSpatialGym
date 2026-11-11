@@ -117,6 +117,22 @@ class ReadOnlyDashboardTests(unittest.TestCase):
             self.write('dashboard/accepted_release.json',invalid)
             self.assertEqual(self.request('GET','/reports/accepted-release')[0],404)
 
+    def test_fleet_gpu_time_preserves_scope_and_rejects_other_campaigns(self):
+        value={'campaign_id':'campaign_20261110','fleet_window_estimated_gpu_seconds':7200,
+               'fleet_window_measured_attributed_worker_gpu_seconds':3600,
+               'rentals':[{'instance':'owned'}], 'sources':[{'path':'private proof'}]}
+        self.write('dashboard/vast_fleet_gpu_time.json',value)
+        before=self.hashes();data=json.loads(self.request('GET','/api/status')[1])
+        self.assertEqual(data['fleet_gpu_time']['fleet_window_estimated_gpu_seconds'],7200)
+        self.assertNotIn('rentals',data['fleet_gpu_time'])
+        self.assertNotIn('accepted_per_gpu_hour',data['fleet_gpu_time'])
+        code,raw=self.request('GET','/reports/fleet-gpu-time')
+        self.assertEqual(code,200);self.assertEqual(json.loads(raw)['rentals'],value['rentals'])
+        self.assertEqual(before,self.hashes())
+        self.write('dashboard/vast_fleet_gpu_time.json',{'campaign_id':'old'})
+        self.assertEqual(self.request('GET','/reports/fleet-gpu-time')[0],404)
+        self.assertFalse(snapshot(self.root,self.root/'inventory')['sources']['fleet_gpu_time']['available'])
+
     def test_missing_or_invalid_sources_are_explicit(self):
         (self.root / 'dashboard/dashboard_evidence.json').write_text('{broken')
         (self.root / 'infra/cluster_snapshot.json').unlink()
