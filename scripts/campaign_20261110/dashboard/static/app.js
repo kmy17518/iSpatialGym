@@ -56,6 +56,9 @@ function nativeDrawEvidence(r){
   return `${num(r.observed_native_draws)===null?'Unavailable':'≥'+n(r.observed_native_draws)} observed native draws; exact retry-inclusive ratio unavailable.`;
 }
 function renderFleetTime(d){
+  const c=d.cluster_fleet_gpu_time??{}, cs=d.sources.cluster_fleet_gpu_time??{};
+  const clusterObserved=observation('Cluster allocation accounting',c.observed_at_unix,cs.available,(c.errors??[]).length?'Accounting rows failed validation':cs.error,300);
+  $('cluster-fleet-gpu-time').innerHTML='<h3>Campaign-wide cluster GPU time</h3>'+clusterObserved+(cs.available?`<div class="stats-inline"><div><div class="value">${decimal(num(c.verified_allocated_gpu_seconds)===null?null:c.verified_allocated_gpu_seconds/3600)}</div><div class="small-label">Verified allocation GPU-hours</div></div><div><div class="value">${n(c.allocation_count)}</div><div class="small-label">Campaign allocations · both accounts</div></div></div><p>${esc(c.scope)}</p><p class="caption">${n((c.ambiguous_campaign_named_allocations??[]).length)} unresolved allocation identities; ${n((c.errors??[]).length)} invalid accounting rows. Active allocations are included through this observation.</p><p>${esc(c.warning)}</p><a href="/reports/cluster-fleet-gpu-time" target="_blank" rel="noopener">Allocation records and scope ↗</a>`:'<p>Campaign-wide cluster accounting is unavailable. No rate is inferred.</p>');
   const f=d.fleet_gpu_time??{}, source=d.sources.fleet_gpu_time??{};
   const observed=observation('Vast rental accounting',f.observed_at_unix,source.available,source.error,300);
   if(!source.available){$('fleet-gpu-time').innerHTML='<h3>Whole-fleet GPU time</h3>'+observed+'<p>Rental-time evidence is unavailable. No rate is inferred.</p>';return;}

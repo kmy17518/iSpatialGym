@@ -141,6 +141,22 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertFalse(data['sources']['cluster']['available'])
         self.assertIn('error', data['sources']['evidence'])
 
+    def test_broader_cluster_time_is_separate_and_campaign_scoped(self):
+        value={'campaign_id':'campaign_20261110','verified_allocated_gpu_seconds':10800,
+               'records':[{'job_id':'123','gpu_count':1}], 'accepted_instance_rate':None}
+        self.write('dashboard/cluster_fleet_gpu_time.json',value)
+        before=self.hashes();data=json.loads(self.request('GET','/api/status')[1])
+        self.assertEqual(data['cluster_fleet_gpu_time']['allocation_count'],1)
+        self.assertEqual(data['cluster_fleet_gpu_time']['verified_allocated_gpu_seconds'],10800)
+        self.assertIsNone(data['cluster_fleet_gpu_time']['accepted_instance_rate'])
+        self.assertNotIn('records',data['cluster_fleet_gpu_time'])
+        code,raw=self.request('GET','/reports/cluster-fleet-gpu-time')
+        self.assertEqual(code,200);self.assertEqual(json.loads(raw)['records'],value['records'])
+        self.assertEqual(before,self.hashes())
+        self.write('dashboard/cluster_fleet_gpu_time.json',{'campaign_id':'older'})
+        self.assertEqual(self.request('GET','/reports/cluster-fleet-gpu-time')[0],404)
+        self.assertFalse(snapshot(self.root,self.root/'inventory')['sources']['cluster_fleet_gpu_time']['available'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -46,6 +46,7 @@ def snapshot(root, inventory):
     evidence, es = read_source(root / 'dashboard/dashboard_evidence.json')
     group_yield, ys = read_source(root / 'dashboard/goal_group_yield.json')
     fleet, fs = read_source(root / 'dashboard/vast_fleet_gpu_time.json')
+    cluster_fleet, cfs = read_source(root / 'dashboard/cluster_fleet_gpu_time.json')
     yield_error, yes = read_source(root / 'dashboard/goal_group_yield_error.json')
     audit_error, aes = read_source(root / 'dashboard/dashboard_evidence_error.json')
     sync, ss = read_source(root / 'dashboard/sync_status.json')
@@ -59,6 +60,8 @@ def snapshot(root, inventory):
         group_yield = {}; ys = {'available': False, 'error': 'Campaign identity mismatch'}
     if fleet and fleet.get('campaign_id') != 'campaign_20261110':
         fleet = {}; fs = {'available': False, 'error': 'Campaign identity mismatch'}
+    if cluster_fleet and cluster_fleet.get('campaign_id') != 'campaign_20261110':
+        cluster_fleet = {}; cfs = {'available': False, 'error': 'Campaign identity mismatch'}
     live_keys = ('updated_at', 'cluster_observed_at', 'cluster_probe_error', 'vast_observed_at',
         'campaign_vast_metrics', 'acceptance_evidence', 'annotated_coverage', 'campaign_results',
         'cluster_by_user_partition', 'cluster_capacity', 'family_controller', 'pending')
@@ -85,7 +88,8 @@ def snapshot(root, inventory):
     cluster_view['jobs'] = jobs
     return sanitize({'campaign_id': 'campaign_20261110', 'served_at': datetime.now(timezone.utc).isoformat(),
         'targets': TARGETS, 'deadline': '2026-11-12T19:00:00Z', 'refresh_seconds': 30,
-        'sources': {'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss, 'group_yield': ys, 'fleet_gpu_time': fs},
+        'sources': {'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss, 'group_yield': ys, 'fleet_gpu_time': fs, 'cluster_fleet_gpu_time': cfs},
+        'cluster_fleet_gpu_time': {**{k:v for k,v in cluster_fleet.items() if k != 'records'}, 'allocation_count': len(cluster_fleet.get('records', []))},
         'fleet_gpu_time': {k:v for k,v in fleet.items() if k not in ('rentals','sources','attempts_missing_complete_intervals')},
         'group_yield': {k:v for k,v in group_yield.items() if k not in ('sources','groups','jobs')},
         'yield_error': yield_error if yes['available'] else {},
@@ -111,13 +115,14 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 return self.send_body(404, b'Report unavailable', 'text/plain')
         audits = {'/reports/reconciliation': 'reconciliation.json',
+            '/reports/cluster-fleet-gpu-time': 'cluster_fleet_gpu_time.json',
             '/reports/fleet-gpu-time': 'vast_fleet_gpu_time.json',
             '/reports/accepted-release': 'accepted_release.json',
             '/reports/goal-yield': 'goal_group_yield.json',
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time') and status['available'] and (
+            if path in ('/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,

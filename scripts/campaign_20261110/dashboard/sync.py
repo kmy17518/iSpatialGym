@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 REMOTE = '/vision/u/minyeong/projects/isg_home/campaign_20261110/infra'
 FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group_yield.json', 'goal_group_yield_error.json')
 FLEET_FILE = 'vast_fleet_gpu_time.json'
+CLUSTER_FLEET_FILE = 'cluster_fleet_gpu_time.json'
 
 
 def atomic(path, data):
@@ -21,7 +22,7 @@ def atomic(path, data):
 
 
 def sync(output):
-    remote = "import json,pathlib; p=pathlib.Path(%r); names=%r; data={n:json.loads((p/n).read_text()) for n in names if (p/n).exists()}; report=p/'GOAL_GROUP_YIELD.md'; data['goal_yield_report']=report.read_text() if report.exists() else None; fleet=p.parent/'accounting'/%r; data[%r]=json.loads(fleet.read_text()) if fleet.exists() else {}; print(json.dumps(data))" % (REMOTE, FILES, FLEET_FILE, FLEET_FILE)
+    remote = "import json,pathlib; p=pathlib.Path(%r); names=%r; data={n:json.loads((p/n).read_text()) for n in names if (p/n).exists()}; report=p/'GOAL_GROUP_YIELD.md'; data['goal_yield_report']=report.read_text() if report.exists() else None; data.update({n:json.loads((p.parent/'accounting'/n).read_text()) for n in %r if (p.parent/'accounting'/n).exists()}); print(json.dumps(data))" % (REMOTE, FILES, (FLEET_FILE, CLUSTER_FLEET_FILE))
     # The fixed remote program reads only the allowlisted campaign audit files.
     command = "python3 - <<'PY'\n" + remote + "\nPY"
     result = subprocess.run(['ssh', '-oBatchMode=yes', '-oConnectTimeout=15',
@@ -33,9 +34,10 @@ def sync(output):
     for name in FILES:
         if name in bundle:
             atomic(output / name, bundle[name])
-    fleet = bundle.get(FLEET_FILE) or {}
-    if fleet.get('campaign_id') == 'campaign_20261110':
-        atomic(output / FLEET_FILE, fleet)
+    for name in (FLEET_FILE, CLUSTER_FLEET_FILE):
+        fleet = bundle.get(name) or {}
+        if fleet.get('campaign_id') == 'campaign_20261110':
+            atomic(output / name, fleet)
     if bundle.get('goal_yield_report'):
         target=output.parent/'GOAL_GROUP_YIELD.md';temporary=target.with_suffix('.tmp')
         temporary.write_text(bundle['goal_yield_report']);temporary.replace(target)
@@ -95,6 +97,14 @@ def return_report(output):
                 f"{f['fleet_window_unattributed_gpu_seconds']/3600:.3f} not yet attributed.",
                 f.get('boundary_precision', ''),
                 'This includes fleet startup, idle and failed attempts. It is not a completed-group yield denominator; active work and historical gaps remain separate.']
+    cluster_fleet_path = output / CLUSTER_FLEET_FILE
+    if cluster_fleet_path.exists():
+        f = json.loads(cluster_fleet_path.read_text())
+        if f.get('campaign_id') == 'campaign_20261110':
+            lines += ['', 'Campaign-wide Slurm allocation accounting: ' + chicago(datetime.fromtimestamp(f['observed_at_unix'], timezone.utc).isoformat()),
+                f"Verified allocation GPU-hours: {f['verified_allocated_gpu_seconds']/3600:.3f}; "
+                f"{len(f.get('records', []))} allocations; {len(f.get('ambiguous_campaign_named_allocations', []))} unresolved allocation identities.",
+                f.get('scope', ''), f.get('warning', '')]
     lines += ['Vast observation: ' + chicago(live.get('vast_observed_at')),
         f"Vast: {vast.get('running_gpus', 'unavailable')} provider GPUs running; "
         f"{vast.get('worker_ready_gpus', 'unavailable')} ready/running workers; "
