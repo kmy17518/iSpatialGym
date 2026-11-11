@@ -108,6 +108,15 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(raw), [{'cpu_affinity': '1-9'}])
 
+    def test_new_quality_and_denominator_reports_are_scoped_sanitized_and_read_only(self):
+        for route,name in [('/reports/replay-quality','gate_quality_audit.json'),
+                           ('/reports/gpu-denominator-coverage','cohort_rental_denominator_coverage.json')]:
+            self.write('dashboard/'+name,{'campaign_id':'campaign_20261110','observed_at':'dated','api_key':'HIDDEN'})
+            before=self.hashes();status,raw=self.request('GET',route)
+            self.assertEqual(status,200);self.assertNotIn('HIDDEN',raw.decode());self.assertEqual(before,self.hashes())
+            self.write('dashboard/'+name,{'campaign_id':'older'})
+            self.assertEqual(self.request('GET',route)[0],404)
+
     def test_accepted_release_is_read_only_and_rejects_wrong_campaign(self):
         self.write('dashboard/accepted_release.json',{'campaign_id':'campaign_20261110','release':{'instances':3704}})
         before=self.hashes();status,raw=self.request('GET','/reports/accepted-release')

@@ -13,6 +13,8 @@ REMOTE = '/vision/u/minyeong/projects/isg_home/campaign_20261110/infra'
 FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group_yield.json', 'goal_group_yield_error.json')
 FLEET_FILE = 'vast_fleet_gpu_time.json'
 CLUSTER_FLEET_FILE = 'cluster_fleet_gpu_time.json'
+AUDIT_FILES = {'gate_quality_audit.json': 'validation/gate_quality_audit.json',
+               'cohort_rental_denominator_coverage.json': 'accounting/cohort_rental_denominator_coverage.json'}
 
 
 def atomic(path, data):
@@ -23,6 +25,8 @@ def atomic(path, data):
 
 def sync(output):
     remote = "import json,pathlib; p=pathlib.Path(%r); names=%r; data={n:json.loads((p/n).read_text()) for n in names if (p/n).exists()}; report=p/'GOAL_GROUP_YIELD.md'; data['goal_yield_report']=report.read_text() if report.exists() else None; data.update({n:json.loads((p.parent/'accounting'/n).read_text()) for n in %r if (p.parent/'accounting'/n).exists()}); print(json.dumps(data))" % (REMOTE, FILES, (FLEET_FILE, CLUSTER_FLEET_FILE))
+    remote = remote.replace('print(json.dumps(data))',
+        "data.update({n:json.loads((p.parent/relative).read_text()) for n,relative in %r.items() if (p.parent/relative).exists()}); print(json.dumps(data))" % AUDIT_FILES)
     # The fixed remote program reads only the allowlisted campaign audit files.
     command = "python3 - <<'PY'\n" + remote + "\nPY"
     result = subprocess.run(['ssh', '-oBatchMode=yes', '-oConnectTimeout=15',
@@ -38,6 +42,10 @@ def sync(output):
         fleet = bundle.get(name) or {}
         if fleet.get('campaign_id') == 'campaign_20261110':
             atomic(output / name, fleet)
+    for name in AUDIT_FILES:
+        audit = bundle.get(name) or {}
+        if audit.get('campaign_id') == 'campaign_20261110':
+            atomic(output / name, audit)
     if bundle.get('goal_yield_report'):
         target=output.parent/'GOAL_GROUP_YIELD.md';temporary=target.with_suffix('.tmp')
         temporary.write_text(bundle['goal_yield_report']);temporary.replace(target)

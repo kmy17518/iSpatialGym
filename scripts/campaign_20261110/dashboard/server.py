@@ -115,6 +115,8 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 return self.send_body(404, b'Report unavailable', 'text/plain')
         audits = {'/reports/reconciliation': 'reconciliation.json',
+            '/reports/replay-quality': 'gate_quality_audit.json',
+            '/reports/gpu-denominator-coverage': 'cohort_rental_denominator_coverage.json',
             '/reports/cluster-fleet-gpu-time': 'cluster_fleet_gpu_time.json',
             '/reports/fleet-gpu-time': 'vast_fleet_gpu_time.json',
             '/reports/accepted-release': 'accepted_release.json',
@@ -122,7 +124,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time') and status['available'] and (
+            if path in ('/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,
