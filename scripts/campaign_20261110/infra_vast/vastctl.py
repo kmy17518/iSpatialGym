@@ -48,6 +48,7 @@ try:
     from .cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
     from .fleet_accounting import observe as observe_rentals
+    from .fleet_policy import rental_ceiling
     from . import ik_transport
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision, preserved_instances
@@ -59,6 +60,7 @@ except ImportError:
     from cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from funding import read_snapshot as read_credit_snapshot, remaining_credit
     from fleet_accounting import observe as observe_rentals
+    from fleet_policy import rental_ceiling
     import ik_transport
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -1147,11 +1149,12 @@ def tick(c, s3, state):
     # 5. rent for the queued jobs that no instance (ready or booting) will take
     needs_by_gpu = rental_needs(queued, routing_live, hbs, created, reserved_to, C, t)
     need = sum(needs_by_gpu.values())
+    fleet_ceiling = rental_ceiling(C, len(live), need)
     stop = os.path.exists(os.path.join(VJ, "STOP_LAUNCH"))
     committed = sum(float(created[iid]["dph_total"]) * max(0.0, float(created[iid].get("max_lifetime_s",21600)) - (t-created[iid]["time"])) / 3600 for iid in live_ids)
     budget_left = min(float(C["budget_usd"]),3000.0) - float(C.get("transfer_reserve_usd",300.0)) - tot - committed
     hourly = sum(float(i.get("dph_total") or 0) for i in live.values())
-    if need > 0 and list_ok and not stop and len(live) < C["max_instances"] and budget_left > max(10.0, 2 * hourly):
+    if need > 0 and list_ok and not stop and len(live) < fleet_ceiling and budget_left > max(10.0, 2 * hourly):
         credit_snapshot = read_credit_snapshot(os.path.join(VJ,'funding_state.json'), tuple(c))
         C['_rental_credit_remaining'] = {name:remaining_credit(credit_snapshot,name,events(),now(),
                                                                reserve=float(C.get('funding_reserve_per_account_usd',25)))
@@ -1167,7 +1170,7 @@ def tick(c, s3, state):
         reserved_live, reserved_created = dict(live), dict(created)
         market_reasons = Counter()
         for o in offers:
-            if n_new >= C["launch_per_tick"] or need <= 0 or len(live) + n_new >= C["max_instances"]:
+            if n_new >= C["launch_per_tick"] or need <= 0 or len(live) + n_new >= fleet_ceiling:
                 break
             offer_gpu = o.get("gpu_name")
             demand_gpu = next((requested for requested in sorted(needs_by_gpu,key=lambda x:x != offer_gpu)
@@ -1200,6 +1203,8 @@ def tick(c, s3, state):
         with open(market_temporary, 'w') as stream:
             json.dump({'observed_at_unix':now(), 'offers':len(offers), 'launched':n_new,
                        'remaining_demand':needs_by_gpu, 'rejections':dict(market_reasons),
+                       'fleet_scaling_mode':C.get('fleet_scaling_mode','fixed'),
+                       'fleet_bound_from_ready_demand':fleet_ceiling,
                        'budget_remaining_after_commitments':budget_left,
                        'funded_credit_remaining_by_account':{SHORT[name]:value for name,value in C['_rental_credit_remaining'].items()},
                        'max_contracts_per_machine':C.get('max_contracts_per_machine',4)}, stream, indent=2)
