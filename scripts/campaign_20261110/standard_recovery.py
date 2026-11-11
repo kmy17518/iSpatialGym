@@ -40,6 +40,28 @@ def identity(path):
  try:return {'path':str(path),'sha256':file_digest(path),'mtime':path.stat().st_mtime}
  except OSError:return {'path':str(path),'unavailable':True}
 
+def received_artifacts(root):
+ """Only explicit owner updates backed by exact readiness audits lift a park."""
+ raw=read(root/'infra/standard_recovery/owner_artifact_updates.json',{}) or {}
+ if not raw:return {}
+ if raw.get('campaign_id')!=CAMPAIGN:raise ValueError('artifact update belongs to another campaign')
+ result={}
+ for row in raw.get('artifacts',[]):
+  key=row['class_id'];proof=Path(row['audit']['path']).resolve()
+  if key not in PENDING_ALIASES:raise ValueError('artifact update is not a parked class')
+  if not proof.is_relative_to(root/'infra/standard_recovery'):raise ValueError('artifact audit outside campaign recovery')
+  if file_digest(proof)!=row['audit']['sha256']:raise ValueError('artifact readiness audit changed')
+  audit=read(proof)
+  matches=[r for r in audit.get('classes',[]) if r['class_id']==key]
+  if audit.get('campaign_id')!=CAMPAIGN or len(matches)!=1:raise ValueError('artifact audit class differs')
+  record=matches[0]
+  if not (record.get('all_ready_and_exact_assets') is True and record.get('exact_source_template') is True
+          and record.get('errors')==[] and record.get('reservations')=='passed'):
+   raise ValueError('artifact source/readiness/reservation audit incomplete')
+  if not row.get('owner_instruction') or not row.get('source_commit'):raise ValueError('artifact update lacks owner provenance')
+  result[key]=row
+ return result
+
 def configured_attempt(root,row,validation,cluster):
  job=Path(row['job_dir']); cfg=None; cp=None
  if not job.resolve().is_relative_to(root/'out'):return None
@@ -81,9 +103,9 @@ def state_from_attempts(attempts):
  if attempts:return 'failed'
  return 'unattempted'
 
-def combine(baseline,evidence,technical,workers,previous=None):
+def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=None):
  """Acceptance is authoritative; a worker cannot promote a demo to acceptance."""
- now=datetime.now(timezone.utc).isoformat();previous=previous or {}
+ now=datetime.now(timezone.utc).isoformat();previous=previous or {};artifact_updates=artifact_updates or {}
  current={r['class_id']:r for r in evidence['classes'] if r['split']=='eval_standard'}
  initial={r['class_id']:r for r in baseline['classes']}
  prior={r['class_id']:r for r in previous.get('classes',[])}
@@ -96,19 +118,22 @@ def combine(baseline,evidence,technical,workers,previous=None):
  for key,b in sorted(initial.items()):
   c=current.get(key);count=c.get('accepted') if c else None
   attempts=technical.get(key,[]);w=notes.get(key,{})
+  parked=key in PENDING_ALIASES and key not in artifact_updates
   state=w.get('state',state_from_attempts(attempts))
-  if key in PENDING_ALIASES:state='parked'
-  elif count and count>0:state='accepted'
+  if count and count>0:state='accepted'
+  elif parked:state='parked'
   elif state in ('accepted','parked'):state='failed'
   first=prior.get(key,{}).get('first_accepted_observed_at')
   if count and count>0 and not first:first=evidence.get('observed_at')
   latest=attempts[0] if attempts else {}
   rows.append({'class_id':key,'task':b['task'],'accepted_standard':count,'target':10,
     'remaining':max(0,10-count) if count is not None else None,'baseline_accepted':b['accepted'],
-    'first_accepted_observed_at':first,'state':state,'owner':owner(key),
-    'engineering_status':'awaiting_promised_user_artifact' if key in PENDING_ALIASES else w.get('engineering_status','assigned_for_diagnosis'),
-    'blocker':'Promised updated oracle/template artifact has not arrived.' if key in PENDING_ALIASES else w.get('blocker',(c or {}).get('reason','Evidence unavailable')),
-    'next_action':'Resume only after the promised artifact arrives; continue independent classes.' if key in PENDING_ALIASES else w.get('next_action','Read exact native/demo failure and implement a bounded correction; do not repeat unchanged failed configurations.'),
+    'first_accepted_observed_at':first,'state':state,'owner':artifact_updates.get(key,{}).get('owner',owner(key)),
+    'artifact_update':artifact_updates.get(key),
+    'engineering_status':'awaiting_promised_user_artifact' if parked else w.get('engineering_status','assigned_for_diagnosis'),
+    'blocker':'Promised updated oracle/template artifact has not arrived.' if parked else w.get('blocker',
+      'Source artifact and readiness audit received; fresh native/demo/replay and sibling proof still required.' if key in artifact_updates else (c or {}).get('reason','Evidence unavailable')),
+    'next_action':'Resume only after the promised artifact arrives; continue independent classes.' if parked else w.get('next_action','Read exact native/demo failure and implement a bounded correction; do not repeat unchanged failed configurations.'),
     'configuration':w.get('configuration') or latest.get('configuration'), 'runtime':w.get('runtime') or latest.get('runtime'),
     'native':w.get('native') or latest.get('native'), 'demo':w.get('demo') or latest.get('demo'), 'replay':w.get('replay') or latest.get('replay'),
     'acceptance':{'accepted_standard':count,'observed_at':evidence.get('observed_at'),'source':'locked allocation audit',
@@ -163,7 +188,7 @@ def main():
      if rec is not None:technical[row['key']].append(rec)
     except (OSError,ValueError,KeyError,TypeError):continue
    workers=[read(f,{}) for f in sorted(directory.glob('worker_*.json'))]
-   value=combine(baseline,evidence,technical,workers,read(destination,{}))
+   value=combine(baseline,evidence,technical,workers,read(destination,{}),received_artifacts(root))
    write_json_atomic(destination,value)
    target=directory/'REPORT.txt';temp=target.with_suffix('.tmp');temp.write_text(report(value));temp.replace(target)
    print(json.dumps({k:value[k] for k in ['observed_at','covered_classes','zero_classes','newly_covered','state_counts']}),flush=True)
