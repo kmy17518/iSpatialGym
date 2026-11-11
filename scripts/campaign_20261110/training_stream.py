@@ -48,7 +48,7 @@ def register(root,entry):
     with atomic_directory_lock(path.with_suffix('.lockdir')):
         policy=read(path)
         require(policy['mode']=='blocked' and policy['standalone_training_allowed'] is False,'canary registration cannot change production release')
-        same=[a for a in policy.get('allowed_canaries',[]) if a['config_sha256']==entry['config_sha256']]
+        same=[a for a in policy.get('allowed_canaries',[]) if (a['config_sha256'],a['start'],a['count'])==(entry['config_sha256'],entry['start'],entry['count'])]
         if same:require(same==[entry],'canary authorization conflicts');return
         history=root/'infra/training_production_gate/canary_stream_history';history.mkdir(parents=True,exist_ok=True)
         previous=history/(str(time.time_ns())+'.json');previous.write_bytes(path.read_bytes())
@@ -61,7 +61,7 @@ def prepare_annotated(row, *, root):
     if proof is None:return None
     for p,s in [('config_path','config_sha256'),('input_manifest','input_manifest_sha256'),('authorization_path','authorization_sha256')]:
         require(Path(row[p]).resolve().is_relative_to(root) and file_digest(row[p])==row[s],'native stage input changed: '+p)
-    output=Path(row['config_path']).parent/'annotated'
+    output=Path(row['config_path']).parent/('annotated_'+row['candidate_id'])
     if (output/'request.json').exists():
         previous=read(output/'request.json');require(previous['native_proof']==proof,'prepared native proof changed');return previous
     require(not output.exists(),'partial annotated preparation needs explicit recovery')
@@ -71,7 +71,7 @@ def prepare_annotated(row, *, root):
     active=active_policy(root);require(active is not None,'no active reservations')
     native=Path(row['native_runtime']);bound,perturbations=bind_training_candidate(original,job,Path(proof['metadata']),native,active[1],active[2],active[0])
     key=ValidationKey(bound.fingerprint,file_digest(native/'.snapshot_commit'),cfg['validation_key']['physics_sha256'],cfg['validation_key']['data_sha256'],perturbations.scale_fingerprint)
-    token='training_height_annotated_r1_'+row['candidate_id'];index=reserve_indices(root,token,1)
+    token='training_height_annotated_'+row['candidate_id']+'_'+proof['gate_sha256'][:12];index=reserve_indices(root,token,1)
     output.mkdir();config_path=output/'campaign_config.json'
     config={'campaign_id':'campaign_20261110','split':'train','purpose':'training_pipeline_canary',
             'template':asdict(bound),'perturbations':asdict(perturbations),'validation_key':asdict(key)}
@@ -109,12 +109,35 @@ def observe(root,requests):
     destination=Path(requests).parent/'stream';destination.mkdir(exist_ok=True)
     with atomic_directory_lock(destination/'state.lockdir'):
         state=read(destination/'state.json') if (destination/'state.json').exists() else {'campaign_id':'campaign_20261110','records':{}}
+        from scripts.campaign_20261110.controller_families import allocations
+        from scripts.campaign_20261110.training_canaries import publish_canary
+        allocated=None
         for row in document['records']:
             previous=state['records'].get(row['candidate_id'],{})
-            if previous.get('status')=='ready_for_guarded_gpu_submission':continue
+            if previous.get('status')=='ready_for_guarded_gpu_submission':
+                if previous.get('annotated_status')=='validated_canary_exported':continue
+                if allocated is None:allocated=allocations(root)
+                matches=[a for a in allocated if int(a['start'])==previous['start'] and a['key']==row['class_id']]
+                if not matches:continue
+                try:
+                    require(len(matches)==1,'ambiguous annotated allocation')
+                    allocation=matches[0];job=Path(allocation['job_dir'])
+                    from scripts.campaign_20261110.production_gate import read_environment
+                    env=read_environment(job/'job.env')
+                    require(file_digest(env['ISPATIALGYM_CAMPAIGN_CONFIG'])==previous['config_sha256'],'annotated allocation config differs')
+                    gate=root/'validation/open_loop'/row['class_id']/allocation['jobid']/'gate.json'
+                    previous.update(allocation=allocation,annotated_status='awaiting_own_demo_and_replay')
+                    if gate.exists():
+                        require(read(gate).get('success') is True,'own native physics replay failed')
+                        previous['validation_review']=publish_canary(job,gate,root=root,started_at=1794321600)
+                        previous['annotated_status']='validated_canary_exported'
+                    previous.pop('annotated_error',None)
+                except Exception as exc:
+                    previous.update(annotated_status='blocked',annotated_error=type(exc).__name__+': '+str(exc))
+                continue
             try:
                 prepared=prepare_annotated(row,root=root)
-                value={'status':'native_pending'} if prepared is None else {'status':prepared['status'],'request':str(Path(row['config_path']).parent/'annotated/request.json'),'start':prepared['start'],'config_sha256':prepared['config_sha256']}
+                value={'status':'native_pending'} if prepared is None else {'status':prepared['status'],'request':str(Path(row['config_path']).parent/('annotated_'+row['candidate_id'])/'request.json'),'start':prepared['start'],'config_sha256':prepared['config_sha256']}
             except Exception as exc:
                 value={'status':'blocked','reason':type(exc).__name__+': '+str(exc)}
             if previous and previous!=value:state.setdefault('history',[]).append({'candidate_id':row['candidate_id'],'previous':previous,'at':time.time()})
