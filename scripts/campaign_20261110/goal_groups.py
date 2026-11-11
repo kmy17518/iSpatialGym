@@ -702,7 +702,11 @@ def submission_command(group_dir, *, snapshot, campaign_root, v2_root, base_inde
         # source's exact visibility requirement must survive sibling dispatch.
         env['ISGF_GOAL_OCCLUSION'] = 'on'
         env['ISPATIALGYM_GOAL_OCCLUSION'] = 'on'
-        protected.update(('ISGF_GOAL_OCCLUSION', 'ISPATIALGYM_GOAL_OCCLUSION'))
+        # Earlier immutable runtimes can remove sensors before that screen.
+        # Retain cameras explicitly, including when reusing their exact source.
+        env['ISPATIALGYM_FAST_SAMPLER_CAMERAS'] = '0'
+        protected.update(('ISGF_GOAL_OCCLUSION', 'ISPATIALGYM_GOAL_OCCLUSION',
+                          'ISPATIALGYM_FAST_SAMPLER_CAMERAS'))
     for item in extra_env:
         name, value = item.split("=", 1)
         require(name not in protected or env.get(name) == value, f"cannot override group invariant {name}")

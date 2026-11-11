@@ -114,6 +114,13 @@ class GoalGroupControllerTests(unittest.TestCase):
                 with self.assertRaises(c.ContractError):
                     g.submission_command(out, **args, extra_env=[name+'=off'])
                 self.assertIn(name+'=on', g.submission_command(out, **args, extra_env=[name+'=on']))
+            self.assertIn('ISPATIALGYM_FAST_SAMPLER_CAMERAS=0', command)
+            config['template'].update(class_id='inter_object_relation_satisfaction-under_large_scale_02',
+                                      task='inter_object_relation_satisfaction-under_large_scale')
+            c.write_json_atomic(out/'campaign_config.json', config)
+            self.assertIn('ISPATIALGYM_FAST_SAMPLER_CAMERAS=0', g.submission_command(out, **args))
+            with self.assertRaises(c.ContractError):
+                g.submission_command(out, **args, extra_env=['ISPATIALGYM_FAST_SAMPLER_CAMERAS=1'])
 
     def test_historical_or_unallocated_anchor_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
