@@ -39,7 +39,7 @@ from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
-    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
+    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
@@ -49,7 +49,7 @@ try:
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
     from .fleet_accounting import observe as observe_rentals
 except ImportError:
-    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
+    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
@@ -901,6 +901,11 @@ def tick(c, s3, state):
     STAGER.recover(owner_alive,assignment,reconcile_assignment)
     for reservation in list(STAGER.active().values()):
         if reservation['status']=='assigning' and reservation['instance'] in live:
+            if not production_decision(states[reservation['id']], C)['allowed']:
+                # A previous publish might have completed; do not republish or
+                # discard its reservation without reconciliation.
+                log('PRODUCTION_GATE blocked assignment recovery ' + reservation['id'])
+                continue
             # Recovery retries the same job/worker/object only. Never free a
             # reservation while a previous remote PUT could still complete.
             r2_put(s3,f"assign/{reservation['instance']}/{reservation['id']}.json",json.dumps(reservation['spec']))
@@ -941,7 +946,7 @@ def tick(c, s3, state):
             # Replay has no sampling-attempt denominator. Its genuine native
             # gate (including a failed replay) must be synced without guessing
             # that a missing sampler counter means a launch failure.
-            host_fail = (s.get('job_kind') not in ('physics_replay','native_dependency') and not d.get("attempts")) and not s.get("zero_retried") and s["tries"] < C["retries"]
+            host_fail = production_decision(s, C)['allowed'] and (s.get('job_kind') not in ('physics_replay','native_dependency') and not d.get("attempts")) and not s.get("zero_retried") and s["tries"] < C["retries"]
             if host_fail:
                 s["history"].append({"instance": s.get("instance"), "rc": d.get("rc"), "error": d.get("error"), "time": t, "zero_attempts": True,
                                      'attempt_evidence':attempt_evidence,'assigned_unix':s.get('assigned'),'done':d})
@@ -1014,7 +1019,7 @@ def tick(c, s3, state):
     allowed = {job['id'] for job in queued}
     for reservation in STAGER.ready():
         jid,iid=reservation['id'],reservation['instance'];s=states[jid]
-        if jid not in allowed or iid not in routing_live:
+        if jid not in allowed or iid not in routing_live or not production_decision(s, C)['allowed']:
             STAGER.release(jid,'job no longer eligible or worker unavailable');continue
         i=live[iid];spec=dict(reservation['spec'])
         candidate,_=assignment_plan([s],{iid:i},hbs,created,assigned_to,t)

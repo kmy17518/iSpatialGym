@@ -97,6 +97,7 @@ def dispatch_order(states, config):
     priority = {str(jid): index for index, jid in enumerate(config.get("dispatch_priority_job_ids", []))}
     rows = [row for row in states if row["status"] == "queued" and
             (allowed is None or str(row["id"]) in allowed)]
+    rows = [row for row in rows if production_decision(row, config)['allowed']]
     standard = bool(config.get("prioritize_standard_eval", False))
     recovery_classes = set(config.get("standard_recovery_class_ids", []))
     explicit = set(map(str, config.get("standard_recovery_priority_job_ids", [])))
@@ -121,6 +122,17 @@ def dispatch_order(states, config):
                 tier = 2  # unknown/held-out scope is never relabeled standard
         return tier, priority.get(str(row["id"]), len(priority)), int(row["id"])
     return sorted(rows, key=rank)
+
+
+def production_decision(job, config):
+    """Re-read the persistent gate at each dispatch boundary, including retries."""
+    # vastctl also runs as a file, without the repository on sys.path.
+    source_root = str(Path(__file__).resolve().parents[3])
+    if source_root not in sys.path:
+        sys.path.insert(0, source_root)
+    from scripts.campaign_20261110.production_gate import check_job
+    root = config.get('campaign_root', '/vision/u/minyeong/projects/isg_home/campaign_20261110')
+    return check_job(root, job.get('job_dir', ''), kind=job.get('job_kind', 'collection'))
 
 
 def prepare_environment(job_dir, root):

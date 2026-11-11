@@ -7,10 +7,14 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_queue
+from scripts.campaign_20261110.production_gate import check_job
 
 root = Path(os.environ['ISG_DISPATCH_CAMPAIGN_ROOT']).resolve()
 job = Path(sys.argv[-1]).resolve()
 assert job.is_relative_to(root / 'out') and (job / 'job.env').is_file()
+decision = check_job(root, job)
+if not decision['allowed']:
+    raise SystemExit('training production gate: ' + decision['reason'])
 env = {}
 for line in (job / 'job.env').read_text().splitlines():
     key, value = line.split('=', 1)

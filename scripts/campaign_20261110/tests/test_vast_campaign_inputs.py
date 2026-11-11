@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, sha, QUEUE_ENV
 from scripts.campaign_20261110.infra_vast.campaign_inputs import compatible_gpus, uncovered_jobs, worker_can_run
@@ -119,12 +120,29 @@ class VastQueueInputsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'unexpected cluster cache'):
                 prepare_cache_environment(job, root)
             self.assertEqual(env.read_bytes(), before)
-    def test_production_priority_never_bypasses_dispatch_allowlist(self):
+    @patch("scripts.campaign_20261110.infra_vast.campaign_inputs.production_decision", return_value={"allowed":True})
+    def test_production_priority_never_bypasses_dispatch_allowlist(self, gate):
         rows=[{"id":str(n),"status":"queued"} for n in (4,2,3,1)] + [{"id":"5","status":"assigned"}]
         self.assertEqual([r['id'] for r in dispatch_order(rows,{})],['1','2','3','4'])
         config={'dispatch_job_ids':['1','2','4','5'],'dispatch_priority_job_ids':['5','3','4']}
         self.assertEqual([r['id'] for r in dispatch_order(rows,config)],['4','1','2'])
         self.assertEqual(dispatch_order(rows,{'dispatch_job_ids':[]}),[])
+
+    def test_dispatch_gate_blocks_train_even_with_priority_and_missing_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); rows=[]
+            for n,split in enumerate(('train','eval_standard','eval_model')):
+                job=root/str(n);job.mkdir();config=job/'campaign_config.json'
+                config.write_text(json.dumps({'template':{'split':split,'task':'test','class_id':'test'}}))
+                (job/'job.env').write_text('ISPATIALGYM_CAMPAIGN_CONFIG='+str(config)+'\n')
+                rows.append({'id':str(n),'status':'queued','job_dir':str(job)})
+            rows.append({'id':'3','status':'queued','job_dir':str(root/'missing')})
+            config={'campaign_root':str(root),'dispatch_priority_job_ids':['0']}
+            self.assertEqual([j['id'] for j in dispatch_order(rows,config)],['1','2'])
+            # Editing the policy to a nominal open flag cannot authorize train.
+            (root/'controllers').mkdir();(root/'controllers/training_production_gate.json').write_text(json.dumps(
+                {'schema':'isg-training-production-gate-v1','campaign_id':'campaign_20261110','mode':'open'}))
+            self.assertEqual([j['id'] for j in dispatch_order(rows,config)],['1','2'])
 
     def test_pool_stays_at_exact_path_and_config_bytes_are_unchanged(self):
         for queued in (False, True):
@@ -352,6 +370,8 @@ def test_native_handle_closure_refuses_external_absolute_files(tmp_path):
 
 
 def test_standard_recovery_precedes_training_without_enabling_parked_jobs(monkeypatch):
+    from scripts.campaign_20261110.infra_vast import campaign_inputs
+    monkeypatch.setattr(campaign_inputs, 'production_decision', lambda *args: {'allowed':True})
     from scripts.campaign_20261110.infra_vast import cost_provenance
     evidence={
         '1':{'split':'train','class_id':'zero_class'},
