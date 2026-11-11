@@ -141,10 +141,18 @@ def context():
 
 def register_query(key,payload,indices,dof):
  if context() is None:return
- payload=canonical_query(payload)
- if query_key(payload)!=key:raise ValueError('exact cache key serialization differs')
- if len(_QUERIES)>=8192:_QUERIES.pop(next(iter(_QUERIES)))
- _QUERIES[key]={'query':payload,'arm_indices':list(indices),'dof':int(dof)}
+ try:
+  # Match the existing key serializer exactly, including flattened tensors and
+  # NumPy scalar handling. Transport helpers remain simulator-free: this import
+  # runs only on the sampler's query path, where cache is already loaded.
+  from ispatialgym.sampling.cache import _plain,_json_default
+  payload=json.loads(json.dumps(_plain(payload),sort_keys=True,default=_json_default,allow_nan=False))
+  if query_key(payload)!=key:raise ValueError('exact cache key serialization differs')
+  if len(_QUERIES)>=8192:_QUERIES.pop(next(iter(_QUERIES)))
+  _QUERIES[key]={'query':payload,'arm_indices':list(indices),'dof':int(dof)}
+ except (ValueError,TypeError,KeyError)as exc:
+  _QUERIES.pop(key,None);record_event('unshareable_query')
+  LOG.warning('Exact witness sharing skipped for this query; ordinary cache/solver retained: %s',exc)
 
 def read_shared(key):
  c=context()

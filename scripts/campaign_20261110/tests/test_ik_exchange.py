@@ -155,3 +155,19 @@ def test_compatibility_identical_content_survives_path_and_comment_changes(tmp_p
  assert C.build_manifest(code,renamed,{},refs)['compatibility_sha256']==value['compatibility_sha256']
  (code/C.MODULES[0]).write_text('value=2\n')
  assert C.build_manifest(code,renamed,{},refs)['compatibility_sha256']!=value['compatibility_sha256']
+
+
+def test_query_registration_uses_native_cache_tensor_and_numpy_serialization(monkeypatch):
+ import numpy as np
+ import torch
+ from ispatialgym.sampling.cache import cache_key
+ monkeypatch.setattr(E,'context',lambda:({},None));monkeypatch.setattr(E,'_QUERIES',{})
+ payload={'poses':[[0.,0.,0.,0.,0.,0.,1.]],'arm':'right',
+          'seed_arms':torch.tensor([[.123456,.234567]]),'scale':np.float32(.123456)}
+ key=cache_key('exact_ik_v3',payload)
+ E.register_query(key,payload,[0],2)
+ assert E.query_key(E._QUERIES[key]['query'])==key
+ assert E._QUERIES[key]['query']['seed_arms']==[.1235,.2346]
+ assert E._QUERIES[key]['query']['scale']==float(payload['scale'])
+ E.register_query(key,{'changed':True},[0],2)
+ assert key not in E._QUERIES  # no native-sampling failure or stale registration
