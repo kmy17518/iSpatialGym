@@ -1461,11 +1461,26 @@ class Disembedding(SamplerV2):
                 if layout is not None:
                     self._place_layout(layout)
 
+    def campaign_grasp_joint_margin(self, grasp):
+        """Reject fragile approach witnesses using the existing safe joint margin."""
+        if not CR.contact_recovery('tray_grasp_joint_margin'):
+            return
+        from ispatialgym.sampling.v2 import orient as O
+        qs = O.chain_qs(self.ikc, grasp.arm, [grasp.pre_grasp, grasp.grasp])
+        if not qs:
+            raise Reject('campaign_grasp_margin', 'grasp approach lacks exact native witnesses')
+        margin = min(self.ikc.joint_limit_margin(q, grasp.arm)[0] for q in qs)
+        limit = self.ikc.JOINT_LIMIT_MARGIN
+        grasp.extras['campaign_grasp_joint_margin'] = {'margin_rad': float(margin), 'required_rad': float(limit)}
+        if not math.isfinite(margin) or margin < limit:
+            raise Reject('campaign_grasp_margin', f'approach joint clearance {margin:.6f} rad < native safe margin {limit:.6f}')
+
     def _segment_rest(self, rng, d: Draft, init: Stance, manip: Stance, t_pose, grasp, s_pose, src_w, tname: str, sname: str, dname: str, dnames: List[str], k: int,
                       arms_here: List[str], layout: Optional[Dict[str, TT.Pose]] = None, layout_rec: Optional[Dict[str, Any]] = None) -> Draft:
         """The segment after its grasp, with the grasp's arm: destination, distractors (drawn on the source floor, or the fixed
         layout's ``layout`` poses at the yaw of ``layout_rec``), frame and whole-body checks, the placement stance and its place, the
         carried path, the records."""
+        self.campaign_grasp_joint_margin(grasp)
         support = self.obj("support")
         dst, tgt = self.obj(self.dst_role), self.obj("target")
         grasp.place_on = dname

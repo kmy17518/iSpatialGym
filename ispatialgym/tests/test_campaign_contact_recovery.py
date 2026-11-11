@@ -70,3 +70,13 @@ def test_clutter_approach_is_only_enabled_for_audited_milk_class(monkeypatch):
     template.class_id = 'disembedding_06'
     with pytest.raises(ContractError, match='another audited class'):
         CR.contact_recovery('milk_clutter_approach')
+
+
+def test_tray_joint_margin_is_bound_to_the_audited_cellulose_tape_class(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    assert not CR.contact_recovery('tray_grasp_joint_margin')
+    template = bind(monkeypatch, 'disembedding_07', 'disembedding', {'tray_grasp_joint_margin': True})
+    assert CR.contact_recovery('tray_grasp_joint_margin')
+    template.class_id = 'disembedding_08'
+    with pytest.raises(ContractError, match='another audited class'):
+        CR.contact_recovery('tray_grasp_joint_margin')

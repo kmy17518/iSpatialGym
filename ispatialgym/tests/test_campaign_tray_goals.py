@@ -152,3 +152,23 @@ def test_stance_search_filters_actual_fixed_trays_before_attempting_grasps():
     assert s._destination_fit(init, [bad, good]) == [good]
     assert len(seen) == 2 and seen[0][0] == 'actual_start_camera'
     assert s.template_facts['destination_fit'][0]['candidates_after'] == 1
+
+
+def test_margin_screen_requires_exact_witnesses_and_the_existing_safe_threshold(monkeypatch):
+    from ispatialgym.sampling import campaign_runtime as CR
+    from ispatialgym.sampling.v2 import orient as O
+    s = Disembedding.__new__(Disembedding)
+    g = SimpleNamespace(arm='left', pre_grasp='pre', grasp='grasp', extras={})
+    monkeypatch.setattr(CR, 'contact_recovery', lambda option: False)
+    s.campaign_grasp_joint_margin(g)  # No witness access for existing templates.
+    monkeypatch.setattr(CR, 'contact_recovery', lambda option: True)
+    s.ikc = SimpleNamespace(JOINT_LIMIT_MARGIN=.05, joint_limit_margin=lambda q, arm: (q, 'joint6'))
+    monkeypatch.setattr(O, 'chain_qs', lambda *args: [.1, .0058])
+    with pytest.raises(Reject, match='native safe margin'):
+        s.campaign_grasp_joint_margin(g)
+    monkeypatch.setattr(O, 'chain_qs', lambda *args: [.1, .1204])
+    s.campaign_grasp_joint_margin(g)
+    assert g.extras['campaign_grasp_joint_margin'] == {'margin_rad': .1, 'required_rad': .05}
+    monkeypatch.setattr(O, 'chain_qs', lambda *args: None)
+    with pytest.raises(Reject, match='exact native witnesses'):
+        s.campaign_grasp_joint_margin(g)
