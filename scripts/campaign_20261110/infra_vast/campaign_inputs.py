@@ -165,6 +165,24 @@ def template_customs_inputs(env, root):
                     'external template customs bytes or template identity differ')
         require(path.is_file() and isinstance(json.loads(path.read_text()), dict), 'invalid template customs dependency')
         result.append({'path': str(path), 'sha256': sha(path)})
+        # multiply_isg selects metadata.variant, which can differ from the
+        # counted ALIAS in job.env. Absolute native handle records are indirect
+        # inputs of that selected customs entry; preserve their original paths.
+        selected = json.loads(path.read_text()).get(metadata.get('variant'), {})
+        def handle_paths(value):
+            if isinstance(value, dict):
+                for child in value.values(): yield from handle_paths(child)
+            elif isinstance(value, list):
+                for child in value: yield from handle_paths(child)
+            elif isinstance(value, str) and Path(value).is_absolute():
+                yield Path(value).resolve()
+        for role in selected.get('roles', {}).values() if isinstance(selected, dict) else []:
+            if not isinstance(role, dict): continue
+            for dependency in handle_paths(role.get('handle_file')):
+                require(dependency.is_relative_to(root), 'native handle dependency outside owned campaign')
+                require(dependency.is_file(), 'native handle dependency missing')
+                row = {'path': str(dependency), 'sha256': sha(dependency)}
+                if row not in result: result.append(row)
     return result
 
 

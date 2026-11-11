@@ -320,3 +320,32 @@ def test_camera_context_stages_checked_source_proof_and_review_image_closure(tmp
     with pytest.raises(ValueError, match='bytes changed'):
         camera_context_inputs(env, tmp_path)
 
+
+
+def test_native_handle_closure_uses_template_variant_not_counted_alias(tmp_path):
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import template_customs_inputs
+    root=tmp_path/'campaign';template=root/'templates/wardrobe';template.mkdir(parents=True)
+    handle=root/'private/handles.json';handle.parent.mkdir();handle.write_text('{"native":"exact"}')
+    customs=root/'customs.json';customs.write_text(json.dumps({
+        'wardrobe':{'roles':{'target':{'handle_file':{'scene/object':str(handle)}}}},
+        'dishwasher':{'roles':{'target':{'handle_file':'/unrelated/absent.json'}}}}))
+    meta=template/'template_meta.json';meta.write_text(json.dumps({'customs':str(customs),'variant':'wardrobe'}))
+    before=meta.read_bytes()
+    result=template_customs_inputs({'TEMPLATE':str(template),'ALIAS':'dishwasher'},root)
+    assert result==[{'path':str(customs),'sha256':sha(customs)},{'path':str(handle),'sha256':sha(handle)}]
+    assert meta.read_bytes()==before
+    handle.unlink()
+    import pytest
+    with pytest.raises(ValueError,match='native handle dependency missing'):
+        template_customs_inputs({'TEMPLATE':str(template)},root)
+
+
+def test_native_handle_closure_refuses_external_absolute_files(tmp_path):
+    import pytest
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import template_customs_inputs
+    root=tmp_path/'campaign';template=root/'templates/wardrobe';template.mkdir(parents=True)
+    outside=tmp_path/'outside.json';outside.write_text('{}')
+    customs=root/'customs.json';customs.write_text(json.dumps({'wardrobe':{'roles':{'target':{'handle_file':str(outside)}}}}))
+    (template/'template_meta.json').write_text(json.dumps({'customs':str(customs),'variant':'wardrobe'}))
+    with pytest.raises(ValueError,match='outside owned campaign'):
+        template_customs_inputs({'TEMPLATE':str(template)},root)
