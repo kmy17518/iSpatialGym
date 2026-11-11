@@ -2813,6 +2813,13 @@ def _recorded_lift_q(sc, arm: str) -> Optional[th.Tensor]:
     return None
 
 
+def carry_online_wanted(grasp) -> bool:
+    """Use the existing checked live carry search only for explicit policies."""
+    from ispatialgym.sampling import campaign_runtime
+    return bool((getattr(grasp, "extra", None) or {}).get("carry_online")
+                or campaign_runtime.contact_recovery('touching_carry_online'))
+
+
 def _carry_online(action, motions: Motions, state, arm: str, targets, ctx, carry: Sequence[Any], ignore: Sequence[Any],
                   repose: bool = True) -> Optional[Tuple[str, Any]]:
     """oracle-fix 2026-11-05 (the sidecar's ``grasps[k].carry_online``, written under the sampler's ``generation.carry_via_online``;
@@ -2828,7 +2835,7 @@ def _carry_online(action, motions: Motions, state, arm: str, targets, ctx, carry
 
     sc = ctx.get("sidecar")
     g = next((g for g in (getattr(sc, "grasps", None) or []) if getattr(g, "object", None) == action.object and getattr(g, "arm", None) in (None, arm)), None)
-    if not (getattr(g, "extra", None) or {}).get("carry_online"):
+    if not carry_online_wanted(g):
         return None
     ok, why = _carry_dry_run(motions, arm, carry, check_collisions=False)
     if ok:

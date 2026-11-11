@@ -131,3 +131,19 @@ def test_touching_inhand_reaim_requires_the_exact_configuration(monkeypatch):
     template.class_id='inter_object_relation_satisfaction-touching_02'
     with pytest.raises(ContractError,match='another audited class'):
         EX.place_inhand_reaim_wanted({},cfg)
+
+
+def test_touching_online_carry_is_opt_in_and_exact_class_bound(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    assert not EX.carry_online_wanted(NS(extra={}))
+    assert EX.carry_online_wanted(NS(extra={'carry_online': True}))
+    template=bind(monkeypatch,'inter_object_relation_satisfaction-touching_04',
+        'inter_object_relation_satisfaction-touching_small_scale',{'touching_carry_online':True})
+    assert EX.carry_online_wanted(NS(extra={}))
+    template.class_id='inter_object_relation_satisfaction-touching_03'
+    with pytest.raises(ContractError,match='another audited class'):
+        EX.carry_online_wanted(NS(extra={}))
+    template.class_id='inter_object_relation_satisfaction-touching_04'
+    template.scene_setup['recovery_options']['touching_carry_online']='true'
+    with pytest.raises(ContractError,match='boolean'):
+        EX.carry_online_wanted(NS(extra={}))
