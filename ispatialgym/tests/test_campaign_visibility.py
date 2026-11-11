@@ -114,3 +114,15 @@ def test_required_native_screen_retains_real_camera_before_sampling(monkeypatch)
     monkeypatch.setattr(C,'required',lambda:False)
     monkeypatch.setattr(S,'fast_on',lambda name:False)
     assert S.world_cameras_required('inter_object_relation_satisfaction-inside_small_scale')
+
+
+def test_shelf_recovery_requires_both_books_visible_at_original_threshold():
+    task='inter_object_relation_satisfaction-touching_small_scale'
+    assert C.required(template(True,class_id='inter_object_relation_satisfaction-touching_03',task=task))
+    with pytest.raises(ValueError):
+        C.required(template(True,class_id='inter_object_relation_satisfaction-touching_04',task=task))
+    from ispatialgym.eval import goal_occlusion as GO
+    result=GO.report({'target':{'status':'ok','occluded':.3761},
+                      'partner':{'status':'ok','occluded':.7064}},method='measured')
+    C.verify_report(result)
+    assert result['occluded'] and result['threshold']==.5 and result['worst']=='partner'

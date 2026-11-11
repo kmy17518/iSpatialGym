@@ -10,6 +10,8 @@ AUDITED = {CLASS_ID: TASK,
         'inter_object_relation_satisfaction-ontop_large_scale',
     'inter_object_relation_satisfaction-inside_02':
         'inter_object_relation_satisfaction-inside_small_scale',
+    'inter_object_relation_satisfaction-touching_03':
+        'inter_object_relation_satisfaction-touching_small_scale',
     'inter_object_relation_satisfaction-under_large_scale_02':
         'inter_object_relation_satisfaction-under_large_scale'}
 
