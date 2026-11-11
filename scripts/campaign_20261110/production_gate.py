@@ -226,6 +226,9 @@ def check_environment(root, environment, *, kind='collection', start=None, count
             proof = json.loads(evidence.read_text())
             if proof.get('purpose') != 'training_pipeline_canary' or proof.get('config_sha256') != result['config_sha256']: continue
             if (proof.get('start'), proof.get('count')) != (int(start), int(count)): continue
+            from scripts.campaign_20261110.execution_dependencies import verify_execution_dependencies
+            result['execution_dependencies'] = verify_execution_dependencies(root,result['config_sha256'],
+                'native_generation' if kind=='collection' else 'physics_replay',start=start,count=count)
             result['heldout_parallel_work'] = heldout_parallel_ready(root,config,result['config_sha256'],proof,
                 check_freshness=kind == 'collection')
             return {**result, 'allowed': True, 'category': 'validation_canary',
@@ -274,7 +277,11 @@ def check_job(root, job_dir, *, kind='collection', submission_script=None):
             except (OSError,ValueError,TypeError):policy={}
             from scripts.campaign_20261110.training_existing_canaries import check_existing_review
             existing=check_existing_review(root,job_dir,environment,policy,kind=kind,submission_script=submission_script)
-            if existing is not None:return existing
+            if existing is not None:
+                from scripts.campaign_20261110.execution_dependencies import verify_execution_dependencies
+                existing['execution_dependencies']=verify_execution_dependencies(root,existing['config_sha256'],
+                    'collection'if kind=='collection'else'physics_replay',start=int(environment['START']),count=int(environment['N']))
+                return existing
         return check_environment(root, environment, kind=kind,
             start=int(environment['START']) if environment.get('START') else None,
             count=int(environment['N']) if environment.get('N') else None)

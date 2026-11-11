@@ -60,7 +60,7 @@ def observe(root, *, now=None):
                     'native_runtime': request['native_runtime'], 'batch': path.parent.name,
                     'request': current_request, 'original_request': original_request,
                     'status': 'native_not_observed', 'native': None,
-                    'review': None, 'benchmark_credit': 0, 'quota_consumed': 0}
+                    'review': None, 'benchmark_credit': 0, 'quota_consumed': 0, 'dependencies': []}
                 config_path = request.get('config_path')
                 if config_path:
                     config_path = Path(config_path).resolve()
@@ -68,6 +68,15 @@ def observe(root, *, now=None):
                             'native configuration evidence changed')
                     row['task'] = read(config_path)['template']['task']
                     row['configuration'] = ref(config_path)
+                for name,sha_name in [('config_path','config_sha256'),('input_manifest','input_manifest_sha256'),('authorization_path','authorization_sha256')]:
+                    if not request.get(name):continue
+                    artifact=Path(request[name]).resolve()
+                    require(artifact.is_relative_to(root) and file_digest(artifact)==request[sha_name],
+                            'canary prerequisite identity changed: '+name)
+                    row['dependencies'].append({'id':name+':'+request[sha_name],
+                        'required_for':['native_generation','collection','physics_replay'],
+                        'state':'verified','scope':'immutable input identity; physical runtime checks remain mandatory',
+                        'artifact':ref(artifact),'source_ref':current_request})
                 output = Path(request['output']).resolve()
                 require(output.is_relative_to(base), 'native output outside pipeline scope')
                 gate_path = output/'sampling_gate.json'
@@ -79,6 +88,13 @@ def observe(root, *, now=None):
                         'returncode': gate.get('returncode'), 'written': gate.get('tro_count'),
                         'elapsed_seconds': gate.get('elapsed_seconds')}
                     row['status'] = 'native_passed' if gate.get('returncode') == 0 and gate.get('tro_count') == 1 else 'native_failed'
+                    if row['status']=='native_passed':
+                        from scripts.campaign_20261110.training_stream import native_evidence
+                        row['native_proof']=native_evidence(request,root)
+                        row['dependencies'].append({'id':'native_gate:'+file_digest(gate_path),
+                            'required_for':['collection','physics_replay'],'state':'verified',
+                            'artifact':ref(gate_path),'source_ref':current_request,
+                            'scope':'this exact index/config/runtime and hash-checked native TRO only'})
                 if key in reviews:
                     record, observed_at, source = reviews[key]
                     row['review'] = {**record, 'observed_at': observed_at, 'observation_source': source}
