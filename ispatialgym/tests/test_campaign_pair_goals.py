@@ -301,3 +301,26 @@ def test_large_under_filters_checked_candidates_without_mutating_native_stances(
     result = s.placement_candidates([.2, .3])
     assert result == [kept] and result[0] is kept
     assert other.extras['goal_cell'] == [1., 3.]
+
+
+def test_nextto_source_hint_survives_plan_validation_with_exact_goal_and_provenance():
+    import copy
+    from ispatialgym.sampling.campaign_pair_goals import SCHEMA, validate_pair_plan
+    from ispatialgym.sampling.campaign_held_goals import GoalPlanError
+    pose={'position':[1.,2.,.8], 'orientation':[0.,0.,0.,1.]}
+    raw={'schema':SCHEMA,'task':'inter_object_relation_satisfaction-nextto_small_scale',
+         'template_id':'t','scene':'s','room':'r','campaign_id':'c','group_id':'g',
+         'target_name':'salt','partner_name':'pepper','split':'eval_standard','contract_template_sha256':'a'*64,
+         'release_pose':pose,'goal_pose':pose,'partner_pose':pose,'created_at':10.,'budget_seconds':900.,
+         'anchor_sources':{'summary':{'sha256':'b'*64}},
+         'anchor_manipulation_stance':{'base_pose2d':[5.389566,3.647212,-.002552],
+             'focus':[6.219768,3.725094,.890702],'translate':0.,'tilt':-.610867,'source_summary_sha256':'b'*64}}
+    def check(value, relation='nextto'):
+        return validate_pair_plan(value,template_id='t',scene='s',rooms=['r'],relation=relation,activated_at=10.,now=11.)
+    validated=check(raw)
+    assert validated.anchor_manipulation_stance['translate']==0.
+    assert validated.goal==validated.release==((1.,2.,.8),(0.,0.,0.,1.))
+    changed=copy.deepcopy(raw);changed['anchor_manipulation_stance']['source_summary_sha256']='c'*64
+    with pytest.raises(GoalPlanError,match='provenance'):check(changed)
+    changed=copy.deepcopy(raw);changed['task']='inter_object_relation_satisfaction-ontop_small_scale'
+    with pytest.raises(GoalPlanError,match='requires small'):check(changed,'ontop')
