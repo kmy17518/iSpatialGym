@@ -97,3 +97,15 @@ def test_recovered_vast_gate_preserves_strict_native_report_tree(tmp_path):
     publish_recovered_gate(e,tmp_path)
     assert canonical.is_symlink() and failure.read_text()=='original failed gate'
     assert replay_report_path(gate,canonical,'instance',root=tmp_path,started_at=0)==report
+
+
+def test_watcher_reads_only_its_replay_records(tmp_path,monkeypatch):
+    from scripts.campaign_20261110 import controller_validation as watcher
+    seen=[]
+    def read(path,default):
+        seen.append(path.name)
+        return {'id':'900000123','job_kind':'physics_replay','status':'assigned'}
+    monkeypatch.setattr(watcher,'read',read)
+    result=watcher.vast_replay_states(tmp_path,{'source':{'replay_job_id':'900000123'},
+        'cluster':{'replay_job_id':'18420000'},'waiting':{}})
+    assert result=={'900000123':'assigned'} and seen==['900000123.json']

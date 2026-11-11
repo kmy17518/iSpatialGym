@@ -8,6 +8,17 @@ def read(path,default):
     try:return json.loads(path.read_text())
     except (OSError,ValueError):return default
 
+def vast_replay_states(root,gates):
+    """Inspect only replay IDs owned by this watcher, not every collection job."""
+    result={}
+    ids={str(entry.get('replay_job_id','')) for entry in gates.values()}
+    for jid in ids:
+        if not re.fullmatch(r'900000\d+',jid):continue
+        value=read(root/'vast/state/jobs'/(jid+'.json'),{})
+        if value.get('job_kind')=='physics_replay' and value.get('status') in ('queued','assigned'):
+            result[jid]=value['status']
+    return result
+
 def ledger_paths(root, explicit=None):
     base=explicit or [root/'manifests'/name for name in ('canary_allocations.tsv','vast_canary_allocations.tsv',
         'goal_group_allocations.tsv','augmentation_allocations.tsv','shiyuc_allocations.tsv')]
@@ -153,10 +164,7 @@ def main():
         if queue.returncode:time.sleep(a.interval);continue
         active=dict(x.split('|') for x in queue.stdout.splitlines() if '|' in x)
         replay_active=dict(active)
-        for path in (a.root/'vast/state/jobs').glob('9*.json'):
-            value=read(path,{})
-            if value.get('job_kind')=='physics_replay' and value.get('status') in ('queued','assigned'):
-                replay_active[str(value['id'])]=value['status']
+        replay_active.update(vast_replay_states(a.root,state['gates']))
         migration_candidates=[]
         for source_id,entry in state['gates'].items():
             phase=entry.get('vast_migration',{}).get('status')
