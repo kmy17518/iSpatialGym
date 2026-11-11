@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import hashlib
 import itertools
 import json
+import math
 from pathlib import Path
 import random
 
@@ -57,6 +58,35 @@ def slots(candidate):
     # two support-height requirement, despite the older checklist's omission.
     height = [0, 1] if support.get("category") not in (None, "walls", "floors") and not task.endswith("_large_scale") else [None]
     return list(itertools.product(objects, height))
+
+
+def joint_candidates(candidates, assets):
+    """Count each measured movable joint; reachability remains a native gate."""
+    for candidate in candidates:
+        if "articulation_" not in candidate["task"]:
+            yield candidate
+            continue
+        target = candidate.get("target") or {}
+        asset = assets.get(target.get("category", "") + "/" + target.get("model", ""), {})
+        geometry = asset.get("native_default_geometry")
+        joints = (geometry or {}).get("joints")
+        usable = []
+        unresolved = False
+        for name, joint in (joints or {}).items():
+            if "fixed" in str(joint.get("type", "")).lower():
+                continue
+            lower, upper = joint.get("lower_limit"), joint.get("upper_limit")
+            if not isinstance(lower, (float, int)) or not isinstance(upper, (float, int)) or not all(map(math.isfinite, (lower, upper))):
+                unresolved = True
+                continue
+            if upper > lower:
+                usable.append({"name": name, **joint})
+        for joint in usable:
+            yield {**candidate, "selected_joint": joint,
+                   "joint_selection_state": "measured_movable_reachability_unverified"}
+        if not usable or unresolved:
+            yield {**candidate, "selected_joint": None, "joint_selection_state":
+                   "native_joint_inventory_missing_or_nonfinite" if joints is None or unresolved else "no_movable_joint_measured"}
 
 
 def requirements(task):
@@ -105,7 +135,7 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
         artifacts[key]["required_by_classes"].append(cls)
         return key
 
-    for candidate in candidates:
+    for candidate in joint_candidates(candidates, assets):
         task, cls = candidate["task"], candidate["class_id"]
         anchor = candidate["anchor"]
         roles = [("target", candidate.get("target")), ("partner", candidate.get("partner"))]
@@ -118,8 +148,12 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
         if {(anchor["scene"], r) for r in anchor["rooms"]} & held_rooms:
             candidate_blockers.append("current_global_room_holdout")
         for scale_slot, height_slot in slots(candidate):
-            cid = "configuration_" + digest({"candidate_id": candidate["candidate_id"], "object_scale_slot": scale_slot,
-                                           "support_height_slot": height_slot})[:24]
+            configuration_identity = {"candidate_id": candidate["candidate_id"], "object_scale_slot": scale_slot,
+                                      "support_height_slot": height_slot}
+            if "selected_joint" in candidate:
+                configuration_identity["selected_joint"] = candidate["selected_joint"]
+                configuration_identity["joint_selection_state"] = candidate["joint_selection_state"]
+            cid = "configuration_" + digest(configuration_identity)[:24]
             dependencies, selected_roles, blockers = [], [], list(candidate_blockers)
             coupled = task in ("configuration_matching-attachment", "configuration_matching-block_design")
             for role, asset in role_rows:
@@ -148,6 +182,8 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
                     "ready": asset["ready"], "readiness_source": asset["readiness_source"],
                     "original_default_scale": geometry["default_scale"] if geometry else None,
                     "applied_scale": scale, "scale_rule": scale_reason, "scale_profile": profile["id"] if profile else None})
+                if role == "target" and "articulation_" in task:
+                    selected_roles[-1]["joint"] = candidate.get("selected_joint")
             if task.startswith("camera_relocalization"):
                 dependencies.append(request("grasp_and_reach_not_applicable", {"task": task}, cid, cls, not_applicable=True))
                 dependencies.append(request("camera_room_navigation_and_obstacle_geometry", {"scene": anchor["scene"],
@@ -191,12 +227,16 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
                         "candidate_id": candidate["candidate_id"], "scale_slot": scale_slot}, cid, cls,
                         unresolved=["selected full distractor models, tray size and coupled puzzle context closure"]))
                 if "articulation_" in task:
-                    blockers.append("movable reachable joint expansion not yet fully enumerated")
+                    blockers.append("native joint reachability and handle/contact suitability unverified")
+                    if candidate.get("selected_joint") is None:
+                        blockers.append(candidate["joint_selection_state"])
             blockers.extend(sorted({x for d in dependencies for x in artifacts[d]["unresolved_inputs"]}))
             configurations.append({"id": cid, "candidate_id": candidate["candidate_id"], "class_id": cls,
                 "configuration_sha256": None,
                 "task": task, "scene": anchor["scene"], "rooms": anchor["rooms"], "support": anchor,
                 "object_scale_slot": scale_slot, "support_height_slot": height_slot, "roles": selected_roles,
+                "selected_joint": candidate.get("selected_joint"),
+                "joint_selection_state": candidate.get("joint_selection_state"),
                 "dependencies": sorted(set(dependencies)), "status": "blocked" if blockers else "missing",
                 "blockers": sorted(set(blockers)), "owner": OWNER,
                 "next_action": "Resolve the first unmet physical dependency; retain this slot and any replacement deficit",

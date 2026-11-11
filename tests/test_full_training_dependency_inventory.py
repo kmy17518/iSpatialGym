@@ -68,6 +68,30 @@ class FullTrainingInventoryTests(unittest.TestCase):
         self.assertTrue(all(r["applied_scale"] is None for c in result["configurations"] for r in c["roles"]))
         self.assertFalse(result["summary"]["denominator_complete"])
 
+    def test_each_measured_movable_joint_gets_distinct_required_slots(self):
+        candidate = copy.deepcopy(self.candidate)
+        candidate["task"] = "configuration_matching-articulation_open_small_scale"
+        asset = copy.deepcopy(self.asset)
+        asset["native_default_geometry"]["joints"] = {
+            "lid": dict(type="revolute", lower_limit=0., upper_limit=1.5),
+            "drawer": dict(type="prismatic", lower_limit=0., upper_limit=.2),
+            "fixed": dict(type="fixed", lower_limit=0., upper_limit=0.),
+        }
+        result = self.inventory([candidate], asset)
+        self.assertEqual(len(result["configurations"]), 4)
+        self.assertEqual(len({r["id"] for r in result["configurations"]}), 4)
+        self.assertEqual({r["selected_joint"]["name"] for r in result["configurations"]}, {"lid", "drawer"})
+        self.assertTrue(all("reachability" in r["joint_selection_state"] for r in result["configurations"]))
+
+    def test_unusable_joint_does_not_silently_remove_required_candidate(self):
+        candidate = copy.deepcopy(self.candidate)
+        candidate["task"] = "configuration_matching-articulation_close_small_scale"
+        asset = copy.deepcopy(self.asset)
+        asset["native_default_geometry"]["joints"] = {}
+        result = self.inventory([candidate], asset)
+        self.assertEqual(len(result["configurations"]), 2)
+        self.assertTrue(all("no_movable_joint_measured" in r["blockers"] for r in result["configurations"]))
+
 
 if __name__ == "__main__":
     unittest.main()
