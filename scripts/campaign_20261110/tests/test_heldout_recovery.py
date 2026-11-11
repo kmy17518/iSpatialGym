@@ -48,6 +48,25 @@ def test_completed_native_geometry_remains_distinct_from_demo_failure():
     assert recovery_state(9,[{'worker_status':'RUNNING'}],{'status':'native_passed'})=='running'
 
 
+def test_changed_engineering_evidence_is_unavailable_without_invalidating_unrelated_observations(tmp_path):
+    from scripts.campaign_20261110.heldout_recovery import engineering_evidence_error
+    from scripts.campaign_20261110.contracts import file_digest
+    p=tmp_path/'controller.json';p.write_text('before')
+    entry={'evidence':[{'path':str(p),'sha256':file_digest(p)}]}
+    assert engineering_evidence_error(entry) is None
+    p.write_text('after')
+    assert 'changed' in engineering_evidence_error(entry)
+    assert recovery_state(3,[],{'status':'engineering_evidence_unavailable','reason':'changed'})=='awaiting_observation'
+    assert recovery_state(3,[{'worker_status':'RUNNING'}],{'status':'engineering_evidence_unavailable'})=='running'
+    assert recovery_state(0,[],{'status':'engineering_evidence_unavailable'})=='complete'
+
+
+def test_missing_engineering_evidence_is_not_treated_as_a_physical_pass(tmp_path):
+    from scripts.campaign_20261110.heldout_recovery import engineering_evidence_error
+    assert engineering_evidence_error({'evidence':[]})
+    assert engineering_evidence_error({'evidence':[{'path':str(tmp_path/'missing'),'sha256':'0'*64}]})
+
+
 def test_array_tasks_keep_authored_identity_when_pending_running_and_completed(monkeypatch):
     from types import SimpleNamespace
     calls=[]

@@ -22,12 +22,25 @@ def recovery_state(remaining,jobs,latest):
     if states & {'queued','staging','PENDING','CONFIGURING'}:return 'queued'
     if jobs:return 'awaiting_observation'
     status=(latest or{}).get('status')
+    if status=='engineering_evidence_unavailable':return 'awaiting_observation'
     if status in ('native_preparation','engineering_blocked'):return 'engineering_blocked'
     if status=='native_passed':return 'awaiting_validation'
     if status in ('admitted','complete','retired_after_claim'):return 'ready_for_scoped_refill'
     if status in ('external_submission','awaiting_replay','awaiting_gate'):return 'awaiting_acceptance'
     if status=='failed' or (latest or{}).get('reason'):return 'failed'
     return 'unattempted'
+
+def engineering_evidence_error(entry):
+    """A stale mutable evidence reference must not freeze every quota observation."""
+    try:
+        refs=entry.get('evidence')
+        if not isinstance(refs,list)or not refs:return 'engineering evidence is missing'
+        for source in refs:
+            if file_digest(source['path'])!=source['sha256']:
+                return 'engineering evidence changed: '+source['path']
+    except (OSError,ValueError,KeyError,TypeError)as exc:
+        return 'engineering evidence unavailable: '+str(exc)
+    return None
 
 def vast_execution(jobid,state,mirror=None,now=None):
     """Assignment is allocation evidence; only a fresh exact worker heartbeat proves execution."""
@@ -218,8 +231,19 @@ def publish(root):
     if engineering.exists():
         valid_scopes={(r['split'],r['class_id'])for r in rows}
         for entry in load(engineering)['rows']:
-            key=(entry['split'],entry['class_id']);require(key in valid_scopes,'unknown engineering scope')
-            source=entry['evidence'][0];require(file_digest(source['path'])==source['sha256'],'engineering evidence changed')
+            key=(entry['split'],entry['class_id'])
+            if key not in valid_scopes:
+                errors.append({'source':str(engineering),'scope':key,'error':'unknown engineering scope'})
+                continue
+            evidence_error=engineering_evidence_error(entry)
+            if evidence_error:
+                errors.append({'source':str(engineering),'scope':key,'error':evidence_error})
+                observations[key].append({'controller':'owned_native_engineering','controller_state':str(engineering),
+                    'controller_config':str(engineering),'configuration':None,'runtime':None,
+                    'bucket':entry.get('bucket'),'job':None,'failures':[],'status':'engineering_evidence_unavailable',
+                    'reason':evidence_error,'next_action':'Snapshot and re-audit this scope’s actual native/controller evidence; no job or success is inferred from the changed reference.',
+                    'last_progress_epoch':now,'observed_at':iso(now),'evidence':entry.get('evidence',[])})
+                continue
             records=entry.get('jobs')or[None]
             for job in records:
                 if job:

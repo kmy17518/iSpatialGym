@@ -98,6 +98,8 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
                 "owner": OWNER, "next_action": "No grasp/reach work for camera navigation" if not_applicable else
                     "Resolve exact measured inputs: " + ", ".join(missing) if missing else
                     "Execute the exact native generator and positive reader/identity audit",
+                "required_for": ["native_generation", "collection", "physics_replay"],
+                "artifact": list(verified_evidence)[0] if verified_evidence else None,
                 "active_jobs": [], "evidence": list(verified_evidence), "observed_at": observed}
         artifacts[key]["consumers"].append(cid)
         artifacts[key]["required_by_classes"].append(cls)
@@ -192,6 +194,7 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
                     blockers.append("movable reachable joint expansion not yet fully enumerated")
             blockers.extend(sorted({x for d in dependencies for x in artifacts[d]["unresolved_inputs"]}))
             configurations.append({"id": cid, "candidate_id": candidate["candidate_id"], "class_id": cls,
+                "configuration_sha256": None,
                 "task": task, "scene": anchor["scene"], "rooms": anchor["rooms"], "support": anchor,
                 "object_scale_slot": scale_slot, "support_height_slot": height_slot, "roles": selected_roles,
                 "dependencies": sorted(set(dependencies)), "status": "blocked" if blockers else "missing",
