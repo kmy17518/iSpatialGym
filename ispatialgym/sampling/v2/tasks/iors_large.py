@@ -720,6 +720,35 @@ PUSH_GUIDE_SCAN_Z0_M = 0.06
 PUSH_GUIDE_HAND_AHEAD_M = (0.49, 0.875)
 
 
+# ---- i7-ul01reach (2026-11-10, under_large_01): the heel-first yaw lock's tolerance. Its default is one step of the 16-yaw grid (22.5 deg), so
+# the grid yaw 5.89 rad (-22.5 deg) is kept next to 0 and the B IK's retries jitter the drawn yaw by up to 22.5 deg. The floor push cannot
+# deliver the sandal from those yaws: over the 138 under_large_01 demos written 2026-11-06..10, every one whose carried yaw was -0.35..-0.39
+# rad or the grid's -22.5 deg ended not_reached (28, residual 0.18-0.19 m, the sandal sliding 26 mm sideways in stroke 1 and 75 mm off
+# the line by stroke 3, beyond the 30 mm re-aim cap) or plan_failed (6), 0 ok; the jittered -0.12..-0.24 rad ended symbolic_only (7 of 7,
+# turned 0.19-0.31 rad); the carried yaws within 0.04 rad of 0 gave 78 ok of 96. ``ISPATIALGYM_PUSH_HEEL_TIGHT`` (default OFF; "1" =
+# :data:`PUSH_HEEL_TIGHT_TOL_DEG`, a number = that many degrees) narrows heel_first's tolerance to it (never wider than the spec's) and caps
+# the init-yaw jitter at :data:`PUSH_HEEL_TIGHT_JITTER_FRAC` of it - only where the heel_first lock is set (the sandal-under-bed
+# variants). Kit counters ``push_heel_tight.dropped`` (a yaw the default tolerance keeps and the tight one does not) and
+# ``push_heel_tight.jitter_capped`` (a draw whose jitter it capped).
+PUSH_HEEL_TIGHT_ENV = "ISPATIALGYM_PUSH_HEEL_TIGHT"
+PUSH_HEEL_TIGHT_TOL_DEG = 5.0
+PUSH_HEEL_TIGHT_JITTER_FRAC = 0.8
+
+
+def push_heel_tight_tol_deg() -> Optional[float]:
+    """:data:`PUSH_HEEL_TIGHT_ENV`: heel_first's tolerance (deg) under the switch, None when it is off (default). ``ValueError`` for a
+    value that is neither on / off nor a positive angle."""
+    v = os.environ.get(PUSH_HEEL_TIGHT_ENV, "").strip().lower()
+    if v in ("", "0", "off", "false", "no", "none"):
+        return None
+    if v in _ON:
+        return PUSH_HEEL_TIGHT_TOL_DEG
+    f = float(v)
+    if not (math.isfinite(f) and f > 0.0):
+        raise ValueError(f"{PUSH_HEEL_TIGHT_ENV}={v!r}: on / off or a positive angle (deg)")
+    return f
+
+
 def push_guide_wall_on() -> bool:
     """:data:`PUSH_GUIDE_WALL_ENV` (default ON since lead #99f, 2026-11-10: ug2_ul02_on 22/8/6 at 0.89 GPU-h/ok, 0 topples, end yaw <= 3.9 deg
     vs ug_ul02_off 0 ok in 6 demos, 2 topples; "0" / "off" restores today's push)."""
@@ -2462,7 +2491,17 @@ class IORSLarge(SamplerV2):
     def push_yaw_tol_deg(self) -> float:
         """heel_first's largest angle between the heel's direction and the push's reverse (``generation.push_under_yaw_tol_deg``; default one
         step of the yaw grid, :meth:`yaws`: 22.5 deg at 16 - the two grid yaws on either side of the exact heel-first yaw)."""
-        return float(self.num("push_under_yaw_tol_deg", 360.0 / max(1, int(self.num("n_yaws", 16)))))
+        base = float(self.num("push_under_yaw_tol_deg", 360.0 / max(1, int(self.num("n_yaws", 16)))))
+        tight = self.push_heel_tight()
+        return base if tight is None else min(base, tight)
+
+    def push_heel_tight(self) -> Optional[float]:
+        """i7-ul01reach (:data:`PUSH_HEEL_TIGHT_ENV`): the tight heel_first tolerance (deg) when the switch is on and the lock is heel_first,
+        else None (today's tolerance and jitter)."""
+        tight = push_heel_tight_tol_deg()
+        if tight is None or not getattr(self, "push_under", True) or self.push_yaw_lock() != "heel_first":
+            return None
+        return tight
 
     def push_heel(self) -> Tuple[th.Tensor, float, float]:
         """The target's heel for ``heel_first``: ``(h, heel, toe)`` - :func:`footprint_heel` of its footprint at the rest orientation, ``h``
@@ -2479,6 +2518,12 @@ class IORSLarge(SamplerV2):
         self._push_heel = (name, (h_local, heel, toe))
         self.template_facts["push_under_yaw"] = {"lock": "heel_first", "heel_m": round(heel, 4), "toe_m": round(toe, 4),
                                                  "heel_dir_local": [round(float(v), 4) for v in h_local], "tol_deg": round(self.push_yaw_tol_deg(), 2)}
+        if self.push_heel_tight() is not None:
+            # i7-ul01reach: the heel's direction at the rest orientation (yaw 0), for judging the tight tolerance's window around the grid
+            ang = math.degrees(math.atan2(float(h[1]), float(h[0])))
+            self.template_facts["push_under_yaw"]["heel_angle_rest_deg"] = round(ang, 2)
+            log.info("%s: push-under yaw lock heel_first: tolerance %.1f deg (%s), the heel at the rest orientation %.2f deg (heel %.3f m, toe %.3f m)",
+                     self.gp.variant, self.push_yaw_tol_deg(), PUSH_HEEL_TIGHT_ENV, ang, heel, toe)
         return self._push_heel[1]
 
     def push_yaw_kept(self, quat, d2, off: Optional[float] = None) -> bool:
@@ -2501,6 +2546,10 @@ class IORSLarge(SamplerV2):
         d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
         cos = -float(h @ d) / max(float(th.linalg.norm(h)) * float(th.linalg.norm(d)), 1e-9)
         if cos < math.cos(math.radians(self.push_yaw_tol_deg())) - 1e-6:
+            if self.push_heel_tight() is not None:
+                base = float(self.num("push_under_yaw_tol_deg", 360.0 / max(1, int(self.num("n_yaws", 16)))))
+                if cos >= math.cos(math.radians(base)) - 1e-6:
+                    TT._count(self, "push_heel_tight.dropped")  # i7-ul01reach: today's tolerance keeps this yaw
             return False
         if off is None:
             off = self.push_contact_offset(quat, d2)
@@ -4573,7 +4622,13 @@ class IORSLarge(SamplerV2):
     def init_yaw_jitter(self) -> float:
         """The init yaw's draw around the screened yaw (± this, rad; the B exact IK's retries too): :data:`TARGET_JITTER`; none with the
         guide wall (i7-ul02guide: the carried goal yaw is snapped onto the wall, :meth:`end_aligned_init_yaw`)."""
-        return 0.0 if push_guide_wall_on() and self.guide_wall_active() else TARGET_JITTER
+        if push_guide_wall_on() and self.guide_wall_active():
+            return 0.0
+        tight = self.push_heel_tight() if push_heel_tight_tol_deg() is not None else None
+        if tight is not None and math.radians(tight) * PUSH_HEEL_TIGHT_JITTER_FRAC < TARGET_JITTER:
+            TT._count(self, "push_heel_tight.jitter_capped")  # i7-ul01reach: the draw stays within the tight heel_first tolerance
+            return math.radians(tight) * PUSH_HEEL_TIGHT_JITTER_FRAC
+        return TARGET_JITTER
 
     def end_aligned_init_yaw(self, yaw0: float, d_yaw: float):
         """The init yaw near the screened ``yaw0`` whose carried goal yaw (``+ d_yaw``) a mode aligns (the touching mode's
