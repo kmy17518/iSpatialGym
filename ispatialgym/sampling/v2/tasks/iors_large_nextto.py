@@ -1191,7 +1191,19 @@ def _complete(s, rng, cands: List[Tuple[Stance, Dict[str, Any]]], chain_of, side
             count(stats, f"leg_{e.reason}")
             continue
         s.sidecar.add_stance(end)
-        return _record(s, init, st, end, info, chain, side, face, yaw, d2, init_pose, goal_pose, dist, gap, bound, nt, leg)
+        draft = _record(s, init, st, end, info, chain, side, face, yaw, d2, init_pose, goal_pose, dist, gap, bound, nt, leg)
+        from ispatialgym.sampling.campaign_large_recovery import ottoman_candidate_program_screen, ottoman_candidate_program_rejection
+        if ottoman_candidate_program_screen(s):
+            failure = ottoman_candidate_program_rejection(s, draft)
+            if failure is not None:
+                count(stats, 'candidate_program_rejected')
+                why.append('complete candidate program: ' + failure)
+                log.info('%s: held ottoman stance rejected by the unchanged full program check: %s', s.gp.variant, failure)
+                s.sidecar.reset_instance()
+                continue
+            count(stats, 'candidate_program_passed')
+            draft.summary['campaign_early_program_screen'] = {'passed': True, 'final_check_required': True}
+        return draft
     raise Reject("push_unreachable", f"face {face}: {len(cands)} collision-free push stances, none passes the IK / sweep / leg: " + "; ".join(why[-3:]))
 
 

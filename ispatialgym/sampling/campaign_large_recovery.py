@@ -6,6 +6,27 @@ from scripts.campaign_20261110.contracts import require
 
 
 SOAP_LIFT_FRAME_ENV = 'ISPATIALGYM_CAMPAIGN_SOAP_LIFT_FRAME_SCREEN'
+OTTOMAN_CANDIDATE_SCREEN = 'campaign_held_ottoman_candidate_program_screen'
+
+
+def ottoman_candidate_program_screen(sampler):
+    """Opt in the measured held ottoman before discarding other native stances."""
+    enabled = sampler.gp.gen(OTTOMAN_CANDIDATE_SCREEN, False)
+    require(type(enabled) is bool, 'ottoman candidate program screen must be boolean')
+    if not enabled:
+        return False
+    models = sampler.choice.models
+    require(sampler.gp.variant == 'inter_object_relation_satisfaction-touching_large_scale-ottoman-sofa-floor'
+            and (models['target'].category, models['target'].model) == ('ottoman', 'xcuyiw')
+            and (sampler.partner.category, sampler.partner.model) == ('sofa', 'mnfbbh'),
+            'ottoman candidate screen requires the exact held target and reserved partner')
+    return True
+
+
+def ottoman_candidate_program_rejection(sampler, draft):
+    if not ottoman_candidate_program_screen(sampler):
+        return None
+    return _candidate_program_rejection(sampler, draft)
 
 
 def candidate_program_screen(plan=None):
@@ -48,6 +69,11 @@ def candidate_program_rejection(sampler, draft, plan=None):
     """
     if not candidate_program_screen(plan):
         return None
+    return _candidate_program_rejection(sampler, draft)
+
+
+def _candidate_program_rejection(sampler, draft):
+    """The original full checker in a temporary, fully restored draft world."""
     from ispatialgym.sampling.sim_utils import Reject
     from ispatialgym.sampling.v2 import program_check
 
