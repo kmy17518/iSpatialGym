@@ -5032,6 +5032,24 @@ def push_stroke_plan(extra: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]
     return out
 
 
+def push_guide_wall_plan(extra: Optional[Dict[str, Any]]) -> Optional[Dict[str, float]]:
+    """i7-ul02guide (``iors_large.PUSH_GUIDE_WALL_ENV``): the push record's ``guide_wall`` - the object is pushed along a wall on its
+    ``wall_left`` side (+1 = left of the push, -1 = right): ``{"side", "lean_m_per_m", "aim_away_m"}``; None without one or a malformed one
+    (today's strokes)."""
+    raw = (extra or {}).get("guide_wall")
+    if not isinstance(raw, dict):
+        return None
+    try:
+        side = int(raw.get("wall_left", 0))
+        lean = float(raw.get("lean_m_per_m", 0.0))
+        away = float(raw.get("aim_away_m", 0.0))
+    except (TypeError, ValueError):
+        return None
+    if side not in (1, -1) or not (math.isfinite(lean) and math.isfinite(away)) or lean < 0.0:
+        return None
+    return {"side": float(side), "lean_m_per_m": lean, "aim_away_m": away}
+
+
 def push_stroke_aim(root_xy, line_xy, direction, yaw_err: float, plan: Dict[str, Any]) -> Tuple[float, float, float]:
     """Which point of the object's back a stroke pushes, across the push (owner 2026-10-13 ~04:30 item 2): ``(target, off, term)`` in metres
     from the recorded line (the line through ``line_xy`` along the unit ``direction``; + = left of the push). ``off``: the object's root off
@@ -5155,8 +5173,12 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
     :func:`push_back_along` over its live collision points; the record's contact offset without them), at the recorded blade height and
     orientation; the stroke then pushes along the push until the object has advanced to ``ends_m[k]`` of the push (the last stroke to the
     recorded goal line), watched as every push leg (stop at the goal). Between strokes the hand backs off ``backoff_m`` along the push. A
-    re-aim move that fails falls back to the recorded line for that stroke. ``ctx["push_strokes"]`` records every stroke."""
+    re-aim move that fails falls back to the recorded line for that stroke. ``ctx["push_strokes"]`` records every stroke. i7-ul02guide: a
+    record with ``guide_wall`` (:func:`push_guide_wall_plan`) aims ``aim_away_m`` AWAY from the wall and moves the hand INTO it by
+    ``lean_m_per_m`` per metre of each stroke's travel (the pusher's friction presses the object to the wall; its front turns into the wall,
+    which resists it) - ``guide_aim_m`` / ``guide_lean_m`` per stroke."""
     extra = getattr(contact, "extra", None) or {}
+    guide = push_guide_wall_plan(extra)
     wps = targets["waypoints"]
     p_init, q_blade = (x.float() for x in as_world_pose(wps[0]))
     p_goal = as_world_pose(wps[-1])[0].float()
@@ -5181,6 +5203,8 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
     ctx["push_strokes"] = rep
     e0, ref = push_yaw_error(state, obj, pose0)
     rep.update({"yaw_reference": ref, "yaw_start_deg": round(math.degrees(e0), 2)})
+    if guide is not None:
+        rep["guide_wall"] = dict(guide)
     for k in range(1, int(plan["n"]) + 1):
         if k > 1:
             p_e, q_e = (C.as_tensor(x).float() for x in motions.eef_pose(arm))
@@ -5189,6 +5213,8 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
         p_o = C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:3].float()
         e, _ = push_yaw_error(state, obj, pose0)
         target, off, term = push_stroke_aim(p_o[:2], p_init[:2], d3[:2], e, plan)
+        g_aim = 0.0 if guide is None else -guide["side"] * guide["aim_away_m"]
+        target += g_aim
         pts = _object_points_world(state, obj)
         hit = push_contact_aim(pts, p_init[:2], d3[:2], target, strips, *band) if pts is not None else None
         cap = abs(float(plan["reaim_max_m"]))
@@ -5211,9 +5237,12 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
             end_along = min(goal_along, rear + max(0.0, float(res_now) - want) - face)
         end_along = max(end_along, start_along)
         pose_at = lambda along, lat: (p_init + d3 * along + n3 * lat, q_blade)  # noqa: E731
+        lean = 0.0 if guide is None else guide["side"] * guide["lean_m_per_m"] * (end_along - start_along)
         rec: Dict[str, Any] = {"stroke": k, "yaw_before_deg": round(math.degrees(e), 2), "root_off_line_m": round(off, 4), "yaw_term_m": round(term, 4),
                                "target_m": round(target, 4), "aim_m": round(aim, 4), "contact_lateral_m": round(contact_lat, 4), "contact": source,
                                "start_along_m": round(start_along, 4), "end_along_m": round(end_along, 4)}
+        if guide is not None:
+            rec.update({"guide_aim_m": round(g_aim, 4), "guide_lean_m": round(lean, 4)})
         try:
             yield from motions.arm_along(arm, [pose_at(start_along, aim)], loaded=False)
         except SkillError as err:
@@ -5224,7 +5253,7 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
             yield from motions.arm_along(arm, [pose_at(start_along, 0.0)], loaded=False)
         s_before = float((C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:2].float() - pose0[0].reshape(-1)[:2].float()) @ d3[:2])
         n_stop = len(ctx.get("push_stopped") or [])
-        yield from _push_leg(motions, state, arm, obj, [pose_at(end_along, aim)], geom, pose0, cfg, ctx, f"stroke {k}/{int(plan['n'])}")
+        yield from _push_leg(motions, state, arm, obj, [pose_at(end_along, aim + lean)], geom, pose0, cfg, ctx, f"stroke {k}/{int(plan['n'])}")
         yield from _hold_until_still(motions, state, obj, cfg)
         p_after = C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:2].float()
         e1, _ = push_yaw_error(state, obj, pose0)

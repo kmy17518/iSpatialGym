@@ -6719,3 +6719,96 @@ Kit counts `round_symmetry.COUNTS`; `meta.success_yaw_free` per demo.
 | close_02 (carton; BASE_SIG on both) | 5/4/4, 0.40 | 5/4/4, 0.43 | start 1.6493 -> 1.71-2.06 |
 
 N 4, index 361000, svl titanrtx, own ledger and empty sampling cache per arm. BASE_SIG A/B: close_01/02 off 46/1/1 each (45 missing_map) vs on 11/4/3 and 5/4/4.
+
+## under_large_02: the desk's leg panel as a guide wall for the standing briefcase (branch `i7-ul02guide`, owner 2026-11-10)
+
+Owner: "if the desk has wall-like legs can we make standing briefcase kind of lean against it during push & place so it doesn't rotate".
+The standing goal and the success measure stay as they are.
+
+### The geometry (desk_mdhelw_0, office_cubicles_right)
+
+desk_mdhelw_0 was loaded alone at its scene pose, and its 7 collision pieces were scanned with horizontal and vertical rays
+(`$OFH/ul02guide_20261110/desk_probe.py`; only derived numbers are kept, no asset is written). The desk's AABB is x 14.699-17.510,
+y -13.190..-12.259, and its top is at 0.785 m.
+
+- **Side panels.** Two full-depth panels run from the floor to 0.62 m:
+  - left panel: x 15.265-15.483;
+  - right panel: x 16.70-16.936;
+  - both span y -13.165..-12.279, so they end 2.5 cm inside the AABB edges, with a 2 cm chamfer up to ~6 cm in;
+  - each has a recessed plinth, 2-3 cm deep at 2 cm up.
+- **Face flatness.**
+  - The outer faces (15.265 and 16.933-16.936) are flat to 3 mm.
+  - The left inner face (15.475-15.483) is flat to 8 mm.
+  - The right inner face is slanted from 16.738 to 16.678 over 0.55 m. This is the convex hull of its joint with the modesty panel, so it is no guide.
+- **Modesty panel.** It spans x 15.485-16.674 and y -12.547..-12.450, from 0.119 m up.
+- **Free space around the panels:**
+  - left end: 0.565 m;
+  - right end: 0.574 m;
+  - knee space: 1.22 m wide, from the front edge to the modesty panel.
+- **Today's lanes (124 recorded instances).**
+  - The +x edge pushes -x toward the right panel's outer face. That face stands 0.5 m ahead of the goal and square to the push, so it does not guide.
+  - The +y edge pushes -y at x 16.964 / 17.064 / 17.164. The 16.964 lane overlaps the outer face by 3.2 cm for an end push; the other two run beside it, unused.
+
+### The switch: `ISPATIALGYM_PUSH_GUIDE_WALL` (default off)
+
+The switch acts only on the under_large_02 variant's pitched floor push of an elongated footprint.
+
+- **Lanes** (`iors_large.guide_scan_rays` / `guide_faces_from_hits` / `guide_lanes`).
+  - A horizontal ray scan of the partner runs along each edge's tangent. It samples 3 depths: the target's back, middle and front at the guide goal. It samples 3 heights: 0.06 m, half the target's height, and its height minus 3 cm.
+  - A face qualifies as a wall when:
+    - it is hit in every cell;
+    - the rays reaching it crossed at least the target's width + gap + 1 cm of free space;
+    - its hits spread at most 1.5 cm.
+  - The lane is the target's centre line, placed 6 + 1.5 cm off the face.
+  - The scan finds 5 lanes on this desk (checked against the real meshes, lambda `scan_probe.py`):
+    - +y edge: x 15.190 and 17.011;
+    - -y edge: x 15.190, 15.555 and 17.010.
+- **Goal.** The target's whole length lies along the flat wall: its centre is 0.10 + 0.165 = 0.265 m inside the edge, against today's 0.07 m. With only one end beside the wall, the briefcase still turns. The centre stays under the desk.
+- **Footprint check.** The footprint at the goal is checked on the B4 clearance raster. From the back, the knee space is closed by the modesty panel.
+- **Drop.** The drop is either just outside the edge (front 3 cm out) or alongside the panel (centre 3 cm out).
+- **Stand-offs.** The frontal stand-offs (0.6-1.0 m) are filtered so that the hand's push stays 0.35-0.90 m ahead of the base.
+- **Yaw.**
+  - Yaw lock `"endwise"`: the long axis must be within 11.25 deg of the push.
+  - The carried goal yaw is snapped onto the desk's axes, with no init-yaw jitter.
+  - The goal orientation is still the carried one, now parallel to the wall.
+- **Oracle** (`execute._push_strokes`, the record's `guide_wall`).
+  - Each stroke moves the hand into the wall by 0.10 m per m of travel.
+  - Each stroke aims 1 cm away from the wall.
+  - Why: take a box flush on a wall, pushed at lateral offset e (+ away from the wall) with a lateral force k x F into the wall. It slides without turning when -k mu w/2 <= e <= k (L - mu w/2), with L = 0.33, w = 0.12, mu = 0.5. An aim toward the wall turns it away unless k is large; an aim at or away from the centre line holds it once k > 0.
+- **QA.** Briefcase-desk contact is object-object, so no QA rule needed changing:
+  - `robot_touching_objects` and `protected_contact` count only robot links and held objects (`qa._check_collision` / `_protected_pairs`);
+  - the desk is not a protected (task-placed) object.
+- **Kit counters:** `push_guide_wall.scan`, `.walls`, `.edge_without_wall`, `.recorded`.
+
+### i7-ul02guide r2 (2026-11-10): why the first ON arm wrote nothing, and the fix (commit 6cd642f0; A/B snapshot trunk_0f1315a1)
+
+- **Run.** ug_ul02_on (trunk_b30097bd, N 8 at 360000 + 360100): 8 attempts, 0 written; the lead cancelled it. The baseline arm ug_ul02_off kept running.
+- **Root cause 1: the front drop was out of the pitched hand's reach.** This was the dominant cause, found from the logs without GPU.
+  - The front drop sits 0.195 m outside the edge. With the goal 0.265 m inside, the push is 0.49 m long.
+  - The pitched hand's reach window ahead of the base, measured over every pitched chain of r2_ul02_stand + ug_ul02_off + ug_ul02_on:
+    - eef start below 0.47 m: 0 of 1395 chains solved. Every one failed with `exact IK failed at pose 1 of 4`: the pre-pose, back and up from the start, is too close to the body.
+    - eef start 0.47-0.49 m: 273 of 1036 solved.
+    - eef goal 0.89-0.91 m: 5 of 726 solved. Goal at 0.91 m or more: 0 of 721 (`approach_untrackable`).
+  - The window is therefore about 0.385 m long, so a 0.49 m push cannot fit at any stand-off. The r1 bound `PUSH_GUIDE_HAND_AHEAD_M` (0.35, 0.90) still admitted these stances.
+  - Effect on the ON arm: 1363 of its 1765 unsolved chains (77 %) were these front drops. Its eef starts were 0.36-0.42 m and none solved.
+  - Fix: `PUSH_GUIDE_HAND_AHEAD_M` = (0.49, 0.875), checked by `guide_push_in_reach`, and `PUSH_GUIDE_DROP_OUTS_M` = (0.03, 0.06).
+  - Both drops are now alongside the panel: the briefcase's front half is beside the panel from the start. The stand-offs that fit are 0.725-0.775 m and 0.75-0.775 m.
+- **Root cause 2: the endwise yaw often had no pair of F that could release it.**
+  - Of the 166 C stances with a solved chain, 76 then failed with `the push-under yaw lock endwise keeps none of F's yaws`.
+  - At the endwise carried yaws, the drop releases with one hand orientation only. The cached F_goal sets show top_2 at yaw 0 and top_0 at yaw pi, which is often not the pair B took.
+  - Fix: `guide_endwise_pairs` screens the drop release at the locked yaws before the chain is solved. A C with no such pair is skipped.
+- **Ruled out.**
+  - The panel: the failing pose is the pre-pose, 0.2 m outside the edge, and the short pushes on the lanes solve 39 %.
+  - A too-narrow contact face: the contact offsets are 0.166-0.172 m and the band is never empty.
+  - The largest-offset yaw order: both ends have equal offsets.
+  - The goal depth on its own: eef goals of 0.82-0.88 m solve.
+- **Not changed.**
+  - Lane 17.01 seen from the front: 22 of its C stances fail the B -> C carry because the C base is "disconnected on the eroded map". This is the generic carry check.
+  - The A -> B transit failures near (18.1, -11.57) come from the drawn robot start, not from the lanes.
+- **New kit counters:** `push_guide_wall.c_out_of_reach`, `.c_no_endwise_pair`, `.c_endwise_pair`. One INFO line per C: 'guide-wall endwise pairs at C'.
+- **A/B result (r2).**
+  - ug2_ul02_on (trunk_0f1315a1): 22 attempts, 8 written, 6 ok out of 8 demos. 5.32 GPU-h, i.e. 0.89 GPU-h per ok.
+    - Every pushed demo was guided. The end-of-push yaw stayed within 3.9 deg, with tilt 0 and no topples.
+    - The 2 failures are not the push: arm_stutter in the final retreat, and the wheel touching the briefcase in the first navigate.
+  - Baseline ug_ul02_off (partial, one job still running): 6 demos, 0 ok. End yaw 0.4-20.9 deg, 2 topples.
+  - Flip recommended by the standard rule; not flipped on this branch.
