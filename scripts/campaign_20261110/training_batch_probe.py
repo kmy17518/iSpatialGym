@@ -161,6 +161,18 @@ def install_reset_boundary_probe(runner, *, final_pre_action=False, observer=Non
     return restore
 
 
+def episode_order(value, kind):
+    """A repeated-A control is diagnostic only and cannot pass the A/B/A gate."""
+    control = value.get('diagnostic_control')
+    if control is None:
+        return [0, 1, 0]
+    require(control == 'A_A' and kind == 'physics_action_open_loop'
+            and value.get('diagnostic_only') is True
+            and value.get('production_released') is False,
+            'unsupported or non-diagnostic restoration control')
+    return [0, 0]
+
+
 def run(root,request,output,kind):
     root=Path(root).resolve();output=Path(output).resolve()
     require(output.is_relative_to(root) and not output.exists(),'probe output must be new and private')
@@ -169,12 +181,15 @@ def run(root,request,output,kind):
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
     compatibility=verify_runtime_compatibility(root,value,records,runtime.parent)
     os.environ['ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE']='1'
-    order=[0,1,0];entries=[]
+    order=episode_order(value,kind);entries=[]
     common={'schema':'isg-training-restoration-probe-v1','campaign_id':'campaign_20261110','kind':kind,
             'request':{'path':str(Path(request).resolve()),'sha256':file_digest(request)},
             'probe_runtime':{'path':str(runtime),'sha256':file_digest(runtime)},'entries':entries,
             'runtime_compatibility':compatibility,
             'accepted':False,'eligible_for_goal':False,'quota_consumed':0}
+    if value.get('diagnostic_control'):
+        common.update(schema='isg-training-restoration-control-v1', diagnostic_control=value['diagnostic_control'],
+                      release_eligible=False, scope='Repeated-A baseline only; cannot satisfy the A/B/A restoration gate.')
     if kind=='physics_action_open_loop':
         # A and B are immutable copies of one exact configuration. Production
         # prebuild checks compare their content and recorded scene, not paths.
