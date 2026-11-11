@@ -62,6 +62,18 @@ def scope(job):
             result['group_ids'] = sorted(set(map(str, queue.get('group_ids', []))))
             result['group_binding'] = 'exact_queue_groups' if result['group_ids'] else 'queue_without_group_ids'
             result['queue_schema'] = queue.get('schema')
+        elif env.get('ISPATIALGYM_CAMPAIGN_GOAL_PLAN'):
+            plan = document(env['ISPATIALGYM_CAMPAIGN_GOAL_PLAN'])
+            if plan.get('campaign_id') != CAMPAIGN:
+                raise ValueError('goal plan campaign identity differs')
+            if not isinstance(plan.get('group_id'), str) or not plan['group_id']:
+                raise ValueError('goal plan lacks an explicit group identity')
+            if plan.get('task') != result.get('task') or plan.get('split') != result.get('split'):
+                raise ValueError('goal plan task/split differs from config')
+            if plan.get('contract_template_sha256') != (result.get('validation_key') or {}).get('template_sha256'):
+                raise ValueError('goal plan template differs from config')
+            result.update(group_ids=[plan['group_id']], group_binding='exact_goal_plan_group',
+                          goal_plan_schema=plan.get('schema'))
         elif str(result.get('task', '')).startswith('camera_relocalization'):
             result['group_binding'] = 'camera_exempt'
         native = directory / 'native_inputs.json'

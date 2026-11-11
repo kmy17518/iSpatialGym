@@ -51,3 +51,27 @@ def test_immutable_transition_idempotent_with_lost_bounds(tmp_path):
     assert a==b
     record=json.loads(Path(a['path']).read_text())
     assert record['last_observed_unix']==12 and record['exact_runtime_end_unavailable']
+
+
+def test_direct_goal_plan_preserves_exact_group_and_input_hash(tmp_path):
+    import hashlib
+    j = job(tmp_path); p = Path(j['job_dir'])
+    config = p / 'config.json'
+    config.write_text(json.dumps({'campaign_id': 'campaign_20261110', 'split': 'eval_standard',
+        'template': {'task': 'test', 'class_id': 'test_01'}, 'validation_key': {'template_sha256': 'a'*64}}))
+    plan = p / 'plan.json'
+    plan.write_text(json.dumps({'campaign_id': 'campaign_20261110', 'group_id': 'direct_standard_group',
+        'task': 'test', 'split': 'eval_standard', 'contract_template_sha256': 'a'*64, 'schema': 'goal-plan'}))
+    with (p / 'job.env').open('a') as f:
+        f.write(f'ISPATIALGYM_CAMPAIGN_CONFIG={config}\nISPATIALGYM_CAMPAIGN_GOAL_PLAN={plan}\n')
+    value = scope(j)
+    assert value['status'] == 'observed'
+    assert value['group_ids'] == ['direct_standard_group']
+    assert value['group_binding'] == 'exact_goal_plan_group'
+    assert {'path': str(plan), 'sha256': hashlib.sha256(plan.read_bytes()).hexdigest()} in value['evidence']
+    # A conflicting identity must never retain an apparently usable group join.
+    body = json.loads(plan.read_text()); body['contract_template_sha256'] = 'b'*64
+    plan.write_text(json.dumps(body))
+    rejected = scope(j)
+    assert rejected['status'] == 'incomplete' and rejected['group_ids'] == []
+    assert 'template differs' in rejected['errors'][0]
