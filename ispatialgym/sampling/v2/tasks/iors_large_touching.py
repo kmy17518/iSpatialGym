@@ -600,6 +600,15 @@ class TouchingMode:
         _, front = extent_along(pts, d2)
         return touching_goal_xy(face_xy, d2, front, self.touching_gap)
 
+    def _push_chain_screen_quat(self, quat):
+        """Screen the fixed release before native draw yaw snapping.
+
+        The final draw still calls ``_push_under_chain`` with its actual attitude
+        and must pass the existing fixed-goal orientation/geometry checks.
+        """
+        plan = getattr(self, "_campaign_pair_active", None)
+        return G.t(plan.place[1]) if plan is not None and plan.placement_mode == "drop_push" else quat
+
     def _push_under_chain(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
         """The push-under chain to the touching goal of this yaw (:meth:`touching_goal_at` at the C candidate's face point); the
         passed (nominal) goal cell is replaced. Not solved (None) when the blade's span at this yaw lies more than ``BLADE_TOL_M``

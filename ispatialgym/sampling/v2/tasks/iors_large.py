@@ -7085,7 +7085,9 @@ class IORSLarge(SamplerV2):
                 for y in best:
                     ck = (int(kc), int(round(y / yaw_step)))
                     if ck not in chain_cache:
-                        chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), cd, gc, place.extras["push_dir"])
+                        screen_quat = G.qmul(G.quat_from_yaw(y + d_yaw), self.rest)
+                        screen_quat = getattr(self, "_push_chain_screen_quat", lambda q: q)(screen_quat)
+                        chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, screen_quat, cd, gc, place.extras["push_dir"])
                     if chain_cache[ck] is not None:
                         found = True
                         ch = chain_cache[ck]
