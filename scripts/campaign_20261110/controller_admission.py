@@ -345,13 +345,93 @@ def prepare(proof, allocation, cfg, root, *, prepared_source=None, prepared_indi
     return record
 
 
-def refresh(record, cfg, root, rows, queue):
-    template = held.template_from(read(record["prepared"]["config"])["template"])
+def seed_bootstraps(cfg, state):
+    for source in cfg.get("existing_bootstraps", []):
+        record = read(source); template = held.template_from(read(record["prepared"]["config"])["template"])
+        scoped_template(template, cfg)
+        model_class_pin(template, state, cfg, commit=True)
+        identity = admission_id(template, cfg["snapshot"], read(record["prepared"]["config"])["perturbations"],
+                                cfg.get("admission_split", "train"), cfg.get('author_revision'))
+        if identity not in state["records"]:
+            record["admission_id"] = identity
+            record["status"] = "external_submission"
+            # Older immutable bootstrap submissions predate the spool fields.
+            directory = Path(record['directory'])
+            intent = Path(cfg['root'])/'dispatch/ready'/(directory.name+'.json')
+            if intent.exists():
+                record.setdefault('dispatch_intent', str(intent))
+                record.setdefault('dispatch_receipt', str(Path(cfg['root'])/'dispatch/receipts'/(directory.name+'.json')))
+            state["records"][identity] = record
+
+
+def check_admission_pending(record, cfg, root, queue, save):
+    """Use the existing exact queue continuation; never cancel without its proof."""
+    if cfg.get('migrate_pending_seconds') is None or cfg.get('_migration_checks_remaining', 0) <= 0:
+        return
+    allocation = record.get('allocation') or {}
+    scheduled = queue.get(str(allocation.get('jobid'))) or [None, None]
+    if scheduled[1] != 'PENDING' and not record.get('migration_replacement'):
+        return
+    cfg['_migration_checks_remaining'] -= 1
+    try:
+        proof = record['source_proof']
+        for name in ('config', 'source_gate'):
+            ref = proof[name]
+            require(Path(ref['path']).resolve().is_relative_to(root) and
+                    file_digest(ref['path']) == ref['sha256'], 'pending admission source changed')
+        require(read(proof['source_gate']['path']).get('success') is True,
+                'pending admission source replay failed')
+        from scripts.campaign_20261110.controller_queue_migration import migrate_pending_queue
+        migrate_pending_queue(root, record, save, queue, minimum_age=cfg['migrate_pending_seconds'])
+    except Exception as exc:
+        record['migration_error'] = {'at': time.time(), 'type': type(exc).__name__, 'reason': str(exc)}
+        save()
+
+
+def observe_admission_allocations(root, cfg, state, save):
+    from scripts.campaign_20261110.controller_saved_allocations import adopt_receipt
+    started = time.time()
+    seed_bootstraps(cfg, state)
+    queue = slurm_status()
+    rows, blocked, observed, legacy = [], set(), [], False
+    cfg['_migration_checks_remaining'] = 8
+    for identity, record in state['records'].items():
+        if record.get('status') in ('admitted', 'retired_after_claim', 'failed'):
+            continue
+        try:
+            adopted = adopt_receipt(root, record)
+            if adopted: save()
+            check_admission_pending(record, cfg, root, queue, save)
+            allocation = record.get('allocation')
+            if allocation:
+                rows.append(allocation)
+            elif record.get('status') != 'ready' and not record.get('dispatch_receipt'):
+                legacy = True
+            observed.append({'admission_id': identity, 'index': record.get('index'), 'adopted': adopted,
+                             'job_id': (allocation or {}).get('jobid'),
+                             'scheduler_state': (queue.get(str((allocation or {}).get('jobid'))) or [None, None])[1]})
+            record.pop('allocation_receipt_error', None)
+        except Exception as exc:
+            blocked.add(identity)
+            record['allocation_receipt_error'] = {'observed_at': time.time(), 'reason': repr(exc)}
+            save()
+    state['early_pending_observation'] = {'started_at': started, 'completed_at': time.time(),
+        'records': observed, 'blocked_admissions': sorted(blocked), 'before_allocation_and_source_scan': True}
+    save()
+    # Legacy unresolved jobs retain the old discovery path, after known pending checks.
+    return (allocations(root) if legacy else rows), queue, blocked
+
+
+def refresh(record, cfg, root, rows, queue, save=None):
     allocation = record.get("allocation") or reconcile(rows, key=record["command"][3], index=record["index"], count=record["count"],
                                                        snapshot=cfg["snapshot"], tag="goal_groups")
     if allocation is None:
         return
     record["allocation"] = allocation
+    if save is not None:
+        check_admission_pending(record, cfg, root, queue, save)
+        if record.get('allocation') != allocation:
+            return
     if not held.job_terminal(allocation, root, queue):
         return
     gate = root / "validation/open_loop" / allocation["key"] / allocation["jobid"] / "gate.json"
@@ -364,6 +444,7 @@ def refresh(record, cfg, root, rows, queue):
         record.update(status="failed", reason="new_runtime_admission_physics_replay_failed",
                       failed_gate={"path": str(gate), "sha256": file_digest(gate)})
         return
+    template = held.template_from(read(record["prepared"]["config"])["template"])
     held.claim_finished_groups(record, allocation, str(gate), cfg, root, job_terminal=True)
     require(record.get("groups"), "admission lacks a durable closed goal group")
     if held.retired_class(cfg, template.class_id):
@@ -499,24 +580,17 @@ def main():
             lifecycle.record_policy(cfg, state)
             reconcile_author_gaps(state)
             save = lambda: write_json_atomic(path, state)
-            rows, queue = allocations(root), slurm_status()
-            for source in cfg.get("existing_bootstraps", []):
-                record = read(source); template = held.template_from(read(record["prepared"]["config"])["template"])
-                scoped_template(template, cfg)
-                model_class_pin(template, state, cfg, commit=True)
-                identity = admission_id(template, cfg["snapshot"], read(record["prepared"]["config"])["perturbations"], cfg.get("admission_split", "train"), cfg.get('author_revision'))
-                if identity not in state["records"]:
-                    record["admission_id"] = identity
-                    record["status"] = "external_submission"
-                    state["records"][identity] = record
-            for record in state["records"].values():
-                if not refreshable(record, root):
+            rows, queue, blocked = observe_admission_allocations(root, cfg, state, save)
+            from scripts.campaign_20261110.controller_source_allocations import SourceAllocations
+            sources = SourceAllocations(root, state, allocations)
+            for identity, record in state["records"].items():
+                if identity in blocked or not refreshable(record, root):
                     continue
                 try:
                     if record["status"] == "ready":
                         ensure_dry_run(record, save)
                         enqueue_record(root, record, save, priority=30)
-                    refresh(record, cfg, root, rows, queue)
+                    refresh(record, cfg, root, rows, queue, save)
                     record.pop("error", None)
                 except Exception as exc:
                     record["error"] = {"at": time.time(), "reason": type(exc).__name__ + ": " + str(exc)}
@@ -545,8 +619,7 @@ def main():
                     scoped_template(template, cfg)
                     model_class_pin(template, state, cfg)
                     identity = admission_id(template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"), cfg.get('author_revision'))
-                    found = [r for r in rows if Path(r["job_dir"]).resolve() == Path(proof["source_job"])]
-                    require(len(found) == 1, "anchor allocation missing or ambiguous")
+                    found = [sources.find(proof["source_job"])]
                     if not held.job_terminal(found[0], root, queue):
                         continue  # Freeze source template metadata only after its job ends.
                     if identity not in state["records"]:

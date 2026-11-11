@@ -85,14 +85,14 @@ def load_seeds(cfg, state):
     seen = state.setdefault('admitted_seed_hashes', {})
     current = {spec['id']: digest(spec) for spec in raw['seeds']}
     require(all(current.get(key) == value for key, value in seen.items()), 'held seed removed or changed')
-    rows = allocations(root)
+    from scripts.campaign_20261110.controller_source_allocations import SourceAllocations
+    sources = SourceAllocations(root, state, allocations)
     for spec in raw['seeds']:
         if spec['id'] in seen:
             continue
         proof = source_proof(spec['source_gate'], root=root, started_at=cfg['started_at'],
                              campaign_id=cfg['campaign_id'], permitted_split=source_split(cfg))
-        found = [row for row in rows if Path(row['job_dir']).resolve() == Path(proof['source_job'])]
-        require(len(found) == 1, 'held source allocation missing or ambiguous')
+        found = [sources.find(proof['source_job'], ledger=spec['anchor_ledger'])]
         require(make_seed(proof, found[0], cfg, root) == spec, 'held seed differs from fresh audited source')
         seen[spec['id']] = current[spec['id']]
     return specs
@@ -112,7 +112,8 @@ def main():
             require(state['config_sha256'] == digest(cfg), 'held source controller config changed')
             lifecycle.record_policy(cfg, state)
             catalog = read(cfg['seed_catalog']); owned = {owner_key(row, cfg) for row in catalog['seeds'] + cfg.get('seeds', [])}
-            rows, queue = allocations(root), slurm_status()
+            from scripts.campaign_20261110.controller_source_allocations import SourceAllocations
+            sources, queue = SourceAllocations(root, state, allocations), slurm_status()
             examined = 0
             for gate in recent_gates(root):
                 if examined >= 40:
@@ -129,8 +130,7 @@ def main():
                 try:
                     proof = source_proof(gate, root=root, started_at=cfg['started_at'], campaign_id=cfg['campaign_id'], permitted_split=split)
                     require(proof['template']['task'] in held.RANGES, 'source is not a held-object task')
-                    found = [row for row in rows if Path(row['job_dir']).resolve() == Path(proof['source_job'])]
-                    require(len(found) == 1, 'held source allocation missing or ambiguous')
+                    found = [sources.find(proof['source_job'])]
                     if not held.job_terminal(found[0], root, queue):
                         continue
                     spec = make_seed(proof, found[0], cfg, root)

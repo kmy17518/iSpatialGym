@@ -22,6 +22,8 @@ def fixture(root, monkeypatch):
            'config':{'path':str(config),'sha256':c.file_digest(config)},
            'validation_key':{'physics_sha256':'a'*64,'data_sha256':'b'*64}}
     allocation={'job_dir':str(f.job),'ledger':str(root/'manifests/allocations.tsv')}
+    ledger=Path(allocation['ledger']);ledger.parent.mkdir(exist_ok=True)
+    ledger.write_text('job_dir\n'+str(f.job)+'\n')
     return cfg,proof,allocation,library
 
 
