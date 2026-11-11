@@ -114,6 +114,61 @@ def active_scene(scene, loaded_names, active_names):
     return out
 
 
+def native_properties(obj):
+    """Physics flags omitted by OG's object-state JSON, measured per link."""
+    import omnigibson.lazy as lazy
+    links = {}
+    for name, link in obj.links.items():
+        prim = link.prim
+        gravity = None
+        if prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
+            gravity = bool(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI(prim).GetDisableGravityAttr().Get()) \
+                if prim.HasAPI(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI) else False
+        links[name] = {'gravity_disabled':gravity,
+            'collisions':{str(api.GetPrim().GetPath().MakeRelativePath(obj.prim_path)):bool(api.GetCollisionEnabledAttr().Get())
+                          for api in getattr(link,'_collision_apis',[])}}
+    return {'category':obj.category,'model':obj.model,'scale':obj.scale.tolist(),
+            'visible':bool(obj.visible),'links':links}
+
+
+def restore_export(scene, sim, template):
+    """Restore an explicit pool export after scene construction, before use.
+
+This template-load hook restores the recorded initial state. A TRO loader must
+then install its own instance poses/holds; this function must not overwrite a
+subsequently loaded TRO's per-instance state.
+"""
+    meta=template.get('metadata',{}).get('ispatialgym',{}).get('model_pool')
+    if not meta or not meta.get('active_properties'):return None
+    from omnigibson.utils.python_utils import recursively_convert_to_torch
+    import omnigibson.lazy as lazy
+    import torch as th
+    require(set(meta['active_properties'])==set(meta['active_names']), 'pool property inventory differs')
+    restored={}
+    for name,expected in meta['active_properties'].items():
+        obj=scene.object_registry('name',name)
+        require(obj is not None and obj.category==expected['category'] and obj.model==expected['model'], 'restored object identity differs')
+        require(th.allclose(obj.scale,th.tensor(expected['scale']),atol=1e-6,rtol=0), 'restored scale differs')
+        require(set(obj.links)==set(expected['links']), 'restored link inventory differs')
+        for link_name,flags in expected['links'].items():
+            link=obj.links[link_name]
+            if flags['gravity_disabled'] is not None:
+                (link.disable_gravity if flags['gravity_disabled'] else link.enable_gravity)()
+            with sim.editing_usd():
+                if flags['gravity_disabled'] is not None:
+                    api=lazy.pxr.PhysxSchema.PhysxRigidBodyAPI(link.prim) if link.prim.HasAPI(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI) \
+                        else lazy.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(link.prim)
+                    api.GetDisableGravityAttr().Set(flags['gravity_disabled'])
+                apis={str(api.GetPrim().GetPath().MakeRelativePath(obj.prim_path)):api for api in getattr(link,'_collision_apis',[])}
+                require(set(apis)==set(flags['collisions']), 'restored collision geometry differs')
+                for key,enabled in flags['collisions'].items():apis[key].GetCollisionEnabledAttr().Set(enabled)
+        obj.load_state(recursively_convert_to_torch(copy.deepcopy(template['state']['registry']['object_registry'][name])),serialized=False)
+        obj.visible=expected['visible']
+        require(native_properties(obj)==expected, 'pool physical properties were not restored')
+        restored[name]=expected
+    return {'active_properties':restored,'source_manifest_sha256':meta['manifest_sha256']}
+
+
 class ModelPool:
     """Exact object leases; the backend performs real physical state changes."""
     def __init__(self, world, manifest, reference, output):
@@ -163,7 +218,8 @@ class ModelPool:
         result = active_scene(scene, self.members, self.active)
         result.setdefault('metadata', {}).setdefault('ispatialgym', {})['model_pool'] = {
             'manifest_sha256': self.reference['sha256'], 'batch_id': self.manifest['batch_id'],
-            'active_names': sorted(self.active), 'inactive_omitted': len(self.members) - len(self.active)}
+            'active_names': sorted(self.active), 'inactive_omitted': len(self.members) - len(self.active),
+            'active_properties':{name:native_properties(self.members[name]) for name in self.active}}
         self.record('exported')
         return result
 

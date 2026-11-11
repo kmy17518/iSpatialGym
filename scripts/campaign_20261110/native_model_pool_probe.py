@@ -95,6 +95,10 @@ def run(manifest_path, output, mode, source=None):
                 expected=next(r for r in manifest['entries'] if r['model']==obj.model)
                 require(th.allclose(obj.scale,th.tensor(expected['scale']),atol=1e-6,rtol=0), 'restored model scale differs')
                 pos,quat=obj.get_position_orientation();want_pos,want_quat=[th.tensor(x) for x in entry['object_pose']]
+                result['last_pose_check']={'model':obj.model,'actual':[pos.tolist(),quat.tolist()],
+                    'expected':entry['object_pose'],'gravity_disabled':world.gravity_disabled_in_usd(obj),
+                    'pool_export_restoration':getattr(world,'pool_export_restoration',None)}
+                write_json_atomic(output/'result.json',result)
                 require(float(th.linalg.norm(pos-want_pos))<.002 and float(th.abs(th.dot(quat,want_quat)))>1-1e-6,
                         'restored active pose differs')
                 require(not (set(prior['stages'][i]['active'] for i in range(3))-{obj.name}) & {o.name for o in world.scene.objects},

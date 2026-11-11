@@ -262,6 +262,12 @@ class SimWorld:
         #: that every computation sees exactly the render-side and physics-side poses of a fresh process (measured
         #: 2026-09-16: without it the support table had crept by ~4e-6 m after two more rendering steps and 7 of 111
         #: (yaw, grasp) pairs of a band changed). ``park_cell`` / ``measure_floor_z`` below only raycast (no step).
+        # A physical pool export carries gravity/visibility/collision flags
+        # absent from OG's ordinary object-state JSON. Restore before recording
+        # reset references; subsequent TRO state remains authoritative.
+        if self.stable_scene.get('metadata', {}).get('ispatialgym', {}).get('model_pool', {}).get('active_properties'):
+            from ispatialgym.sampling.model_pool import restore_export
+            self.pool_export_restoration = restore_export(self.scene, og.sim, self.stable_scene)
         self.initial_state = og.sim.dump_state()
         xy = self.park_cell()
         self.floor_z = self.measure_floor_z(xy)
@@ -456,6 +462,7 @@ class SimWorld:
             observed[name] = {'category': obj.category, 'model': obj.model, 'scale': obj.scale.tolist(),
                               'position': pos.tolist(), 'orientation': quat.tolist(), 'visible': bool(obj.visible),
                               'active': name in active, 'planner_included': self.obstacle_filter(obj),
+                              'gravity_disabled_in_usd': self.gravity_disabled_in_usd(obj),
                               'joint_positions': obj.get_joint_positions().tolist() if obj.n_joints else [],
                               'joint_velocities': obj.get_joint_velocities().tolist() if obj.n_joints else [],
                               'collision_enabled': [bool(api.GetCollisionEnabledAttr().Get())
