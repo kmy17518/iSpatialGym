@@ -1,5 +1,6 @@
 import unittest
-from scripts.campaign_20261110.training_batch_probe import observe_reset_boundary
+from scripts.campaign_20261110.training_batch_probe import observe_reset_boundary, install_reset_boundary_probe
+from types import SimpleNamespace
 
 
 class ResetBoundaryTests(unittest.TestCase):
@@ -42,6 +43,41 @@ class ResetBoundaryTests(unittest.TestCase):
             scene.reset=lambda:[sim.step_physics()for _ in range(count)]
             with self.assertRaisesRegex(ValueError,'exactly one'):
                 observe_reset_boundary(scene,sim,scene.reset,lambda:{})
+
+    def test_final_checkpoint_follows_complete_loader_without_replacing_early_state(self):
+        class Sim:
+            value=0
+            steps=0
+            def step_physics(self):self.steps+=1;self.value+=1
+        sim=Sim()
+        class Scene:
+            def reset(self):sim.value=7;sim.step_physics()
+        scene=Scene()
+        class Task:
+            def load_tro_instance(self):scene.reset()
+        task=Task()
+        class Loader:
+            def restore(self):
+                self.task.load_tro_instance()
+                self.report['campaign_restoration']={'native_observation':{'value':sim.value}}
+                # Model the unchanged constraints/settle/final reset sequence.
+                sim.step_physics();sim.step_physics();sim.value=42
+                return ('native-observation','native-info')
+        runner=SimpleNamespace(InstanceLoader=Loader,og=SimpleNamespace(sim=sim))
+        loader=Loader();loader.task=task;loader.env=SimpleNamespace(scene=scene)
+        loader.report={};loader.tro=SimpleNamespace(meta=SimpleNamespace(raw={'campaign':{}}))
+        original=install_reset_boundary_probe(runner,final_pre_action=True,
+            observer=lambda *_:{'value':sim.value,'steps':sim.steps})
+        try:result=loader.restore()
+        finally:Loader.restore=original
+        self.assertEqual(result,('native-observation','native-info'))
+        report=loader.report['campaign_restoration']
+        self.assertEqual(report['native_reset_boundary_observation']['observation'],{'value':7,'steps':0})
+        self.assertEqual(report['native_observation'],{'value':8})
+        self.assertEqual(report['native_final_pre_action_observation']['observation'],{'value':42,'steps':3})
+        self.assertEqual(sim.steps,3)
+        self.assertNotIn('load_tro_instance',vars(task))
+        self.assertNotIn('reset',vars(scene))
 
 
 if __name__=='__main__': unittest.main()

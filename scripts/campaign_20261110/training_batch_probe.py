@@ -116,11 +116,14 @@ def observe_reset_boundary(scene, sim, load, observe):
     return result, observations[0]
 
 
-def install_reset_boundary_probe(runner):
+def install_reset_boundary_probe(runner, *, final_pre_action=False, observer=None):
     """Instrument only this diagnostic process; the ordinary loader is unchanged."""
     restore=runner.InstanceLoader.restore
     def observed_restore(loader, *args, **kwargs):
-        from ispatialgym.sampling.campaign_runtime import restoration_observation
+        if observer is None:
+            from ispatialgym.sampling.campaign_runtime import restoration_observation
+        else:
+            restoration_observation=observer
         task=loader.task
         load=task.load_tro_instance
         raw_load=vars(task).get('load_tro_instance')
@@ -143,6 +146,16 @@ def install_reset_boundary_probe(runner):
             'phase':'after_scene_restore_before_existing_reset_physics_step',
             'diagnostic_only':True, 'post_step_checks_unchanged':True,
             'observation':checkpoints[0]}
+        if final_pre_action:
+            # The entire native loader has returned, including constraints,
+            # grasps, settling, final reset, and its pose checks. Read only:
+            # retain the earlier checkpoint and add no simulator step.
+            loader.report['campaign_restoration']['native_final_pre_action_observation']={
+                'phase':'after_complete_native_loader_before_task_actions',
+                'diagnostic_only':True, 'earlier_checks_unchanged':True,
+                'physics_steps_added':0,
+                'observation':restoration_observation(loader.tro.meta.raw['campaign'],
+                                                       loader.env.scene, runner.og.sim)}
         return result
     runner.InstanceLoader.restore=observed_restore
     return restore
@@ -170,8 +183,10 @@ def run(root,request,output,kind):
         from ispatialgym.fastflags import fast_on
         require(fast_on('COLLECTOR_PREBUILD'),'production template compatibility is disabled')
         if value.get('observe_reset_boundary') is True:
-            install_reset_boundary_probe(run_isg)
+            install_reset_boundary_probe(run_isg,
+                final_pre_action=value.get('observe_final_pre_action') is True)
             common['reset_boundary_diagnostic']=True
+            common['final_pre_action_diagnostic']=value.get('observe_final_pre_action') is True
         world=shared_world_proof(run_isg,records)
         common['world_compatibility']=world
         shared={'signature':world['signature'],
