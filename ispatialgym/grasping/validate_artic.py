@@ -578,6 +578,14 @@ class MotionWorld:
     def __init__(self, aw: ArticWorld, mcfg: MotionConfig = MotionConfig()):
         self.aw, self.w, self.mcfg = aw, aw.w, mcfg
 
+    def push_motion(self, motion: Dict[str, Any]) -> bool:
+        """The library's closed-fist mode; isolated diagnostics may specialize it.
+
+        Ordinary library generation retains its original three motion kinds.
+        A diagnostic subclass must write outside the library/export paths.
+        """
+        return motion["motion"] == "push_close"
+
     # -- the alias's object, motion, profile and rest
 
     def setup(self, alias: str, root: str, customs_path: Optional[str] = None) -> Dict[str, Any]:
@@ -743,7 +751,7 @@ class MotionWorld:
 
         w, cfg, mcfg, arm = self.w, self.aw.cfg, self.mcfg, self.w.cfg.arm
         t0 = time.time()
-        push = motion["motion"] == "push_close"
+        push = self.push_motion(motion)
         jn, jinfo, h = motion["joint"], motion["jinfo"], variant["handle"]
         label = "push0" if push else "pull0"
         rec: Dict[str, Any] = {"schema": S.ARTIC_TRIAL, "alias": motion["alias"], "motion": motion["motion"], "variant": variant["name"],
