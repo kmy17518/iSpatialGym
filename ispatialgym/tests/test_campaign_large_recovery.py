@@ -4,6 +4,35 @@ from ispatialgym.sampling import campaign_runtime as runtime
 from ispatialgym.sampling.campaign_large_recovery import pillow_grasp_margin
 
 
+def test_soap_carry_screen_reuses_final_program_bounds(monkeypatch):
+    from ispatialgym.sampling.v2.tasks.iors_large import IORSLarge
+    from ispatialgym.sampling.campaign_large_recovery import soap_carry_oracle_screen
+    monkeypatch.setattr(runtime, 'active', lambda: True)
+    template = SimpleNamespace(scene_setup={'recovery_options': {'soap_carry_oracle_screen': True}},
+        class_id='inter_object_relation_satisfaction-ontop_large_scale_01',
+        task='inter_object_relation_satisfaction-ontop_large_scale')
+    monkeypatch.setattr(runtime, 'configuration', lambda: (None, template, None, None))
+    ik = SimpleNamespace(FINISH_MAX_EXCURSION=.6, ORACLE_SOFT_POS_TOL=.01,
+                         ORACLE_SOFT_ROT_TOL=.02, ORACLE_DIFF_IK_MAX_ITERS=100)
+    sampler = SimpleNamespace(gp=SimpleNamespace(gen=lambda key: None), ikc=ik)
+    expected = {'finish_max_excursion': .6, 'soft_pos_tol': .01,
+                'soft_rot_tol': .02, 'max_iters': 100}
+    assert IORSLarge._carry_track_kw(sampler) == expected
+    template.scene_setup = {}
+    assert IORSLarge._carry_track_kw(sampler) == {}
+    sampler.gp.gen = lambda key: key == 'carry_track_oracle' or None
+    assert IORSLarge._carry_track_kw(sampler) == expected
+    template.scene_setup = {'recovery_options': {'soap_carry_oracle_screen': True}}
+    template.class_id = 'another_class'
+    with pytest.raises(ValueError, match='audited soap class'):
+        soap_carry_oracle_screen()
+    template.scene_setup['recovery_options']['soap_carry_oracle_screen'] = 'true'
+    with pytest.raises(ValueError, match='must be boolean'):
+        soap_carry_oracle_screen()
+    monkeypatch.setattr(runtime, 'active', lambda: False)
+    assert soap_carry_oracle_screen() is False
+
+
 def test_legacy_and_other_campaigns_keep_original_grasp_selection(monkeypatch):
     monkeypatch.setattr(runtime,'active',lambda:False)
     assert pillow_grasp_margin() is None

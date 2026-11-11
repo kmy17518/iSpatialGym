@@ -6020,7 +6020,8 @@ class IORSLarge(SamplerV2):
         pose 9/45 (11.1 mm) was finished 1.12 rad away and the program check rejected the place after 1468 s (block design's re-posed
         carries take the same bound). ``{}`` when off: the tracking as before."""
         kw: Dict[str, Any] = {}
-        if bool(self.gp.gen("carry_track_oracle") or False):
+        from ispatialgym.sampling.campaign_large_recovery import soap_carry_oracle_screen
+        if bool(self.gp.gen("carry_track_oracle") or False) or soap_carry_oracle_screen():
             kw = {"finish_max_excursion": self.ikc.FINISH_MAX_EXCURSION, "soft_pos_tol": self.ikc.ORACLE_SOFT_POS_TOL,
                   "soft_rot_tol": self.ikc.ORACLE_SOFT_ROT_TOL, "max_iters": self.ikc.ORACLE_DIFF_IK_MAX_ITERS}
         rem = self.gp.gen("carry_finish_max_remaining_m")

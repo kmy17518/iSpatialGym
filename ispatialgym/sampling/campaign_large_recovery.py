@@ -7,6 +7,21 @@ from scripts.campaign_20261110.contracts import require
 SOAP_LIFT_FRAME_ENV = 'ISPATIALGYM_CAMPAIGN_SOAP_LIFT_FRAME_SCREEN'
 
 
+def soap_carry_oracle_screen():
+    """Use the final program's continuation bounds during soap candidate search."""
+    from ispatialgym.sampling import campaign_runtime as runtime
+    if not runtime.active():
+        return False
+    _, template, _, _ = runtime.configuration()
+    enabled = template.scene_setup.get('recovery_options', {}).get('soap_carry_oracle_screen', False)
+    require(type(enabled) is bool, 'soap carry screen option must be boolean')
+    if enabled:
+        require(template.class_id == 'inter_object_relation_satisfaction-ontop_large_scale_01'
+                and template.task == 'inter_object_relation_satisfaction-ontop_large_scale',
+                'soap carry screen belongs to the audited soap class')
+    return enabled
+
+
 def soap_lift_frame_rejection(sampler, stance, grasp, lift):
     """Try another lift candidate before a known late fingertip-frame failure.
 
