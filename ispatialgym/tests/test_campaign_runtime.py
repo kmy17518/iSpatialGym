@@ -34,6 +34,26 @@ def test_restored_scale_is_verified_and_mismatch_rejected():
         runtime.verify_loaded(meta, {})
 
 
+def test_observational_probe_records_loaded_joint_state_without_mutation(monkeypatch):
+    template,p,key=fixture()
+    meta=attach_tro_metadata({'ispatialgym':{}},campaign_id='fresh',split='train',template=template,
+        created_at=1,seed=1,perturbations=p,validation_key=key)['ispatialgym']['campaign']
+    joint=[.2]
+    obj=SimpleNamespace(name='target',category='book',model='abc',scale=[.9,.9,2.25],fixed_base=False,n_joints=1,
+        get_position_orientation=lambda **kw:([1,2,3],[0,0,0,1]),get_joint_positions=lambda:list(joint),
+        get_joint_velocities=lambda:[0.],get_linear_velocity=lambda:[0.,0.,0.],get_angular_velocity=lambda:[0.,0.,0.])
+    scene=SimpleNamespace(objects=[obj]);sim=SimpleNamespace(skybox=SimpleNamespace(intensity=2000.,color=[1.,1.,1.]))
+    monkeypatch.setattr(runtime.augmentation,'_lights',lambda scene:{})
+    first=runtime.restoration_observation(meta,scene,sim)
+    joint[0]=.3
+    second=runtime.restoration_observation(meta,scene,sim)
+    assert first['loaded_state']['objects']['target']['joint_positions']==[.2]
+    assert second['loaded_state']['objects']['target']['joint_positions']==[.3]
+    assert first['process_session']==second['process_session'] and first['scene_runtime_id']==second['scene_runtime_id']
+    assert second['sequence']==first['sequence']+1 and first['loaded_state_sha256']!=second['loaded_state_sha256']
+    assert joint==[.3]
+
+
 def test_campaign_metadata_passes_real_tro_parser_and_stays_strict():
     from ispatialgym.eval.targets import ISGTroMeta, SCHEMA_VERSION, TROValidationError
 

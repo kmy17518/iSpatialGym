@@ -1,0 +1,91 @@
+"""Execute an observational A/B/A probe through existing native production paths.
+
+Inputs are separate validated canaries. Outputs never allocate benchmark quota.
+A modern CPU helper must re-audit the resulting evidence before any release.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+from scripts.campaign_20261110.contracts import file_digest,require,write_json_atomic
+
+
+def inputs(root,request):
+    root=Path(root).resolve();value=json.loads(Path(request).read_text())
+    require(value['schema']=='isg-training-batch-probe-request-v1' and value['campaign_id']=='campaign_20261110','invalid native probe request')
+    records=[]
+    for ref in value['canaries']:
+        path=Path(ref['path']).resolve()
+        require(path.is_relative_to(root) and file_digest(path)==ref['sha256'],'canary review changed')
+        review=json.loads(path.read_text());require(review['validation_passed'] and not review['accepted'],'input not a validation-only canary')
+        row=review['export_record']
+        for artifact in row['artifacts'].values():
+            path=Path(artifact['path']).resolve()
+            require(path.is_relative_to(root) and file_digest(path)==artifact['sha256'],'probe input changed')
+        records.append(row)
+    require(len(records)==2 and records[0]['instance_id']!=records[1]['instance_id'],'probe needs two distinct canaries')
+    require(records[0]['render_compatibility_sha256']==records[1]['render_compatibility_sha256'],
+            'probe cannot bypass production configuration isolation')
+    return value,records
+
+
+def run(root,request,output,kind):
+    root=Path(root).resolve();output=Path(output).resolve()
+    require(output.is_relative_to(root) and not output.exists(),'probe output must be new and private')
+    value,records=inputs(root,request);output.mkdir(parents=True)
+    runtime=Path(__file__).resolve().parents[2]/'.snapshot_commit'
+    require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
+    os.environ['ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE']='1'
+    order=[0,1,0];entries=[]
+    common={'schema':'isg-training-restoration-probe-v1','campaign_id':'campaign_20261110','kind':kind,
+            'request':{'path':str(Path(request).resolve()),'sha256':file_digest(request)},
+            'probe_runtime':{'path':str(runtime),'sha256':file_digest(runtime)},'entries':entries,
+            'accepted':False,'eligible_for_goal':False,'quota_consumed':0}
+    if kind=='physics_action_open_loop':
+        from ispatialgym.oracle import run_isg
+        signatures=[run_isg.instance_signature(r['artifacts']['tro']['path'])for r in records]
+        require(signatures[0]==signatures[1],'production world signatures differ')
+        shared={}
+        for ordinal,index in enumerate(order):
+            row=records[index];destination=output/('episode_'+str(ordinal))
+            argv=['--instance',row['artifacts']['tro']['path'],'--mode','replay',
+                  '--replay',row['artifacts']['demo']['path'],'--record','hdf5','--no-goal-override','--out',str(destination)]
+            args=run_isg.parse_args(argv);code,result=run_isg.run_instance(args,argv[1],shared)
+            report=destination/row['instance_id']/'meta.json'
+            entries.append({'canary_review':value['canaries'][index],'returncode':code,'result':result,
+                            'report':{'path':str(report),'sha256':file_digest(report)}})
+            write_json_atomic(output/'probe.json',common)
+            require(code==0 and result.get('success') is True,'native batch physics episode failed')
+    else:
+        require(kind=='kinematic_observation_rendering','unknown native probe kind')
+        from ispatialgym.multienv import replay
+        manifest=output/'canaries.jsonl';manifest.write_text(''.join(json.dumps(r)+'\n'for r in records))
+        listing=output/'demos.txt';listing.write_text(''.join(str(Path(records[i]['artifacts']['demo']['path']).parent)+'\n'for i in order))
+        results=output/'results.jsonl'
+        code=replay.main(['--demos','@'+str(listing),'--campaign-manifest',str(manifest),
+            '--root',str(output/'rendered'),'--task',records[0]['variant'],'--slots','1',
+            '--scene','recorded','--results',str(results),'--repo-prefix','training_probe'])
+        rows=[(i,json.loads(line))for i,line in enumerate(results.read_text().splitlines())]
+        episodes=[(i,row)for i,row in rows if row.get('tag')=='REPLAY_DEMO']
+        outputs=[{'path':str(p),'sha256':file_digest(p)}for p in sorted((output/'rendered').rglob('*'))if p.is_file()]
+        require(code==0 and len(episodes)==3 and outputs,'native renderer did not produce three episodes and files')
+        for ordinal,(line,row)in enumerate(episodes):
+            require(Path(row['demo']).name==records[order[ordinal]]['instance_id'],'render order differs')
+            entries.append({'canary_review':value['canaries'][order[ordinal]],
+                'report':{'path':str(results),'sha256':file_digest(results),'jsonl_index':line},'outputs':outputs})
+        write_json_atomic(output/'probe.json',common)
+    # Recheck all source bytes after running; no source state or goal rewrites.
+    inputs(root,request)
+    return common
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser(description=__doc__)
+    for name in ('root','request','output'):p.add_argument('--'+name,required=True)
+    p.add_argument('--kind',required=True,choices=('physics_action_open_loop','kinematic_observation_rendering'))
+    a=p.parse_args()
+    try:print(json.dumps(run(a.root,a.request,a.output,a.kind)),flush=True)
+    finally:
+        import sys
+        og=sys.modules.get('omnigibson')
+        if og is not None and hasattr(og,'shutdown'):og.shutdown()

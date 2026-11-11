@@ -293,9 +293,46 @@ def verify_loaded(meta, physical, *, scene=None, sim=None):
             objects=tuple(SimpleNamespace(instance=name) for name in physical))
         context_observed = verify_live_context(template, scene)
         require(context_observed == recorded.get("observed_objects"), "camera context replay differs from sampling")
-    return {"observed_scales": verify_scales(physical, perturbations.scales), "scale_verified": True,
+    result = {"observed_scales": verify_scales(physical, perturbations.scales), "scale_verified": True,
             "camera_context": context_observed,
             "scene_augmentation": bool(perturbations.removed_objects), "lighting_augmentation": bool(perturbations.lighting)}
+    if os.environ.get('ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE') == '1':
+        result['native_observation'] = restoration_observation(meta, scene, sim)
+    return result
+
+
+_RESTORATION_PROBE_SESSION = None
+_RESTORATION_PROBE_SEQUENCE = 0
+
+
+def restoration_observation(meta, scene, sim):
+    """Measure actual loaded state without modifying physics or release status."""
+    global _RESTORATION_PROBE_SESSION, _RESTORATION_PROBE_SEQUENCE
+    require(scene is not None and sim is not None, 'native restoration probe needs a loaded simulator')
+    if _RESTORATION_PROBE_SESSION is None:
+        import socket
+        _RESTORATION_PROBE_SESSION = f'{socket.gethostname()}:{os.getpid()}:{time.time_ns()}'
+    _RESTORATION_PROBE_SEQUENCE += 1
+    objects = {}
+    for obj in scene.objects:
+        position, orientation = obj.get_position_orientation(frame='scene')
+        observed = {'category': obj.category, 'model': getattr(obj, 'model', None),
+            'scale': _vector(obj.scale), 'position': _plain(position), 'orientation': _plain(orientation),
+            'fixed_base': bool(obj.fixed_base)}
+        observed['joint_positions'] = _plain(obj.get_joint_positions()) if getattr(obj, 'n_joints', 0) else []
+        observed['joint_velocities'] = _plain(obj.get_joint_velocities()) if getattr(obj, 'n_joints', 0) else []
+        for name in ('linear_velocity', 'angular_velocity'):
+            getter = getattr(obj, 'get_' + name, None)
+            observed[name] = _plain(getter()) if callable(getter) else None
+        objects[obj.name] = observed
+    loaded = {'objects': objects,
+        'lights': {name: float(attr.Get()) for name, attr in augmentation._lights(scene).items()},
+        'skybox': {'intensity': float(sim.skybox.intensity), 'color': _plain(sim.skybox.color)}}
+    return {'schema': 'isg-native-restoration-observation-v1', 'process_session': _RESTORATION_PROBE_SESSION,
+        'sequence': _RESTORATION_PROBE_SEQUENCE, 'scene_runtime_id': id(scene), 'sim_runtime_id': id(sim),
+        'simulator_module': type(sim).__module__, 'scheduler_job_id': os.environ.get('SLURM_JOB_ID'),
+        'validation_key': meta['validation_key'], 'perturbations_sha256': digest(meta['perturbations']),
+        'observed_at': time.time(), 'loaded_state': loaded, 'loaded_state_sha256': digest(loaded)}
 
 
 def _plain(value):

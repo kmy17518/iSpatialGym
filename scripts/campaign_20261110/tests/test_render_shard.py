@@ -66,3 +66,16 @@ def test_render_batch_cannot_mix_global_skybox_settings(tmp_path):
         "render_compatibility_sha256": key}) for name, key in (("a", "light-a"), ("b", "light-b"))))
     with pytest.raises(c.ContractError, match="mixes scene, scale, light"):
         selected_records(path, ["/data/a", "/data/b"])
+
+
+def test_restoration_probe_allows_only_exact_aba_and_preserves_configuration_isolation(tmp_path,monkeypatch):
+    path=tmp_path/'probe.jsonl'
+    rows=[{'artifacts':{'demo':{'path':f'/data/{name}/demo.hdf5'}},'render_compatibility_sha256':'same'}for name in ('a','b')]
+    path.write_text('\n'.join(c.canonical_json(r)for r in rows))
+    with pytest.raises(c.ContractError,match='duplicated'):selected_records(path,['/data/a','/data/b','/data/a'])
+    monkeypatch.setenv('ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE','1')
+    assert len(selected_records(path,['/data/a','/data/b','/data/a']))==2
+    with pytest.raises(c.ContractError,match='duplicated'):selected_records(path,['/data/a','/data/a'])
+    rows[1]['render_compatibility_sha256']='changed'
+    path.write_text('\n'.join(c.canonical_json(r)for r in rows))
+    with pytest.raises(c.ContractError,match='mixes scene'):selected_records(path,['/data/a','/data/b','/data/a'])

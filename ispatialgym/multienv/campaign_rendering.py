@@ -1,5 +1,6 @@
 """Manifest-bound restoration for kinematic campaign observation rendering."""
 import json
+import os
 from pathlib import Path
 
 from scripts.campaign_20261110.contracts import file_digest, require, validate_campaign_block
@@ -14,7 +15,9 @@ def selected_records(manifest, demo_dirs):
         require(directory not in records, "duplicate demo in accepted manifest")
         records[directory] = row
     wanted = [str(Path(path).resolve()) for path in demo_dirs]
-    require(len(set(wanted)) == len(wanted) and wanted, "empty or duplicated campaign render input")
+    probe_repeat = (os.environ.get('ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE') == '1'
+                    and len(wanted) == 3 and wanted[0] == wanted[2] and wanted[0] != wanted[1])
+    require(wanted and (len(set(wanted)) == len(wanted) or probe_repeat), "empty or duplicated campaign render input")
     require(all(path in records for path in wanted), "render input is not in accepted manifest")
     selected = {path: records[path] for path in wanted}
     require(len({row["render_compatibility_sha256"] for row in selected.values()}) == 1,
