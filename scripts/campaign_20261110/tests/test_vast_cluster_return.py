@@ -19,8 +19,11 @@ def fixture(tmp_path):
     library = jobdir / 'inputs/library.json'
     cr.write(library, {'positive': 6})
     unit = {'index': 0, 'script': str(script), 'script_sha256': cr.digest(script), 'output': str(script.parent)}
+    for name, field in (('jobs.json', 'jobs_sha256'), ('anchors.json', 'anchors_sha256')):
+        cr.write(script.parent/name, {})
+        unit[field] = cr.digest(script.parent/name)
     prepared = target / 'prepared.json'
-    cr.write(prepared, {'units': [unit]})
+    cr.write(prepared, {'units': [unit], 'copied_library_files': {}})
     manifest = jobdir / 'native_inputs.json'
     cr.write(manifest, {'schema': 'isg-vast-map-prebuild-v1', 'new_native_instances': 0,
                        'production_released': False, 'unit_index': 0, 'source_plan': str(plan),

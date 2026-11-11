@@ -12,6 +12,8 @@ import time
 
 from scripts.campaign_20261110.storage import atomic_directory_lock
 from scripts.campaign_20261110.infra_vast import cluster_return as protocol
+from scripts.campaign_20261110.infra_vast import cluster_return_capacity as capacity_probe
+from scripts.campaign_20261110.infra_vast import cluster_return_release as release
 from scripts.campaign_20261110.infra_vast.campaign_inputs import dispatch_order
 
 
@@ -32,13 +34,14 @@ def select(root):
     base.mkdir(parents=True, exist_ok=True)
     with atomic_directory_lock(base / 'selector.lockdir'):
         now = time.time()
-        capacity_path = root / 'infra/capacity_recovery/ledger.json'
-        capacity = read(capacity_path)
+        capacity = capacity_probe.probe()
         metrics = read(root / 'vast/metrics.json')
-        if not 0 <= now-capacity['observed_at'] <= 120 or not 0 <= now-metrics['observed_at_unix'] <= 120:
+        now = time.time()
+        if capacity['status'] != 'observed' or not 0 <= now-metrics['observed_at_unix'] <= 120:
             return {'status': 'stale_observation', 'new_requests': 0}
-        slots = sum(n['bounded_8cpu_48g_slots'] for n in capacity['schedulable_capacity']['nodes']
-                    if 'titanrtx' in n['gres'] and n['node'] != 'svl9')
+        capacity_path = base/'capacity'/('probe_'+str(time.time_ns())+'.json')
+        protocol.write(capacity_path, capacity)
+        slots = capacity['compatible_available_slots']
         states = [read(p) for p in (root / 'vast/state/jobs').glob('*.json')]
         claims = [s['cluster_return'] for s in states if s.get('cluster_return', {}).get('request')]
         outstanding = protocol.unrepresented_claims(claims, capacity['observed_at'])
@@ -61,7 +64,7 @@ def select(root):
             if len(chosen) >= available:
                 break
             jid = str(job['id'])
-            if jid in staged or jid in pending_requests or job.get('tries') or job.get('instance') or job.get('history'):
+            if jid in staged or jid in pending_requests or job.get('tries') or job.get('instance') or job.get('history') or job.get('cluster_return_releases'):
                 continue
             directory = Path(job['job_dir'])
             if job.get('job_kind') != 'native_dependency' or not directory.is_relative_to(root / 'out/vast_map_prebuild'):
@@ -70,6 +73,8 @@ def select(root):
                 inputs = read(directory / 'native_inputs.json')
                 index = inputs['unit_index']
                 account = 'shiyuc' if index % 2 else 'minyeong'
+                if sum(r['account'] == account for r in chosen) >= capacity['account_slots'].get(account, 0):
+                    continue
                 target = account_root(root, account) / 'training_preparation' / Path(inputs['source_plan']).parent.name / 'build_dispatch_r1'
                 prepared = target / 'prepared.json'
                 unit = next(u for u in read(prepared)['units'] if u['index'] == index)
@@ -109,7 +114,7 @@ def submit(root, account):
     base = root / 'vast/cluster_return'
     output = owned / 'infra/capacity_recovery/cluster_return_client_r1'
     output.mkdir(parents=True, exist_ok=True)
-    report = {'submitted': [], 'errors': [], 'preserved_submission_intents': []}
+    report = {'submitted': [], 'errors': [], 'preserved_submission_intents': [], 'recoveries': []}
     audit = protocol.ImmutableFileAudit()
     with atomic_directory_lock(output / 'submit.lockdir'):
         for path in (base / 'acknowledgements').glob('*.json'):
@@ -118,18 +123,23 @@ def submit(root, account):
                 continue
             receipt = output / (path.stem+'_submitted.json')
             attempt = output / (path.stem+'_attempt.json')
-            if receipt.exists():
-                continue
-            if attempt.exists():
-                report['preserved_submission_intents'].append(str(attempt))
-                continue
             try:
+                if release.request_path(root, path).exists():
+                    continue
+                state = read(root / 'vast/state/jobs' / (ack['job_id']+'.json'))
+                if state['status'] != 'cluster_reserved' or state['cluster_return']['request'] != ack['request']:
+                    continue
+                if receipt.exists():
+                    if not any((Path(ack['unit']['output'])/n).exists() for n in ('started.json', 'terminal.json')):
+                        report['recoveries'].append(release.recover_pending(root, path, ack, receipt))
+                    continue
+                if attempt.exists():
+                    if not release.recover_withdrawal(root, path, attempt):
+                        report['preserved_submission_intents'].append(str(attempt))
+                    continue
                 request = read(ack['request']['path'])
                 if protocol.digest(ack['request']['path']) != ack['request']['sha256']:
                     raise ValueError('acknowledged request changed')
-                state = read(root / 'vast/state/jobs' / (ack['job_id']+'.json'))
-                if state['status'] != 'cluster_reserved' or state['cluster_return']['request'] != ack['request']:
-                    raise ValueError('coordinator exclusive claim missing')
                 unit = ack['unit']
                 if protocol.digest(ack['prepared']['path']) != ack['prepared']['sha256'] or protocol.digest(unit['script']) != unit['script_sha256']:
                     raise ValueError('exact prepared inputs changed')
@@ -145,25 +155,34 @@ def submit(root, account):
                         raise ValueError('exact native map command inputs changed')
                 if any((Path(unit['output']) / n).exists() for n in ('started.json', 'terminal.json')):
                     raise ValueError('source unit already executed')
-                wrapper = Path(ack['prepared']['path']).parent / 'pinned.sh'
-                command = ['sbatch', '--parsable', '--nice=1000', '-A', 'vision', '-p', 'svl,viscam',
-                           '--exclude=svl9', '--gres=gpu:titanrtx:1', '--array='+str(ack['unit_index']),
-                           '-c', '8', '--mem=48G', '--time=02:00:00', '-J', 'isg261110_map_return',
-                           '-o', str(output / (path.stem+'_%A_%a.log')), str(wrapper)]
-                value = {'observed_at': time.time(), 'acknowledgement': ref(path), 'job_id_vast': ack['job_id'],
-                         'account': account, 'unit': unit, 'command': command, 'wrapper': ref(wrapper),
-                         'status': 'submitting', 'new_native_instances': 0}
-                protocol.write(attempt, value)
-                result = subprocess.run(command, capture_output=True, text=True, timeout=60)
-                value.update(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
-                if result.returncode:
-                    raise RuntimeError('scheduler rejected exact submission: '+result.stderr)
-                jid = result.stdout.strip().split(';')[0]
-                if not jid.isdigit():
-                    raise RuntimeError('unrecognized scheduler acknowledgement; preserve intent')
-                value.update(status='submitted', job_id=jid)
-                protocol.write(receipt, value)
-                report['submitted'].append({'job_id': jid, 'vast_job_id': ack['job_id'], 'receipt': str(receipt)})
+                # Expensive immutable reads stay outside this short cross-account
+                # boundary. The second account observes the first sbatch before
+                # spending the same last physical slot.
+                with atomic_directory_lock(base/'submit_capacity.lockdir'):
+                    current = capacity_probe.probe()
+                    if current['status'] != 'observed' or current['account_slots'].get(account, 0) <= 0:
+                        report['recoveries'].append({'status': 'withdrawn_before_submission',
+                            'path': release.withdraw(root, path, ack, attempt, current)})
+                        continue
+                    wrapper = Path(ack['prepared']['path']).parent / 'pinned.sh'
+                    command = ['sbatch', '--parsable', '--nice=1000', '-A', 'vision', '-p', 'svl,viscam',
+                               '--exclude=svl9', '--gres=gpu:titanrtx:1', '--array='+str(ack['unit_index']),
+                               '-c', '8', '--mem=48G', '--time=02:00:00', '-J', 'isg261110_map_return',
+                               '-o', str(output / (path.stem+'_%A_%a.log')), str(wrapper)]
+                    value = {'observed_at': time.time(), 'acknowledgement': ref(path), 'job_id_vast': ack['job_id'],
+                             'account': account, 'unit': unit, 'command': command, 'wrapper': ref(wrapper),
+                             'status': 'submitting', 'new_native_instances': 0, 'fresh_capacity': current}
+                    protocol.write(attempt, value)
+                    result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+                    value.update(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
+                    if result.returncode:
+                        raise RuntimeError('scheduler rejected exact submission: '+result.stderr)
+                    jid = result.stdout.strip().split(';')[0]
+                    if not jid.isdigit():
+                        raise RuntimeError('unrecognized scheduler acknowledgement; preserve intent')
+                    value.update(status='submitted', job_id=jid)
+                    protocol.write(receipt, value)
+                    report['submitted'].append({'job_id': jid, 'vast_job_id': ack['job_id'], 'receipt': str(receipt)})
             except Exception as error:
                 report['errors'].append({'acknowledgement': str(path), 'error': str(error)})
     report['immutable_input_audit'] = audit.summary()

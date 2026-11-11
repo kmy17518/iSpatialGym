@@ -49,7 +49,7 @@ def validate(root, request, job, active_staging, heartbeat_jobs, remote_jobs, no
         raise ValueError('cluster-return request identity differs')
     if not 0 <= now - request['observed_at'] <= 120 or not now <= request['expires_at'] <= request['observed_at'] + 180:
         raise ValueError('cluster capacity request expired')
-    if str(job['id']) != jid or job.get('status') != 'queued' or job.get('tries', 0) != 0 or job.get('instance') or job.get('history'):
+    if str(job['id']) != jid or job.get('status') != 'queued' or job.get('tries', 0) != 0 or job.get('instance') or job.get('history') or job.get('cluster_return_releases'):
         raise ValueError('job is not never-assigned queued work')
     if jid in active_staging or jid in heartbeat_jobs or jid in remote_jobs:
         raise ValueError('job retains a stage, heartbeat, or remote assignment owner')
@@ -120,7 +120,9 @@ def reconcile(root, states, active_staging, heartbeats, remote_jobs, save_state,
     now = time.time() if now is None else now
     base = root / 'vast/cluster_return'
     heartbeat_jobs = {str(j) for hb in heartbeats.values() for j in (hb.get('running') or {})}
-    report = {'observed_at': now, 'acknowledged': [], 'rejected': [], 'deferred': []}
+    from scripts.campaign_20261110.infra_vast import cluster_return_release
+    releases = cluster_return_release.reconcile(root, states, active_staging, heartbeat_jobs, remote_jobs, save_state)
+    report = {'observed_at': now, 'acknowledged': [], 'rejected': [], 'deferred': [], 'releases': releases}
     audit = ImmutableFileAudit()
     for path in sorted((base / 'requests').glob('*.json')):
         acknowledgement = base / 'acknowledgements' / path.name
@@ -162,5 +164,6 @@ def reconcile(root, states, active_staging, heartbeats, remote_jobs, save_state,
 
 def has_pending(root):
     base = Path(root) / 'vast/cluster_return'
-    return any(not (base / 'acknowledgements' / p.name).exists() and not (base / 'rejected' / p.name).exists()
-               for p in (base / 'requests').glob('*.json'))
+    return (any(not (base / 'acknowledgements' / p.name).exists() and not (base / 'rejected' / p.name).exists()
+                for p in (base / 'requests').glob('*.json'))
+            or any(not (base / 'released' / p.name).exists() for p in (base / 'releases').glob('*.json')))
