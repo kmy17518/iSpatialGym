@@ -20,3 +20,13 @@ def test_canonical_partial_scope_does_not_verify_training_paths(tmp_path):
     assert rows['G16']['status']=='untested' and not rows['G16']['evidence']
     assert rows['G15']['chain']['verification']['complete_requirement'] is False
     assert rows['G15']['source_requirements']==[{'path':'original','sha256':'x'}]
+
+
+def test_explicit_untested_family_observation_is_not_partial_success(tmp_path):
+    write_json_atomic(tmp_path/'training_pipeline_canaries/pipeline_status.json',
+        {'campaign_id':'campaign_20261110','family_paths':[{'task':'configuration_matching-attachment',
+        'exact_configurations_with_demo_physics_export':0}]})
+    value=executed_audit(tmp_path,tmp_path,[])
+    rows=[r for r in value['requirements'] if r.get('tasks')==['configuration_matching-attachment']]
+    assert len(rows)==5
+    assert all(r['status']=='untested' and r['scope_status']=='unknown_no_executed_evidence' for r in rows)

@@ -135,6 +135,7 @@ def executed_audit(code_root, campaign_root, sources):
         'yield':'infra/goal_group_yield.json',
         'selected_assets':'training_preparation/full_scope_r1/selection_reconciliation.json',
         'dependency_jobs':'training_preparation/full_scope_r1/jobs_asset_geometry.json',
+        'full_preparation':'training_preparation/status.json',
     }
     # The canonical observer has one authoritative output; accept its established
     # validation directory or older monitor location only when exactly present.
@@ -180,7 +181,7 @@ def executed_audit(code_root, campaign_root, sources):
             'G10':('pipeline','aba_restoration'),'G11':('training_eligibility','observed_accepted_coverage'),
             'G13':('yield','attempt_and_cost_denominators'),'G14':('gate','bulk_and_canary_policy'),
             'G15':('canonical','canonical_progress'),'G18':('pipeline','family_path_coverage'),
-            'G17':('selected_assets','selected_inventory_reconciliation'),'G19':('backend_holdout','backend_gate_decisions'),'G20':('queue','queue_disposition')}
+            'G17':('full_preparation','full_selected_dependency_status'),'G19':('backend_holdout','backend_gate_decisions'),'G20':('queue','queue_disposition')}
         if key in mapping:
             label,stage=mapping[key]
             if label in observations:
@@ -195,8 +196,7 @@ def executed_audit(code_root, campaign_root, sources):
         if key=='G17':row['next_action']='Assets reconciles all selected candidates and exact dependencies; compute dispatches disjoint positive-grasp/reach builds across both accounts.'
         if key in ('G05','G06','G07','G08','G10','G18'):
             row['owners']=['/root/dataset_contract','/root'];row['next_action']='Complete corrected A/B/A physics/render probes on unchanged native99f; then independently validate each other applicable family path and model-pool switching.'
-        row['scope_status']='partial_executed_evidence'if row['evidence']else'unknown_no_executed_evidence'
-        row['status']='partial'if row['evidence']else'untested'
+        row['scope_status']='partial_executed_evidence'if row['status']=='partial'else'unknown_no_executed_evidence'
         row['last_observed_progress']=max((str(e.get('observed_at')or'')for e in row['evidence']),default=None)
         row['chain']={'dependencies':[observations[label]['reference'] for label in ('selected_assets','dependency_jobs')if label in observations] if key=='G17' or task else [],
             'owners':row['owners'],'active_work':{'state':'owned_next_action','action':row['next_action']},
