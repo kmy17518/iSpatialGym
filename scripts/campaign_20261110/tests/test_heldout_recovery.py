@@ -2,6 +2,7 @@ import pytest
 from scripts.campaign_20261110.heldout_recovery import targets
 from scripts.campaign_20261110.heldout_recovery import quota_bucket
 from scripts.campaign_20261110.heldout_recovery import recovery_state
+from scripts.campaign_20261110.heldout_recovery import scheduler_states
 from scripts.campaign_20261110.contracts import task_quotas,ContractError
 
 
@@ -45,3 +46,22 @@ def test_completed_native_geometry_remains_distinct_from_demo_failure():
     assert recovery_state(9,[],{'status':'native_passed','reason':'Own demo and replay required'})=='awaiting_validation'
     assert recovery_state(9,[],{'status':'native_preparation','reason':'Missing brace candidates'})=='engineering_blocked'
     assert recovery_state(9,[{'worker_status':'RUNNING'}],{'status':'native_passed'})=='running'
+
+
+def test_array_tasks_keep_authored_identity_when_pending_running_and_completed(monkeypatch):
+    from types import SimpleNamespace
+    calls=[]
+    def run(command,**kwargs):
+        calls.append(command)
+        if command[0]=='squeue':
+            assert '--array' in command
+            return SimpleNamespace(stdout='18440875_1|RUNNING|svl17\n18440875_2|PENDING|Priority\n')
+        assert command[-1]=='JobID,State,Reason,ExitCode'
+        return SimpleNamespace(stdout='18440875_0|COMPLETED|None|0:0\n18440875_0.batch|COMPLETED|None|0:0\n')
+    monkeypatch.setattr('scripts.campaign_20261110.heldout_recovery.subprocess.run',run)
+    states,errors=scheduler_states({'18440875_0','18440875_1','18440875_2'})
+    assert errors==[] and len(calls)==2
+    assert set(states)=={'18440875_0','18440875_1','18440875_2'}
+    assert states['18440875_0']['worker_status']=='COMPLETED'
+    assert states['18440875_1']['worker_status']=='RUNNING'
+    assert states['18440875_2']['pending_reason']=='Priority'

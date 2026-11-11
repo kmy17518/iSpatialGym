@@ -33,8 +33,11 @@ def scheduler_states(ids):
     """Read exact Slurm states; submission receipts never imply pending GPUs."""
     if not ids:return {},[]
     states={};errors=[];joined=','.join(sorted(ids))
-    commands=[['squeue','-h','-j',joined,'-o','%i|%T|%R'],
-              ['sacct','-n','-P','-j',joined,'-o','JobIDRaw,State,Reason,ExitCode']]
+    # Expand array elements while queued, and retain parent_task identities
+    # after completion. JobIDRaw can expose the internal allocation number,
+    # which cannot be joined to the exact authored array-task receipt.
+    commands=[['squeue','--array','-h','-j',joined,'-o','%i|%T|%R'],
+              ['sacct','-n','-P','-j',joined,'-o','JobID,State,Reason,ExitCode']]
     for command in commands:
         try:
             p=subprocess.run(command,capture_output=True,text=True,timeout=20,check=True)
@@ -122,7 +125,8 @@ def publish(root):
                      'prepared_camera_hamper_recovery_r1.json','prepared_scaling_model_admission_r1.json',
                      'prepared_category_jar_brace_r1.json','prepared_scaling_native_regions_r1.json',
                      'prepared_classroom_native_regions_r1.json','prepared_under_model_group_r2.json',
-                     'prepared_axial_passed_groups_r1.json','prepared_under_model_stance86_r1.json'):
+                     'prepared_axial_passed_groups_r1.json','prepared_under_model_stance86_r1.json',
+                     'prepared_under_category_remaining390_r1.json'):
         receipt=root/'infra/heldout_recovery'/filename
         if receipt.exists():
             directory=pathlib.Path(load(receipt)['controller'])
