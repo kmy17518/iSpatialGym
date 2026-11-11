@@ -143,6 +143,26 @@ def compact_family(family):
         'aba_status':{key:value.get('status')for key,value in family.get('aba_restoration',{}).items()},
         'model_pool_status':family.get('model_pool_switch_active_only_export',{}).get('status')}
 
+def compact_model_pool(value):
+    """Keep executed stage facts and references without duplicating native captures."""
+    attempts=[]
+    for attempt in value.get('attempts',[]):
+        native=attempt.get('result',{})
+        row={key:attempt.get(key,native.get(key)) for key in
+             ('job_id','stage','mechanics_passed','independent_load_render_passed','failure')}
+        row['observed_stages']=attempt.get('observed_stages',len(native['stages']) if 'stages' in native else None)
+        row['evidence']=attempt.get('evidence')
+        attempts.append(row)
+    verified=value.get('verification',{})
+    return {'status':value.get('status'),'required_model_count':value.get('required_model_count'),
+        'benchmark_credit':0,'production_released':False,'blocker':value.get('blocker'),
+        'unverified':value.get('unverified',[]),'attempts':attempts,
+        'verification':{key:verified.get(key)for key in
+            ('scope','switch','independent_restore','stages_each','scene_loads_for_switch','pool_rebuilds','clean_exit')},
+        'process_accounting':{key:value.get('process_accounting',{}).get(key)for key in
+            ('observed_at','job_id','record','query_returncode')}}
+
+
 def executed_audit(code_root, campaign_root, sources):
     """Join authoritative observations without treating checklist placeholders as failures."""
     code_root,campaign_root=Path(code_root),Path(campaign_root)
@@ -217,11 +237,7 @@ def executed_audit(code_root, campaign_root, sources):
             row['next_action']=value.get('next_action','Root must execute model-pool preload/activation/active-only export and audit independent reloads.')
             if row['evidence']:
                 row['evidence'][-1]['scope']='Only the explicit model pair and native stages; process, independent restore, TRO, demo and action replay remain separate.'
-                row['evidence'][-1]['facts']={'status':value.get('status'),'required_model_count':value.get('required_model_count'),
-                    'benchmark_credit':0,'production_released':False,'blocker':value.get('blocker'),
-                    'unverified':value.get('unverified',[]),'attempts':[{
-                        key:attempt.get(key) for key in ('job_id','stage','mechanics_passed','independent_load_render_passed','observed_stages','failure')}
-                        for attempt in value.get('attempts',[])]}
+                row['evidence'][-1]['facts']=compact_model_pool(value)
 
         if key=='G17':row['next_action']='Assets reconciles all selected candidates and exact dependencies; compute dispatches disjoint positive-grasp/reach builds across both accounts.'
         if key in ('G05','G06','G07','G08','G10','G18'):

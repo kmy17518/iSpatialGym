@@ -53,3 +53,28 @@ def test_pool_mechanics_and_failed_restore_stay_narrow_partial_evidence(tmp_path
     assert facts['attempts'][0]['failure']['message']=='teardown failed'
     assert facts['unverified']==['TRO_integration','physics_action_replay']
     assert row['next_action']=='Run corrected restore.'
+
+
+def test_nested_pool_results_keep_verified_stages_and_old_failure_without_native_payload(tmp_path):
+    import json
+    evidence={'path':'/campaign/switch/result.json','sha256':'a'*64}
+    write_json_atomic(tmp_path/'training_preparation/pool_pair_r1/status.json',{
+        'campaign_id':'campaign_20261110','status':'scoped_mechanics_verified','required_model_count':2,
+        'attempts':[{'job_id':'old','failure':{'message':'pose differs'},'observed_stages':0},
+            {'job_id':'new','stage':'switch','evidence':evidence,'result':{'mechanics_passed':True,
+                'stages':[{'large_capture':'x'*10000}]*3}},
+            {'job_id':'new','stage':'restore','result':{'independent_load_render_passed':True,'stages':[{}, {}, {}]}}],
+        'verification':{'switch':evidence,'stages_each':3,'clean_exit':True},
+        'process_accounting':{'job_id':'new','record':['new','COMPLETED','0:0','1160'],'query_returncode':0},
+        'unverified':['TRO_integration','oracle_demo','physics_action_replay']})
+    row=next(r for r in executed_audit(tmp_path,tmp_path,[])['requirements']if r['id']=='G16')
+    facts=row['evidence'][0]['facts']
+    assert row['status']=='partial'and not row['chain']['verification']['complete_requirement']
+    assert facts['attempts'][0]['failure']['message']=='pose differs'
+    assert facts['attempts'][1]['mechanics_passed'] is True
+    assert facts['attempts'][2]['independent_load_render_passed'] is True
+    assert [r['observed_stages']for r in facts['attempts']]==[0,3,3]
+    assert facts['attempts'][1]['evidence']==facts['verification']['switch']==evidence
+    assert facts['verification']['clean_exit'] is True
+    assert facts['process_accounting']['record'][1:3]==['COMPLETED','0:0']
+    assert len(json.dumps(facts))<2000
