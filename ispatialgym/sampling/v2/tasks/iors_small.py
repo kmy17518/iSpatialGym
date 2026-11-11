@@ -6032,8 +6032,53 @@ class IORSSmall(SamplerV2):
         xy = st.world(depth_t, lat)
         pos = th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2]) + shelf_goal_dz(getattr(self, "shelf_start", None), self.hull["target"], t_pose, t_quat)])
         if raised is not None:
-            pos = pos + th.tensor([0.0, 0.0, self.release_raise(pos, t_quat, p_hull_w, raised)])
+            pos = self.raised_nextto_goal(pos, t_quat, p_hull_w, raised, st, depth_t, lat_init, p_lat, t_lat, gap)
         return pos, t_quat
+
+    def raised_nextto_goal(self, pos, quat, partner_hull, raised, stance, depth, lat_init, p_lat, t_lat, gap):
+        """For the audited crayon candidate, compose existing legal gaps with native raised clearance.
+
+        This is a source proposal only. Fixed campaign goals return before this branch and cannot move.
+        Each proposal retains the original orientation, side, 5 mm clearance and 30 mm height cap.
+        """
+        enabled = self.gen("crayon_raised_release_gap_fallback", False)
+        if type(enabled) is not bool:
+            raise Reject("spec", "crayon_raised_release_gap_fallback must be boolean")
+        if enabled:
+            models = self.choice.models
+            identity = tuple((models[r].category, models[r].model) for r in ("target", "partner"))
+            if (self.gp.variant != "inter_object_relation_satisfaction-nextto_small_scale-crayon-ruler-pedestal_table"
+                    or self.relation != "nextto" or identity != (("crayon", "coapeh"), ("ruler", "gajhql"))
+                    or getattr(self, "_campaign_pair_active", None) is not None
+                    or raised["partner_clearance_m"] != .005 or raised["max_raise_m"] != .03):
+                raise Reject("spec", "raised gap fallback belongs to the exact unfixed crayon/ruler source and original clearance limits")
+        try:
+            return pos + th.tensor([0., 0., self.release_raise(pos, quat, partner_hull, raised)])
+        except Reject as original:
+            if not enabled or original.reason != "release_sweep":
+                raise
+            trials = [{"gap_m": float(gap), "failure": str(original), "clearance": dict(self.raised_release_facts or {})}]
+            # These are the same bounded lateral proposals used by avoid_release_sweep.
+            for candidate_gap in (float(self.pair["g_NT"]) - .006, float(self.pair["g_NT"]) - .003):
+                if candidate_gap <= gap:
+                    continue
+                _, lateral = nearer_side_lateral(lat_init, (float(p_lat.min()), float(p_lat.max())),
+                                                (float(t_lat.min()), float(t_lat.max())), candidate_gap)
+                xy = stance.world(depth, lateral)
+                candidate = th.tensor([float(xy[0]), float(xy[1]), float(pos[2])])
+                try:
+                    height = self.release_raise(candidate, quat, partner_hull, raised)
+                except Reject as failure:
+                    if failure.reason != "release_sweep":
+                        raise
+                    trials.append({"gap_m": candidate_gap, "failure": str(failure), "clearance": dict(self.raised_release_facts or {})})
+                    continue
+                self.raised_release_facts["gap_recovery"] = {"original_gap_m": float(gap), "chosen_gap_m": candidate_gap,
+                                                            "unchanged_orientation": True, "prior_failures": trials}
+                return candidate + th.tensor([0., 0., height])
+            logger = logging.getLogger(__name__)
+            logger.info("crayon raised-gap proposals exhausted: %s", trials)
+            raise original
 
     # -- raised release (owner 2026-10-14 ~01:51, nextto#03: "try the higher release: lift the spoon about 2 cm so the fingers open above
     #    the chopstick ... not too high - just so that the fingers don't touch") --
