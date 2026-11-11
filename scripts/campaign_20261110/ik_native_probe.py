@@ -23,7 +23,8 @@ OBSERVATION_ENV_KEYS = ('ISGE_CODE', 'ISPATIALGYM_EXACT_IK_MANIFEST',
     'ISPATIALGYM_EXACT_IK_LOCAL_CACHE', 'ISPATIALGYM_EXACT_IK_METRICS',
     'ISPATIALGYM_EXACT_IK_PRODUCER', 'ISGF_SAMPLING_CACHE',
     'ISPATIALGYM_GRASP_LIBRARY_V2', 'ISPATIALGYM_REACH_MAPS',
-    'ISGF_ASSET_CACHE', 'KIT_TPL_NFS_ROOT', 'KIT_TEX_STORE')
+    'ISPATIALGYM_MAP_OVERLAY_SHARDS', 'ISGF_ASSET_CACHE',
+    'KIT_TPL_NFS_ROOT', 'KIT_TEX_STORE')
 
 
 def sha(path):
@@ -63,6 +64,17 @@ def descendant(path, root):
     if not path.is_relative_to(root):
         raise ValueError('probe input/output outside its campaign root')
     return path
+
+
+def isolate_probe_writes(output, env):
+    """Keep writable sampler telemetry out of the preserved source job."""
+    output = Path(output).resolve()
+    previous = {key: env.get(key) for key in
+                ('ISPATIALGYM_SAMPLING_CACHE', 'ISPATIALGYM_MAP_OVERLAY_SHARDS')}
+    env['ISPATIALGYM_SAMPLING_CACHE'] = str(output / 'ordinary_sampling_cache')
+    env['ISPATIALGYM_MAP_OVERLAY_SHARDS'] = str(output / 'map_overlay')
+    return {'previous': previous, 'effective': {key: env[key] for key in previous},
+            'source_files_modified': False}
 
 
 def validate_spec(spec, output):
@@ -135,11 +147,12 @@ def main():
         raise ValueError('effective exact-IK manifest differs from probe spec')
     # Only typed, explicitly imported witnesses may carry across this experiment.
     # Other sampler caches begin empty for each probe and never touch the source.
-    os.environ['ISPATIALGYM_SAMPLING_CACHE'] = str(output / 'ordinary_sampling_cache')
+    write_isolation = isolate_probe_writes(output, os.environ)
     report = {'schema': SCHEMA, 'campaign_id': CAMPAIGN, 'diagnostic_only': True,
               'benchmark_credit': 0, 'eligible_for_admission_or_acceptance': False,
               'spec_sha256': sha(args.spec), 'snapshot': str(paths['snapshot']),
               'reference_index': spec['reference_index'], 'instance_publication_forbidden': True,
+              'write_isolation': write_isolation,
               'started_at': datetime.now(timezone.utc).isoformat(), 'status': 'starting', 'queries': []}
 
     def save():

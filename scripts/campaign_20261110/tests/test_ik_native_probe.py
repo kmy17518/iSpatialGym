@@ -6,7 +6,8 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from scripts.campaign_20261110.ik_native_probe import (CAMPAIGN, SCHEMA, sha, validate_spec,
-    compatibility_difference, write_observation_environment, observe_native_shutdown)
+    compatibility_difference, write_observation_environment, observe_native_shutdown,
+    isolate_probe_writes)
 
 
 class ProbeBoundaryTests(unittest.TestCase):
@@ -92,6 +93,24 @@ class ProbeBoundaryTests(unittest.TestCase):
             self.assertEqual(events, ['flushed', ('native_shutdown', ('argument',), {'flag': True})])
             restore()
             self.assertIs(module.shutdown, original)
+
+    def test_inherited_source_overlay_writes_are_redirected_before_native_import(self):
+        source = self.root / 'out/preserved_source/map_overlay'
+        source.mkdir(parents=True)
+        original = source / 'old.jsonl'
+        original.write_text('{"preserved":true}\n')
+        env = {'ISPATIALGYM_MAP_OVERLAY_SHARDS': str(source),
+               'ISPATIALGYM_MAP_OVERLAY': '/immutable/native/maps',
+               'ISPATIALGYM_SAMPLING_CACHE': '/old/cache',
+               'ISPATIALGYM_EXACT_IK_LOCAL_CACHE': '/account/typed/cache'}
+        proof = isolate_probe_writes(self.output, env)
+        self.assertEqual(env['ISPATIALGYM_MAP_OVERLAY_SHARDS'], str(self.output / 'map_overlay'))
+        self.assertEqual(env['ISPATIALGYM_SAMPLING_CACHE'], str(self.output / 'ordinary_sampling_cache'))
+        self.assertEqual(env['ISPATIALGYM_MAP_OVERLAY'], '/immutable/native/maps')
+        self.assertEqual(env['ISPATIALGYM_EXACT_IK_LOCAL_CACHE'], '/account/typed/cache')
+        self.assertEqual(proof['previous']['ISPATIALGYM_MAP_OVERLAY_SHARDS'], str(source))
+        self.assertEqual(list(source.iterdir()), [original])
+        self.assertEqual(original.read_text(), '{"preserved":true}\n')
 
 
 if __name__ == '__main__':
