@@ -49,6 +49,27 @@ self_destroy() {
   fi
   sleep infinity
 }
+# Every new boot checks private control before any GPU initialization or job
+# dispatch. A stopped training disk can only archive its original files.
+POLICY=/work/campaign_boot_policy.json
+if ! $S5 cp "$ISG_S3/bundle/boot_policy.json" "$POLICY" >/dev/null 2>&1; then
+  heartbeat recovery_blocked "private boot policy unavailable"
+  sleep infinity
+fi
+if ! mode=$(python3 "$RUN/recovery.py" mode "$POLICY" "$ISG_INSTANCE"); then
+  heartbeat recovery_blocked "invalid private boot policy"
+  sleep infinity
+fi
+if [[ "$mode" == recover ]]; then
+  heartbeat recovery "archive existing stopped training outputs only"
+  if timeout 1200 python3 "$RUN/recovery.py" recover "$POLICY" "$ISG_INSTANCE"; then
+    heartbeat recovery_complete "awaiting cluster archive verification"
+  else
+    heartbeat recovery_blocked "archive failed; disk preserved"
+  fi
+  upload_logs
+  sleep infinity
+fi
 heartbeat boot
 ( sleep "${ISG_MAX_LIFETIME_S:-21600}"; self_destroy "rental lifetime cap" ) &
 
