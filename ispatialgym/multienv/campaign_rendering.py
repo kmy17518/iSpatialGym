@@ -28,8 +28,8 @@ def selected_records(manifest, demo_dirs):
 def checked_metadata(record, demo_dir):
     demo_dir = Path(demo_dir).resolve()
     require(Path(record["artifacts"]["demo"]["path"]).resolve() == demo_dir / "demo.hdf5", "manifest demo path mismatch")
-    for kind in ("tro", "demo", "report", "sidecar"):
-        item = record["artifacts"][kind]
+    require({'tro', 'demo', 'report', 'sidecar'} <= set(record['artifacts']), 'incomplete render inputs')
+    for kind, item in record["artifacts"].items():
         require(file_digest(item["path"]) == item["sha256"], f"render input {kind} changed after export")
     with open(record["artifacts"]["tro"]["path"]) as stream:
         meta = json.load(stream)["ispatialgym"]

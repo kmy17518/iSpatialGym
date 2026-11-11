@@ -8,6 +8,34 @@ from scripts.campaign_20261110 import contracts as c, export_release as ex
 from scripts.campaign_20261110.tests.test_group_lane import candidate, claim, reservations
 
 
+def test_recorded_crop_identity_ignores_copy_path_but_preserves_background(tmp_path):
+    tro = {'ispatialgym': {'object_bindings': {'target': {'scene_object_name': 'target_0'}}}}
+    def scene(path, target, wall):
+        c.write_json_atomic(path, {'init_info': {'args': {'scene_file': str(path)}},
+            'state': {'registry': {'object_registry': {
+                'target_0': {'root_link': {'pos': [target, 0, 0]}},
+                'wall_0': {'root_link': {'pos': [wall, 0, 0]}}}}}})
+    a, b = tmp_path/'a.json', tmp_path/'b.json'
+    scene(a, 1, 3); scene(b, 2, 3)
+    audit = ex.ArtifactAudit(tmp_path, 0)
+    identity_a, ref_a = ex.recorded_crop_identity({'mode': 'region', 'loaded_scene_file': str(a)}, tro, audit)
+    identity_b, ref_b = ex.recorded_crop_identity({'mode': 'region', 'loaded_scene_file': str(b)}, tro, audit)
+    assert identity_a == identity_b and ref_a != ref_b
+    assert ref_a['sha256'] == c.file_digest(a)
+    # No tolerance is introduced: even tiny changes to untouched objects split the batch.
+    scene(b, 2, 3.000001)
+    changed, _ = ex.recorded_crop_identity({'mode': 'region', 'loaded_scene_file': str(b)}, tro, audit)
+    assert changed != identity_a
+    changed, _ = ex.recorded_crop_identity({'mode': 'rooms', 'loaded_scene_file': str(a)}, tro, audit)
+    assert changed != identity_a
+
+
+def test_recorded_crop_identity_fails_on_missing_scene(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        ex.recorded_crop_identity({'loaded_scene_file': str(tmp_path/'missing')},
+            {'ispatialgym': {'object_bindings': {}}}, ex.ArtifactAudit(tmp_path, 0))
+
+
 def exported_fixture(root):
     f, review = candidate(root, 1)
     claim(root, f, review)

@@ -8,6 +8,7 @@ final split. A release is visible only after the entire audit has passed.
 from __future__ import annotations
 
 import argparse
+import copy
 from collections import Counter, defaultdict
 from contextlib import ExitStack, closing
 from dataclasses import asdict, replace
@@ -111,6 +112,43 @@ class ArtifactAudit:
         return path
 
 
+def recorded_crop_identity(crop, tro, auditor):
+    """Hash saved background content, retaining its exact file as provenance.
+
+    Task objects and robots are restored per episode. The exclusions match the
+    native ``_scene_leaves`` check, but this export uses exact equality, without
+    numerical rounding or a relaxed scene tolerance.
+    """
+    if not crop or not crop.get('loaded_scene_file'):
+        return crop, None
+    path = Path(crop['loaded_scene_file']).resolve()
+    reference = {'path': str(path), 'sha256': file_digest(path)}
+    doc = copy.deepcopy(read(auditor.check(reference)))
+    names = {b.get('scene_object_name') for b in tro['ispatialgym']['object_bindings'].values()
+             if isinstance(b, dict) and b.get('scene_object_name')}
+    names.update(k for k, v in tro.items() if isinstance(v, dict) and 'root_link' in v)
+    for section in (doc.get('state', {}).get('registry', {}).get('object_registry', {}),
+                    doc.get('objects_info', {}).get('init_info', {})):
+        for name in list(section):
+            if name in names or name.startswith('robot'):
+                del section[name]
+    doc.get('metadata', {}).get('task', {}).pop('robot_poses', None)
+    doc.get('init_info', {}).get('args', {}).pop('scene_file', None)
+    leaves = {}
+    def walk(value, prefix=''):
+        if isinstance(value, dict):
+            for key, child in value.items(): walk(child, prefix+'/'+key)
+        elif isinstance(value, list):
+            for index, child in enumerate(value): walk(child, prefix+'['+str(index)+']')
+        elif not (prefix.endswith('/is_asleep') or '/lin_vel[' in prefix or
+                  '/ang_vel[' in prefix or '/non_kin/AABB/' in prefix):
+            leaves[prefix] = value
+    walk(doc)
+    identity = {k: v for k, v in crop.items() if k != 'loaded_scene_file'}
+    identity.update(identity_schema='isg-recorded-crop-background-v1', background_sha256=digest(leaves))
+    return identity, reference
+
+
 def normalize_record(row, *, root, started_at, templates, reservations, reservation_hashes, auditor):
     artifacts = row.get("artifacts") or {kind: {"path": row[kind], "sha256": row[kind + "_sha256"]}
                                         for kind in ("tro", "sidecar", "demo", "report")}
@@ -163,10 +201,14 @@ def normalize_record(row, *, root, started_at, templates, reservations, reservat
     require_validation(key, evidence, campaign_started_at=started_at)
     report_variant = report.get("variant") or template.class_id
     runtime = block.get("runtime", {})
+    crop_identity, scene_reference = recorded_crop_identity(
+        report.get('scene_crop'), read(artifacts['tro']['path']), auditor)
+    if scene_reference is not None:
+        artifacts = {**artifacts, 'recorded_scene': scene_reference}
     # A shared skybox is global. Absolute lighting, actual scales, removals and
     # the exact code/data/physics key all participate in compatibility.
     render_config = {"physical_template": physical_template(template), "validation_key": row["validation_key"],
-                     "variant": report_variant, "scene_mode": "recorded", "scene_crop": report.get("scene_crop"),
+                     "variant": report_variant, "scene_mode": "recorded", "scene_crop": crop_identity,
                      "perturbations": block["perturbations"], "augmentation": runtime.get("augmentation", {})}
     result = {"instance_id": row["instance_id"], "campaign_id": block["campaign_id"], "split": row["split"],
               "sampling_split": row["sampling_split"], "task": template.task, "class_id": template.class_id,
@@ -178,6 +220,7 @@ def normalize_record(row, *, root, started_at, templates, reservations, reservat
               "artifacts": artifacts, "validation_key": row["validation_key"], "gate": row["gate"],
               "evidence": row["evidence"], "allocation_source": row["allocation_source"],
               "perturbations": block["perturbations"], "runtime_augmentation": runtime.get("augmentation", {}),
+              "recorded_scene_identity": crop_identity,
               "render_compatibility_sha256": digest(render_config)}
     return result, template
 
