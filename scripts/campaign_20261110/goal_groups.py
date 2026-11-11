@@ -219,6 +219,23 @@ def bind_runtime_definition(template: Template, runtime_template_dir, *, runtime
         "runtime_bddl_sha256": snapshots[1]["sha256"], "runtime_bddl_equivalence": proof})
 
 
+def native_base_push_endpoint(anchor, target):
+    """Use the recorded post-settle endpoint, not the stale initial draw summary."""
+    from ispatialgym.sampling.campaign_pair_goals import pose
+
+    source = anchor['sources']['tro']
+    require(file_digest(source['path']) == source['sha256'], 'base-push source TRO changed after audit')
+    runtime = read_json(source['path'])['ispatialgym'].get('campaign', {}).get('runtime', {})
+    endpoint = runtime.get('planned_goal_poses', {}).get(target)
+    require(endpoint is not None and endpoint == anchor.get('planned_goal_poses', {}).get(target),
+            'base-push source lacks its recorded post-settle endpoint')
+    require(isinstance(endpoint, (list, tuple)) and len(endpoint) == 2,
+            'base-push source endpoint has invalid native pose format')
+    pose({'position': endpoint[0], 'orientation': endpoint[1]}, 'recorded base-push endpoint')
+    return endpoint, {'method':'recorded_native_post_settle_endpoint',
+                      'source_tro':{'path':source['path'],'sha256':source['sha256']}}
+
+
 def with_alignment_buckets(template: Template, native_range_deg, *, source):
     """Bind equal thirds of a measured/applied native range, without extending it."""
     require(template.task.startswith("alignment-"), "alignment bucket policy requires an alignment template")
@@ -610,13 +627,14 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             matching = [row for row in sides if row["name"] == push.get("side")]
             require(len(matching) == 1 and push.get("direction") and push.get("face"),
                     "large push anchor lacks audited push and partner side geometry")
-            require(push.get("goal_pose") and len(push["goal_pose"]) == 2, "large push anchor lacks its native horizontal endpoint")
-            plan["release_pose"] = {"position": push["goal_pose"][0], "orientation": push["goal_pose"][1]}
+            endpoint, endpoint_proof = native_base_push_endpoint(anchor, plan['target_name'])
+            plan['base_push_source_endpoint'] = endpoint_proof
+            plan["release_pose"] = {"position": endpoint[0], "orientation": endpoint[1]}
             plan["base_push"] = {key: push[key] for key in ("side", "face", "direction", "goal_gap_m", "nextto_bound_m")}
             plan["base_push"]["side_inward"] = matching[0]["inward"]
             if relation == "nextto" and not reuse_anchor_goal:
                 changed_goal, changed_release, gap = vary_base_push_gap(target,
-                    push["goal_pose"], inward=matching[0]["inward"],
+                    endpoint, inward=matching[0]["inward"],
                     gap_max=push["nextto_bound_m"], observed_gap=push["goal_gap_m"],
                     fraction=int(digest({"group": group_id, "anchor": anchor["instance_id"]})[:16], 16) / (2 ** 64 - 1))
                 plan["goal_pose"] = {"position": changed_goal[0], "orientation": changed_goal[1]}

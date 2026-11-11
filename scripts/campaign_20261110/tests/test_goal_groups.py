@@ -365,6 +365,53 @@ def test_large_under_author_requires_hashed_native_drop_contact_and_fixed_endpoi
         g.prepare_group(**kwargs, group_id='bad_drop', output=tmp_path/'groups/bad_drop')
 
 
+def test_base_push_siblings_use_native_post_settle_endpoint(tmp_path):
+    import pytest
+    job, ledger, tro_path, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    partner = c.ObjectRef('table.n.02_1', 'partner', 'table', 'p', c.digest('partner'), ready=True, readiness_source='test')
+    template = replace(template, task='inter_object_relation_satisfaction-nextto_large_scale', objects=template.objects+(partner,))
+    name = template.objects[0].instance
+    endpoint = [[.938295, 13.320756, .490933], [0., 0., 0., 1.]]
+    settled = [[.938294, 13.320746, .490933], [0., 0., 0., 1.]]
+    anchor['template_meta'].update(bindings=[{'name':name,'role':'target'}, {'name':partner.instance,'role':'partner'}],
+        template_facts={'nextto':{'sides':[{'name':'+x','inward':[-1.,0.]}]}})
+    anchor['tro']['ispatialgym']['object_bindings'][name]['scene_object_name'] = 'target_scene'
+    anchor['tro']['ispatialgym']['object_bindings'][partner.instance] = {'category':'table','model':'p'}
+    anchor['bound_object_poses'] = {partner.instance:[[0.,13.,.7],[0.,0.,0.,1.]]}
+    anchor['planned_goal_poses'] = {name:endpoint}
+    anchor['summary'].update(goal_check={'settled_poses':{'target_scene':settled}}, nextto={
+        'side':'+x','face':'+x','direction':[-1.,0.,0.], 'goal_gap_m':.1277,'nextto_bound_m':.2837,
+        'goal_pose':[[.935557,13.321057,.495631],[0.,0.,0.,1.]]})
+    tro = g.read_json(tro_path)
+    tro['ispatialgym']['campaign'] = {'runtime':{'planned_goal_poses':{name:endpoint}}}
+    c.write_json_atomic(tro_path, tro)
+    anchor['sources']['tro']['sha256'] = c.file_digest(tro_path)
+    kwargs = dict(anchor=anchor, template=template, campaign_id='new', code_sha256=c.file_digest(code/'.snapshot_commit'),
+                  physics_sha256=c.digest('physics'), data_sha256=c.digest('maps'), magnitude_range=[0,1])
+    for reuse in (True, False):
+        out = tmp_path/'groups'/str(reuse)
+        g.prepare_group(**kwargs, group_id=str(reuse), output=out, reuse_anchor_goal=reuse)
+        plan = g.read_json(out/'goal_plan.json')
+        assert plan['base_push_source_endpoint']['source_tro']['sha256'] == c.file_digest(tro_path)
+        assert plan['release_pose']['position'][2] == endpoint[0][2]
+        if reuse:
+            assert plan['release_pose']['position'] == endpoint[0]
+            assert plan['goal_pose']['position'] == settled[0]
+        else:
+            # Native-region gap proposals shift both endpoints together; settle
+            # displacement must not be reintroduced as a fixed-start error.
+            assert [a-b for a,b in zip(plan['release_pose']['position'], plan['goal_pose']['position'])] == pytest.approx(
+                [a-b for a,b in zip(endpoint[0],settled[0])])
+    tro['ispatialgym']['campaign']['runtime']['planned_goal_poses'] = {}
+    c.write_json_atomic(tro_path, tro)
+    with pytest.raises(c.ContractError, match='TRO changed'):
+        g.native_base_push_endpoint(anchor, name)
+    anchor['sources']['tro']['sha256'] = c.file_digest(tro_path)
+    with pytest.raises(c.ContractError, match='post-settle endpoint'):
+        g.native_base_push_endpoint(anchor, name)
+
+
 def test_alignment_buckets_use_applied_native_range_without_widening(tmp_path):
     import pytest
     _, _, _, template, _ = GoalGroupControllerTests().fixture(tmp_path)

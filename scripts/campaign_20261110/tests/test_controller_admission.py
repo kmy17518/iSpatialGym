@@ -113,6 +113,19 @@ def test_legacy_single_group_binds_actual_native_identity_for_new_queue(tmp_path
         admission.bind_missing_runtime_identity(template, anchor)
 
 
+def test_held_push_endpoint_author_has_distinct_scoped_identity(tmp_path, monkeypatch):
+    _, template, _ = anchor_fixture(tmp_path, monkeypatch, split='eval_category',
+        task='inter_object_relation_satisfaction-nextto_large_scale')
+    snapshot = tmp_path/'code/snapshot'
+    revision = 'held_native_push_endpoint_v1'
+    old = admission.admission_id(template, snapshot, {}, 'eval_category')
+    assert old != admission.admission_id(template, snapshot, {}, 'eval_category', revision)
+    with pytest.raises(c.ContractError, match='unsupported admission author revision'):
+        admission.admission_id(template, snapshot, {}, 'eval_standard', revision)
+    with pytest.raises(c.ContractError, match='unsupported admission author revision'):
+        admission.admission_id(replace(template, task='object_scaling'), snapshot, {}, 'eval_category', revision)
+
+
 def test_standard_admission_preserves_default_contract_ownership_and_sibling_capacity(tmp_path, monkeypatch):
     _, template, _ = anchor_fixture(tmp_path, monkeypatch)
     cfg = {"admission_split": "eval_standard", "admitted_classes": [template.class_id]}

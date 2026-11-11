@@ -138,7 +138,9 @@ def admission_id(template, snapshot, perturbations, split="train", author_revisi
     if author_revision is not None:
         standard = split == 'eval_standard' and author_revision in ('standard_native_coverage_v1', 'standard_native_opening_v1')
         held_opening = split in ('eval_model', 'eval_category') and author_revision == 'held_native_opening_v1'
-        require(standard or held_opening, 'unsupported admission author revision')
+        held_push = split in ('eval_model', 'eval_category') and author_revision == 'held_native_push_endpoint_v1' and template.task in (
+            'inter_object_relation_satisfaction-nextto_large_scale', 'inter_object_relation_satisfaction-touching_large_scale')
+        require(standard or held_opening or held_push, 'unsupported admission author revision')
         identity['author_revision'] = author_revision
     return digest(identity)
 
