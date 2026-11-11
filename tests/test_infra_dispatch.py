@@ -124,6 +124,19 @@ class DispatchTests(unittest.TestCase):
         path.write_text('{"schema":"wrong"}')
         with self.assertRaises(ValueError): D.enqueue(self.root, 'bad_index', command)
 
+    def test_enqueue_preserves_already_readable_immutable_metadata(self):
+        paths = [self.code/'.snapshot_commit', self.config,
+                 self.root/'manifests/family_index_reservations.json']
+        for path in paths:
+            path.chmod(0o640)
+        before = {path: (path.stat().st_ctime_ns, D.file_digest(path)) for path in paths}
+        real_chmod = D.os.chmod
+        with patch.object(D.os, 'chmod', wraps=real_chmod) as chmod:
+            D.enqueue(self.root, 'readable', self.command, backends=['shiyuc_svl'])
+        changed = {Path(call.args[0]) for call in chmod.call_args_list}
+        self.assertFalse(set(paths) & changed)
+        self.assertEqual(before, {path: (path.stat().st_ctime_ns, D.file_digest(path)) for path in paths})
+
     def test_vast_activation_retries_contention_without_resubmission(self):
         path = D.enqueue(self.root, 'fresh', self.command, backends=['vast_5090'])
         payload = json.loads(path.read_text())

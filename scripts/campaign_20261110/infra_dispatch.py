@@ -158,8 +158,9 @@ def enqueue(root, token, command, priority=50, backends=BACKENDS, migration_rout
     identity = input_identity(root, command)
     prepare_intent_ledger(root, token)
     reservation_path = root / 'manifests/family_index_reservations.json'
-    if reservation_path.stat().st_uid == os.getuid():
-        os.chmod(reservation_path, reservation_path.stat().st_mode | 0o040)
+    reservation_stat = reservation_path.stat()
+    if reservation_stat.st_uid == os.getuid() and not reservation_stat.st_mode & 0o040:
+        os.chmod(reservation_path, reservation_stat.st_mode | 0o040)
     # These are new campaign inputs, never provider assets or historical data.
     # Grant the already-authorized private lab group read access without changing
     # bytes. The queue's writable event journal is staged inside the fresh job.
@@ -172,7 +173,10 @@ def enqueue(root, token, command, priority=50, backends=BACKENDS, migration_rout
             seen.add(path)
             require(path.is_relative_to(root), 'shared input outside owned campaign')
             stat = path.stat()
-            if stat.st_uid == os.getuid(): os.chmod(path, stat.st_mode | 0o040)
+            # A no-op chmod still changes ctime and invalidates immutable-input
+            # audit caches. Preserve metadata when the requested bit exists.
+            if stat.st_uid == os.getuid() and not stat.st_mode & 0o040:
+                os.chmod(path, stat.st_mode | 0o040)
             if path.suffix == '.json':
                 value = json.loads(path.read_text())
                 def paths(item):
