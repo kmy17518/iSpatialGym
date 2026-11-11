@@ -209,7 +209,7 @@ def publish(root):
                 msg,evidence=failure_observation(job['job_dir'],root)
                 if msg:detail=[{'reason':msg,'evidence':evidence}];progress=max([progress]+[x.get('mtime',0)for x in evidence])
             except (OSError,ValueError,KeyError,TypeError)as exc:errors.append({'source':job['job_dir'],'error':str(exc)})
-        observations[key].append({'controller':worker['name'],'controller_state':worker['state'],'controller_config':worker['config'],
+        observations[key].append({'controller':worker['name'],'controller_state':worker['state'],'controller_config':worker['config'],'owner':cfg.get('owner','/root/templates_assets'),
             'status':status,'seed_status':state.get('status'),'reason':failure,'configuration':ref(path),'runtime':job['runtime']if job else(seed or{}).get('snapshot')or cfg.get('snapshot')or cfg.get('admission_snapshot'),
             'bucket':(record.get('decision')or{}).get('bucket'),'job':job,'failures':detail,'last_progress_epoch':progress,'observed_at':iso(now)})
     for worker in workers:
@@ -238,7 +238,7 @@ def publish(root):
             evidence_error=engineering_evidence_error(entry)
             if evidence_error:
                 errors.append({'source':str(engineering),'scope':key,'error':evidence_error})
-                observations[key].append({'controller':'owned_native_engineering','controller_state':str(engineering),
+                observations[key].append({'controller':'owned_native_engineering','controller_state':str(engineering),'owner':entry.get('owner','/root/templates_assets'),
                     'controller_config':str(engineering),'configuration':None,'runtime':None,
                     'bucket':entry.get('bucket'),'job':None,'failures':[],'status':'engineering_evidence_unavailable',
                     'reason':evidence_error,'next_action':'Snapshot and re-audit this scope’s actual native/controller evidence; no job or success is inferred from the changed reference.',
@@ -251,7 +251,7 @@ def publish(root):
                     vp=root/'vast/state/jobs'/(job['job_id']+'.json')
                     if vp.exists():
                         job.update(vast_job(job['job_id'],load(vp)))
-                observations[key].append({'controller':'owned_native_engineering','controller_state':str(engineering),
+                observations[key].append({'controller':'owned_native_engineering','controller_state':str(engineering),'owner':entry.get('owner','/root/templates_assets'),
                     'controller_config':str(engineering),'configuration':entry.get('configuration'),
                     'runtime':entry.get('runtime'),'bucket':entry.get('bucket'),'job':job,'failures':[],
                     'status':entry.get('status','native_preparation'),'reason':entry['blocker'],'next_action':entry['next_action'],
@@ -280,7 +280,7 @@ def publish(root):
             action='Inspect exact candidate and unmet native dependencies in '+', '.join(e['path']for e in prep[-1]['evidence'])+'; prepare a bounded native geometry proof before demo/replay admission.'
         if remain and (latest or{}).get('next_action'):
             action=latest['next_action']
-        row.update(accepted=n,historical_accepted=rawcounts[countkey],remaining=remain,owner='/root/templates_assets',state=state,blocker=blocker,next_action=action,
+        row.update(accepted=n,historical_accepted=rawcounts[countkey],remaining=remain,owner=(latest or{}).get('owner','/root/templates_assets'),state=state,blocker=blocker,next_action=action,
             configuration=(latest or{}).get('configuration'),runtime=(latest or{}).get('runtime'),controller=sorted(set(ownership[key]+[o['controller']for o in obs])),active_jobs=list(jobs.values()),
             last_accepted_at=iso(last[countkey]),last_accepted_time_kind='immutable committed-group export mtime; exact commit timestamp not recorded'if last[countkey]else'unavailable',
             last_progress_at=iso(max([last[countkey]]+[o['last_progress_epoch']for o in same])),failures=failures,
