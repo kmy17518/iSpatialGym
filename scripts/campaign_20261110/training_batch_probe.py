@@ -147,6 +147,16 @@ if __name__=='__main__':
     p.add_argument('--kind',required=True,choices=('physics_action_open_loop','kinematic_observation_rendering'))
     a=p.parse_args()
     try:print(json.dumps(run(a.root,a.request,a.output,a.kind)),flush=True)
+    except BaseException as error:
+        # OG shutdown may terminate the interpreter before Python prints a
+        # traceback. Preserve the actual diagnostic failure first.
+        import traceback
+        destination=Path(a.output)
+        if destination.is_dir():
+            write_json_atomic(destination/'failure.json',{'schema':'isg-training-batch-probe-failure-v1',
+                'kind':a.kind,'error':repr(error),'traceback':traceback.format_exc(),
+                'accepted':False,'eligible_for_goal':False,'quota_consumed':0})
+        raise
     finally:
         import sys
         og=sys.modules.get('omnigibson')

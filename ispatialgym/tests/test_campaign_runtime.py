@@ -188,3 +188,23 @@ def test_full_training_buckets_remain_eligible_when_another_is_underfilled():
 
     buckets = [{"max_m": 3, "n": 3}, {"max_m": 5, "n": 4}, {"max_m": 10, "n": 3}]
     assert runtime.choose_soft_bucket(CaptureRNG(), buckets, {3.0: 10, 5.0: 4, 10.0: 0}) == 0
+
+
+def test_kinematic_root_does_not_call_broken_entity_velocity_delegate(monkeypatch):
+    def unavailable():
+        raise AssertionError('kinematic root has no dynamic velocity API')
+    root=type('RigidKinematicPrim',(),{})()
+    obj=SimpleNamespace(name='wall',category='walls',model='wall',scale=[1,1,1],fixed_base=True,
+        n_joints=0,kinematic_only=True,root_link=root,
+        get_position_orientation=lambda **kw:([1,2,3],[0,0,0,1]),
+        get_linear_velocity=unavailable,get_angular_velocity=unavailable)
+    scene=SimpleNamespace(objects=[obj]);sim=SimpleNamespace(skybox=SimpleNamespace(intensity=1,color=[1,1,1]))
+    monkeypatch.setattr(runtime.augmentation,'_lights',lambda scene:{})
+    result=runtime.restoration_observation({'validation_key':{},'perturbations':{}},scene,sim)
+    row=result['loaded_state']['objects']['wall']
+    assert row['kinematic_only'] is True and row['root_prim_type']=='RigidKinematicPrim'
+    assert row['linear_velocity'] is row['angular_velocity'] is None
+    obj.kinematic_only=False
+    with pytest.raises(AssertionError,match='no dynamic velocity'):runtime.restoration_observation({'validation_key':{},'perturbations':{}},scene,sim)
+    obj.get_linear_velocity=None
+    with pytest.raises(ContractError,match='dynamic restoration velocity'):runtime.restoration_observation({'validation_key':{},'perturbations':{}},scene,sim)

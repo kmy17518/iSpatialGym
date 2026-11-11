@@ -42,7 +42,7 @@ def same_loaded_state(first,last):
     require(first['objects'].keys()==last['objects'].keys(),'restoration changed object inventory')
     for name,a in first['objects'].items():
         b=last['objects'][name]
-        require(all(a[k]==b[k] for k in ('category','model','fixed_base')),'restoration object identity changed')
+        require(all(a[k]==b[k] for k in ('category','model','fixed_base','kinematic_only','root_prim_type')),'restoration object identity changed')
         require(all(abs(float(x)-float(y))<=1e-6 for x,y in zip(a['scale'],b['scale'])),'restoration scale contaminated')
         require(math.dist(a['position'],b['position'])<=.002,'restoration object pose contaminated')
         qa,qb=a['orientation'],b['orientation']
@@ -52,7 +52,9 @@ def same_loaded_state(first,last):
         for key,tolerance in [('joint_positions',1e-5),('joint_velocities',1e-4),('linear_velocity',1e-4),('angular_velocity',1e-4)]:
             x,y=a[key],b[key]
             if x is None or y is None:
-                require(x is y,'restoration motion observation missing')
+                require(key in ('linear_velocity','angular_velocity') and x is y and
+                        a['kinematic_only'] is True and a['root_prim_type']=='RigidKinematicPrim',
+                        'restoration dynamic motion observation missing')
             else:
                 require(len(x)==len(y) and all(abs(float(u)-float(v))<=tolerance for u,v in zip(x,y)),
                         'restoration '+key+' contaminated')

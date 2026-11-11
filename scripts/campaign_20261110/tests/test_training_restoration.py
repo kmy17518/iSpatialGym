@@ -7,7 +7,7 @@ from scripts.campaign_20261110.training_batch_probe import inputs,verify_runtime
 
 
 def state():
-    return {'objects':{'o':{'category':'book','model':'abc','fixed_base':False,'scale':[1,1,1],
+    return {'objects':{'o':{'category':'book','model':'abc','fixed_base':False,'kinematic_only':False,'root_prim_type':'RigidDynamicPrim','scale':[1,1,1],
         'position':[1,2,3],'orientation':[0,0,0,1],'joint_positions':[.2],'joint_velocities':[0],
         'linear_velocity':[0,0,0],'angular_velocity':[0,0,0]}},'lights':{'lamp':1000},
         'skybox':{'intensity':2000,'color':[1,1,1]}}
@@ -88,3 +88,13 @@ def test_shared_world_requires_both_native_signature_and_saved_scene_checks():
     with pytest.raises(ContractError,match='saved scenes differ'):shared_world_proof(runner,records)
     runner.instance_signature=lambda path:path
     with pytest.raises(ContractError,match='signatures differ'):shared_world_proof(runner,records)
+
+
+def test_missing_velocity_is_allowed_only_for_explicit_native_kinematic_root():
+    a=state();a['objects']['o']['linear_velocity']=None
+    with pytest.raises(ContractError,match='dynamic motion observation missing'):
+        same_loaded_state(a,deepcopy(a))
+    a['objects']['o'].update(kinematic_only=True,root_prim_type='RigidKinematicPrim',angular_velocity=None)
+    same_loaded_state(a,deepcopy(a))
+    b=deepcopy(a);b['objects']['o']['kinematic_only']=False
+    with pytest.raises(ContractError,match='identity changed'):same_loaded_state(a,b)

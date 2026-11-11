@@ -351,9 +351,22 @@ def restoration_observation(meta, scene, sim):
             'fixed_base': bool(obj.fixed_base)}
         observed['joint_positions'] = _plain(obj.get_joint_positions()) if getattr(obj, 'n_joints', 0) else []
         observed['joint_velocities'] = _plain(obj.get_joint_velocities()) if getattr(obj, 'n_joints', 0) else []
+        # EntityPrim exposes velocity methods even when its root is a
+        # RigidKinematicPrim, which deliberately has no dynamic velocity API.
+        # Record that native distinction instead of inventing zero velocities.
+        kinematic = bool(getattr(obj, 'kinematic_only', False))
+        observed['kinematic_only'] = kinematic
+        observed['root_prim_type'] = type(getattr(obj, 'root_link', obj)).__name__
         for name in ('linear_velocity', 'angular_velocity'):
-            getter = getattr(obj, 'get_' + name, None)
-            observed[name] = _plain(getter()) if callable(getter) else None
+            if kinematic:
+                require(observed['root_prim_type'] == 'RigidKinematicPrim',
+                        'kinematic restoration observation has an unexpected native root')
+                observed[name] = None
+            else:
+                getter = getattr(obj, 'get_' + name, None)
+                require(callable(getter), 'dynamic restoration velocity observation unavailable: ' + obj.name)
+                observed[name] = _plain(getter())
+                require(observed[name] is not None, 'dynamic restoration velocity observation missing: ' + obj.name)
         objects[obj.name] = observed
     loaded = {'objects': objects,
         'lights': {name: float(attr.Get()) for name, attr in augmentation._lights(scene).items()},
