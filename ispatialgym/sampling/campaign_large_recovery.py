@@ -1,5 +1,28 @@
 """Strict candidate-selection policies for measured large-object failures."""
+import os
+
 from scripts.campaign_20261110.contracts import require
+
+
+SOAP_LIFT_FRAME_ENV = 'ISPATIALGYM_CAMPAIGN_SOAP_LIFT_FRAME_SCREEN'
+
+
+def soap_lift_frame_rejection(sampler, stance, grasp, lift):
+    """Try another lift candidate before a known late fingertip-frame failure.
+
+    Ready-countertop source 1347 lost two of three complete native draws at
+    the program check's lift frame gate. Reuse that exact projection and its
+    margins before selecting the lift. The final program check still runs.
+    """
+    enabled = os.environ.get(SOAP_LIFT_FRAME_ENV, '0')
+    require(enabled in ('0', '1'), 'soap lift frame option must be 0 or 1')
+    if enabled == '0':
+        return None
+    require(sampler.gp.variant == 'inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor',
+            'soap lift frame recovery belongs to the audited soap class')
+    from ispatialgym.sampling.v2.program_check import fingertips_in_frame
+
+    return fingertips_in_frame(sampler, stance, 'lift', [('lift', [grasp, lift])])
 
 
 def pillow_grasp_margin():

@@ -4953,6 +4953,13 @@ class IORSLarge(SamplerV2):
         same ``lift_end``); None when the lift has no solution (the leg then uses the stance posture, as before). The segment arm's."""
         arm = self.seg_arm
         lift = (eef[0] + th.tensor([0.0, 0.0, float(carry_height)]), eef[1])
+        from ispatialgym.sampling.campaign_large_recovery import soap_lift_frame_rejection
+        frame_failure = soap_lift_frame_rejection(self, manip, eef, lift)
+        if frame_failure is not None:
+            TT._count(self, "soap_lift_frame.rejected")
+            log.info("%s: lift %.2f m fails the existing fingertip frame gate (%s): lift candidate skipped",
+                     self.gp.variant, carry_height, frame_failure)
+            return None
         # owner 2026-09-25 (shampoo 0925-171050 / 194056: 8/8 draws lost at the program check's lift - 'lift: 1/11 tracked chain
         # configurations collide' - after this end-pose check had passed): the lift is TRACKED from the grasp configuration exactly
         # as the program check tracks it (IKChecker.continue_chain: the oracle's differential IK, the grasp's supports and the
