@@ -53,7 +53,8 @@ def register(root,entry):
         history=root/'infra/training_production_gate/canary_stream_history';history.mkdir(parents=True,exist_ok=True)
         previous=history/(str(time.time_ns())+'.json');previous.write_bytes(path.read_bytes())
         policy.setdefault('allowed_canaries',[]).append(entry);policy['observed_at']=datetime.now(timezone.utc).isoformat()
-        write_json_atomic(path,policy)
+        from .training_policy_history import replace_policy
+        replace_policy(root, policy, expected_previous_sha256=file_digest(previous))
 
 
 def prepare_annotated(row, *, root):
