@@ -76,6 +76,27 @@ log = logging.getLogger("ispatialgym.sampling.v2")
 EVAL_ONLY_GENERATION_KEYS = ("requested_bucket_m", "requested_direction", "start_depth_band", "partner_side", "destination_side")
 
 
+def prepare_train_generation(gp) -> None:
+    """Keep a campaign's validated tray side while applying ordinary train draws.
+
+    Campaign validation and goal groups also use the train execution driver.
+    Their explicitly chosen tray side is part of the feasible template layout,
+    so dropping it can rebuild a different, unreachable scene before any draw.
+    Legacy training still draws its destination side; all other train keys keep
+    their existing behavior.
+    """
+    from ispatialgym.sampling import campaign_runtime
+
+    preserve_side = False
+    if campaign_runtime.active():
+        _, template, _, _ = campaign_runtime.configuration()
+        preserve_side = template.task == 'disembedding' and gp.subtask == 'disembedding'
+    for key in EVAL_ONLY_GENERATION_KEYS:
+        if key == 'destination_side' and preserve_side:
+            continue
+        gp.generation.pop(key, None)
+
+
 def parse_path_buckets(text: Optional[str]) -> Optional[List[Dict[str, Any]]]:
     """``"3:10,5:10,10:5"`` -> ``[{"max_m": 3, "n": 10}, ...]`` (§2.3 ``generation.path_buckets``)."""
     if not text:
@@ -304,8 +325,7 @@ def main_train(args) -> int:
         # the eval-only draws of the customs entry (owner 2026-10-11): the eval camera bucket and object-scaling direction / start
         # band; train fills the buckets by the deficit draw and draws the direction at random (IORS small, owner 2026-10-12: the
         # partner side among the sides with a start cell; disembedding: the destination side per template)
-        for k in EVAL_ONLY_GENERATION_KEYS:
-            gp.generation.pop(k, None)
+        prepare_train_generation(gp)
         choice = choice_for_template(gp, meta)
         seed, seed_rec = template_seed(args, gp.variant)
         scene_draw = SS.scene_draw_applies(gp.subtask) and not args.keep_template_scene
