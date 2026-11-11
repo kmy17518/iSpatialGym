@@ -89,3 +89,28 @@ def test_canary_cannot_borrow_another_job_replay_or_ignore_hard_qa(tmp_path,monk
     c.write_json_atomic(replay,value)
     with pytest.raises(c.ContractError,match='QA'):
         canary.audit_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
+
+
+def test_existing_collector_requires_its_exact_scope_with_active_native_approval(tmp_path,monkeypatch):
+    f,_=setup(tmp_path,monkeypatch)
+    policy_path=tmp_path/'controllers/training_production_gate.json'
+    policy=json.loads(policy_path.read_text())
+    entry={**policy['allowed_canaries'][0], 'job_dir':str(f.job),
+           'review_manifest':{'path':str(tmp_path/'exact_review.json'),'sha256':'a'*64}}
+    policy['allowed_existing_canary_reviews']=[entry]
+    c.write_json_atomic(policy_path,policy)
+    from scripts.campaign_20261110 import training_existing_canaries as existing
+    checked=[]
+    def validate(root,job,env,actual,*,kind):
+        checked.append((job,kind))
+        assert actual['allowed_existing_canary_reviews']==[entry]
+        return {'allowed':True}
+    monkeypatch.setattr(existing,'check_existing_review',validate)
+    report=canary.audit_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
+    assert report['authorization']==entry and checked==[(f.job.resolve(),'source_validation')]
+    assert report['quota_consumed']==0 and not report['accepted']
+    # A malformed exact review must not fall back to the generic sampler entry.
+    entry['config_sha256']='b'*64
+    c.write_json_atomic(policy_path,policy)
+    with pytest.raises(c.ContractError,match='one exact explicit authorization'):
+        canary.audit_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
