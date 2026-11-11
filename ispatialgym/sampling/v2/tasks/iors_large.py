@@ -5397,6 +5397,10 @@ class IORSLarge(SamplerV2):
         """``generation.grasp_reach_margin_m`` (m; default None = off, owner 2026-10-13 ~03:15 item 1): the reach margin a grasp at B must
         keep along its approach (:meth:`grasp_margin_fails`)."""
         v = self.gp.gen("grasp_reach_margin_m")
+        from ispatialgym.sampling.campaign_large_recovery import pillow_grasp_margin
+        recovery = pillow_grasp_margin()
+        if recovery is not None:
+            return max(recovery, float(v or 0.0))
         return float(v) if v is not None and float(v) > 0.0 else None
 
     def grasp_margin_fails(self, stance: Stance, arm: str, eef: G.Pose, pre: G.Pose) -> Optional[str]:
