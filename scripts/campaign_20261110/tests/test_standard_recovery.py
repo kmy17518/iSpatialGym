@@ -53,6 +53,13 @@ class RecoveryLedgerTests(unittest.TestCase):
   self.baseline['classes'][0]['class_id']=k;self.current['classes'][0]['class_id']=k
   d=combine(self.baseline,self.current,{},[],artifact_updates={'inter_object_relation_satisfaction-under_large_scale_03':{}})
   self.assertEqual(d['classes'][0]['state'],'parked')
+ def test_new_hold_preserves_historical_count_but_excludes_validation(self):
+  k='inter_object_relation_satisfaction-nextto_04'
+  self.baseline['classes'][0]['class_id']=k;self.current['classes'][0].update(class_id=k,accepted=1)
+  row=combine(self.baseline,self.current,{},[])['classes'][0]
+  self.assertEqual(row['accepted_standard'],1)
+  self.assertEqual(row['state'],'parked')
+  self.assertIs(row['canonical_validation_eligible'],False)
  def test_artifact_audit_requires_unchanged_ready_source_proof(self):
   with tempfile.TemporaryDirectory() as directory:
    root=Path(directory);target=root/'infra/standard_recovery';target.mkdir(parents=True)
@@ -63,6 +70,10 @@ class RecoveryLedgerTests(unittest.TestCase):
       'audit':{'path':str(proof),'sha256':file_digest(proof)}}]}
    (target/'owner_artifact_updates.json').write_text(json.dumps(update))
    self.assertIn(key,received_artifacts(root))
+   (root/'controllers').mkdir()
+   (root/'controllers/training_production_gate.json').write_text(json.dumps({'campaign_id':CAMPAIGN,'parked_classes':[key]}))
+   self.assertNotIn(key,received_artifacts(root))
+   (root/'controllers/training_production_gate.json').unlink()
    audit['classes'][0]['all_ready_and_exact_assets']=False;proof.write_text(json.dumps(audit))
    with self.assertRaisesRegex(ValueError,'audit changed'):received_artifacts(root)
 

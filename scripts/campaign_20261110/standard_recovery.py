@@ -46,8 +46,11 @@ def received_artifacts(root):
  if not raw:return {}
  if raw.get('campaign_id')!=CAMPAIGN:raise ValueError('artifact update belongs to another campaign')
  result={}
+ gate=read(root/'controllers/training_production_gate.json',{}) or {}
+ current_holds=set(gate.get('parked_classes',[])) if gate.get('campaign_id')==CAMPAIGN else set()
  for row in raw.get('artifacts',[]):
   key=row['class_id'];proof=Path(row['audit']['path']).resolve()
+  if key in current_holds:continue  # A newer explicit owner hold supersedes an earlier availability proof.
   if key not in PENDING_ALIASES:raise ValueError('artifact update is not a parked class')
   if not proof.is_relative_to(root/'infra/standard_recovery'):raise ValueError('artifact audit outside campaign recovery')
   if file_digest(proof)!=row['audit']['sha256']:raise ValueError('artifact readiness audit changed')
@@ -120,8 +123,8 @@ def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=N
   attempts=technical.get(key,[]);w=notes.get(key,{})
   parked=key in PENDING_ALIASES and key not in artifact_updates
   state=w.get('state',state_from_attempts(attempts))
-  if count and count>0:state='accepted'
-  elif parked:state='parked'
+  if parked:state='parked'
+  elif count and count>0:state='accepted'
   elif state in ('accepted','parked'):state='failed'
   first=prior.get(key,{}).get('first_accepted_observed_at')
   if count and count>0 and not first:first=evidence.get('observed_at')
@@ -130,6 +133,7 @@ def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=N
     'remaining':max(0,10-count) if count is not None else None,'baseline_accepted':b['accepted'],
     'first_accepted_observed_at':first,'state':state,'owner':artifact_updates.get(key,{}).get('owner',owner(key)),
     'artifact_update':artifact_updates.get(key),
+    'canonical_validation_eligible':False if parked else None,
     'engineering_status':'awaiting_promised_user_artifact' if parked else w.get('engineering_status','assigned_for_diagnosis'),
     'blocker':'Promised updated oracle/template artifact has not arrived.' if parked else w.get('blocker',
       'Source artifact and readiness audit received; fresh native/demo/replay and sibling proof still required.' if key in artifact_updates else (c or {}).get('reason','Evidence unavailable')),
