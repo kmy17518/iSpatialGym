@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -412,7 +413,9 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
                                      "release_lift": lift_tab.astype(np.float32), "release_z": z_tab.astype(np.float32), "tilts": np.array(tilts, dtype=np.float32)}
     t_ik = t_chk = 0.0
     n_ik = 0
-    for tr, ti in trunk_grid(height):
+    from ispatialgym.sampling.interior_shards import ENV, select
+    trunks_to_compute, trunk_shard = select(trunk_grid(height), os.environ.get(ENV))
+    for tr, ti in trunks_to_compute:
         key = f"t{tr:.2f}_k{ti:+.1f}"
         rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
         # the idle postures: every one free of self-collision (stance C judges the static body in the real scene and picks per candidate)
@@ -553,6 +556,8 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
             rec.setdefault("n_feasible", {})[f"{d_e:.2f}"] = int(f_any.sum())
             rec.setdefault("n_feasible_by_tilt", {})[f"{d_e:.2f}"] = {f"{tilts[k]:g}": int((st5[:, :, k] == STATUS["feasible"]).sum()) for k in range(nT)}
         meta_trunks.append(rec)
+        print("INTERIOR_TRUNK_DONE " + json.dumps({"key": key, "feasible": rec.get("n_feasible"),
+              "elapsed_s": round(time.time() - t_all, 2), "shard": trunk_shard}), flush=True)
     tim.update({"ik_s": round(t_ik, 2), "checks_s": round(t_chk, 2), "ik_problems": n_ik, "total_s": round(time.time() - t_all, 2)})
     meta = {"schema": RM.SCHEMA, "kind": "interior", "arm": cfg.arm, "frame": "base_link on the floor: +x ahead, +y left, z up from the floor",
             "object": lib.identity(), "object_key": lib.identity_key(), "rest_id": rest_id,
@@ -576,5 +581,8 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
                               "every lateral of laterals_m (its centre at centre_y_m - lateral); the release lifted / tilted as the exact place; the "
                               "working arm and its hand (closed on the object) against the board (policed) and the other boxes; the static body is "
                               "stance C's exact check; feasible under any self-collision-free idle posture, at any tilt / lateral")}
+    if trunk_shard is not None:
+        meta["interior_trunk_shard"] = trunk_shard
+        meta["exhaustive"] = False
     meta["key"] = RM.map_key(meta)
     return meta, arrays

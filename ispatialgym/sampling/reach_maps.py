@@ -1282,6 +1282,8 @@ def map_key(meta: Dict[str, Any]) -> str:
         ident["overhang"] = {k: meta["overhang"].get(k) for k in ("digest", "edge_along_m", "yaw_rad")}
     if meta.get("split_finger_touch"):  # i7-t03 2026-11-08 (item 2, default off): built with the fingers judged by hulls only (other keys stay)
         ident["split_finger_touch"] = meta["split_finger_touch"]
+    if meta.get("interior_trunk_shard") is not None:
+        ident["interior_trunk_shard"] = meta["interior_trunk_shard"]
     return hashlib.sha1(json.dumps(ident, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -1305,6 +1307,8 @@ class ReachMap:
             self.meta = json.load(f)
         if self.meta.get("schema") != SCHEMA:
             raise S.IncompatibleRecord(f"{path_json}: schema {self.meta.get('schema')!r} is not {SCHEMA}")
+        from ispatialgym.sampling.interior_shards import require_complete
+        require_complete(self.meta)
         z = np.load(path_json[:-5] + ".npz")
         self.arrays = {k: z[k] for k in z.files}
         self.cells = self.arrays["cells"]
@@ -1355,6 +1359,8 @@ class ReachMap:
                 with open(p) as f:
                     m = json.load(f)
             except Exception:  # noqa: BLE001
+                continue
+            if m.get("interior_trunk_shard") is not None:
                 continue
             if m.get("schema") != SCHEMA or m.get("kind", "tabletop") != kind or m.get("object_key") != want or m.get("rest_id") != rest_id or m.get("arm") != arm:
                 continue
