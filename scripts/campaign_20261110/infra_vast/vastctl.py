@@ -45,6 +45,7 @@ try:
     from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, camera_context_inputs
     from .async_staging import StagingReservations
     from .lifecycle import retain_attempt
+    from .cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
     from .fleet_accounting import observe as observe_rentals
 except ImportError:
@@ -54,6 +55,7 @@ except ImportError:
     from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, camera_context_inputs
     from async_staging import StagingReservations
     from lifecycle import retain_attempt
+    from cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from funding import read_snapshot as read_credit_snapshot, remaining_credit
     from fleet_accounting import observe as observe_rentals
 
@@ -113,6 +115,15 @@ def ledger(ev, **kw):
     os.makedirs(os.path.dirname(LEDGER), exist_ok=True)
     with open(LEDGER, "a") as f:
         f.write(json.dumps({"ev": ev, "time": now(), **kw}) + "\n")
+
+
+def cost_record(kind, identity, **payload):
+    # Observational metadata must not interrupt collection if its disk is unavailable.
+    try:
+        return retain_cost(os.path.join(VJ, 'state', 'cost_provenance'), kind, identity, payload)
+    except Exception as error:
+        log('COST_PROVENANCE_UNAVAILABLE', kind, str(identity), type(error).__name__)
+        return {'status': 'unavailable', 'error_type': type(error).__name__}
 
 
 def events():
@@ -638,11 +649,17 @@ def launch(c, o, C, live_by_acct):
         if C.get('_rental_credit_remaining', {}).get(name, 0) < lease_cost:
             continue
         request_started = now()
+        cost_request = cost_record('rental_request', tag + '_' + name,
+            request_started_unix=request_started, offer_id=o['id'], machine_id=o.get('machine_id'),
+            gpu_count=int(o['num_gpus']), account=name, work_intent=C.get('_rental_work_intent',
+                {'purpose':'unassigned_shared_campaign_capacity','exclusive_cost_assignment':False}))
         try:
             r = vi.create_instance(c[name], o["id"], image=IMAGE, disk=C["disk_gb"], env=env, label=f"{LABEL}-{tag}", login=login,
                                    runtype="args", args=[], cancel_unavail=True)
         except Exception as e:  # noqa: BLE001
             err = vast_error(e) or type(e).__name__
+            cost_record('rental_response',tag+'_'+name,request=cost_request,
+                response_completed_unix=now(),instance=None,outcome='create_error',error_type=type(e).__name__)
             if any(w in err for w in ACCOUNT_ERRORS):
                 log(f"account {SHORT[name]}: {err} (offer {o['id']}); next account")
                 continue
@@ -650,11 +667,14 @@ def launch(c, o, C, live_by_acct):
             log(f"create {o['id']} failed: {err}")
             return None
         iid = r.get("new_contract")
+        cost_record('rental_response',tag+'_'+name,request=cost_request,
+            response_completed_unix=now(),instance=iid,outcome='created' if iid else 'no_contract_returned')
         if not iid:
             ledger("tried", offer=o["id"], error=str(r)[:80], account=name)
             return None
         ledger("create", instance=iid, offer=o["id"], machine_id=o.get("machine_id"), gpu=o.get("gpu_name"), dph_total=o["dph_total"],
                num_gpus=int(o['num_gpus']),request_started_unix=request_started,response_completed_unix=now(),
+               cost_request=cost_request,
                disk=C["disk_gb"], max_lifetime_s=C.get("max_worker_lifetime_s",21600), inet_up_cost=o.get("inet_up_cost"), inet_down_cost=o.get("inet_down_cost"), tag=tag, label=f"{LABEL}-{tag}", account=name, driver=o.get("driver_version"),
                cpus=o.get("cpu_cores_effective"), ram_gb=round(float(o.get("cpu_ram") or 0) / 1024), slots=o["_slots"],
                **o.get('_reservation', {}),
@@ -869,6 +889,12 @@ def tick(c, s3, state):
         job.update(status='assigned',instance=iid,account=worker.get('_key_name'),machine_id=worker.get('machine_id'),
                    dph=worker.get('dph_total'),tries=int(reservation['job']['tries'])+1,
                    assigned=reservation.get('assignment_started_at',now()),gpu_actual=worker.get('gpu_name'),inputs=reservation['spec']['inputs'])
+        attempt_id=reservation['spec'].get('attempt_id')
+        job['cost_assignment_identity']=assignment_identity(job,attempt_id)
+        job['cost_assignment_begin']=cost_record('assignment_begin',job['cost_assignment_identity'],
+            instance=iid, job_id=job['id'], assignment_started_unix=job['assigned'],
+            attempt_id=attempt_id, try_number=job['tries'], staging_started_unix=reservation.get('started_at'),
+            scope=cost_scope(job), boundary='Assignment publish begin; worker runtime timestamps arrive separately.')
         save_state(job)
     STAGER.recover(owner_alive,assignment,reconcile_assignment)
     for reservation in list(STAGER.active().values()):
@@ -880,6 +906,10 @@ def tick(c, s3, state):
     for failed in STAGER.poll():
         job=states[failed['id']]
         job.update(status='failed',error='stage: '+failed['error']);save_state(job)
+        cost_record('staging_failure',job['id']+'_'+str(failed.get('started_at')),
+            job_id=job['id'],instance=failed.get('instance'),scope=cost_scope(job),
+            started_unix=failed.get('started_at'),failed_unix=failed.get('failed_at'),
+            gpu_assignment_started=False,reason=failed.get('error'))
         log(f"STAGE_FAILED {job['id']}: {failed['error']}")
     if list_ok:  # an instance that destroyed itself: its rental ends now in the ledger (no later than the truth)
         for iid in live_ids:
@@ -897,6 +927,13 @@ def tick(c, s3, state):
         if s["status"] in ("assigned",) and s["id"] in dones:
             d = r2_json(s3, f"done/{s['id']}.json") or {}
             attempt_evidence = retain_attempt(os.path.join(VJ,'state','attempts'),s,d)
+            cost_record('assignment_end',s.get('cost_assignment_identity') or assignment_identity(s,d.get('attempt_id')),
+                job_id=s['id'],instance=s.get('instance'),attempt_evidence=attempt_evidence,
+                assignment_begin=s.get('cost_assignment_begin'),scope=cost_scope(s),end_kind='worker_done',
+                observed_done_unix=t,worker_timestamps={key:d.get(key) for key in
+                    ('fetch_started_unix','runtime_started_unix','runtime_ended_unix','upload_finished_unix','start','end')},
+                rc=d.get('rc'),upload_error=d.get('upload_error'),
+                legacy_assignment_begin_unavailable=not bool(s.get('cost_assignment_begin')))
             # a job that made no sampling attempt at all (inputs failed, Kit died at its first frame, ...) runs once more on another
             # instance before its result counts; the instance is kept (a code error fails everywhere: the second result is synced)
             # Replay has no sampling-attempt denominator. Its genuine native
@@ -937,6 +974,11 @@ def tick(c, s3, state):
         stale = hb.get("time") and t - hb["time"] > 1500
         if gone or stale:
             log(f"LOST {s['id']} on {iid} ({'gone' if gone else 'heartbeat stale'}); requeue")
+            cost_record('assignment_end',s.get('cost_assignment_identity') or assignment_identity(s),
+                job_id=s['id'],instance=iid,assignment_begin=s.get('cost_assignment_begin'),scope=cost_scope(s),
+                end_kind='worker_lost',reason='gone' if gone else 'stale',last_heartbeat_unix=hb.get('time'),
+                loss_observed_unix=t,exact_runtime_end_unavailable=True,
+                legacy_assignment_begin_unavailable=not bool(s.get('cost_assignment_begin')))
             s["history"].append({"instance": iid, "lost": "gone" if gone else "stale", "time": t})
             s.update(status="queued" if s["tries"] < C["retries"] else "failed", instance=None)
             save_state(s)
@@ -1077,6 +1119,7 @@ def tick(c, s3, state):
                        for name in rental_accounts(tuple(c),C,by_acct)):
                 market_reasons['insufficient_funded_credit'] += 1
                 continue
+            C['_rental_work_intent'] = rental_intent(queued, demand_gpu)
             iid = launch(c, o, C, by_acct)
             if iid:
                 n_new += 1
