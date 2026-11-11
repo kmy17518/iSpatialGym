@@ -60,6 +60,12 @@ def run(root, requests, index, *, preflight=False):
     from ispatialgym.sampling.v2.problem import GroundedProblem
     from ispatialgym.sampling import campaign_runtime
     gp=GroundedProblem.load(job['alias'],argv[argv.index('--customs')+1],argv[argv.index('--bddl-root')+1])
+    from types import SimpleNamespace
+    from ispatialgym.sampling.sample_isg import variant_split
+    args=SimpleNamespace(seed=int(argv[argv.index('--seed')+1]),seed_index=0,seed_split=None,
+        scene=job['scene'],room=argv[argv.index('--room')+1] if '--room' in argv else None,scene_from_split=False)
+    variant_split(args,gp)
+    require(gp.rooms(job['scene'])==[job['room']], 'native room binding differs from the exact candidate')
     campaign_runtime.configuration()
     proof={'campaign_id':'campaign_20261110','candidate_id':row['candidate_id'],'request_sha256':file_digest(requests),
            'config_sha256':row['config_sha256'],'gate':decision,'argv':argv,'native_runtime':row['native_runtime'],

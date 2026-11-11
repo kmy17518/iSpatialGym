@@ -148,7 +148,7 @@ def materialize(root, release, code, output, classes):
                   'ISPATIALGYM_GRASP_LIBRARY_V2':str(release/'glib'),'ISPATIALGYM_REACH_MAPS':str(release/'maps'),
                   'ISPATIALGYM_REACH_MAP_ANCHORS':str(release/'anchors.json'),'ISPATIALGYM_V2_ONLY':'1'},
                 'sample_argv':['python','-m','ispatialgym.sampling.sample_isg','--variant',alias,'--customs',str(custom),
-                  '--bddl-root',str(out/'bddl'),'--scene',baseline.scene,'--room',baseline.room,'--templates','1',
+                  '--bddl-root',str(out/'bddl'),'--scene',baseline.scene,'--templates','1',
                   '--instances-per-template','1','--max-attempts','3','--seed','2026111108','--no-write-back',
                   '--out','${CAMPAIGN_OUT}/validation/'+identity],
                 'remaining':['native maximum scaled layout and binding','annotated training canary','own physics replay',
