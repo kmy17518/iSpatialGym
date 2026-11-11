@@ -57,6 +57,34 @@ def author_context(anchor, *, target_name, support_name):
         # Native summary writes the drawn start depth to four decimal places.
         _require(abs(drawn-depth) <= .00005001, 'shelf drawn depth differs from source summary')
         depth = fixed
+        # The drawn member start is not the geometry reference of its fixed
+        # release. Its audited group summary retains that original reference.
+        group = summary.get('campaign_goal_group', {})
+        inherited = group.get('shelf_tip_context')
+        _require(group.get('phase') == 'settled_goal_verified' and
+                 group.get('relation') == 'touching' and group.get('target_name') == target_name and
+                 isinstance(inherited, dict), 'shelf refill lacks a verified parent geometry context')
+        parent_sha = group.get('plan_sha256')
+        _require(isinstance(parent_sha, str) and len(parent_sha) == 64 and
+                 all(c in '0123456789abcdef' for c in parent_sha), 'shelf parent plan identity missing')
+        _require(inherited.get('support_name') == support_name and
+                 inherited.get('spine_behind_edge_m') == fixed,
+                 'shelf parent support or fixed depth differs')
+        release = pose(group.get('requested_release'), 'shelf parent release')
+        actual_release = anchor.get('planned_goal_poses', {}).get(target_name)
+        _require(actual_release is not None and pose_error(release, actual_release)[0] < .001 and
+                 pose_error(release, actual_release)[1] < .001,
+                 'shelf parent reference does not produce the source release')
+        result = dict(inherited,
+            source_summary_sha256=anchor['sources']['summary']['sha256'],
+            source_sidecar_sha256=anchor['sources']['sidecar']['sha256'],
+            inherited_group_plan_sha256=parent_sha)
+        checked = checked_context({'class_id': CLASS, 'anchor_sources': anchor['sources'],
+                                   'shelf_tip_context': result}, relation='touching', scale='small',
+                                  release=release, place=pose(group.get('requested_place'), 'shelf parent place'))
+        reference = checked['source_target_start']
+        result['source_target_start'] = {'position': list(reference[0]), 'orientation': list(reference[1])}
+        return result
     return {'mode': 'native_shelf_tip', 'support_name': support_name,
             'grasp_key': board['grasp_key'], 'row_z': board['row_z'], 'bay_m': start['bay_m'],
             'target_board': start['target_board'], 'arm': start['arm'],

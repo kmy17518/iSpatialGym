@@ -66,8 +66,22 @@ def test_refill_preserves_fixed_partner_depth_after_target_start_draw():
     start['spine_behind_edge_m'] = .0443
     start['target_depth_proposal'] = {'source_depth_m': .06, 'target_depth_m': .04427400200423898,
         'partner_depth_unchanged': True, 'goal_unchanged': True}
+    parent = raw()['shelf_tip_context']
+    release = {'position': [.1, -.122109, .6], 'orientation': [0, 0, 0, 1]}
+    a['summary']['campaign_goal_group'] = {'phase': 'settled_goal_verified', 'relation': 'touching',
+        'target_name': 'target', 'plan_sha256': 'c'*64, 'shelf_tip_context': parent,
+        'requested_release': release, 'requested_place': release}
+    a['planned_goal_poses'] = {'target': (release['position'], release['orientation'])}
+    a['planned_start_poses']['target'] = ([0, .015726, .6], [0, 0, 0, 1])
     context = author_context(a,target_name='target',support_name='bookcase')
     assert context['spine_behind_edge_m'] == .06
+    assert context['source_target_start'] == parent['source_target_start']
+    assert context['source_target_start']['position'] != a['planned_start_poses']['target'][0]
+    assert context['inherited_group_plan_sha256'] == 'c'*64
+    # A geometry reference cannot be inherited for a different release.
+    a['planned_goal_poses']['target'] = ([.1, -.10, .6], release['orientation'])
+    with pytest.raises(GoalPlanError, match='source release'):
+        author_context(a,target_name='target',support_name='bookcase')
     assert context['source_summary_sha256'] == a['sources']['summary']['sha256']
     assert start['spine_behind_edge_m'] == .0443
 
@@ -183,3 +197,12 @@ def test_depth_draw_changes_only_target_start_preserving_partner_check(monkeypat
     assert s.shelf_pose[0][1] == pytest.approx(.09)
     assert s.shelf_partner_pose[0].tolist() == pytest.approx(p.partner[0])
     assert s._shelf_draw['target_depth_proposal']['source_depth_m'] == .06
+
+
+def test_drawn_member_cannot_invent_an_ancestor_reference():
+    a=shelf_anchor();start=a['summary']['shelf_start']
+    start['spine_behind_edge_m']=.0443
+    start['target_depth_proposal']={'source_depth_m':.06,'target_depth_m':.044274,
+        'partner_depth_unchanged':True,'goal_unchanged':True}
+    with pytest.raises(GoalPlanError,match='verified parent geometry'):
+        author_context(a,target_name='target',support_name='bookcase')
