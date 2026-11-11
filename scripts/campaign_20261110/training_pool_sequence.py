@@ -92,10 +92,19 @@ def verify_stage(pool, original_identity, event_offset, target, output):
             'native export pool identity differs')
     loaded = set(model_pool.members); initial = set(scene['objects_info']['init_info'])
     require(initial & loaded == active_names, 'inactive model leaked into export')
+    # The shared event journal grows at each model switch. Bind this stage to
+    # immutable bytes before the next member appends another observation.
+    journal = Path(model_pool.output).read_bytes()
+    snapshot = Path(output)/'pool_execution_stage.json'
+    if snapshot.exists():
+        require(snapshot.read_bytes() == journal, 'preserve prior stage execution evidence')
+    else:
+        with snapshot.open('xb') as stream:
+            stream.write(journal)
     return identity, {'world_loads':pool.n_loads,'same_world_and_members':True,
         'ordinary_cleanup_complete':True,'active_names':sorted(active_names),
-        'inactive_export_omissions':len(loaded-active_names), 'pool_execution':{'path':str(model_pool.output),
-        'sha256':file_digest(model_pool.output)},'template_export':{'path':str(exports_on_disk[0]),
+        'inactive_export_omissions':len(loaded-active_names), 'pool_execution':{'path':str(snapshot),
+        'sha256':file_digest(snapshot)},'template_export':{'path':str(exports_on_disk[0]),
         'sha256':file_digest(exports_on_disk[0])}, 'event_range':[event_offset,len(model_pool.events)],
         'scope':'Sampler physical isolation/export only; independent demo, replay and render gates remain separate.'}
 

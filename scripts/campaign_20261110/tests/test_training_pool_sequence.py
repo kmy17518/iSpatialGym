@@ -59,6 +59,17 @@ def test_stage_demands_same_world_and_active_only_export(tmp_path):
     with pytest.raises(ValueError,match='leaked'):sequence.verify_stage(pool,None,0,target,tmp_path)
 
 
+def test_stage_journal_reference_survives_next_member_append(tmp_path):
+    pool,_=stage(tmp_path)
+    _,proof=sequence.verify_stage(pool,None,0,{'category':'bottle','model':'a'},tmp_path)
+    snapshot=Path(proof['pool_execution']['path'])
+    assert snapshot != pool.world.model_pool.output
+    pool.world.model_pool.output.write_text('{"later_member":true}')
+    assert sequence.file_digest(snapshot) == proof['pool_execution']['sha256']
+    with pytest.raises(ValueError,match='preserve prior stage'):
+        sequence.verify_stage(pool,None,0,{'category':'bottle','model':'a'},tmp_path)
+
+
 @pytest.mark.parametrize('field,value',[('visible',True),('planner_included',True),('collision_enabled',[True])])
 def test_stage_rejects_inactive_model_participation(tmp_path,field,value):
     pool,_=stage(tmp_path);pool.world.model_pool.events[0]['native_observation']['objects']['b'][field]=value
