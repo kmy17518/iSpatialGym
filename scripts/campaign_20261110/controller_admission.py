@@ -260,7 +260,7 @@ def bind_missing_runtime_identity(template, anchor):
             "choice_sha256": digest(metadata["choice"]), "method": "native_TemplateChoice_from_audited_anchor"}})
 
 
-def prepare(proof, allocation, cfg, root):
+def prepare(proof, allocation, cfg, root, *, prepared_source=None, dry_run=True):
     from scripts.campaign_20261110.goal_batches import prepare_batch, submission_command
     from ispatialgym.sampling.campaign_goal_queue import schema_for_task
     source_template = held.template_from(proof["template"])
@@ -275,7 +275,12 @@ def prepare(proof, allocation, cfg, root):
     v2_root = source_release(template, env, cfg)
     identity = admission_id(source_template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"), cfg.get('author_revision'))
     name = "group_admit_" + identity[:20]
-    anchor = successful_anchor(allocation["job_dir"], campaign_root=root, ledger=allocation["ledger"], campaign_started_at=cfg["started_at"])
+    if prepared_source is None:
+        anchor = successful_anchor(allocation["job_dir"], campaign_root=root, ledger=allocation["ledger"], campaign_started_at=cfg["started_at"])
+    else:
+        from scripts.campaign_20261110.planning_inputs import checked_anchor
+        anchor = checked_anchor(prepared_source, allocation["job_dir"], campaign_root=root,
+            ledger=allocation["ledger"], campaign_started_at=cfg["started_at"])
     template = bind_missing_runtime_identity(template, anchor)
     if cfg.get('author_revision') == 'standard_native_coverage_v1':
         from scripts.campaign_20261110.disembedding_coverage import bind_standard_coverage
@@ -310,10 +315,11 @@ def prepare(proof, allocation, cfg, root):
     if env.get("START_PER_ATTEMPT") == "0":
         command += ["--customs", "template"]
     directory = Path(prepared["queue"]).parent
-    run_logged(command + ["--dry-run"], directory / "dryrun.txt")
+    if dry_run:
+        run_logged(command + ["--dry-run"], directory / "dryrun.txt")
     record = {"directory": str(directory), "queue": prepared["queue"], "prepared": prepared, "command": command,
         "index": index, "count": 3, "validation_key": read(prepared["config"])["validation_key"], "phase": template.split,
-        "decision": decision, "needs_new_gate": True, "status": "ready", "dry_run_passed": True,
+        "decision": decision, "needs_new_gate": True, "status": "ready", "dry_run_passed": dry_run,
         "admission_id": identity, "source_proof": proof, "v2_root": v2_root}
     backends = cfg.get('dispatch_backends')
     if backends is None and template.task == 'alignment-world_vertical':
@@ -457,6 +463,14 @@ def source_in_scope(gate, root, cfg):
         return True  # Malformed or unavailable evidence must still fail the full audit.
 
 
+def ensure_dry_run(record, save):
+    """A saved reservation may outlive a failed dry-run; never enqueue it early."""
+    if record.get("dry_run_passed") is not True:
+        run_logged(record["command"] + ["--dry-run"], Path(record["directory"]) / "dryrun.txt")
+        record["dry_run_passed"] = True
+        save()
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--config", required=True); p.add_argument("--state", required=True); p.add_argument("--once", action="store_true")
@@ -487,6 +501,7 @@ def main():
                     continue
                 try:
                     if record["status"] == "ready":
+                        ensure_dry_run(record, save)
                         enqueue_record(root, record, save, priority=30)
                     refresh(record, cfg, root, rows, queue)
                     record.pop("error", None)
@@ -522,11 +537,17 @@ def main():
                     if not held.job_terminal(found[0], root, queue):
                         continue  # Freeze source template metadata only after its job ends.
                     if identity not in state["records"]:
+                        from scripts.campaign_20261110.planning_inputs import prepare_anchor
+                        prepared_source = prepare_anchor(found[0]["job_dir"], campaign_root=root,
+                            ledger=found[0]["ledger"], campaign_started_at=cfg["started_at"],
+                            extra_paths=[Path(cfg["snapshot"]) / ".snapshot_commit"])
                         with admission_planning_lock(root):
-                            record = prepare(proof, found[0], cfg, root)
+                            record = prepare(proof, found[0], cfg, root,
+                                             prepared_source=prepared_source, dry_run=False)
                             state["records"][identity] = record
                             model_class_pin(template, state, cfg, commit=True)
                             save()
+                        ensure_dry_run(record, save)
                         enqueue_record(root, record, save, priority=30)
                         allowance -= 1
                     state["checked_gates"][str(gate)] = {"sha256": sha, "admission_id": identity, "observed_at": time.time()}

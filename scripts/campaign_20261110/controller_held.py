@@ -250,7 +250,14 @@ def claim_gate_for_record(spec, record, allocation, gates, root):
     return str(path)
 
 
-def prepare_queue(spec, state, decision, cfg, root, template, save):
+def prepare_source(spec, cfg, root):
+    from scripts.campaign_20261110.planning_inputs import prepare_anchor
+    return prepare_anchor(spec["anchor_job"], campaign_root=root, ledger=spec["anchor_ledger"],
+        campaign_started_at=cfg["started_at"],
+        extra_paths=[spec["seed_config"], Path(spec["snapshot"]) / ".snapshot_commit"])
+
+
+def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_source=None):
     from scripts.campaign_20261110.goal_groups import successful_anchor
     from scripts.campaign_20261110.held_goal_batches import prepare_batch, submission_command
     from scripts.campaign_20261110.base_regions import room_base_region
@@ -262,7 +269,12 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     policy = active_policy(root)
     require(policy is not None, "held queue requires active reservations")
     check_reservations(template, policy[1], policy[2])
-    anchor = successful_anchor(spec["anchor_job"], campaign_root=root, ledger=spec["anchor_ledger"], campaign_started_at=cfg["started_at"])
+    if prepared_source is None:
+        anchor = successful_anchor(spec["anchor_job"], campaign_root=root, ledger=spec["anchor_ledger"], campaign_started_at=cfg["started_at"])
+    else:
+        from scripts.campaign_20261110.planning_inputs import checked_anchor
+        anchor = checked_anchor(prepared_source, spec["anchor_job"], campaign_root=root,
+            ledger=spec["anchor_ledger"], campaign_started_at=cfg["started_at"])
     snapshot = Path(spec["snapshot"])
     region = room_base_region(snapshot / "Behavior-1K/datasets", template.scene, template.room)
     number = len(state["queues"]) + 1
@@ -457,6 +469,9 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
     if zero_tail >= cfg.get("maximum_empty_queues", 3):
         state["status"] = "needs_feasibility_diagnosis"
         return 0
+    # Large immutable demo/source hashes do not serialize unrelated classes.
+    source_preparer = getattr(adapter, 'prepare_source', None) if adapter else prepare_source
+    prepared_source = source_preparer(spec, cfg, root) if source_preparer else None
     with planning_lock(root/'controllers/held_planning.lockdir'):
         if adapter is None:
             counts = read_counts(root, template, read(cfg["standard_contracts"])["templates"], read(cfg["room_plan"]))
@@ -478,7 +493,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
                                                             spec.get("group_budget_seconds", 900))
         if allowance <= 0 or decision["groups"] <= 0:
             return 0
-        record = (adapter.prepare_queue if adapter else prepare_queue)(spec, state, decision, cfg, root, template, save)
+        options = {'prepared_source': prepared_source} if source_preparer else {}
+        record = (adapter.prepare_queue if adapter else prepare_queue)(spec, state, decision, cfg, root, template, save, **options)
     run_logged(record["command"] + ["--dry-run"], Path(record["directory"]) / "dryrun.txt")
     record["dry_run_passed"] = True
     save()

@@ -210,7 +210,14 @@ def audit_shelf_source_context(prepared, anchor, template, root):
     return {'path': str(path), 'sha256': file_digest(path)}
 
 
-def prepare_queue(spec, state, decision, cfg, root, template, save):
+def prepare_source(spec, cfg, root):
+    from scripts.campaign_20261110.planning_inputs import prepare_anchor
+    return prepare_anchor(spec["anchor_job"], campaign_root=root, ledger=spec["anchor_ledger"],
+        campaign_started_at=cfg["started_at"],
+        extra_paths=[spec["seed_config"], Path(spec["snapshot"]) / ".snapshot_commit"])
+
+
+def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_source=None):
     from scripts.campaign_20261110.goal_groups import successful_anchor, read_env
     from scripts.campaign_20261110.goal_batches import prepare_batch, submission_command
     from scripts.campaign_20261110.group_lane import check_reservations
@@ -221,7 +228,12 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     policy = active_policy(root)
     require(policy is not None, "generic queue requires active reservations")
     check_reservations(template, policy[1], policy[2])
-    anchor = successful_anchor(spec["anchor_job"], campaign_root=root, ledger=spec["anchor_ledger"], campaign_started_at=cfg["started_at"])
+    if prepared_source is None:
+        anchor = successful_anchor(spec["anchor_job"], campaign_root=root, ledger=spec["anchor_ledger"], campaign_started_at=cfg["started_at"])
+    else:
+        from scripts.campaign_20261110.planning_inputs import checked_anchor
+        anchor = checked_anchor(prepared_source, spec["anchor_job"], campaign_root=root,
+            ledger=spec["anchor_ledger"], campaign_started_at=cfg["started_at"])
     snapshot = Path(spec["snapshot"])
     number = len(state["queues"]) + 1
     name = "group_auto_" + spec["id"] + "_" + str(number).zfill(4)
