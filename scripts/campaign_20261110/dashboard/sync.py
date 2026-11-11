@@ -129,7 +129,7 @@ def return_report(output):
         if canonical.get('campaign_id')=='campaign_20261110':
             lines += ['','CANONICAL TEMPLATE VALIDATION', 'Observed: '+chicago(canonical.get('observed_at')),
                 str(canonical.get('validated'))+' / 100 exact canonical classes verified; states: '+json.dumps(canonical.get('state_counts')),
-                'This artifact audit is distinct from historical accepted class coverage. Only under_large_01 remains held for an owner artifact; available updates still need exact validation.',
+                'This artifact audit is distinct from historical accepted class coverage. The under_large_01 owner update is merged; fresh exact validation remains required.',
                 'Proof: http://127.0.0.1:8765/reports/canonical-validation']
     recovery_path=output/'standard_recovery.json'
     if recovery_path.exists():
