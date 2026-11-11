@@ -39,3 +39,29 @@ def near_lateral(rng, lo, hi, preferred, radius=.08):
              'invalid campaign lateral proposal bounds')
     centre = min(hi, max(lo, preferred))
     return float(rng.uniform(max(lo, centre-radius), min(hi, centre+radius)))
+
+
+def prioritize_written_stances(order, candidates, written, *, explore=4, exploit=2):
+    """Keep exploration and try checked candidates near a fully written member.
+
+    This never adds a stance or removes one from the native checked pool.
+    Callers key ``written`` by the immutable goal-plan hash.
+    """
+    if not written:
+        return order
+    order = [int(i) for i in order]
+    def distance(index):
+        c = candidates[index]
+        def one(prior):
+            base = prior['base_pose2d']
+            angle = abs(math.atan2(math.sin(float(c.base_pose2d[2])-base[2]),
+                                   math.cos(float(c.base_pose2d[2])-base[2])))
+            score = math.dist([float(v) for v in c.base_pose2d[:2]], base[:2]) + .3*angle
+            score += abs(float(c.translate)-prior['translate']) + abs(float(c.tilt)-prior['tilt'])
+            if c.focus is not None and prior.get('focus') is not None:
+                score += math.dist([float(v) for v in c.focus[:2]], prior['focus'][:2])
+            return score
+        return min(one(prior) for prior in written)
+    prefix = order[:explore]
+    promoted = sorted((i for i in order if i not in prefix), key=distance)[:exploit]
+    return prefix + promoted + [i for i in order if i not in prefix and i not in promoted]

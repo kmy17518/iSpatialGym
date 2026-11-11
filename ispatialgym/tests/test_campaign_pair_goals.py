@@ -23,6 +23,21 @@ def test_disabled_pair_plan_never_accesses_runtime_context(monkeypatch):
     assert I.IORSSmall.campaign_pair_plan(SimpleNamespace()) is None
 
 
+def test_inside_stance_is_remembered_only_after_native_write_and_scoped_to_goal(monkeypatch):
+    s=I.IORSSmall.__new__(I.IORSSmall)
+    s._campaign_pair_active=plan('inside');s.relation='inside'
+    s.campaign_verify_pair=lambda draft:None
+    d=Draft();d.summary={'campaign_goal_group':{},'manipulation_stance':{'base_pose2d':[1.,2.,0.],'translate':.5,'tilt':0.}}
+    def failed(*args):raise Reject('physical_check','failed before write')
+    monkeypatch.setattr(I.SamplerV2,'write_instance',failed)
+    with pytest.raises(Reject):s.write_instance(d,1,2)
+    assert not hasattr(s,'_campaign_written_inside_stances')
+    monkeypatch.setattr(I.SamplerV2,'write_instance',lambda *args:'written')
+    assert s.write_instance(d,1,2)=='written'
+    assert s._campaign_written_inside_stances[s._campaign_pair_active.sha256] == [d.summary['manipulation_stance']]
+    assert s._campaign_written_inside_stances.get('another_goal',[]) == []
+
+
 def test_campaign_frame_ranking_uses_fixed_release_instead_of_random_focus():
     p=plan('inside');observed=[];candidate=SimpleNamespace(focus=None)
     s=SimpleNamespace(_campaign_pair_active=p,camera_pose_at=lambda c:'camera',

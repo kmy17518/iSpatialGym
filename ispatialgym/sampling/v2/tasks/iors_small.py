@@ -2740,6 +2740,11 @@ class IORSSmall(SamplerV2):
         # pick bin move to the end of the order above (a Thompson draw keeps them in place, never below the floor; never removed). Memory off
         # / nothing flagged: the order unchanged and no random number drawn (alias_memory.reorder_pick; kit alias_memory.pick.*)
         order = AM.reorder_pick(self, order, cands, lambda st: default, rng)
+        plan = getattr(self, "_campaign_pair_active", None)
+        if plan is not None and self.relation == "inside":
+            from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
+            written = getattr(self, "_campaign_written_inside_stances", {}).get(plan.sha256, [])
+            order = prioritize_written_stances(order, cands, written)
         for k in order[:6]:
             cand = cands[int(k)]
             pdc_c = pdc.get(id(cand))
@@ -6362,6 +6367,13 @@ class IORSSmall(SamplerV2):
         path = super().write_instance(draft, index, seed)
         if getattr(self, "_campaign_pair_active", None) is not None:
             self._campaign_group_written = getattr(self, "_campaign_group_written", 0) + 1
+            if self.relation == "inside":
+                # Only a fully validated and durably written native member can
+                # guide later siblings of this exact immutable goal group.
+                if not hasattr(self, "_campaign_written_inside_stances"):
+                    self._campaign_written_inside_stances = {}
+                self._campaign_written_inside_stances.setdefault(self._campaign_pair_active.sha256, []).append(
+                    draft.summary["manipulation_stance"])
         return path
 
     def _aabb_gap(self, tname: str, pname: str) -> float:

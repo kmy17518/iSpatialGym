@@ -30,3 +30,15 @@ def test_lateral_proposals_remain_inside_native_bounds_and_keep_start_variation(
     assert min(values)>=.08 and max(values)<=.2 and len(set(values))==100
     assert -.2<=near_lateral(rng,-.2,.2,-4)<=-.12
     with pytest.raises(GoalPlanError):near_lateral(rng,.2,-.2,0)
+
+
+def test_written_member_proposes_only_existing_checked_stances_and_keeps_exploration():
+    from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
+    cands=[SimpleNamespace(base_pose2d=(float(i),0.,0.),translate=0.,tilt=0.,focus=None) for i in range(10)]
+    order=list(range(10))
+    assert prioritize_written_stances(order,cands,[]) is order
+    prior={'base_pose2d':[8.,0.,0.],'translate':0.,'tilt':0.}
+    ranked=prioritize_written_stances(order,cands,[prior])
+    assert ranked[:4] == order[:4]
+    assert ranked[4] == 8 and len(ranked[:6]) == 6
+    assert sorted(ranked) == order and len(set(ranked)) == len(order)
