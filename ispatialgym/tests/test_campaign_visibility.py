@@ -71,3 +71,19 @@ def test_under02_requires_measured_goal_without_releasing_other_large_classes():
             C.required(template(True,class_id='inter_object_relation_satisfaction-under_large_scale_'+suffix,task=task))
     with pytest.raises(ValueError):
         C.required(template(True,class_id='inter_object_relation_satisfaction-under_large_scale_02',task=C.TASK))
+
+
+def test_inside02_requires_same_measured_partner_visibility_policy():
+    from types import SimpleNamespace
+    t=SimpleNamespace(class_id='inter_object_relation_satisfaction-inside_02',
+        task='inter_object_relation_satisfaction-inside_small_scale',
+        scene_setup={'recovery_options':{C.OPTION:True}})
+    assert C.required(t)
+    C.verify_report({'objects':{'target':{'status':'ok','occluded':1.,'judged':False},
+        'partner':{'status':'ok','occluded':.6733}},'occluded':True})
+    # Verification does not turn the passing-pose but occluded jar into a pass;
+    # the original GO report and unchanged threshold remain authoritative.
+    from ispatialgym.eval import goal_occlusion as GO
+    result=GO.report({'target':{'status':'ok','occluded':1.,'judged':False},
+        'partner':{'status':'ok','occluded':.6733}},method='measured')
+    assert result['occluded'] and result['threshold']==.5 and result['worst']=='partner'

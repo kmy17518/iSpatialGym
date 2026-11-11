@@ -6,6 +6,8 @@ CLASS_ID = 'inter_object_relation_satisfaction-under_small_scale_04'
 TASK = 'inter_object_relation_satisfaction-under_small_scale'
 OPTION = 'native_goal_occlusion_screen'
 AUDITED = {CLASS_ID: TASK,
+    'inter_object_relation_satisfaction-inside_02':
+        'inter_object_relation_satisfaction-inside_small_scale',
     'inter_object_relation_satisfaction-under_large_scale_02':
         'inter_object_relation_satisfaction-under_large_scale'}
 
@@ -20,7 +22,7 @@ def required(template=None):
     if type(value) is not bool:
         raise ValueError('native goal occlusion requirement must be boolean')
     if value and AUDITED.get(template.class_id) != template.task:
-        raise ValueError('native goal occlusion recovery belongs to an audited under-object class')
+        raise ValueError('native goal occlusion recovery belongs to an audited visibility-recovery class')
     return value
 
 
