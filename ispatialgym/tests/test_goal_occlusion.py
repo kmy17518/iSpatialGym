@@ -214,3 +214,38 @@ def test_settled_depth_waits_for_a_settled_non_empty_buffer():
     dead = _Sensor(first_frame=10**6)
     with pytest.raises(RuntimeError):
         settled_depth(dead, dead.render, max_renders=5, read=dead.read)
+
+
+def test_action_replay_preserves_inside_container_visibility_policy(monkeypatch):
+    """A missing oracle sidecar must not turn the contained target into a QA failure."""
+    import sys
+    from types import SimpleNamespace
+    from ispatialgym.oracle import executor as E, head_depth
+    monkeypatch.setitem(sys.modules,'omnigibson.utils.constants',
+        SimpleNamespace(JointType=SimpleNamespace(JOINT_REVOLUTE='revolute')))
+    monkeypatch.setattr(E,'CameraModel',SimpleNamespace(from_sensor=lambda sensor:INTR))
+    monkeypatch.setattr(GO,'intrinsics_of',lambda camera:camera)
+    depth=_depth(.85)
+    monkeypatch.setattr(head_depth,'settled_depth',lambda sensor,render:depth)
+    sensor=SimpleNamespace(get_position_orientation=lambda:(th.tensor(CAM[0]),th.tensor(CAM[1])))
+    replay=E.Executor.__new__(E.Executor)
+    replay.sidecar=None  # action-stream replay has no executable oracle sidecar
+    replay.task_variant='inter_object_relation_satisfaction-inside_small_scale-garlic_clove-saucepot-commercial_kitchen_table'
+    replay.robot=SimpleNamespace(sensors={'head':sensor})
+    replay.cam_key='head';replay._sim=SimpleNamespace(render=lambda:None);replay.n=928
+    replay.tracked={'target':_Obj('target_garlic_clove_0',[1.1,0.,0.],[.05,.05,.05]),
+                    'partner':_Obj('partner_saucepot_0',[1.,0.,0.],[.3,.3,.3])}
+    report=replay.goal_occlusion_report()
+    assert report['objects']['target_garlic_clove_0']['occluded']==1.
+    assert report['objects']['target_garlic_clove_0']['judged'] is False
+    assert report['occluded'] is False and report['worst']=='partner_saucepot_0'
+    depth[:]=.5
+    report=replay.goal_occlusion_report()
+    assert report['occluded'] is True and report['worst']=='partner_saucepot_0'
+    assert report['threshold']==.5
+    depth[:]=.85
+    replay.task_variant='inter_object_relation_satisfaction-ontop_small_scale'
+    report=replay.goal_occlusion_report()
+    assert report['occluded'] is True and report['worst']=='target_garlic_clove_0'
+    replay.task_variant=None
+    assert replay.goal_occlusion_report()['occluded'] is True

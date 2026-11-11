@@ -1857,7 +1857,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             ex_cfg.brace_retry_aim_frac = float(os.environ["ISG_AIM_FRAC"])
         meta["rush_env"] = {k: v for k, v in os.environ.items() if k.startswith("ISG_")}
         executor = Executor(env, task, sidecar, recorder=recorder, motions=motions, monitors=monitors, cfg=ex_cfg, sim=og.sim, state=state,
-                            tracked_objects=tracked, cam_key=cam_key)
+                            tracked_objects=tracked, cam_key=cam_key, task_variant=meta["variant"])
+        meta["qa_task_variant"] = executor.task_variant
         executor.qa_program = qa_program
         executor.last_obs, executor.last_info = obs, info
         # owner 2026-10-11: the template's objects start on an interior support surface (a shelf inside a bookcase / wardrobe / hall

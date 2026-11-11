@@ -747,8 +747,13 @@ class Executor:
 
     def __init__(self, env, task, sidecar, recorder: Optional[Recorder] = None, motions: Optional[Motions] = None,
                  monitors: Optional[Monitors] = None, cfg: Optional[ExecutorConfig] = None, sim=None, state: Optional[SimState] = None,
-                 tracked_objects: Optional[Dict[str, Any]] = None, cam_key: Optional[str] = None):
+                 tracked_objects: Optional[Dict[str, Any]] = None, cam_key: Optional[str] = None,
+                 task_variant: Optional[str] = None):
         self.env, self.task, self.sidecar = env, task, sidecar
+        # Action replay intentionally has no oracle sidecar. Keep the loaded
+        # task identity for QA rules, including the existing inside-container
+        # visibility policy, without enabling any oracle actions or retries.
+        self.task_variant = getattr(sidecar, "variant", None) or task_variant
         self.cfg = cfg or ExecutorConfig()
         self.robot = env.scene.robots[0]
         self.cam_key = cam_key or (state.cam_key if state is not None else None)
@@ -2334,7 +2339,7 @@ class Executor:
                     self.sim.render()
         cam = (cp.float().tolist(), cq.float().tolist())
         objects = GO.screen_scene(depth, cam, intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE,
-                                  subtask=getattr(self.sidecar, "variant", None))
+                                  subtask=self.task_variant)
         return GO.report(objects, method="live head-camera depth", step=self.n, camera_key=self.cam_key, resolution=[intr[0], intr[1]])
 
     # ------------------------------------------------------------------ TRO goal override (§3.8, spec §8)
