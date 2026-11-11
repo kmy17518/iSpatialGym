@@ -2820,6 +2820,14 @@ def carry_online_wanted(grasp) -> bool:
                 or campaign_runtime.contact_recovery('touching_carry_online'))
 
 
+def protected_carry_recovery_wanted() -> bool:
+    """Enable the existing fully checked detour for an exact recovery config."""
+    from ispatialgym.sampling import campaign_runtime
+    return bool((os.environ.get('ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY', '0') == '1'
+                 and os.environ.get('ISPATIALGYM_CAMPAIGN_CONFIG'))
+                or campaign_runtime.contact_recovery('touching_protected_carry'))
+
+
 def _carry_online(action, motions: Motions, state, arm: str, targets, ctx, carry: Sequence[Any], ignore: Sequence[Any],
                   repose: bool = True) -> Optional[Tuple[str, Any]]:
     """oracle-fix 2026-11-05 (the sidecar's ``grasps[k].carry_online``, written under the sampler's ``generation.carry_via_online``;
@@ -3038,8 +3046,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             except SkillError as e:
                 if e.details.get("stage") != "protected":
                     raise
-                if (os.environ.get("ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY", "0") == "1"
-                        and os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG")):
+                if protected_carry_recovery_wanted():
                     # Standard touching01: a fixed 12 cm arm rise stalls before
                     # the carry and its 34 cm remainder cannot be treated as a
                     # small finishing motion. Prove a bounded detour from the
@@ -3048,7 +3055,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
 
                     legs, candidates = choose(motions, arm, as_world_pose(targets["pre_place"]),
                         ignore=on, monitor=ctx.get("monitors"))
-                    ctx["campaign_protected_carry"] = {"candidates": candidates, "chosen": legs is not None}
+                    ctx["campaign_protected_carry"] = {"candidates": candidates, "chosen": legs is not None,
+                                                       "original_failure": e.details}
                     if legs is None:
                         raise SkillError("plan_failed", "no complete, collision-free, protected-clear carry detour in camera",
                                          stage="campaign_protected_carry", candidates=candidates) from e

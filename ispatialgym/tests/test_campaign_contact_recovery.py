@@ -147,3 +147,15 @@ def test_touching_online_carry_is_opt_in_and_exact_class_bound(monkeypatch):
     template.scene_setup['recovery_options']['touching_carry_online']='true'
     with pytest.raises(ContractError,match='boolean'):
         EX.carry_online_wanted(NS(extra={}))
+
+
+def test_touching_protected_carry_requires_exact_class_policy(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY', raising=False)
+    assert not EX.protected_carry_recovery_wanted()
+    template=bind(monkeypatch,'inter_object_relation_satisfaction-touching_04',
+        'inter_object_relation_satisfaction-touching_small_scale',{'touching_protected_carry':True})
+    assert EX.protected_carry_recovery_wanted()
+    template.class_id='inter_object_relation_satisfaction-touching_03'
+    with pytest.raises(ContractError,match='another audited class'):
+        EX.protected_carry_recovery_wanted()
