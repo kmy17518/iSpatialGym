@@ -63,10 +63,19 @@ def build_manifest(code,config,env,robot_refs):
  modules={};trees=[]
  for name in MODULES:
   h,tree=semantic(code/name);modules[name]=h;trees.append(tree)
+ from scripts.campaign_20261110.contracts import Perturbations,ScaleState
+ perturbation=cfg['perturbations']
+ scales={name:ScaleState(**value) for name,value in perturbation['scales'].items()}
+ perturbations=Perturbations(scales,tuple(perturbation.get('removed_objects',())),perturbation.get('lighting',{}))
+ perturbations.validate(cfg['split'],(o['instance'] for o in t['objects']))
+ if cfg['validation_key']['scale_sha256']!=perturbations.scale_fingerprint:raise ValueError('scale identity differs from validation key')
+ if set(scales)!={o['instance'] for o in t['objects']}:raise ValueError('complete exact object scales required')
  objects=[]
  for o in t['objects']:
   if o.get('ready') is not True or len(o.get('asset_sha256',''))!=64:raise ValueError('asset identity/readiness unavailable')
-  objects.append({k:o[k] for k in ('instance','category','model','asset_sha256','default_scale')})
+  scale=scales[o['instance']]
+  if tuple(o['default_scale'])!=scale.default:raise ValueError('scale default differs from ready asset')
+  objects.append({**{k:o[k] for k in ('instance','category','model','asset_sha256','default_scale')},'applied_scale':scale.applied})
  setup=t.get('scene_setup',{});source=Path(setup['source_template'])/'template.json'
  source_hash=file_hash(source)
  if source_hash!=setup['source_template_sha256']:raise ValueError('scene template identity differs')
@@ -74,7 +83,8 @@ def build_manifest(code,config,env,robot_refs):
  identity={'campaign_id':CAMPAIGN,'cache_kind':'exact_ik_v3','cache_schema':1,'modules':modules,
   'robot_solver_assets':refs,'settings':{k:env.get(k) for k in keys},
   'objects':sorted(objects,key=lambda o:o['instance']),
-  'scene':{'model':t['scene'],'room':t['room'],'template_sha256':source_hash},
+  'scene':{'model':t['scene'],'room':t['room'],'template_sha256':source_hash,
+   'removed_objects':sorted(perturbations.removed_objects)},
   'branch_limit':int(env.get('ISPATIALGYM_FAST_IK_CACHE_MAX_CHAINS',6)),
   'branch_min_rad':float(env.get('ISPATIALGYM_FAST_IK_BRANCH_MIN_RAD',.2)),
   'candidate_checks':'unchanged FK + current-world collision + support policy + normal downstream validation'}

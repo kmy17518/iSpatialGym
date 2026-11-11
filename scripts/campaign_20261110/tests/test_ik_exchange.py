@@ -103,3 +103,55 @@ def test_lock_timeout_does_not_steal_unproven_owner(tmp_path):
  with pytest.raises(TimeoutError):
   with E.file_lock(p,timeout=.02):pass
  assert p.exists()
+
+
+def compatibility_inputs(tmp_path):
+ from scripts.campaign_20261110 import ik_compatibility as C
+ code=tmp_path/'runtime';code.mkdir()
+ for name in C.MODULES:
+  p=code/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text('value=1\n')
+ refs={}
+ for name in ('robot_urdf','robot_curobo_yaml','robot_meshes/arm','curobo_implementation/solver'):
+  p=tmp_path/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(name)
+  refs[name]={'path':str(p),'sha256':C.file_hash(p)}
+ source=tmp_path/'scene';source.mkdir();(source/'template.json').write_text('{}')
+ scales={'target':{'default':[1.,1.,1.],'applied':[1.,1.,1.],'mode':'fixed'}}
+ cfg={'split':'train','template':{'objects':[{'instance':'target','category':'cup','model':'model',
+  'ready':True,'asset_sha256':'a'*64,'default_scale':[1.,1.,1.]}],'scene':'house_single_floor','room':'kitchen',
+  'scene_setup':{'source_template':str(source),'source_template_sha256':C.file_hash(source/'template.json')}},
+  'perturbations':{'scales':scales,'removed_objects':[],'lighting':{}},'validation_key':{'scale_sha256':digest(scales)}}
+ config=tmp_path/'config.json';config.write_text(json.dumps(cfg))
+ return C,code,config,refs,cfg
+
+
+def test_compatibility_binds_applied_scale_and_scene_removals(tmp_path):
+ C,code,config,refs,cfg=compatibility_inputs(tmp_path)
+ baseline=C.build_manifest(code,config,{},refs)
+ scale=cfg['perturbations']['scales']['target'];scale.update(applied=[1.,1.,1.1],mode='height')
+ cfg['validation_key']['scale_sha256']=digest(cfg['perturbations']['scales']);config.write_text(json.dumps(cfg))
+ changed=C.build_manifest(code,config,{},refs)
+ assert changed['compatibility_sha256']!=baseline['compatibility_sha256']
+ assert changed['compatible_identity']['objects'][0]['applied_scale']==(1.,1.,1.1)
+ with pytest.raises(ValueError,match='incompatible'):C.verify_running(baseline,code,config,{})
+ cfg['perturbations']['removed_objects']=['background_chair'];config.write_text(json.dumps(cfg))
+ assert C.build_manifest(code,config,{},refs)['compatibility_sha256']!=changed['compatibility_sha256']
+
+
+def test_compatibility_rejects_incomplete_scale_and_changed_solver(tmp_path):
+ C,code,config,refs,cfg=compatibility_inputs(tmp_path)
+ value=C.build_manifest(code,config,{},refs)
+ Path(refs['robot_urdf']['path']).write_text('changed kinematics')
+ with pytest.raises(ValueError,match='hash mismatch'):C.verify_running(value,code,config,{})
+ Path(refs['robot_urdf']['path']).write_text('robot_urdf')
+ cfg['perturbations']['scales']={};cfg['validation_key']['scale_sha256']=digest({});config.write_text(json.dumps(cfg))
+ with pytest.raises(ValueError,match='complete exact'):C.build_manifest(code,config,{},refs)
+
+
+def test_compatibility_identical_content_survives_path_and_comment_changes(tmp_path):
+ C,code,config,refs,cfg=compatibility_inputs(tmp_path)
+ value=C.build_manifest(code,config,{},refs)
+ renamed=tmp_path/'other_config.json';renamed.write_text(config.read_text())
+ (code/C.MODULES[0]).write_text('#different comment\nvalue=1\n')
+ assert C.build_manifest(code,renamed,{},refs)['compatibility_sha256']==value['compatibility_sha256']
+ (code/C.MODULES[0]).write_text('value=2\n')
+ assert C.build_manifest(code,renamed,{},refs)['compatibility_sha256']!=value['compatibility_sha256']
