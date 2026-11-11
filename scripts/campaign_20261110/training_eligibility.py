@@ -302,8 +302,34 @@ def build_projection(root):
                      'by_task': {task:coverage_summary(coverage_tasks[task]) for task in sorted(tasks)},
                      'by_class': {cls:coverage_summary(coverage_classes[cls]) for cls in sorted(classes)}},
         'cohorts': list(cohorts.values()), 'records': records,
+        'validation_canaries': canary_projection(root),
         'raw_generated': None, 'raw_generated_note': 'not inferred from accepted totals; see native attempt accounting',
         'policy': 'standalone blocked; preserve historical acceptance; eligible standard siblings/singletons only'}
+
+
+def canary_projection(root):
+    """Separate validation evidence never contributes to benchmark counts."""
+    path=Path(root)/'validation/training_canaries/ledger.json'
+    if not path.exists():
+        return {'status':'no_validated_canaries','validated_instances':0,'eligible_accepted':0,
+                'quota_consumed':0,'coverage':coverage_summary([])}
+    ledger=json.loads(path.read_text())
+    if ledger.get('schema')!='isg-training-canary-ledger-v1' or ledger.get('campaign_id')!='campaign_20261110':
+        raise ValueError('training canary ledger identity differs')
+    facts=[]
+    for iid,record in ledger['records'].items():
+        review=Path(record['review']).resolve()
+        if not review.is_relative_to(Path(root).resolve()/'validation/training_canaries/reviews') or file_digest(review)!=record['sha256']:
+            raise ValueError('training canary review changed')
+        value=json.loads(review.read_text())
+        if value['instance_id']!=iid or value['validation_passed'] is not True or value['eligible_for_benchmark'] is not False or value['quota_consumed']!=0:
+            raise ValueError('invalid canary validation/eligibility record')
+        facts.append(value['coverage'])
+    coverage=coverage_summary(facts)
+    coverage['basis']='validated pipeline canaries only; excluded from benchmark requirement coverage'
+    return {'status':'validation_only','observed_at':ledger['observed_at'],'ledger':str(path),
+            'ledger_sha256':file_digest(path),'validated_instances':len(facts),'eligible_accepted':0,
+            'quota_consumed':0,'coverage':coverage}
 
 
 def publish(root):
