@@ -130,6 +130,13 @@ def test_projection_reaudits_native_demo_and_replay_without_rewriting_acceptance
     projection=build_projection(tmp_path)
     assert projection['historically_accepted']==projection['eligible_accepted']==1
     assert projection['unverified']==projection['excluded']==0
+    catalog=tmp_path/'manifests/dashboard_standard_catalog.json';catalog.parent.mkdir(exist_ok=True)
+    catalog.write_text(json.dumps({'schema':'isg-dashboard-standard-catalog-v1',
+        'templates':[{'class_id':'unattempted_class','task':'object_scaling'}]}))
+    full=build_projection(tmp_path)
+    assert full['coverage']['by_class']['unattempted_class']['eligible_instances']==0
+    assert full['coverage']['by_class']['unattempted_class']['supports']['distinct']==0
+    assert full['coverage']['standard_catalog']['classes']==1
     Path(review['members'][1]['report']).write_text('{}')
     after=build_projection(tmp_path)
     assert after['eligible_accepted']==0 and after['unverified']==1

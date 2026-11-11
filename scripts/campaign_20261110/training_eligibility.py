@@ -278,6 +278,18 @@ def build_projection(root):
     from scripts.campaign_20261110.contracts import task_quotas
     for q in task_quotas(): tasks.setdefault(q.task, 0)
     for row in rows: classes.setdefault(row.get('class_id', row['task']), 0)
+    catalog_path = root/'manifests/dashboard_standard_catalog.json'
+    catalog_proof = None
+    if catalog_path.exists():
+        catalog = json.loads(catalog_path.read_text())
+        if catalog.get('schema') != 'isg-dashboard-standard-catalog-v1':
+            raise ValueError('unrecognized authoritative standard coverage catalog')
+        for entry in catalog['templates']:
+            if not isinstance(entry.get('class_id'), str) or entry.get('task') not in tasks:
+                raise ValueError('invalid standard coverage catalog entry')
+            classes.setdefault(entry['class_id'], 0)
+        catalog_proof = {'path': str(catalog_path), 'sha256': file_digest(catalog_path),
+                         'classes': len(catalog['templates'])}
     return {'schema': 'isg-training-eligibility-v1', 'campaign_id': 'campaign_20261110', 'observed_at': now,
         'status': 'complete', 'coverage_complete': True, 'historically_accepted': sum(totals.values()), 'eligible_accepted': totals['eligible'],
         'excluded': totals['excluded'], 'unverified': totals['unverified'], 'replacement_count': 0,
@@ -286,6 +298,7 @@ def build_projection(root):
         'classes': [{'class_id': cls, 'eligible_accepted': n} for cls,n in sorted(classes.items())],
         'coverage': {**coverage_summary(coverage), 'excluded_historical_instances_not_counted': totals['excluded'],
                      'unverified_instances_not_counted': totals['unverified'],
+                     'standard_catalog': catalog_proof,
                      'by_task': {task:coverage_summary(coverage_tasks[task]) for task in sorted(tasks)},
                      'by_class': {cls:coverage_summary(coverage_classes[cls]) for cls in sorted(classes)}},
         'cohorts': list(cohorts.values()), 'records': records,
