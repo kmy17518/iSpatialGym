@@ -32,6 +32,9 @@ assert.ok(goalYield.text.includes('native draws'),'Retry-inclusive attempt denom
 const fleetTime=await evaluate(`({available:current.sources.fleet_gpu_time.available,text:document.querySelector('#fleet-gpu-time').innerText,seconds:current.fleet_gpu_time.fleet_window_estimated_gpu_seconds})`);
 assert.ok(fleetTime.available&&fleetTime.seconds>=0,'Authoritative fleet GPU time is available');
 assert.ok(fleetTime.text.includes('not divided by this partial time window'),'No mixed-window yield inference');
+const clusterTime=await evaluate(`({available:current.sources.cluster_fleet_gpu_time.available,text:document.querySelector('#cluster-fleet-gpu-time').innerText,seconds:current.cluster_fleet_gpu_time.verified_allocated_gpu_seconds})`);
+assert.ok(clusterTime.available&&clusterTime.seconds>=0,'Verified cluster allocation accounting is available');
+assert.ok(clusterTime.text.includes('no accepted count or throughput is inferred'),'Broader allocation time remains separate from group yield');
 await evaluate(`document.querySelector('#yield-search').value='mental_rotation';document.querySelector('#yield-search').dispatchEvent(new Event('input'));document.querySelector('#yield-mode').value='train_only';document.querySelector('#yield-mode').dispatchEvent(new Event('change'))`);
 assert.ok(await evaluate(`document.querySelectorAll('#yield-rows tr').length>0&&document.querySelector('#yield-rows').innerText.includes('mental_rotation')`));
 await evaluate(`document.querySelector('#split').value='eval_model';document.querySelector('#split').dispatchEvent(new Event('change'));document.querySelector('#search').value='disembedding';document.querySelector('#search').dispatchEvent(new Event('input'))`);
@@ -55,5 +58,5 @@ const mobile=await evaluate('({viewport:innerWidth,width:document.documentElemen
 const mobileShot=await call('Page.captureScreenshot',{format:'png'});await writeFile(output+'/mobile.png',Buffer.from(mobileShot.data,'base64'));
 await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});await evaluate(`document.querySelector('#compute').scrollIntoView({behavior:'instant'})`);await delay(200);const computeShot=await call('Page.captureScreenshot',{format:'png'});await writeFile(output+'/compute.png',Buffer.from(computeShot.data,'base64'));await evaluate(`document.querySelector('#activity').scrollIntoView({behavior:'instant'})`);await delay(200);const activityShot=await call('Page.captureScreenshot',{format:'png'});await writeFile(output+'/activity.png',Buffer.from(activityShot.data,'base64'));await evaluate('scrollTo(0,0)');
 assert.equal(errors.length,0,'No JavaScript runtime exceptions');assert.ok(requests.filter(r=>r.url.startsWith('http://127.0.0.1:8765')).every(r=>r.method==='GET'),'Browser sent GET only');
-const result={passed:true,observed_at:new Date().toISOString(),first,goalYield,fleetTime,refreshed,filtered,states,mobile,request_count:requests.length,errors};
+const result={passed:true,observed_at:new Date().toISOString(),first,goalYield,fleetTime,clusterTime,refreshed,filtered,states,mobile,request_count:requests.length,errors};
 await writeFile(output+'/browser_check.json',JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));ws.close();
