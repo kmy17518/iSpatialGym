@@ -260,7 +260,14 @@ def bind_missing_runtime_identity(template, anchor):
             "choice_sha256": digest(metadata["choice"]), "method": "native_TemplateChoice_from_audited_anchor"}})
 
 
-def prepare(proof, allocation, cfg, root, *, prepared_source=None, dry_run=True):
+def prepare_indices(proof, cfg, root):
+    from scripts.campaign_20261110.planning_indices import prepare as reserve
+    source=held.template_from(proof['template'])
+    identity=admission_id(source,cfg['snapshot'],proof['perturbations'],cfg.get('admission_split','train'),cfg.get('author_revision'))
+    return reserve(root,'group_admit_'+identity[:20],3)
+
+
+def prepare(proof, allocation, cfg, root, *, prepared_source=None, prepared_indices=None, dry_run=True):
     from scripts.campaign_20261110.goal_batches import prepare_batch, submission_command
     from ispatialgym.sampling.campaign_goal_queue import schema_for_task
     source_template = held.template_from(proof["template"])
@@ -302,7 +309,12 @@ def prepare(proof, allocation, cfg, root, *, prepared_source=None, dry_run=True)
     decision = admission_decision(template, reserved, cfg)
     # Reserve before authoring immutable queue files. A contended global index
     # lock must leave no half-prepared queue that blocks the next controller pass.
-    index = reserve_indices(root, name, 3)
+    index_proof=None
+    if prepared_indices is None:
+        index = reserve_indices(root, name, 3)
+    else:
+        from scripts.campaign_20261110.planning_indices import consume
+        index,index_proof=consume(prepared_indices,root,name,3)
     prepared = prepare_batch(anchor=anchor, template=template, campaign_root=root, batch_id=name, count=1,
         magnitude_range=groups.ranges(template)[decision["bucket"]], seed=cfg["seed"], campaign_id=cfg["campaign_id"],
         code_sha256=file_digest(Path(cfg["snapshot"]) / ".snapshot_commit"), physics_sha256=proof["validation_key"]["physics_sha256"],
@@ -321,6 +333,7 @@ def prepare(proof, allocation, cfg, root, *, prepared_source=None, dry_run=True)
         "index": index, "count": 3, "validation_key": read(prepared["config"])["validation_key"], "phase": template.split,
         "decision": decision, "needs_new_gate": True, "status": "ready", "dry_run_passed": dry_run,
         "admission_id": identity, "source_proof": proof, "v2_root": v2_root}
+    if index_proof is not None:record['index_reservation']=index_proof
     backends = cfg.get('dispatch_backends')
     if backends is None and template.task == 'alignment-world_vertical':
         # Native wall provenance includes provider JSON symlinks. Keep those
@@ -541,9 +554,10 @@ def main():
                         prepared_source = prepare_anchor(found[0]["job_dir"], campaign_root=root,
                             ledger=found[0]["ledger"], campaign_started_at=cfg["started_at"],
                             extra_paths=[Path(cfg["snapshot"]) / ".snapshot_commit"])
+                        prepared_indices = prepare_indices(proof,cfg,root)
                         with admission_planning_lock(root):
                             record = prepare(proof, found[0], cfg, root,
-                                             prepared_source=prepared_source, dry_run=False)
+                                             prepared_source=prepared_source, prepared_indices=prepared_indices, dry_run=False)
                             state["records"][identity] = record
                             model_class_pin(template, state, cfg, commit=True)
                             save()

@@ -257,7 +257,13 @@ def prepare_source(spec, cfg, root):
         extra_paths=[spec["seed_config"], Path(spec["snapshot"]) / ".snapshot_commit"])
 
 
-def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_source=None):
+def prepare_indices(spec, state, decision, root):
+    from scripts.campaign_20261110.planning_indices import prepare
+    name='held_auto_'+spec['id']+'_'+str(len(state.get('queues',[]))+1).zfill(4)
+    return prepare(root,name,3*decision['groups'])
+
+
+def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_source=None, prepared_indices=None):
     from scripts.campaign_20261110.goal_groups import successful_anchor
     from scripts.campaign_20261110.held_goal_batches import prepare_batch, submission_command
     from scripts.campaign_20261110.base_regions import room_base_region
@@ -284,7 +290,12 @@ def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_
     key = seed_config["validation_key"]
     require(file_digest(snapshot / ".snapshot_commit") == key["code_sha256"], "held source code identity changed")
     count = decision["groups"]
-    index = reserve_indices(root, name, 3*count)
+    index_proof=None
+    if prepared_indices is None:
+        index = reserve_indices(root, name, 3*count)
+    else:
+        from scripts.campaign_20261110.planning_indices import consume
+        index,index_proof=consume(prepared_indices,root,name,3*count)
     prepared = prepare_batch(anchor=anchor, template=template, campaign_root=root, batch_id=name, count=count,
         magnitude_range=RANGES[template.task][decision["bucket"]], seed=cfg["seed"]+number*1009+spec["seed_offset"],
         campaign_id=cfg["campaign_id"], code_sha256=key["code_sha256"], physics_sha256=key["physics_sha256"],
@@ -304,6 +315,7 @@ def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_
               "validation_key": actual, "phase": phase, "index": index, "count": 3*count,
               "command": command, "status": "ready", "needs_new_gate": decision["needs_new_gate"], 'decision':dict(decision)}
     if state.get('next_dispatch_backends'):record['dispatch_backends']=state.pop('next_dispatch_backends')
+    if index_proof is not None:record['index_reservation']=index_proof
     state["queues"].append(record)
     save()
     write_json_atomic(Path(record["directory"]) / "submission.json", record)
@@ -497,6 +509,11 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
     # Large immutable demo/source hashes do not serialize unrelated classes.
     source_preparer = getattr(adapter, 'prepare_source', None) if adapter else prepare_source
     prepared_source = source_preparer(spec, cfg, root) if source_preparer else None
+    index_preparer=getattr(adapter,'prepare_indices',None) if adapter else prepare_indices
+    preview_groups=lifecycle.bounded_group_count(cfg,min(decision['groups'],remaining_budget//3),
+                                                spec.get('group_budget_seconds',900))
+    if preview_groups<=0:return 0
+    prepared_indices=index_preparer(spec,state,{**decision,'groups':preview_groups},root) if index_preparer else None
     with planning_lock(root/'controllers/held_planning.lockdir'):
         counts, reserved, decision = observe_work()
         state.update(counts=counts,counts_after_pending_reservations=reserved)
@@ -507,9 +524,11 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
             return 0
         decision["groups"] = lifecycle.bounded_group_count(cfg, min(decision["groups"], remaining_budget//3),
                                                             spec.get("group_budget_seconds", 900))
+        if prepared_indices is not None:decision['groups']=min(decision['groups'],prepared_indices.count//3)
         if allowance <= 0 or decision["groups"] <= 0:
             return 0
         options = {'prepared_source': prepared_source} if source_preparer else {}
+        if prepared_indices is not None:options['prepared_indices']=prepared_indices
         record = (adapter.prepare_queue if adapter else prepare_queue)(spec, state, decision, cfg, root, template, save, **options)
     run_logged(record["command"] + ["--dry-run"], Path(record["directory"]) / "dryrun.txt")
     record["dry_run_passed"] = True

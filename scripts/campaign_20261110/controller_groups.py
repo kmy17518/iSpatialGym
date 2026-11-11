@@ -217,7 +217,13 @@ def prepare_source(spec, cfg, root):
         extra_paths=[spec["seed_config"], Path(spec["snapshot"]) / ".snapshot_commit"])
 
 
-def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_source=None):
+def prepare_indices(spec, state, decision, root):
+    from scripts.campaign_20261110.planning_indices import prepare
+    name='group_auto_'+spec['id']+'_'+str(len(state.get('queues',[]))+1).zfill(4)
+    return prepare(root,name,3*decision['groups'])
+
+
+def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_source=None, prepared_indices=None):
     from scripts.campaign_20261110.goal_groups import successful_anchor, read_env
     from scripts.campaign_20261110.goal_batches import prepare_batch, submission_command
     from scripts.campaign_20261110.group_lane import check_reservations
@@ -240,7 +246,12 @@ def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_
     seed_config = read(spec["seed_config"])
     key = seed_config["validation_key"]
     require(file_digest(snapshot / ".snapshot_commit") == key["code_sha256"], "generic source code identity changed")
-    index = reserve_indices(root, name, 3 * decision["groups"])
+    index_proof=None
+    if prepared_indices is None:
+        index = reserve_indices(root, name, 3 * decision["groups"])
+    else:
+        from scripts.campaign_20261110.planning_indices import consume
+        index,index_proof=consume(prepared_indices,root,name,3*decision['groups'])
     prepared = prepare_batch(anchor=anchor, template=template, campaign_root=root, batch_id=name,
         count=decision["groups"], magnitude_range=ranges(template)[decision["bucket"]],
         seed=cfg["seed"] + number * 1009 + spec["seed_offset"], campaign_id=cfg["campaign_id"],
@@ -268,6 +279,8 @@ def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_
         "command": command, "status": "ready", "needs_new_gate": decision["needs_new_gate"], "decision": dict(decision)}
     if context_audit is not None:
         record['source_context_audit'] = context_audit
+    if index_proof is not None:
+        record['index_reservation']=index_proof
     if spec.get('dispatch_backends'):
         record['dispatch_backends'] = spec['dispatch_backends']
     elif template.task == 'alignment-world_vertical':
