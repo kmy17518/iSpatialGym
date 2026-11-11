@@ -6,6 +6,8 @@ CLASS_ID = 'inter_object_relation_satisfaction-under_small_scale_04'
 TASK = 'inter_object_relation_satisfaction-under_small_scale'
 OPTION = 'native_goal_occlusion_screen'
 AUDITED = {CLASS_ID: TASK,
+    'inter_object_relation_satisfaction-ontop_large_scale_02':
+        'inter_object_relation_satisfaction-ontop_large_scale',
     'inter_object_relation_satisfaction-inside_02':
         'inter_object_relation_satisfaction-inside_small_scale',
     'inter_object_relation_satisfaction-under_large_scale_02':

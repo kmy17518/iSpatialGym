@@ -87,3 +87,15 @@ def test_inside02_requires_same_measured_partner_visibility_policy():
     result=GO.report({'target':{'status':'ok','occluded':1.,'judged':False},
         'partner':{'status':'ok','occluded':.6733}},method='measured')
     assert result['occluded'] and result['threshold']==.5 and result['worst']=='partner'
+
+
+def test_mouse02_reference_occlusion_requires_new_measured_native_goal():
+    task='inter_object_relation_satisfaction-ontop_large_scale'
+    assert C.required(template(True,class_id=task+'_02',task=task))
+    for suffix in ['01','03']:
+        with pytest.raises(ValueError): C.required(template(True,class_id=task+'_'+suffix,task=task))
+    report={'objects':{'mouse':{'status':'ok','occluded':.8992}},'occluded':True}
+    C.verify_report(report)
+    from ispatialgym.eval import goal_occlusion as GO
+    result=GO.report(report['objects'],method='measured')
+    assert result['occluded'] and result['threshold']==.5
