@@ -4,6 +4,7 @@ Only native dependency generation is supported. No scene sampler, collection,
 acceptance, or arbitrary command can enter this route.
 """
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -59,16 +60,21 @@ def prepare(root, request, kind, index, native, helper, token):
     asset = Path(entry['asset_path'])
     require(asset.is_relative_to(native / 'Behavior-1K/datasets') and sha(asset) == entry['asset_sha256'], 'exact asset identity differs')
     proof = entry['native_default_evidence']
-    require(Path(proof['path']).resolve().is_relative_to(root) and sha(proof['path']) == proof['sha256'], 'native default measurement differs')
+    require(sha(proof['path']) == proof['sha256'], 'native default measurement differs')
     job = root / 'out/vast_prebuild' / token
     require(not job.exists(), 'prebuild token already has evidence')
     job.mkdir(parents=True)
-    # The exact row is copied without changing scale, rest, model, or proof.
+    # Private proof relocation changes no native scale/rest/model/geometry.
+    private_proof = job / 'native_default_evidence.json'
+    private_proof.write_bytes(Path(proof['path']).read_bytes())
+    require(sha(private_proof) == proof['sha256'], 'private default measurement copy differs')
+    selected_entry = copy.deepcopy(entry)
+    selected_entry['native_default_evidence']['path'] = str(private_proof)
     selected = job / 'selected_jobs.json'
-    write(selected, [entry])
+    write(selected, [selected_entry])
     env = {'ISGE_CODE': str(native), 'ISGF_ROOT': str(root), 'ISGF_NATIVE_HELPER': str(helper)}
     (job / 'job.env').write_text(''.join(k+'='+shlex.quote(v)+'\n' for k, v in env.items()))
-    files = [request, manifest, Path(proof['path']), native / '.snapshot_commit',
+    files = [request, manifest, private_proof, native / '.snapshot_commit',
              native / 'scripts/grasp_bands/job_glib.sh', selected, job / 'job.env',
              helper / 'scripts/campaign_20261110/vast_prebuild.py',
              helper / 'scripts/campaign_20261110/job_prebuild.sh']
@@ -77,6 +83,7 @@ def prepare(root, request, kind, index, native, helper, token):
              'source_manifest': str(manifest), 'source_request': str(request), 'entry_index': index,
              'original_entry': {**entry, 'class_id': 'dependency-tabletop', 'task': 'library_preparation'},
              'selected_manifest': str(selected), 'files': {str(p): sha(p) for p in files},
+             'proof_relocation': {'original': proof['path'], 'copy': str(private_proof), 'sha256': proof['sha256']},
              'asset_files': {str(asset): sha(asset)}, 'scenes': [], 'kind': kind,
              'environment': {'GBH': str(root), 'ISG_GB_ROOT': str(native)},
              'time_limit_s': 9000, 'prepared_at_unix': time.time(),
@@ -99,6 +106,9 @@ def verify(job, root=None):
     for name, expected in value['asset_files'].items():
         require(Path(name).is_relative_to(Path(value['snapshot']) / 'Behavior-1K/datasets') and sha(name) == expected, 'prebuild native asset changed: '+name)
     original = json.loads(Path(value['source_manifest']).read_text())[value['entry_index']]
+    relocation = value['proof_relocation']
+    require(original['native_default_evidence'] == {'path': relocation['original'], 'sha256': relocation['sha256']}, 'native measurement provenance differs')
+    original['native_default_evidence']['path'] = relocation['copy']
     selected = json.loads(Path(value['selected_manifest']).read_text())
     require(selected == [original], 'prebuild selected native row differs')
     return value

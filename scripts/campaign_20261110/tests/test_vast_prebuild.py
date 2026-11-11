@@ -27,7 +27,9 @@ def test_exact_recipe_copies_row_and_idempotently_enqueues_without_activation(tm
     before=manifest.read_bytes()
     job=v.prepare(tmp_path,request,'tabletop',0,native,helper,'one')
     value=v.verify(job,tmp_path)
-    assert json.loads(Path(value['selected_manifest']).read_text())==json.loads(before)
+    copied=json.loads(Path(value['selected_manifest']).read_text())
+    copied[0]['native_default_evidence']['path']=value['proof_relocation']['original']
+    assert copied==json.loads(before)
     assert manifest.read_bytes()==before and value['new_native_instances']==0
     jid=v.enqueue(job,tmp_path); assert v.enqueue(job,tmp_path)==jid
     assert not (tmp_path/'vast/config.json').exists()
