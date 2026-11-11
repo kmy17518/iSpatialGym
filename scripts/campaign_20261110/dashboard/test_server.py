@@ -79,6 +79,18 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertEqual(data['evidence'], {})
         self.assertFalse(data['sources']['evidence']['available'])
 
+    def test_containment_receipt_is_scoped_read_only(self):
+        value={'campaign_id':'campaign_20261110','status':'verified_blocked','api_key':'HIDDEN'}
+        self.write('dashboard/training_containment.json',value)
+        before=self.hashes()
+        code,raw=self.request('GET','/reports/training-containment')
+        self.assertEqual(code,200);self.assertNotIn(b'HIDDEN',raw)
+        self.assertEqual(snapshot(self.root,self.root/'inventory')['training_containment']['status'],'verified_blocked')
+        self.assertEqual(before,self.hashes())
+        self.write('dashboard/training_containment.json',{'campaign_id':'older'})
+        self.assertEqual(self.request('GET','/reports/training-containment')[0],404)
+        self.assertEqual(snapshot(self.root,self.root/'inventory')['training_containment'],{})
+
     def test_group_yield_isolated_read_only_and_full_evidence_route(self):
         value={'campaign_id':'campaign_20261110','summary':{'standard_eval':{'completed_groups':4}},
                'sources':[{'path':'proof','sha256':'abc'}],'groups':[{'group_id':'one'}],'api_key':'HIDDEN'}

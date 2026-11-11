@@ -49,6 +49,7 @@ def snapshot(root, inventory):
     canonical, cvs = read_source(root / 'dashboard/canonical_validation.json')
     training, tes = read_source(root / 'dashboard/training_eligibility.json')
     production_gate, pgs = read_source(root / 'dashboard/training_production_gate.json')
+    containment, cts = read_source(root / 'dashboard/training_containment.json')
     requirements, reqs = read_source(root / 'dashboard/training_requirements.json')
     fleet, fs = read_source(root / 'dashboard/vast_fleet_gpu_time.json')
     cluster_fleet, cfs = read_source(root / 'dashboard/cluster_fleet_gpu_time.json')
@@ -71,6 +72,8 @@ def snapshot(root, inventory):
         training = {}; tes = {'available': False, 'error': 'Campaign identity mismatch'}
     if production_gate and production_gate.get('campaign_id') != 'campaign_20261110':
         production_gate = {}; pgs = {'available': False, 'error': 'Campaign identity mismatch'}
+    if containment and containment.get('campaign_id') != 'campaign_20261110':
+        containment = {}; cts = {'available': False, 'error': 'Campaign identity mismatch'}
     if requirements and requirements.get('campaign_id') != 'campaign_20261110':
         requirements = {}; reqs = {'available': False, 'error': 'Campaign identity mismatch'}
     if fleet and fleet.get('campaign_id') != 'campaign_20261110':
@@ -103,10 +106,11 @@ def snapshot(root, inventory):
     cluster_view['jobs'] = jobs
     return sanitize({'campaign_id': 'campaign_20261110', 'served_at': datetime.now(timezone.utc).isoformat(),
         'targets': TARGETS, 'deadline': '2026-11-12T19:00:00Z', 'refresh_seconds': 30,
-        'sources': {'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss, 'group_yield': ys, 'fleet_gpu_time': fs, 'cluster_fleet_gpu_time': cfs, 'standard_recovery': rs, 'training_eligibility': tes, 'training_production_gate': pgs, 'training_requirements': reqs, 'canonical_validation': cvs},
+        'sources': {'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss, 'group_yield': ys, 'fleet_gpu_time': fs, 'cluster_fleet_gpu_time': cfs, 'standard_recovery': rs, 'training_eligibility': tes, 'training_production_gate': pgs, 'training_requirements': reqs, 'canonical_validation': cvs, 'training_containment': cts},
         'training_eligibility': {**{k:v for k,v in training.items() if k not in ('records','inputs','cohorts')},
             'cohorts': [{k:v for k,v in row.items() if k!='instance_ids'} for row in training.get('cohorts',[])]} if training else {},
         'training_production_gate': production_gate,
+        'training_containment': containment,
         'training_requirements': requirements,
         'standard_recovery': recovery,
         'canonical_validation': canonical,
@@ -139,6 +143,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/canonical-validation': 'canonical_validation.json',
             '/reports/training-eligibility': 'training_eligibility.json',
             '/reports/training-production-gate': 'training_production_gate.json',
+            '/reports/training-containment': 'training_containment.json',
             '/reports/training-requirements': 'training_requirements.json',
             '/reports/standard-recovery': 'standard_recovery.json',
             '/reports/replay-quality': 'gate_quality_audit.json',
@@ -150,7 +155,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
+            if path in ('/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,
