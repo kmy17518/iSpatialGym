@@ -646,7 +646,10 @@ def touch_a1_screen_mode() -> str:
 
 
 def push_line_com_on() -> bool:
-    return (os.environ.get(PUSH_LINE_COM_ENV) or "0").strip() == "1"
+    if (os.environ.get(PUSH_LINE_COM_ENV) or "0").strip() == "1":
+        return True
+    from ispatialgym.sampling import campaign_runtime
+    return campaign_runtime.contact_recovery('touching_push_mass_center')
 
 
 def _tip_keep(cap: float):

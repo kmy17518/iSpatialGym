@@ -1725,6 +1725,15 @@ def grasp_closure(action: Grasp, width: Optional[float], cfg) -> Tuple[Optional[
     """``(rate, squeeze, thin)`` of a grasp's closure (:meth:`Motions.gripper`): a library pinch at most ``cfg.thin_pinch_width_m`` wide
     closes at ``thin_pinch_close_rate`` and holds at the touch width less ``thin_pinch_squeeze_m``; every other grasp at
     ``gripper_close_rate`` with the configured squeeze (``squeeze`` None)."""
+    from ispatialgym.sampling import campaign_runtime
+    if (action.kind == "library" and width is not None and math.isfinite(float(width))
+            and 0.0 < float(width) <= 0.020
+            and campaign_runtime.contact_recovery('marker_gentle_pinch')):
+        # The audited marker pinched asymmetrically (6.8/5.9 mm), then rolled in
+        # action replay. Reuse the established thin-pinch closure at this
+        # template's measured width, without squeezing through the cylinder.
+        # Opening remains the same single full-open command.
+        return float(cfg.thin_pinch_close_rate), float(cfg.thin_pinch_squeeze_m), True
     return closure_for_width(width, cfg, library=action.kind == "library")
 
 

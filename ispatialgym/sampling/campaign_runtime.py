@@ -77,6 +77,30 @@ def inside_frame_recovery() -> bool:
     return value
 
 
+def contact_recovery(option: str) -> bool:
+    """Physical contact policies, carried by the exact campaign template hash.
+
+    Unconfigured runs retain their existing programs. These options change
+    contact construction or grasp closure, never goal poses or tolerances.
+    """
+    classes = {
+        'touching_push_mass_center': ('inter_object_relation_satisfaction-touching_04',
+                                     'inter_object_relation_satisfaction-touching_small_scale'),
+        'marker_gentle_pinch': ('inter_object_relation_satisfaction-nextto_01',
+                                'inter_object_relation_satisfaction-nextto_small_scale'),
+    }
+    require(option in classes, 'unknown campaign contact recovery option')
+    if not active():
+        return False
+    _, template, _, _ = configuration()
+    value = template.scene_setup.get('recovery_options', {}).get(option, False)
+    require(type(value) is bool, 'contact recovery option must be boolean')
+    if value:
+        require((template.class_id, template.task) == classes[option],
+                'contact recovery belongs to another audited class')
+    return value
+
+
 def choose_soft_bucket(rng, buckets, counts):
     """Favor underfilled train buckets while keeping every bucket eligible.
 
