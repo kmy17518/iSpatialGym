@@ -236,6 +236,7 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     key = seed_config["validation_key"]
     require(file_digest(snapshot / ".snapshot_commit") == key["code_sha256"], "held source code identity changed")
     count = decision["groups"]
+    index = reserve_indices(root, name, 3*count)
     prepared = prepare_batch(anchor=anchor, template=template, campaign_root=root, batch_id=name, count=count,
         magnitude_range=RANGES[template.task][decision["bucket"]], seed=cfg["seed"]+number*1009+spec["seed_offset"],
         campaign_id=cfg["campaign_id"], code_sha256=key["code_sha256"], physics_sha256=key["physics_sha256"],
@@ -246,7 +247,6 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     if phase in state.setdefault("phase_keys", {}):
         require(state["phase_keys"][phase] == actual, "held phase changed its immutable key")
     state["phase_keys"][phase] = actual
-    index = reserve_indices(root, name, 3*count)
     extras, template_customs = source_environment(spec["anchor_job"], root=root)
     command = submission_command(prepared["queue"], snapshot=snapshot, campaign_root=root, v2_root=spec["v2_root"],
                                  base_index=index, extra_env=extras + ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"])

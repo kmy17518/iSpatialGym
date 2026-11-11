@@ -223,11 +223,13 @@ def prepare(proof, allocation, cfg, root):
     counts = groups.read_counts(root, template)
     reserved = groups.reserve_pending_counts(counts, template, groups.pending(root))
     decision = admission_decision(template, reserved, cfg)
+    # Reserve before authoring immutable queue files. A contended global index
+    # lock must leave no half-prepared queue that blocks the next controller pass.
+    index = reserve_indices(root, name, 3)
     prepared = prepare_batch(anchor=anchor, template=template, campaign_root=root, batch_id=name, count=1,
         magnitude_range=groups.ranges(template)[decision["bucket"]], seed=cfg["seed"], campaign_id=cfg["campaign_id"],
         code_sha256=file_digest(Path(cfg["snapshot"]) / ".snapshot_commit"), physics_sha256=proof["validation_key"]["physics_sha256"],
         data_sha256=proof["validation_key"]["data_sha256"], budget_seconds=group_budget(cfg, template.task))
-    index = reserve_indices(root, name, 3)
     keys = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR")
     extras = [k + "=" + env[k] for k in keys if env.get(k)] + ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"]
     command = submission_command(prepared["queue"], snapshot=cfg["snapshot"], campaign_root=root, v2_root=v2_root,

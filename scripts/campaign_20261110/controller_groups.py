@@ -164,6 +164,7 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     seed_config = read(spec["seed_config"])
     key = seed_config["validation_key"]
     require(file_digest(snapshot / ".snapshot_commit") == key["code_sha256"], "generic source code identity changed")
+    index = reserve_indices(root, name, 3 * decision["groups"])
     prepared = prepare_batch(anchor=anchor, template=template, campaign_root=root, batch_id=name,
         count=decision["groups"], magnitude_range=ranges(template)[decision["bucket"]],
         seed=cfg["seed"] + number * 1009 + spec["seed_offset"], campaign_id=cfg["campaign_id"],
@@ -175,7 +176,7 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     if phase in state.setdefault("phase_keys", {}):
         require(state["phase_keys"][phase] == actual, "generic phase changed its immutable key")
     state["phase_keys"][phase] = actual
-    index = reserve_indices(root, name, prepared["candidate_instances"])
+    require(prepared["candidate_instances"] == 3 * decision["groups"], "generic author changed the reserved instance count")
     original_env = read_env(Path(spec["anchor_job"]) / "job.env")
     names = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR")
     extras = [name + "=" + original_env[name] for name in names if original_env.get(name)]
