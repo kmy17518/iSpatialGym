@@ -1405,6 +1405,7 @@ class IKChecker:
         (``_last_track_start``) and the caller then updates the recorded witness."""
         if len(poses) == 0:
             return IKResult(True, None, "no poses", 0)
+        self._count("exact_queries")
         q0 = self.q_locked(stance, fingers=fingers) if q_seed is None else q_seed
         # i7-floorfix 2026-11-07: a floor grasp's chain leaves the registered floor out of the world for every pose and the approach, every
         # configuration policed (the fingers by the policy's floor allowance) - the rule of the floor reach maps (floor_fingers "policy")
@@ -1413,13 +1414,19 @@ class IKChecker:
             cache = False  # a chain pinned to a given start is never a cached verdict of the poses alone
         key = None
         if cache:
-            key = cache_key("exact_ik_v3", {**self.exact_cache_scope(), "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
+            payload = {**self.exact_cache_scope(), "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
                                             "poses": [list(G.t(p[0]).tolist()) + list(G.t(p[1]).tolist()) for p in poses],
                                             "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_last), "scale": scale_key,
                                             **SS.cache_identity(self, list(ignore_for_last) + list(approached or [])),
                                             "seeds": EXACT_SEEDS, "seed_arms": q0[self.kit.robot.arm_control_idx[arm]],
-                                            "locked": q0[[i for a in ("left", "right") for i in self.kit.robot.arm_control_idx[a].tolist()] + self.kit.robot.gripper_control_idx["right"].tolist()]})
+                                            "locked": q0[[i for a in ("left", "right") for i in self.kit.robot.arm_control_idx[a].tolist()] + self.kit.robot.gripper_control_idx["right"].tolist()]}
+            key = cache_key("exact_ik_v3", payload)
+            from ispatialgym.sampling.exact_exchange import register_query
+            register_query(key, payload, [int(i) for i in self.kit.robot.arm_control_idx[arm].tolist()], len(q0))
+            self._count("exact_cache_eligible_queries")
             hit = cache_get(key)
+            if hit is not None:
+                self._count("exact_cache_candidate_queries")
             fresh = hit is not None and self._fresh_draw()
             if fresh:
                 self._count("ik_cache_fresh")  # train-fast 2026-11-01 (IK_FRESH_P): solve afresh although an entry exists (more branches)
@@ -1462,8 +1469,13 @@ class IKChecker:
                             self.solutions[(arm, self._pose_key(p))] = q_v.clone()
                         log.debug("exact IK cache hit verified (%d poses, arm %s)", len(poses), arm)
                         self._note_policed(verified[-1], arm, ignore_for_last, approached, poses[-1])  # i7-camhull (switch on / shadow only)
+                        self._count("exact_verified_hit")
+                        if hit.get("_exchange"):
+                            self._count("exact_shared_verified_hit")
                         return IKResult(True, verified[-1], "cache", len(poses))
+                self._count("exact_rejected_cache_queries")
                 log.debug("exact IK cache entry not verified in the current world (%d chains): solving", len(chains))
+        self._count("exact_fresh_queries")
         q = None
         qs: List[Optional[th.Tensor]] = []
         n = len(poses)
@@ -1744,6 +1756,9 @@ class IKChecker:
         st = getattr(getattr(self, "kit", None), "stats", None)
         if isinstance(st, dict):
             st[key] = st.get(key, 0) + n
+        if key.startswith("exact_"):
+            from ispatialgym.sampling.exact_exchange import record_event
+            record_event(key, n)
 
     # -- return-all solves (train-fast 2026-10-31, LIMIT_RETRY_RETURN_ALL) ------------------------------------------------
     #: solutions of one solve farther than this (rad, max abs arm joint difference) from the nearest-to-seed solution belong to
@@ -1756,6 +1771,7 @@ class IKChecker:
         :meth:`_pick_solution` within the nearest solution's branch - the one clear of the joint limits when the solve found one, so
         :meth:`away_from_limits` (4 seeded + 12 random re-solves, ~0.1 s each) usually has nothing left to do. A kit without
         ``ik_all`` (tests' stubs) solves as before."""
+        self._count("exact_fresh_solver_calls")
         ik_all = getattr(self.kit, "ik_all", None)
         if not (callable(ik_all) and fast_on("LIMIT_RETRY_RETURN_ALL", default=False)):
             return self.kit.ik(pose, q_seed, arm=arm)

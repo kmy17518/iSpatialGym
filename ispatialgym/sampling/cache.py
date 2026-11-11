@@ -65,6 +65,13 @@ def cache_key(kind: str, payload: Any) -> str:
 
 
 def cache_get(key: str) -> Optional[Any]:
+    if cache_root() is None:
+        return None
+    if key.startswith("exact_ik_v3-"):
+        from ispatialgym.sampling.exact_exchange import read_shared
+        shared = read_shared(key)
+        if shared is not None:
+            return shared
     root = cache_root()
     if root is None:
         return None
@@ -84,6 +91,11 @@ def cache_put(key: str, value: Any, *, round_floats: bool = True) -> None:
     (``.tmp.<pid>``) - many train workers write the same entry at once on NFS, and a shared ``.tmp`` name let one writer rename
     another's half-written file -, and a temp file that vanished under us (another writer's rename raced ours on a non-POSIX mount) is
     tolerated: the entry on disk is then the other writer's, computed from the same key. ``round_floats`` as :func:`_plain`."""
+    if cache_root() is None:
+        return
+    if key.startswith("exact_ik_v3-"):
+        from ispatialgym.sampling.exact_exchange import write_shared
+        write_shared(key, value)
     root = cache_root()
     if root is None:
         return
