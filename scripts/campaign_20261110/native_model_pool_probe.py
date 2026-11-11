@@ -92,6 +92,11 @@ def run(manifest_path, output, mode, source=None):
                 world.robot.set_joint_positions(th.tensor(entry['robot_joints']));world.robot.keep_still()
                 obj=world.obj(entry['active'])
                 require(obj.model==entry['model'],'independent restoration selected wrong model')
+                expected=next(r for r in manifest['entries'] if r['model']==obj.model)
+                require(th.allclose(obj.scale,th.tensor(expected['scale']),atol=1e-6,rtol=0), 'restored model scale differs')
+                pos,quat=obj.get_position_orientation();want_pos,want_quat=[th.tensor(x) for x in entry['object_pose']]
+                require(float(th.linalg.norm(pos-want_pos))<.002 and float(th.abs(th.dot(quat,want_quat)))>1-1e-6,
+                        'restored active pose differs')
                 require(not (set(prior['stages'][i]['active'] for i in range(3))-{obj.name}) & {o.name for o in world.scene.objects},
                         'inactive model is present in independently loaded export')
                 world._pool_objects={obj.name:obj};world.spawned={obj.name:obj}
@@ -109,4 +114,10 @@ def run(manifest_path, output, mode, source=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--manifest',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--mode',choices=('switch','restore'),required=True);p.add_argument('--source',type=Path);a=p.parse_args()
-    run(a.manifest,a.output,a.mode,a.source)
+    try:
+        run(a.manifest,a.output,a.mode,a.source)
+    finally:
+        # Close Kit explicitly: CPython teardown after a successful probe can
+        # crash native plugins and prevent its independent downstream process.
+        import omnigibson as og
+        og.shutdown()
