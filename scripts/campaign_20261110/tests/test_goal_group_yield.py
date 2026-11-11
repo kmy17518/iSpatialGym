@@ -109,12 +109,37 @@ class GoalYieldTest(unittest.TestCase):
                 result=snapshot(root)
                 self.assertEqual(result['errors'],[])
                 self.assertEqual(result['summary']['standard_eval']['completed_groups'],0)
-                self.assertEqual(result['summary']['standard_eval']['pending_running_unstarted']['running_job_unstarted_group'],2)
+                self.assertEqual(result['summary']['standard_eval']['pending_running_unstarted']['assigned_execution_unverified'],2)
                 self.assertEqual(result['jobs'][0]['queue_evidence_scope'],'authored_pending_worker_sync')
                 # A terminal missing executed queue remains an evidence failure.
                 write(root/'vast/state/jobs/900001000.json',{'status':'synced'})
                 result=snapshot(root)
                 self.assertTrue(result['errors'])
+
+    def test_unknown_execution_is_never_inferred_running(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);job,q,rows,write=self.fixture(root)
+            write(root/'accounting/job_gpu_time.json',{'records':[]})
+            with patch('scripts.campaign_20261110.goal_group_yield.snapshot_allocations',return_value=([],{},[])),patch('scripts.campaign_20261110.goal_group_yield.allocations',return_value=rows):
+                result=snapshot(root)
+            self.assertEqual(result['summary']['standard_eval']['pending_running_unstarted'],{'execution_unavailable':2})
+
+    def test_blocked_training_queue_is_held_not_runnable_pending(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);job,q,rows,write=self.fixture(root)
+            for p in (root/'groups').glob('*/campaign_config.json'):
+                c=json.loads(p.read_text());c['split']='train';write(p,c)
+            queue=json.loads(q.read_text());queue['config_sha256']=file_digest(root/'groups/g1/campaign_config.json')
+            for e in queue['entries']:
+                p=Path(e['path']);plan=json.loads(p.read_text());plan['split']='train';write(p,plan);e['sha256']=file_digest(p)
+            write(q,queue)
+            write(root/'accounting/job_gpu_time.json',{'records':[{'job_id':'1','state':'PENDING','backend':'slurm'}]})
+            decision={'allowed':False,'gate_sha256':'verified','category':'eval_validation_hold','reason':'all100 not validated'}
+            with patch('scripts.campaign_20261110.goal_group_yield.snapshot_allocations',return_value=([],{},[])),patch('scripts.campaign_20261110.goal_group_yield.allocations',return_value=rows),patch('scripts.campaign_20261110.production_gate.check_environment',return_value=decision):
+                result=snapshot(root)
+            self.assertEqual(result['summary']['train_only']['pending_running_unstarted'],{'held':2})
+            self.assertEqual(result['jobs'][0]['dispatch_gate'],decision)
+            self.assertEqual(result['summary']['train_only']['groups_attempted'],0)
 
     def test_duplicate_successes_and_incomplete_transfer(self):
         with tempfile.TemporaryDirectory() as t:

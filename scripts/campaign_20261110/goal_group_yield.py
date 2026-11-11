@@ -79,7 +79,8 @@ def fresh_group(gid, config, plan, path):
         'plan': str(path), 'job_ids': set(), 'members': {}, 'attempt_slots': set(), 'native_attempts': set(),
         'exact_started': set(), 'exact_slots': set(), 'rejections': Counter(), 'demo_rejections': Counter(),
         'activated': False, 'sampling_closed': False, 'terminal': False, 'closure_sources': set(),
-        'pending_execution': False, 'running_execution': False, 'accepted': Counter(), 'accepted_ids': [],
+        'pending_execution': False, 'running_execution': False, 'assigned_unverified': False,
+        'held_execution': False, 'unavailable_execution': False, 'accepted': Counter(), 'accepted_ids': [],
         'acceptance_reasons': [], 'first_attempt_at': None, 'last_attempt_at': None,
         'exact_instrumentation_jobs': set(), 'executed_jobs': set(), 'evidence_incomplete': []}
 
@@ -267,6 +268,18 @@ def snapshot(root):
             if not gids or any(g not in groups for g in gids):
                 unresolved.append({'job_id': jid, 'reason': 'executed group absent from authored registry', 'groups': gids}); continue
             a = account.get(jid, {}); state = a.get('state', '')
+            if jid in vast_ids:
+                state_path = root/'vast/state/jobs'/f'{jid}.json'
+                if state_path.exists():
+                    state = ev.read(state_path, 'vast_job_state').get('status', state)
+            dispatch_gate = None
+            if state in ('PENDING', 'queued', 'staging') and all(groups[g]['split'] == 'train' for g in gids):
+                # A queued record is not runnable work when the exact production
+                # gate holds it. This check only reads campaign inputs.
+                from scripts.campaign_20261110.production_gate import check_environment
+                decision = check_environment(root, env, start=row.get('start'), count=row.get('n'))
+                if not decision['allowed'] and decision.get('gate_sha256') and decision.get('category') in ('standalone_training', 'eval_validation_hold'):
+                    dispatch_gate = decision
             done_file = job/'job_stats.json'; stats = ev.read(done_file, 'job_statistics') if done_file.exists() else {}
             terminal = state.split()[0] in TERMINAL if state else False
             terminal = terminal or stats.get('job_wall_s') is not None
@@ -275,6 +288,7 @@ def snapshot(root):
             j = {'job_id': jid, 'group_ids': gids, 'job_dir': str(job), 'runtime_revision': Path(row['code']).name.removeprefix('trunk_'),
                 'backend': a.get('backend', 'vast' if jid in vast_ids else 'slurm'), 'state': state or 'unavailable',
                 'terminal': terminal, 'allocated_gpu_seconds': a.get('allocated_gpu_seconds'),
+                'dispatch_gate': dispatch_gate,
                 'queue_evidence_scope': queue_scope,
                 'missing_time_components': a.get('missing_time_components', []), 'activated_groups': [],
                 'unassigned_failure_rows': 0, 'sampling_rejections': Counter(), 'validation': gate_states.get(jid, [])}
@@ -288,8 +302,12 @@ def snapshot(root):
                     require(gid not in closed, 'duplicate queue closure'); closed[gid] = event
             for gid in gids:
                 g = groups[gid]; g['job_ids'].add(jid); g['runtime_revision'] = j['runtime_revision']
-                g['pending_execution'] |= not terminal and state in ('PENDING', 'queued', 'staging')
-                g['running_execution'] |= not terminal and state not in ('PENDING', 'queued', 'staging')
+                held = dispatch_gate is not None or state in ('held', 'blocked', 'stopped', 'paused', 'held_training_stop')
+                g['held_execution'] |= not terminal and held
+                g['pending_execution'] |= not terminal and not held and state in ('PENDING', 'queued', 'staging', 'CONFIGURING')
+                g['running_execution'] |= not terminal and state in ('RUNNING', 'COMPLETING', 'running')
+                g['assigned_unverified'] |= not terminal and state == 'assigned'
+                g['unavailable_execution'] |= not terminal and not held and state not in ('PENDING', 'queued', 'staging', 'CONFIGURING', 'RUNNING', 'COMPLETING', 'running', 'assigned')
             # Structured reject rows name actual attempted slots, never requested capacity.
             for path in sorted((job/'inst').rglob('campaign_sampling_failures.jsonl')):
                 for rec in ev.lines(path, 'sampling_rejections'):
@@ -380,9 +398,12 @@ def snapshot(root):
         elif g['accepted']:
             g['status'] = 'completed'; g['activated'] = True
         elif g['activated'] and g['sampling_closed'] and (finished or g['terminal']): g['status'] = 'completed'
-        elif g['activated']: g['status'] = 'running_or_collecting'
+        elif g['held_execution']: g['status'] = 'held'
+        elif g['activated'] and g['running_execution']: g['status'] = 'running_or_collecting'
         elif g['running_execution']: g['status'] = 'running_job_unstarted_group'
         elif g['pending_execution']: g['status'] = 'pending'
+        elif g['assigned_unverified']: g['status'] = 'assigned_execution_unverified'
+        elif g['unavailable_execution']: g['status'] = 'execution_unavailable'
         elif g['job_ids']: g['status'] = 'unstarted_after_job_end'
         else: g['status'] = 'authored_unsubmitted'
         g['attempted'] = g['activated']; g['observed_attempted_slots'] = len(g.pop('attempt_slots'))
@@ -422,6 +443,7 @@ def snapshot(root):
             'native_draw_denominator':'Each entered native draw is a separate attempt, including retries at the same logical member index and interrupted draws. Unique attempted slots count logical indices instead; both are reported. Exact native-draw ratios require journals for every executed job in the cohort.',
             'gpu':'Exact Slurm collection allocation time includes startup and failures. Vast per-group startup/retry attribution and shared replay/bootstrap costs are incomplete; all-backend/end-to-end rates unavailable.',
             'revision':'Executed immutable runtime snapshot, not the current checkout. Comparing revisions is observational, not a controlled effect estimate.',
+            'activity':'Assignments alone do not prove execution. Held production queues, assigned-but-unverified jobs and unavailable execution observations are separate from running/pending groups.',
             'exclusion':'Camera tasks and ungrouped baseline/template validation jobs are excluded.'},
         'summary':{m:summarize([g for g in values if g['mode']==m],jobs) for m in ('standard_eval','train_only','held_out')},
         'cohorts':cohort_rows,'tasks':task_rows,'revision_comparisons':revision_comparisons(cohort_rows),
