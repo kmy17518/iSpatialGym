@@ -98,6 +98,24 @@ def test_heel_path_screen_catches_interior_limit_approach(monkeypatch):
     assert heel_carry_path_screen() is False
 
 
+def test_sink_candidate_screen_requires_exact_template_opt_in(monkeypatch):
+    from ispatialgym.sampling.campaign_large_recovery import candidate_program_screen
+    monkeypatch.setattr(runtime, 'active', lambda: True)
+    template = SimpleNamespace(scene_setup={},
+        class_id='inter_object_relation_satisfaction-inside_large_scale_03',
+        task='inter_object_relation_satisfaction-inside_large_scale')
+    monkeypatch.setattr(runtime, 'configuration', lambda: (None, template, None, None))
+    assert candidate_program_screen() is False
+    template.scene_setup={'recovery_options':{'sink_candidate_program_screen':True}}
+    assert candidate_program_screen() is True
+    template.class_id='inter_object_relation_satisfaction-inside_large_scale_02'
+    with pytest.raises(ValueError, match='audited plate/sink'):
+        candidate_program_screen()
+    template.scene_setup['recovery_options']['sink_candidate_program_screen']='true'
+    with pytest.raises(ValueError, match='must be boolean'):
+        candidate_program_screen()
+
+
 def test_soap_carry_screen_reuses_final_program_bounds(monkeypatch):
     from ispatialgym.sampling.v2.tasks.iors_large import IORSLarge
     from ispatialgym.sampling.campaign_large_recovery import soap_carry_oracle_screen

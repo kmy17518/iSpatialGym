@@ -21,6 +21,13 @@ def candidate_program_screen(plan=None):
                 and template.task == 'inter_object_relation_satisfaction-under_large_scale',
                 'heel candidate program screen belongs to the audited sandal class')
         return True
+    sink_enabled = template.scene_setup.get('recovery_options', {}).get('sink_candidate_program_screen', False)
+    require(type(sink_enabled) is bool, 'sink candidate program screen must be boolean')
+    if sink_enabled:
+        require(template.class_id == 'inter_object_relation_satisfaction-inside_large_scale_03'
+                and template.task == 'inter_object_relation_satisfaction-inside_large_scale',
+                'sink candidate program screen belongs to the audited plate/sink class')
+        return True
     proposal = getattr(plan, 'floor_push_source_proposal', None)
     if proposal is not None:
         require(template.class_id == 'inter_object_relation_satisfaction-under_large_scale_02'
@@ -34,7 +41,7 @@ def candidate_program_screen(plan=None):
 def candidate_program_rejection(sampler, draft, plan=None):
     """Screen a complete candidate without retaining provisional witness edits.
 
-    Both audited classes repeatedly reached the late checker only after the
+    The audited classes reached the late checker only after the
     stance/grasp loop had ended. Reuse that checker on an isolated sidecar so a
     failed retreat leaves the remaining native candidates searchable. Its
     world-state restoration and every original rejection remain in force.
