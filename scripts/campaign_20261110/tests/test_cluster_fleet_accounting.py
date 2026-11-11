@@ -2,7 +2,7 @@ from scripts.campaign_20261110.infra_cluster_fleet_accounting import parse
 
 
 def row(jid,comment='',submission='',gpu='gres/gpu=1',elapsed='100',name='isg261110_prereq'):
-    return '|'.join([jid,'shiyuc',name,comment,'FAILED','2026-11-10T01:00:00','2026-11-10T01:01:00',
+    return '|'.join([jid,jid,'shiyuc',name,comment,'FAILED','2026-11-10T01:00:00','2026-11-10T01:01:00',
                      '2026-11-10T01:02:40',elapsed,gpu,'1:0',submission])+'|\n'
 
 
@@ -29,3 +29,10 @@ def test_conflicting_rows_or_bad_gpu_denominators_are_not_silently_combined(tmp_
     text+=row('124','campaign_20261110_x',elapsed='invalid')
     records,ambiguous,errors=parse(text,tmp_path)
     assert len(records)==1 and len(errors)==2
+
+
+def test_array_display_identity_is_preserved_alongside_physical_allocation_id(tmp_path):
+    text=row('900').replace('900|900|','900|123_0|')+row('901').replace('901|901|','901|123_1|')
+    records,ambiguous,errors=parse(text,tmp_path,explicit=['123'])
+    assert {(r['job_id'],r['array_task_id']) for r in records}=={('900','123_0'),('901','123_1')}
+    assert not ambiguous and not errors

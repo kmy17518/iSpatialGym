@@ -11,7 +11,7 @@ import uuid
 from scripts.campaign_20261110.infra_gpu_accounting import gpu_count
 
 
-FIELDS=('job_id','user','name','comment','state','submitted_utc','start_utc','end_utc',
+FIELDS=('job_id','array_task_id','user','name','comment','state','submitted_utc','start_utc','end_utc',
         'elapsed_seconds','allocated_tres','exit_code','submission')
 
 
@@ -27,7 +27,7 @@ def parse(text, root, explicit=()):
         if '.' in jid:continue  # Allocation rows only, never steps plus their parent.
         owned=(row['comment']=='campaign_20261110' or row['comment'].startswith('campaign_20261110_')
                or root+'/' in row['submission'] or secondary+'/' in row['submission']
-               or jid in explicit or jid.split('_')[0] in explicit)
+               or jid in explicit or jid.split('_')[0] in explicit or row['array_task_id'].split('_')[0] in explicit)
         if not owned:
             if row['name'].startswith('isg261110'):
                 ambiguous.append({'job_id':jid,'name':row['name'],'reason':'campaign-shaped name lacks owned comment, submission path or explicit allocation proof'})
@@ -49,7 +49,7 @@ def snapshot(root):
     registry=root/'accounting/additional_allocations.json'
     explicit=json.loads(registry.read_text()).get('job_ids',[]) if registry.exists() else []
     command=['sacct','-X','-n','-P','-S','2026-11-10T00:00:00','-u','minyeong,shiyuc',
-             '--format=JobIDRaw,User,JobName%180,Comment%250,State,Submit,Start,End,ElapsedRaw,AllocTRES,ExitCode,SubmitLine%1200']
+             '--format=JobIDRaw,JobID%50,User,JobName%180,Comment%250,State,Submit,Start,End,ElapsedRaw,AllocTRES,ExitCode,SubmitLine%1200']
     probe=subprocess.run(command,capture_output=True,text=True,timeout=60,check=True,
                          env=dict(os.environ,TZ='UTC',SLURM_TIME_FORMAT='standard'))
     rows,ambiguous,errors=parse(probe.stdout,root,explicit)
