@@ -48,8 +48,29 @@ def library_environment(root,v2_root=None):
     return environment
 
 
+def runtime_bounds(sampling_budget_s=1800, subprocess_timeout_s=2400):
+    require(type(sampling_budget_s) is int and 0 < sampling_budget_s <= 1800,
+            'native sampling budget must be a positive integer within the existing bound')
+    require(type(subprocess_timeout_s) is int and sampling_budget_s < subprocess_timeout_s <= 2400,
+            'native subprocess timeout must exceed sampling budget within the existing bound')
+    return {'sampling_budget_s':sampling_budget_s,'subprocess_timeout_s':subprocess_timeout_s,
+            'allocation_seconds':subprocess_timeout_s+600}
+
+
+def verified_bounds(value):
+    bounds=value.get('runtime_bounds',runtime_bounds())
+    expected=runtime_bounds(bounds['sampling_budget_s'],bounds['subprocess_timeout_s'])
+    require(bounds==expected,'native runtime bounds differ')
+    argv=value['argv']
+    require(argv.count('--time-budget-s')==1 and argv.index('--time-budget-s')+1<len(argv)
+            and argv[argv.index('--time-budget-s')+1]==str(bounds['sampling_budget_s']),
+            'native sampler budget differs from declared bounds')
+    return bounds
+
+
 def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,start_index,token,
-            v2_root=None,v2_manifest_sha256=None):
+            v2_root=None,v2_manifest_sha256=None,*,sampling_budget_s=1800,subprocess_timeout_s=2400):
+    bounds=runtime_bounds(sampling_budget_s,subprocess_timeout_s)
     root,manifest,native,helper,wrapper=map(lambda p:Path(p).resolve(),(root,manifest,native,helper,original_wrapper))
     require(re.fullmatch(r'[A-Za-z0-9_-]+',token),'unsafe dependency token')
     require(all(p.is_relative_to(root) for p in (manifest,native,helper,wrapper)),'native dependency source outside campaign')
@@ -60,7 +81,11 @@ def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,
     require(argv[:3]==['python','-m','ispatialgym.sampling.sample_isg'],'unsupported native prerequisite entry point')
     require('--no-write-back' in argv and '--out' in argv and '--customs' in argv and '--bddl-root' in argv,
             'native prerequisite lacks immutable explicit inputs')
-    require('--start-index' not in argv and '--time-budget-s' not in argv,'native prerequisite already contains conflicting reservation')
+    require('--start-index' not in argv,'native prerequisite already contains conflicting reservation')
+    if '--time-budget-s' in argv:
+        require(argv.count('--time-budget-s')==1 and argv.index('--time-budget-s')+1<len(argv)
+                and argv[argv.index('--time-budget-s')+1]==str(sampling_budget_s),
+                'native source sampling budget conflicts with requested bound')
     output=Path(canonical_output).absolute()
     require(output.is_relative_to(root/'materialized_runs') and output.parent.resolve().is_relative_to(root),
             'native output outside campaign materialization')
@@ -113,7 +138,8 @@ def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,
         if path.is_symlink():files[str(path.resolve())]=sha(path)
         if path.suffix=='.json':pending.extend(referenced_files(json.loads(path.read_text())))
     argv[argv.index('--out')+1]=str(job/'result')
-    argv += ['--start-index',str(start_index),'--time-budget-s','1800']
+    argv += ['--start-index',str(start_index)]
+    if '--time-budget-s' not in argv:argv += ['--time-budget-s',str(sampling_budget_s)]
     library_files={}
     if v2_root is not None:
         release=Path(v2_root).resolve();release_manifest=release/'release_manifest.json'
@@ -136,6 +162,7 @@ def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,
            'snapshot':str(native),'helper_snapshot':str(helper),'source_manifest':str(manifest),'entry_index':index,
            'original_wrapper':str(wrapper),'original_entry':entry,'canonical_output':str(output),'argv':argv,
            'fresh_start_index':start_index,'environment':environment,'files':files,'scenes':[entry['scene']],
+           'runtime_bounds':bounds,
            'v2_release_root':str(Path(v2_root).resolve()) if v2_root else None,'library_files':library_files,
            'shared_anchor_sha256':sha(environment['ISPATIALGYM_REACH_MAP_ANCHORS']),
            'prepared_at_unix':time.time(),'runtime_adjustments':['image_native_apps','private_warm_kit_cache','worker_cpu_affinity','owned_output_relocation']}
@@ -147,6 +174,7 @@ def verify(job,root=None):
     job=Path(job).resolve();value=json.loads((job/'native_inputs.json').read_text());owned=Path(root or value['campaign_root']).resolve()
     require(value['schema']==SCHEMA and value['campaign_root']==str(owned),'native dependency campaign identity differs')
     require(job.is_relative_to(owned/'out/vast_native_dependency') and value['job_dir']==str(job),'native dependency job ownership differs')
+    verified_bounds(value)
     for name,expected in value['files'].items():
         path=Path(name);require(path.resolve().is_relative_to(owned) and path.is_file() and sha(path)==expected,'native dependency input bytes changed: '+name)
     expected_environment=library_environment(owned,value.get('v2_release_root'))
@@ -168,7 +196,7 @@ def enqueue(job,root,gpu='RTX 4090'):
         except FileExistsError:jid+=1
     record={'id':jid,'job_kind':'native_dependency','name':'isg261110_native_prereq',
             'script':str(Path(value['helper_snapshot'])/'scripts/campaign_20261110/job_native_dependency.sh'),
-            'job_dir':str(job),'time_s':3000,'cpus':9,'mem':'48G','acct':'vision','part':'svl',
+            'job_dir':str(job),'time_s':verified_bounds(value)['allocation_seconds'],'cpus':9,'mem':'48G','acct':'vision','part':'svl',
             'log':str(root/'slurm'/('isg261110_native_prereq_'+str(jid)+'.log')),'cwd':str(root),
             'submitted':time.time(),'submitted_by':'campaign_native_dependency','gpu':gpu,
             'native_inputs_sha256':sha(job/'native_inputs.json')}
@@ -192,7 +220,7 @@ def run(job):
                                'source_transport':str(job/'native_inputs.json'),
                                'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat()})
     with (output/'sample.log').open('w') as log:
-        try:rc=subprocess.run(argv,stdout=log,stderr=subprocess.STDOUT,timeout=2400).returncode
+        try:rc=subprocess.run(argv,stdout=log,stderr=subprocess.STDOUT,timeout=verified_bounds(value)['subprocess_timeout_s']).returncode
         except subprocess.TimeoutExpired:rc=124
     tros=list(output.rglob('*-tro_state.json'))
     report={'returncode':rc,'tro_count':len(tros),'tros':[str(p) for p in tros],

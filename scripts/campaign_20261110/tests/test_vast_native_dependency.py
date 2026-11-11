@@ -139,3 +139,51 @@ def test_exact_campaign_library_release_and_materialized_placeholder_are_preserv
     assert value['environment']['ISPATIALGYM_GRASP_LIBRARY_V2']==str(release/'glib')
     library.write_text('changed native grasps')
     with pytest.raises(ValueError,match='library bytes changed'):native.enqueue(job,tmp_path)
+
+
+def test_declared_short_canary_bounds_survive_source_transport_queue_and_process(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    source=json.loads(manifest.read_text());source['jobs'][0]['sample_argv']+=['--time-budget-s','1200']
+    manifest.write_text(json.dumps(source));before=manifest.read_bytes()
+    job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'bounded',
+                       sampling_budget_s=1200,subprocess_timeout_s=1800)
+    assert manifest.read_bytes()==before
+    value=native.verify(job,tmp_path)
+    assert value['runtime_bounds']=={'sampling_budget_s':1200,'subprocess_timeout_s':1800,'allocation_seconds':2400}
+    assert value['argv'].count('--time-budget-s')==1
+    jid=native.enqueue(job,tmp_path)
+    assert json.loads((tmp_path/'vast/queue'/f'{jid}.json').read_text())['time_s']==2400
+    for key in value['environment']:monkeypatch.setenv(key,native.os.environ.get(key,''))
+    def run(argv,**kwargs):
+        assert kwargs['timeout']==1800 and argv[argv.index('--time-budget-s')+1]=='1200'
+        raise native.subprocess.TimeoutExpired(argv,1800)
+    monkeypatch.setattr(native.subprocess,'run',run)
+    assert native.run(job)==2
+    assert json.loads((job/'result/sampling_gate.json').read_text())['returncode']==124
+
+
+@pytest.mark.parametrize('sampling,timeout', [(0,1800),(1801,2400),(1200,1200),(1200,2401),(True,1800),(1200,float('inf'))])
+def test_invalid_or_expanded_bounds_rejected_before_preparation(tmp_path,monkeypatch,sampling,timeout):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    with pytest.raises(ValueError):
+        native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'bad',
+                       sampling_budget_s=sampling,subprocess_timeout_s=timeout)
+    assert not (tmp_path/'out').exists()
+
+
+def test_conflicting_source_budget_is_not_silently_overwritten(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    source=json.loads(manifest.read_text());source['jobs'][0]['sample_argv']+=['--time-budget-s','1200']
+    manifest.write_text(json.dumps(source))
+    with pytest.raises(ValueError,match='conflicts'):
+        native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'bad')
+    assert not (tmp_path/'out').exists()
+
+
+def test_legacy_inputs_keep_the_original_bounds_and_changed_argv_is_rejected(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'legacy')
+    path=job/'native_inputs.json';value=json.loads(path.read_text());value.pop('runtime_bounds')
+    path.write_text(json.dumps(value));assert native.verified_bounds(native.verify(job))['subprocess_timeout_s']==2400
+    value['argv'][value['argv'].index('--time-budget-s')+1]='3600';path.write_text(json.dumps(value))
+    with pytest.raises(ValueError,match='sampler budget'):native.verify(job)
