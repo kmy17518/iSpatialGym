@@ -1156,10 +1156,37 @@ class Disembedding(SamplerV2):
             st = manip if (a == arms[0] and (not manip.working_arms or manip.working_arms == [a])) else TT.stance_for_arm(self, manip, a)
             if st is None:
                 continue
-            F = self.ikc.feasible_sets([th.zeros(2)], yaws, self.pick_grasps, lambda cell, yaw: target_poses[yaw], st, a, self.grasp_ignore_list(), cache=False)
+            F = self.ikc.feasible_sets([th.zeros(2)], yaws, self._campaign_layout_grasps(), lambda cell, yaw: target_poses[yaw], st, a, self.grasp_ignore_list(), cache=False)
             for yaw, _ in F.get(0, []):
                 n[yaw] += 1
         return n
+
+    def campaign_instance_published(self, path):
+        """Remember only fully screened puzzle members, after native publication.
+
+        A fixed puzzle layout and fixed goal leave the object starts unchanged.
+        Subsequent group members must therefore use another checked library
+        pinch. Failed native proposals never consume a pinch.
+        """
+        plan = getattr(self, "_campaign_tray_active", None)
+        if plan is None or self.layout is None:
+            return
+        with open(path) as stream:
+            campaign = json.load(stream)["ispatialgym"]["campaign"]
+        group = campaign["runtime"]["goal_group"]
+        if campaign["class_id"] != "disembedding_01":
+            return
+        if group["group_id"] != plan.group_id:
+            raise ValueError("published puzzle belongs to another goal group")
+        grasp = C.split_twin(group["requested_start"]["grasp"])[0]
+        used = getattr(self, "_campaign_layout_published_grasps", {})
+        used.setdefault(plan.group_id, set()).add(grasp)
+        self._campaign_layout_published_grasps = used
+
+    def _campaign_layout_grasps(self):
+        plan = getattr(self, "_campaign_tray_active", None)
+        used = getattr(self, "_campaign_layout_published_grasps", {}).get(getattr(plan, "group_id", None), set())
+        return [g for g in self.pick_grasps if C.split_twin(g.name)[0] not in used]
 
     def _layout_pick(self, rng, manip: Stance, arms_here: List[str]):
         """Owner 2026-10-12 (disembedding#01, the puzzle): the fixed layout turned as a whole about the vertical - the target with its
@@ -1188,6 +1215,9 @@ class Disembedding(SamplerV2):
             options[yaw] = (s_pose, src_w, poses, fig_yaw)
         if options:
             self._layout_pad_screen(next(iter(options.values()))[2])  # i7-tray: once per template (the layout is rigid)
+        grasps = self._campaign_layout_grasps()
+        if not grasps:
+            raise Reject("campaign_distinct_start_exhausted", "all screened puzzle library pinches already published in this goal group")
         targets = {yaw: o[2][tname] for yaw, o in options.items()}
         with self.pick_world():
             pairs = self._layout_yaw_screen(manip, arms_here, targets)
@@ -1211,7 +1241,7 @@ class Disembedding(SamplerV2):
             self._place_layout(poses)
             try:
                 with self.pick_world():
-                    t_pose, grasp = TT.phase3_target(self, manip, rng, self.pick_grasps, self.hull["target"], self.rest["target"], self.grasp_ignore_list(), top=src_w,
+                    t_pose, grasp = TT.phase3_target(self, manip, rng, grasps, self.hull["target"], self.rest["target"], self.grasp_ignore_list(), top=src_w,
                                                      support_z=src_w.z, margin=float(self.g("tray_footprint_margin_m")),
                                                      scale_key=self.choice.models["target"].scale, bands=self.bands, arms=arms_here,
                                                      arm_bands=self.arm_bands or None, fixed=(poses[tname][0][:2], fig_yaw))

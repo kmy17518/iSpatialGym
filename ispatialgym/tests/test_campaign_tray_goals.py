@@ -10,6 +10,28 @@ from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.v2.tasks.disembedding import Disembedding
 
 
+def test_puzzle_group_remembers_only_published_grasps_and_resets_by_group(tmp_path):
+    import json
+    s=SimpleNamespace(layout={'fixed':True},_campaign_tray_active=SimpleNamespace(group_id='g1'))
+    s.pick_grasps=[SimpleNamespace(name=n) for n in ('top_13','top_13~r180','top_2')]
+    assert len(Disembedding._campaign_layout_grasps(s))==3
+    p=tmp_path/'native.tro';p.write_text(json.dumps({'ispatialgym':{'campaign':{
+        'class_id':'disembedding_01','runtime':{'goal_group':{
+            'group_id':'g1','requested_start':{'grasp':'top_13~r180'}}}}}}))
+    Disembedding.campaign_instance_published(s,p)
+    assert [g.name for g in Disembedding._campaign_layout_grasps(s)]==['top_2']
+    # Another goal retains the full checked grasp library.
+    s._campaign_tray_active=SimpleNamespace(group_id='g2')
+    assert len(Disembedding._campaign_layout_grasps(s))==3
+    with pytest.raises(ValueError,match='another goal group'):Disembedding.campaign_instance_published(s,p)
+
+
+def test_puzzle_without_campaign_does_not_open_published_artifact():
+    s=SimpleNamespace(pick_grasps=[SimpleNamespace(name='top_1')])
+    Disembedding.campaign_instance_published(s,'/missing/noncampaign.tro')
+    assert Disembedding._campaign_layout_grasps(s)==s.pick_grasps
+
+
 def test_reference_start_proposal_is_scoped_and_provenance_required():
     from ispatialgym.sampling.campaign_tray_goals import reference_start_proposal
     from ispatialgym.sampling.campaign_held_goals import GoalPlanError

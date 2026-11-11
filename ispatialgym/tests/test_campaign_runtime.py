@@ -143,6 +143,18 @@ def test_unactivated_queue_cannot_claim_a_group_attempt(tmp_path, monkeypatch):
     sampler = SimpleNamespace(ctx=SimpleNamespace(out_dir=str(tmp_path)))
     with pytest.raises(ContractError, match="activated queue"):
         runtime.attempt_started(sampler, index=5, attempt=0, seed=7)
+
+
+def test_published_callback_never_consumes_rejected_draw(tmp_path,monkeypatch):
+    called=[]
+    sampler=SimpleNamespace(_campaign_attempt_event={'attempt_id':'a'},
+                            campaign_instance_published=called.append)
+    monkeypatch.setattr(runtime,'_append_attempt_event',lambda *args:None)
+    runtime.attempt_finished(sampler,outcome='rejected',phase='goal_occlusion',tro_path=tmp_path/'a.tro')
+    assert called==[]
+    sampler._campaign_attempt_event={'attempt_id':'b'}
+    runtime.attempt_finished(sampler,outcome='written',phase='published',tro_path=tmp_path/'b.tro')
+    assert called==[tmp_path/'b.tro']
     assert not (tmp_path / "campaign_attempts.jsonl").exists()
 
 

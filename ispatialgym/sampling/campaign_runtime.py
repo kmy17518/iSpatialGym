@@ -361,6 +361,10 @@ def attempt_finished(sampler, *, outcome, phase, reason=None, tro_path=None):
     if started is None:
         return  # Reset failures and pre-draw queue transitions did not enter a native draw.
     require(outcome in ("written", "rejected"), "invalid native attempt outcome")
+    if outcome == "written" and phase == "published":
+        published = getattr(sampler, "campaign_instance_published", None)
+        if published is not None:
+            published(tro_path)
     record = {**started, "event": "finished", "created_at": time.time(), "outcome": outcome,
               "phase": phase, "reason": reason, "tro_path": str(Path(tro_path).resolve()) if tro_path else None}
     _append_attempt_event(sampler, record)

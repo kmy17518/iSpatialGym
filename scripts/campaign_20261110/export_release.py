@@ -280,6 +280,22 @@ def publish(root, tag, rows, groups, inputs, *, shard_size=32):
             shutil.rmtree(temporary)
 
 
+def current_export_groups(root, rows, groups):
+    """Export surviving group assignments while retaining their historical hash."""
+    from scripts.campaign_20261110.current_eligibility import effective_group
+    selected = {}
+    for row in rows:
+        gid = row.get('group_id')
+        if not gid or gid in selected:
+            continue
+        original = groups[gid]
+        effective = effective_group(root, row, original)
+        require(effective is not None, 'export member lost its current eligible group')
+        selected[gid] = {**effective, 'historical_group_sha256': digest(original),
+                         'historical_accepted': original['accepted']}
+    return selected
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     for name in ("root", "tag", "reservations", "reservation-hashes"):
@@ -297,8 +313,7 @@ def main():
     from scripts.campaign_20261110.training_eligibility import classify_record
     excluded = [row for row in source if row['split'] == 'train' and classify_record(row, groups.get(row.get('group_id')), root=a.root)['status'] != 'eligible']
     source = [row for row in source if row not in excluded]
-    included = {row['instance_id'] for row in source}
-    groups = {gid: group for gid,group in groups.items() if any(iid in included for iid in group['accepted'])}
+    groups = current_export_groups(a.root, source, groups)
     inputs.append({'kind': 'training_eligibility_filter', 'excluded_historical_training': len(excluded),
                    'excluded_record_sha256': digest(excluded), 'historical_records_preserved': True})
     contracts = contract_index(a.root)

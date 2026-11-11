@@ -47,6 +47,18 @@ def test_multiple_train_survivors_without_eval_need_explicit_reassignment(tmp_pa
     assert all(not s['quota_eligible']for s in status.values())
 
 
+def test_export_retains_surviving_pair_and_historical_group_identity(tmp_path):
+    from scripts.campaign_20261110.export_release import current_export_groups
+    rows=members();original=group(rows);before=digest(original)
+    ledger(tmp_path,rows,['verified','verified','excluded'])
+    exported=current_export_groups(tmp_path,rows[:2],original)['g']
+    assert exported['accepted']=={r['instance_id']:r['split'] for r in rows[:2]}
+    assert exported['members']==rows[:2]
+    assert exported['historical_accepted']==original['g']['accepted']
+    assert exported['historical_group_sha256']==digest(original['g'])
+    assert digest(original)==before
+
+
 def test_unknown_scope_is_visible_not_a_blanket_exclusion_and_camera_exempt(tmp_path):
     rows=members()[:1];rows[0]['task']='camera_relocalization-standard'
     status,_=e.assess(tmp_path,rows,{})

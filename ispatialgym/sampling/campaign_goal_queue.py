@@ -25,7 +25,7 @@ RESET_FIELDS = ("_campaign_goal_started_at", "_campaign_goal_plan_sha", "_campai
                 "_campaign_destination", "_campaign_joint_plan_sha", "_campaign_joint_active",
                 "_campaign_joint_written_starts", "_campaign_stable_probed_sha",
                 "_campaign_attachment_active", "_campaign_attachment_plan_sha",
-                "_campaign_block_active", "_campaign_block_plan_sha")
+                "_campaign_block_active", "_campaign_block_plan_sha", "_campaign_layout_published_grasps")
 
 
 def canonical_goal(plan):
