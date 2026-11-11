@@ -1380,6 +1380,9 @@ def _record(s, init: Stance, st: Stance, end: Stance, info: Dict[str, Any], chai
         extras.update({"push_hands": 1, "two_hand_fallback": info.get("two_hand_fallback")})
     s.sidecar.add_contact(ContactRecord("push", arm, pre=chain["pre"], contact=chain["contact"], mid=None, goal=goal_eef, direction=d3, distance_m=float(dist),
                                         object=tname, stance="manipulation", extras=extras))
+    # Retain the already solved contact posture for a fresh collision check if
+    # the campaign goal settle nudges a touching endpoint along its line.
+    s._campaign_base_push_contact_q = chain.get("q_both", chain["q"]).clone()
     st.contacts = ["push"]
     st.extras.update({"push": {"face": face, "height_m": extras["push_height_m"], "distance_m": round(dist, 4), "pitch_deg": chain["pitch_deg"]}})
     if second is not None:
@@ -1506,6 +1509,48 @@ class TouchingBasePushMode(NextToMode):
     def refine_targets_from_goal(self, draft: Draft):
         nudge_until_touching(self, draft)
         super().refine_targets_from_goal(draft)
+
+    def after_goal_check(self, draft: Draft):
+        from ispatialgym.sampling import campaign_runtime as CR
+        if not CR.active() or CR.configuration()[1].class_id != "inter_object_relation_satisfaction-touching_large_scale_01":
+            return
+        from ispatialgym.sampling.campaign_base_push import settled_endpoint
+        push = self.sidecar.contacts["push"]
+        settled = draft.summary["goal_check"]["settled_poses"][self.target.name]
+        try:
+            adjustment = settled_endpoint(draft.object_poses[self.tname], settled, push.direction.tolist(),
+                                          push.distance_m, push.extras["base_end"],
+                                          fixed_goal=getattr(self, "_campaign_pair_active", None) is not None)
+        except ValueError as error:
+            raise Reject("campaign_touching_endpoint", str(error)) from error
+        if adjustment is None:
+            return
+        st = self.sidecar.stance("manipulation")
+        end = self.sidecar.stance(END_STANCE)
+        end2d = tuple(adjustment["base_end"])
+        arms = [push.arm] + ([push.extras["second_hand"]["arm"]] if push.extras.get("second_hand") else [])
+        why = []
+        if not _sweep_ok(self, st, end2d, arms, self._campaign_base_push_contact_q, why):
+            raise Reject("campaign_touching_endpoint", "; ".join(why))
+        check = end.with_trunk(end.translate, end.tilt, END_STANCE)
+        check.base_pose2d = end2d
+        with (self.ikc.ignoring([self.target]) if self.gp.gen("push_end_ignore_target") else _NoCtx()):
+            if not bool(self.ikc.stances_collision_free([check])[0]):
+                raise Reject("campaign_touching_endpoint", "measured contact endpoint stance collides")
+        shift = th.tensor(adjustment["delta_xyz"])
+        push.goal = translated_pose(push.goal, shift)
+        push.distance_m = adjustment["distance_m"]
+        push.extras["base_end"] = list(end2d)
+        if push.extras.get("second_hand"):
+            second = push.extras["second_hand"]["goal"]
+            second["position"] = [a+b for a,b in zip(second["position"], adjustment["delta_xyz"])]
+        end.base_pose2d = end2d
+        end.extras["push_distance_m"] = push.distance_m
+        draft.summary["nextto"].update(push_distance_m=push.distance_m, goal_pose=settled)
+        draft.summary["campaign_touching_endpoint"] = {**adjustment, "sweep_rechecked":True,
+            "source":"exact settled goal; straight line preserved; no extra push-on"}
+        self.sidecar.set_goal(end2d, end.translate, end.tilt, arms="same")
+        self.sidecar.language["goal_numbers"]["push_distance_cm"] = 100*push.distance_m
 
 
 def nudge_until_touching(s, draft: Draft) -> None:
