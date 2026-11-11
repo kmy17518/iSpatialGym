@@ -108,6 +108,25 @@ def contact_recovery(option: str) -> bool:
     return value
 
 
+def touching_push_stroke_m():
+    """Exact-template opt-in to the existing checked stroke/re-aim program.
+
+    The successful touching04 reference used 3cm strokes along the full original
+    push. This changes execution segmentation, not its goal or tolerances.
+    """
+    if not active():
+        return None
+    _, template, _, _ = configuration()
+    value = template.scene_setup.get('recovery_options', {}).get('touching_push_stroke_m')
+    if value is None:
+        return None
+    require(type(value) in (int, float) and math.isfinite(value) and 0 < value <= .1,
+            'campaign push stroke must be finite and within (0, 0.1] meters')
+    require((template.class_id, template.task) == ('inter_object_relation_satisfaction-touching_04',
+            'inter_object_relation_satisfaction-touching_small_scale'), 'push stroke recovery belongs to the audited spray-bottle class')
+    return float(value)
+
+
 def choose_soft_bucket(rng, buckets, counts):
     """Favor underfilled train buckets while keeping every bucket eligible.
 

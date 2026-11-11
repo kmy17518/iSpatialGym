@@ -80,3 +80,28 @@ def test_tray_joint_margin_is_bound_to_the_audited_cellulose_tape_class(monkeypa
     template.class_id = 'disembedding_08'
     with pytest.raises(ContractError, match='another audited class'):
         CR.contact_recovery('tray_grasp_joint_margin')
+
+
+def test_touching_strokes_are_hash_bound_and_cannot_be_overridden(monkeypatch):
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    monkeypatch.delenv(IS.TOUCH_PUSH_STROKE_ENV, raising=False)
+    assert IS.touch_push_stroke_m() is None
+    template=bind(monkeypatch,'inter_object_relation_satisfaction-touching_04',
+        'inter_object_relation_satisfaction-touching_small_scale',{'touching_push_stroke_m':.03})
+    assert IS.touch_push_stroke_m()==.03
+    monkeypatch.setenv(IS.TOUCH_PUSH_STROKE_ENV,'0.030')
+    assert IS.touch_push_stroke_m()==.03
+    for value in ['off','0','.04']:
+        monkeypatch.setenv(IS.TOUCH_PUSH_STROKE_ENV,value)
+        with pytest.raises(ValueError,match='differs from campaign'):IS.touch_push_stroke_m()
+    monkeypatch.delenv(IS.TOUCH_PUSH_STROKE_ENV)
+    template.class_id='inter_object_relation_satisfaction-touching_01'
+    with pytest.raises(ContractError,match='audited spray-bottle'):IS.touch_push_stroke_m()
+
+
+@pytest.mark.parametrize('value',[True,'0.03',0,-.03,.11,float('nan'),float('inf')])
+def test_invalid_stroke_policy_never_enters_native_program(monkeypatch,value):
+    bind(monkeypatch,'inter_object_relation_satisfaction-touching_04',
+        'inter_object_relation_satisfaction-touching_small_scale',{'touching_push_stroke_m':value})
+    with pytest.raises(ContractError,match='finite'):CR.touching_push_stroke_m()

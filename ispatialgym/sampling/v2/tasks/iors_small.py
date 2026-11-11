@@ -666,6 +666,14 @@ def _tip_keep(cap: float):
 def touch_push_stroke_m() -> Optional[float]:
     """:data:`TOUCH_PUSH_STROKE_ENV` as a length (m), None when unset / "off" / "0"; ``ValueError`` for a length that is not positive."""
     v = (os.environ.get(TOUCH_PUSH_STROKE_ENV) or "").strip().lower()
+    from ispatialgym.sampling import campaign_runtime
+    bound = campaign_runtime.touching_push_stroke_m()
+    if bound is not None:
+        # A mutable environment override cannot silently change the policy
+        # carried by the template fingerprint and recorded native sidecar.
+        if v and (v in ("off", "0", "none") or float(v) != bound):
+            raise ValueError("push stroke environment differs from campaign configuration")
+        return bound
     if v in ("", "off", "0", "none"):
         return None
     m = float(v)
