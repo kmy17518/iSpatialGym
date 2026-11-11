@@ -64,3 +64,33 @@ def test_existing_pool_keeps_inactive_candidates_and_rejects_capacity_extension(
     assert path.name == 'pool.json'
     with pytest.raises(ValueError, match='immutable maximum pool'):
         existing_pool_for_counts(template, 10, tmp_path)
+
+
+def test_fewer_bodies_is_an_explicit_prediction_only_with_strict_bucket_margin():
+    p = profile([
+        {'category': category, 'model': model, 'area_m2': area, 'scale': [1., 1., 1.]}
+        for category, model, area in [('cap', 'iqeyba', .004373847741942424),
+            ('coaster', 'httqaj', .006213426806118583), ('cork', 'uyceta', .0009951372280284812)]])
+    p['source_floor_area_m2'] = .0927
+    p['target']['area_m2'] = .001965467577987906
+    original = solve_counts(p)
+    assert [row['n_distractors'] for row in original[1:]] == [12, 11]
+    assert original == solve_counts(p, selection_policy='bin_centre')
+    changed = solve_counts(p, selection_policy='fewest_bodies')
+    assert [row['n_distractors'] for row in changed[1:]] == [5, 7]
+    for row in changed:
+        low, high = row['crowdedness_range']
+        assert low + .02 <= row['predicted_native_coverage'] < high - .02
+        assert row['selection_policy'] == 'fewest_bodies'
+        assert sum(row['counts'].values()) == row['n_distractors']
+        assert set(row['counts']).issubset({'cap/iqeyba', 'coaster/httqaj', 'cork/uyceta'})
+    with pytest.raises(ValueError, match='unknown count selection'):
+        solve_counts(p, selection_policy='relax_bucket')
+
+
+def test_fewer_bodies_reports_missing_bucket_instead_of_crossing_margin():
+    p = profile([{'category': 'box', 'model': 'a', 'area_m2': .0445, 'scale': [1., 1., 1.]}])
+    p['target']['area_m2'] = .001
+    p['source_floor_area_m2'] = .1
+    assert solve_counts(p, max_distractors=1)[0]['bucket'] == 2
+    assert solve_counts(p, max_distractors=1, selection_policy='fewest_bodies') == []

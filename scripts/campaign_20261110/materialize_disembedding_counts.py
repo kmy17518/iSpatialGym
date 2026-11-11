@@ -44,10 +44,11 @@ def count_tuples(length, maximum):
                 yield (n, *tail)
 
 
-def solve_counts(profile, max_distractors=12, budget=.85):
+def solve_counts(profile, max_distractors=12, budget=.85, selection_policy='bin_centre'):
     """One model per active category, repeated copies, exact native area sums."""
     require(profile.get('schema') == 'isg-native-tray-coverage-profile-v1', 'native coverage profile required')
     require(not profile.get('fixed_layout'), 'fixed puzzle layout cannot use variable counts')
+    require(selection_policy in {'bin_centre', 'fewest_bodies'}, 'unknown count selection policy')
     require(type(max_distractors) is int and 1 <= max_distractors <= 48, 'finite maximum count must be1..48')
     floor, target = float(profile['source_floor_area_m2']), float(profile['target']['area_m2'])
     require(math.isfinite(floor) and floor > 0 and math.isfinite(target) and target > 0, 'invalid native areas')
@@ -80,9 +81,18 @@ def solve_counts(profile, max_distractors=12, budget=.85):
             selected = {key: count for key, count in zip(chosen, counts) if count}
             # Prefer the middle of a bin, then model diversity, then fewer bodies.
             rank = (abs(coverage - centre), -len(selected), n, tuple(sorted(selected.items())))
+            if selection_policy == 'fewest_bodies':
+                # A prediction is only a proposal. Keep two percentage points
+                # inside the strict native bucket before preferring fewer
+                # bodies; native packing and measured coverage still decide.
+                low, high = BUCKETS[bucket]
+                if not low + .02 <= coverage < high - .02:
+                    continue
+                rank = (n, abs(coverage - centre), -len(selected), tuple(sorted(selected.items())))
             if bucket not in best or rank < best[bucket][0]:
                 best[bucket] = (rank, dict(bucket=bucket, crowdedness_range=list(BUCKETS[bucket]), counts=selected,
-                    n_distractors=n, predicted_native_coverage=coverage, occupied_hull_area_m2=occupied))
+                    n_distractors=n, predicted_native_coverage=coverage, occupied_hull_area_m2=occupied,
+                    **({'selection_policy': selection_policy, 'prediction_boundary_margin': .02} if selection_policy != 'bin_centre' else {})))
     return [best[i][1] for i in sorted(best)]
 
 
@@ -108,6 +118,7 @@ def main():
         p.add_argument('--' + name, type=Path, required=True)
     p.add_argument('--class-id', required=True)
     p.add_argument('--max-distractors', type=int, default=12)
+    p.add_argument('--selection-policy', choices=('bin_centre', 'fewest_bodies'), default='bin_centre')
     a = p.parse_args()
     require(not a.out.exists() and a.out.resolve().is_relative_to(a.campaign_root.resolve()), 'new private output required')
     pointer, reservations, hashes = active_policy(a.campaign_root)
@@ -138,7 +149,7 @@ def main():
         require(max(abs(float(x) - y) for x, y in zip(measured[key]['scale'], obj.default_scale)) <= 1e-6, 'profile scale differs from ready default')
     budget_info = original['generation'].get('distractor_budget', {})
     budget = float(budget_info.get('budget_fraction', original['generation'].get('tray_budget', .85))) if isinstance(budget_info, dict) else float(budget_info)
-    variants = solve_counts(profile, a.max_distractors, budget)
+    variants = solve_counts(profile, a.max_distractors, budget, a.selection_policy)
     require(bool(variants), 'no count candidate fits any native coverage bucket')
     fixed = tuple(o for o in template.objects if o.role == 'support')
     existing = existing_pool_for_counts(template, a.max_distractors, a.campaign_root)
