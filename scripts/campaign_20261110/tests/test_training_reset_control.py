@@ -2,6 +2,19 @@ import pytest
 from scripts.campaign_20261110.training_batch_probe import episode_order
 
 
+def test_reset_step_observation_brackets_only_the_existing_native_call():
+    from types import SimpleNamespace
+    from scripts.campaign_20261110.training_batch_probe import observe_reset_boundary
+    calls=[]
+    def step(token):calls.append(token);return 'native'
+    sim=SimpleNamespace(step_physics=step)
+    scene=SimpleNamespace(reset=lambda:sim.step_physics('unchanged'))
+    original=scene.reset;completed=[]
+    result,before=observe_reset_boundary(scene,sim,lambda:scene.reset(),lambda:len(calls),completed)
+    assert result=='native' and before==0 and completed==[1]
+    assert calls==['unchanged'] and scene.reset is original and sim.step_physics is step
+
+
 def test_default_remains_distinct_a_b_a():
     assert episode_order({},'physics_action_open_loop')==[0,1,0]
     assert episode_order({},'kinematic_observation_rendering')==[0,1,0]

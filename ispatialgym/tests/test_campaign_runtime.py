@@ -54,6 +54,31 @@ def test_observational_probe_records_loaded_joint_state_without_mutation(monkeyp
     assert joint==[.3]
 
 
+def test_dynamics_context_reads_native_sleep_and_cached_contacts_only(monkeypatch):
+    import sys
+    root=type('RigidDynamicPrim',(),{'is_asleep':True,'mass':2.,'sleep_threshold':.001,
+        'solver_position_iteration_count':8,'solver_velocity_iteration_count':1})()
+    obj=SimpleNamespace(name='tray',category='tray',model='a',scale=[1,1,1],fixed_base=False,
+        n_joints=0,kinematic_only=False,root_link=root,
+        get_position_orientation=lambda **kw:([0,0,0],[0,0,0,1]),
+        get_linear_velocity=lambda:[0,0,0],get_angular_velocity=lambda:[0,0,0])
+    matrix=SimpleNamespace(nonzero=lambda:SimpleNamespace(tolist=lambda:[[0,0]]))
+    cache=SimpleNamespace(_CONTACT_MATRIX={0:matrix},_CURRENT_CONTACT_MATRIX={0:matrix},
+        _ROW_IDX_TO_PATH={0:['tray']},_COL_IDX_TO_PATH={0:['table']},_PENDING_IMPULSES={0:[]})
+    monkeypatch.setitem(sys.modules,'omnigibson.utils.usd_utils',SimpleNamespace(RigidContactAPI=cache))
+    monkeypatch.setattr(runtime.augmentation,'_lights',lambda scene:{})
+    monkeypatch.setenv('ISPATIALGYM_CAMPAIGN_RESTORATION_CONTEXT','1')
+    scene=SimpleNamespace(objects=[obj],idx=0)
+    sim=SimpleNamespace(skybox=SimpleNamespace(intensity=1.,color=[1,1,1]))
+    result=runtime.restoration_observation({'validation_key':{},'perturbations':{}},scene,sim)
+    context=result['native_dynamics_context']
+    assert context['dynamic_roots']['tray']['is_asleep'] is True
+    assert context['cached_contacts']['_CURRENT_CONTACT_MATRIX']==[['tray','table']]
+    assert context['physics_steps_added']==0 and context['pending_contact_steps']==0
+    assert result['native_dynamics_context_sha256']==digest(context)
+    assert root.is_asleep is True and cache._CURRENT_CONTACT_MATRIX[0] is matrix
+
+
 def test_campaign_metadata_passes_real_tro_parser_and_stays_strict():
     from ispatialgym.eval.targets import ISGTroMeta, SCHEMA_VERSION, TROValidationError
 

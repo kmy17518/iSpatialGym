@@ -83,7 +83,7 @@ def shared_world_proof(runner, records):
             'scene_check':reason,'method':'native instance_signature + template_compatible'}
 
 
-def observe_reset_boundary(scene, sim, load, observe):
+def observe_reset_boundary(scene, sim, load, observe, completed=None):
     """Read immediately before the existing reset step, without changing it.
 
     This diagnostic checkpoint does not replace the post-step restoration
@@ -99,7 +99,9 @@ def observe_reset_boundary(scene, sim, load, observe):
         had_step='step_physics' in vars(sim)
         def observed_step(*step_args, **step_kwargs):
             observations.append(observe())
-            return step(*step_args, **step_kwargs)
+            result=step(*step_args, **step_kwargs)
+            if completed is not None:completed.append(observe())
+            return result
         sim.step_physics=observed_step
         try:
             return reset(*args, **kwargs)
@@ -170,11 +172,12 @@ def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_
         load=task.load_tro_instance
         raw_load=vars(task).get('load_tro_instance')
         had_load='load_tro_instance' in vars(task)
-        checkpoints=[]
+        checkpoints=[];completed=[]
         def observed_load(*load_args, **load_kwargs):
             result, checkpoint=observe_reset_boundary(loader.env.scene, runner.og.sim,
                 lambda:load(*load_args, **load_kwargs),
-                lambda:restoration_observation(loader.tro.meta.raw['campaign'], loader.env.scene, runner.og.sim))
+                lambda:restoration_observation(loader.tro.meta.raw['campaign'], loader.env.scene, runner.og.sim),
+                completed=completed)
             checkpoints.append(checkpoint)
             return result
         task.load_tro_instance=observed_load
@@ -188,6 +191,10 @@ def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_
             'phase':'after_scene_restore_before_existing_reset_physics_step',
             'diagnostic_only':True, 'post_step_checks_unchanged':True,
             'observation':checkpoints[0]}
+        require(len(completed)==1, 'diagnostic did not observe the completed native reset step')
+        loader.report['campaign_restoration']['native_reset_step_completed_observation']={
+            'phase':'immediately_after_existing_scene_reset_physics_step',
+            'diagnostic_only':True,'physics_steps_added':0,'observation':completed[0]}
         if final_pre_action:
             # The entire native loader has returned, including constraints,
             # grasps, settling, final reset, and its pose checks. Read only:
@@ -234,6 +241,8 @@ def run(root,request,output,kind):
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
     compatibility=verify_runtime_compatibility(root,value,records,runtime.parent)
     os.environ['ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE']='1'
+    if value.get('observe_native_dynamics') is True:
+        os.environ['ISPATIALGYM_CAMPAIGN_RESTORATION_CONTEXT']='1'
     order=episode_order(value,kind);entries=[]
     common={'schema':'isg-training-restoration-probe-v1','campaign_id':'campaign_20261110','kind':kind,
             'request':{'path':str(Path(request).resolve()),'sha256':file_digest(request)},

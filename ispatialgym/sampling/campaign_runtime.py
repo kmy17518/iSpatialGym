@@ -371,11 +371,47 @@ def restoration_observation(meta, scene, sim):
     loaded = {'objects': objects,
         'lights': {name: float(attr.Get()) for name, attr in augmentation._lights(scene).items()},
         'skybox': {'intensity': float(sim.skybox.intensity), 'color': _plain(sim.skybox.color)}}
-    return {'schema': 'isg-native-restoration-observation-v1', 'process_session': _RESTORATION_PROBE_SESSION,
+    result = {'schema': 'isg-native-restoration-observation-v1', 'process_session': _RESTORATION_PROBE_SESSION,
         'sequence': _RESTORATION_PROBE_SEQUENCE, 'scene_runtime_id': id(scene), 'sim_runtime_id': id(sim),
         'simulator_module': type(sim).__module__, 'scheduler_job_id': os.environ.get('SLURM_JOB_ID'),
         'validation_key': meta['validation_key'], 'perturbations_sha256': digest(meta['perturbations']),
         'observed_at': time.time(), 'loaded_state': loaded, 'loaded_state_sha256': digest(loaded)}
+    if os.environ.get('ISPATIALGYM_CAMPAIGN_RESTORATION_CONTEXT') == '1':
+        context = {'scope': 'Read-only sleep and existing contact-cache observations; no solver reset or physics step.',
+                   'dynamic_roots': {}, 'physics_steps_added': 0}
+        for obj in scene.objects:
+            root = getattr(obj, 'root_link', None)
+            if obj.fixed_base or getattr(obj, 'kinematic_only', False) or getattr(obj, 'n_joints', 0):
+                continue
+            if type(root).__name__ != 'RigidDynamicPrim':
+                continue
+            row = {}
+            for field in ('is_asleep', 'mass', 'sleep_threshold',
+                          'solver_position_iteration_count', 'solver_velocity_iteration_count'):
+                try: row[field] = _plain(getattr(root, field))
+                except Exception as error: row[field] = {'unavailable': type(error).__name__ + ': ' + str(error)}
+            context['dynamic_roots'][obj.name] = row
+        try:
+            # Inspect already computed Python caches without refreshing them or
+            # requesting a new native contact query.
+            from omnigibson.utils.usd_utils import RigidContactAPI
+            scene_idx = scene.idx
+            pairs = {}
+            for key in ('_CONTACT_MATRIX', '_CURRENT_CONTACT_MATRIX'):
+                matrix = getattr(RigidContactAPI, key).get(scene_idx)
+                if matrix is None:
+                    pairs[key] = None
+                else:
+                    rows = RigidContactAPI._ROW_IDX_TO_PATH[scene_idx]
+                    cols = RigidContactAPI._COL_IDX_TO_PATH[scene_idx]
+                    pairs[key] = sorted([str(rows[i]), str(cols[j])] for i,j in matrix.nonzero().tolist())
+            context['cached_contacts'] = pairs
+            context['pending_contact_steps'] = len(RigidContactAPI._PENDING_IMPULSES.get(scene_idx, []))
+        except Exception as error:
+            context['contact_cache_unavailable'] = type(error).__name__ + ': ' + str(error)
+        result['native_dynamics_context'] = context
+        result['native_dynamics_context_sha256'] = digest(context)
+    return result
 
 
 def _plain(value):
