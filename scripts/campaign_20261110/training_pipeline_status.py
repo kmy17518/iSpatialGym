@@ -46,6 +46,77 @@ def sequence_stage_references(root, sequence_path, stage):
     return result
 
 
+def template_render_observations(root, request_path):
+    """Join independently rendered exact exports, never a cross-model reuse claim."""
+    root=Path(root).resolve(); request_path=Path(request_path)
+    request=read(request_path); request_ref=ref(request_path)
+    require(request.get('schema')=='isg-training-template-render-request-v1'
+            and request.get('campaign_id')=='campaign_20261110'
+            and request.get('production_released') is False
+            and request.get('benchmark_credit')==0, 'invalid template render scope')
+    results={}
+    for record in request['records']:
+        key=(record['candidate_id'],int(record['start']))
+        require(key not in results,'duplicate exact template render request')
+        directory=Path(record['results']).resolve().parent
+        require(directory.is_relative_to(request_path.parent.resolve()),'render output escapes request')
+        for name in ('configuration','canary_review','source_environment','native_runtime_identity','manifest','demos'):
+            source=record[name]; path=Path(source['path']).resolve()
+            require(path.is_relative_to(root) and file_digest(path)==source['sha256'],
+                    'template render input changed: '+name)
+        row={'request':request_ref,'candidate_id':key[0],'start':key[1],
+             'configuration_sha256':record['configuration_sha256'],
+             'review':record['canary_review'],'native_runtime':record['native_runtime'],
+             'status':'prepared','scheduler_state':'unavailable','benchmark_credit':0,
+             'scope':'Independent rendering of this exact sampler export; no cross-model oracle-world reuse assertion.'}
+        launch=directory/'launch.json'
+        require(launch.is_file(),'template render launch identity missing')
+        plan=read(launch)
+        require(plan['instances']==[record['instance_id']] and plan['request']==request_ref
+                and plan['configuration']==record['configuration']
+                and plan['native_runtime_identity']==record['native_runtime_identity'],
+                'template render launch differs from request')
+        row['launch']=ref(launch)
+        submission=directory/'submission.json'
+        if submission.exists():
+            submitted=read(submission)
+            require(submitted.get('request')==request_ref
+                    and submitted.get('candidate_id')==key[0]
+                    and int(submitted.get('start',-1))==key[1]
+                    and submitted.get('native_runtime')==record['native_runtime']
+                    and submitted.get('launch')==ref(launch)
+                    and submitted.get('source_environment')==record['source_environment'],
+                    'template render submission identity differs')
+            row.update(status='submitted',submission=ref(submission),
+                       job_id=str(submitted['job_id']))
+        path=directory/'result.json'
+        if path.exists():
+            value=read(path)
+            require(value['schema']=='isg-render-result-v1'
+                    and value['launch_sha256']==file_digest(launch), 'render result launch identity differs')
+            iid=record['instance_id'];episodes=value.get('episodes',[])
+            passed=(value.get('success') is True and value.get('returncode')==0
+                    and value.get('expected_instances')==[iid]
+                    and value.get('rendered_instances')==[iid]
+                    and value.get('kept_instances')==[iid] and len(episodes)==1
+                    and Path(episodes[0].get('demo','')).name==iid
+                    and episodes[0].get('kept') is True
+                    and episodes[0].get('episode_index') is not None
+                    and (episodes[0].get('campaign_restoration')or{}).get('scale_verified') is True)
+            row.update(status='verified' if passed else 'failed_validation',
+                       result=ref(path),returncode=value.get('returncode'),
+                       verification_observed_at=timestamp(path))
+            if passed:
+                dataset=Path(episodes[0]['dataset']).resolve()
+                require(dataset.is_relative_to(Path(record['output']).resolve()),'rendered dataset escapes exact output')
+                files=sorted(p for p in dataset.rglob('*')if p.is_file())
+                require(any(p.suffix=='.parquet' for p in files)
+                        and any(p.suffix=='.mp4' for p in files), 'render result lacks saved observation data/video')
+                row['artifacts']=[ref(p) for p in files]
+        results[key]=row
+    return results
+
+
 _BATCH_OBSERVATION_CACHE = {}
 
 
@@ -158,6 +229,15 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
         summarize(snapshot)
         publish(snapshot)
     reviews = {}
+    renders = {}
+    for path in sorted(base.glob('*/template_rendering*/request.json')):
+        try:
+            observed=template_render_observations(root,path)
+            require(not(set(observed)&set(renders)), 'duplicate rendering attempt for exact canary')
+            renders.update(observed)
+            result['sources'].append({**ref(path),'kind':'exact_template_rendering'})
+        except Exception as error:
+            result['errors'].append({'path':str(path),'error':f'{type(error).__name__}: {error}'})
     for path in sorted(base.glob('*/existing_native_reviews.json')):
         try:
             value = read(path)
@@ -302,6 +382,15 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                         if stages:
                             row['sampler_sequence']['stage_references']=sequence_stage_references(root,sequence_path,stages[0])
                             row['sampler_sequence']['evidence_identity_verified']=True
+                if key in renders:
+                    rendering=renders[key]
+                    require(rendering['configuration_sha256']==row['configuration_sha256']
+                            and rendering['review']==(row.get('validated_evidence')or{}).get('review'),
+                            'rendering does not belong to this exact validated canary')
+                    row['template_rendering']=rendering
+                    if rendering['status']=='verified':
+                        row['validated_evidence']['rendering']=True
+                        row['validated_evidence']['rendering_result']=rendering['result']
                 row['last_observed_at'] = datetime.now(timezone.utc).isoformat()
                 result['records'].append(row)
         except Exception as error:
@@ -473,6 +562,9 @@ def family_paths(records, batches):
             'native_attempts_observed':len(selected),'native_written':sum((r.get('native')or{}).get('written')or 0 for r in selected),
             'exact_configurations_with_demo_physics_export':len({r['configuration_sha256']for r in passed}),
             'exact_validation':{'status':'partial' if passed else 'untested','evidence':evidence},
+            'exact_template_rendering':{'status':'partial' if any(r.get('template_rendering',{}).get('status')=='verified'for r in selected) else 'pending' if any(r.get('template_rendering')for r in selected) else 'untested',
+                'attempts':[r['template_rendering']for r in selected if r.get('template_rendering')],
+                'scope':'Only independently rendered exact templates; no global or cross-model oracle-world reuse conclusion.'},
             'aba_restoration':paths,
             'model_pool_switch_active_only_export':{'status':'partial' if sequences else 'untested','owner':'/root/dataset_contract',
                 'exact_native_stages':sequences,
