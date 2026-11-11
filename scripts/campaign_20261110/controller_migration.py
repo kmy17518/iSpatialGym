@@ -105,9 +105,12 @@ def controller_check(root,record,state,cfg,queue,save,*,family):
     cfg['_migration_checks_remaining']-=1;record['migration_last_checked']=now
     try:
         with atomic_directory_lock(root/'controllers'/(family+'_planning.lockdir')):
+            from scripts.campaign_20261110.migration_routes import source_routes
+            routes=source_routes(root,record)
             result=migrate_record(root,record,minimum_age=age,owner=getpass.getuser(),save=save,execute=True)
         if result:
-            state['next_dispatch_backends']=['vast_5090','vast_4090','shiyuc_svl','shiyuc_viscam','minyeong_svl']
+            state['next_dispatch_backends']=routes['backends']
+            record['migration_routes']=routes
             record.pop('migration_error',None)
     except Exception as exc:
         record['migration_error']={'at':time.time(),'type':type(exc).__name__,'reason':str(exc)}
@@ -132,10 +135,13 @@ def main():
                         with atomic_directory_lock(root/'controllers'/(family+'_planning.lockdir')):
                             for record in seed.get(key,[]):
                                 try:
+                                    from scripts.campaign_20261110.migration_routes import source_routes
+                                    routes=source_routes(root,record)
                                     result=migrate_record(root,record,minimum_age=args.minimum_pending_seconds,
                                         owner=getpass.getuser(),save=save,execute=args.execute)
                                     if result and args.execute:
-                                        seed['next_dispatch_backends']=['vast_5090','vast_4090','shiyuc_svl','shiyuc_viscam','minyeong_svl']
+                                        seed['next_dispatch_backends']=routes['backends']
+                                        record['migration_routes']=routes
                                         seed.pop('error',None);save()
                                     if result:print({'job_id':result['before']['job_id'],'migrated':args.execute},flush=True)
                                 except Exception as exc:

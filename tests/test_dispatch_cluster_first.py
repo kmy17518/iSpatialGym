@@ -72,5 +72,30 @@ class ClusterFirstTests(unittest.TestCase):
         self.assertFalse(result['allow_vast']);self.assertEqual(result['reason'],'unverified_resource_requirements')
         self.assertTrue(result['next_action']);self.assertEqual(result['owner'],'/root/compute')
 
+    def test_migrated_cluster_claim_rechecks_both_accounts_and_defers_unavailable_route(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);path=root/'intent.json'
+            path.write_text(json.dumps({'token':'replacement','command':['unused'],
+                'identity':{},'migration_routing':{'proof':'checked separately'}}))
+            decision={**self.assess(),'preferred_cluster_backends':['shiyuc_svl']}
+            with patch('scripts.campaign_20261110.production_gate.require_dispatch'), \
+                 patch('scripts.campaign_20261110.migration_routes.validate_claim') as boundary, \
+                 patch.object(D,'find_allocation',return_value=None), \
+                 patch.object(C,'check',return_value=decision) as check, patch.object(D,'routed_command') as route:
+                D.execute(root,path,'minyeong_svl')
+            boundary.assert_called_once();check.assert_called_once();route.assert_not_called()
+            self.assertFalse((root/'dispatch/receipts/replacement.json').exists())
+
+    def test_migration_without_complete_cancellation_proof_cannot_claim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);path=root/'intent.json'
+            path.write_text(json.dumps({'token':'replacement','command':['unused'],
+                'identity':{},'migration_routing':{'proof':'missing'}}))
+            with patch('scripts.campaign_20261110.production_gate.require_dispatch'), \
+                 patch('scripts.campaign_20261110.migration_routes.validate_claim',side_effect=ValueError('proof changed')), \
+                 patch.object(D,'find_allocation',return_value=None),patch.object(C,'check') as check:
+                with self.assertRaisesRegex(ValueError,'proof changed'):D.execute(root,path,'shiyuc_svl')
+            check.assert_not_called();self.assertFalse((root/'dispatch/receipts/replacement.json').exists())
+
 
 if __name__=='__main__':unittest.main()

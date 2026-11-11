@@ -147,7 +147,7 @@ def input_identity(root, command):
             'tag': option(command, '--tag', 'fast'), 'files': files}
 
 
-def enqueue(root, token, command, priority=50, backends=BACKENDS):
+def enqueue(root, token, command, priority=50, backends=BACKENDS, migration_routing=None):
     root = Path(root).resolve()
     require(token and token.replace('_', '').replace('-', '').isalnum(), 'unsafe dispatch token')
     require(backends and set(backends) <= set(BACKENDS), 'unknown dispatch backend')
@@ -185,6 +185,10 @@ def enqueue(root, token, command, priority=50, backends=BACKENDS):
     path = root / 'dispatch/ready' / (token + '.json')
     payload = {'schema': 'isg-ready-command-v1', 'token': token, 'command': command,
                'command_sha256': digest(command), 'identity': identity, 'priority': int(priority), 'backends': list(backends)}
+    if migration_routing is not None:
+        payload['migration_routing'] = migration_routing
+        from scripts.campaign_20261110.migration_routes import validate_claim
+        validate_claim(root, payload)
     if path.exists():
         require(json.loads(path.read_text()) == payload, 'dispatch token already binds different work')
     else:
@@ -312,11 +316,15 @@ def execute(root, path, backend, *, cluster_observation=None):
             return
         require(prior.get('status') not in ('submitting', 'blocked', 'submitted'), 'prior outcome needs reconciliation')
         cluster_first = None
-        if backend.startswith('vast_'):
+        if backend.startswith('vast_') or payload.get('migration_routing'):
+            if payload.get('migration_routing'):
+                from scripts.campaign_20261110.migration_routes import validate_claim
+                validate_claim(root, payload)
             from scripts.campaign_20261110.dispatch_cluster_first import check
             cluster_first = check(root, payload, cluster_observation)
             shared_json(root / 'dispatch/cluster_first' / (payload['token'] + '.json'), cluster_first)
-            if not cluster_first['allow_vast']:
+            if (backend.startswith('vast_') and not cluster_first['allow_vast'] or
+                    not backend.startswith('vast_') and backend not in cluster_first['preferred_cluster_backends']):
                 # Leave the immutable intent unclaimed for either authorized
                 # cluster account. This is not a submission or a failed job.
                 return

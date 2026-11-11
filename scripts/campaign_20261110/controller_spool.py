@@ -19,6 +19,8 @@ def enqueue_record(root, record, save, *, priority=50, backends=None):
             record['routing_constraint']={'reason':'known_unsupported_nfs_failure_journal_lock',
                 'runtime_source':str(runtime),'runtime_sha256':file_digest(runtime)}
     options['backends']=backends
+    if record.get('migration_routing'):
+        options['migration_routing']=record['migration_routing']
     path=enqueue(root,token,record['command'],**options)
     record.update(status='external_submission',dispatch_intent=str(path),
                   dispatch_receipt=str(Path(root)/'dispatch/receipts'/(token+'.json')))

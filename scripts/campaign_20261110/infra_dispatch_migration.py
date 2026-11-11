@@ -209,8 +209,14 @@ def publish(root, limit=4):
                 if proof_path.exists(): require(read(proof_path) == proof, 'published proof differs')
                 else: shared_json(proof_path, proof)
                 token = Path(replacement['directory']).name
+                from scripts.campaign_20261110.migration_routes import source_routes
+                source_path = root/'dispatch/ready'/(request['source_payload']['token']+'.json')
+                require(read(source_path) == request['source_payload'], 'original migration intent changed')
+                routing = source_routes(root, {'dispatch_intent':str(source_path)})
+                routing['proof'] = {'path':str(proof_path), 'sha256':file_digest(proof_path)}
                 enqueue(root, token, replacement['command'], priority=min(10,request['source_payload']['priority']),
-                        backends=('vast_5090','vast_4090'))
+                        backends=routing['backends'], migration_routing=routing)
+                request['replacement_routing'] = routing
                 receipt_path = Path(request['source_receipt']); receipt = read(receipt_path)
                 receipt['migration'] = {'never_started':True, 'proof':{'path':str(proof_path),'sha256':file_digest(proof_path)},
                                         'replacement':replacement}

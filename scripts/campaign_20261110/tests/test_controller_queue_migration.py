@@ -32,6 +32,8 @@ def source(tmp_path, monkeypatch):
            'index': 50000100, 'count': 3, 'groups': {}, 'status': 'external_submission', 'dry_run_passed': True,
            'prepared': {'queue': str(queue), 'config': str(cfg), 'group_ids': ['old_0000']},
            'allocation': {'jobid': '123', 'job_dir': str(root/'out/old')}}
+    intent=write(root/'dispatch/ready/old.json', {'backends':['minyeong_svl','vast_4090']})
+    row['dispatch_intent']=str(intent)
     monkeypatch.setattr(q, 'read_queue', lambda path, config: json.loads(Path(path).read_text()))
     monkeypatch.setattr(m, 'reserve_indices', lambda root, token, count: 50000200)
     return row, cfg, plan, queue
@@ -41,6 +43,8 @@ def test_fresh_identities_preserve_every_physical_field_and_source_byte(tmp_path
     row, cfg, plan, queue = source(tmp_path, monkeypatch)
     before = {p: p.read_bytes() for p in (cfg, plan, queue)}
     fresh = m.prepare_replacement(tmp_path, row)
+    assert fresh['dispatch_backends']==['minyeong_svl','vast_4090']
+    assert fresh['migration_routing']['source_intent']['sha256']==file_digest(row['dispatch_intent'])
     assert fresh['index'] == 50000200 and fresh['count'] == 3 and 'allocation' not in fresh
     assert fresh['validation_key'] == row['validation_key']
     assert Path(fresh['prepared']['config']).read_bytes() == cfg.read_bytes()
@@ -88,6 +92,8 @@ def test_cancelled_boundary_is_durable_before_new_enqueue_and_dryrun(tmp_path, m
     def enqueue(root, record, save, **kwargs):
         assert 'allocation' not in record and 'migration' not in record
         assert Path(record['pending_migration_source']['proof']['path']).exists()
+        assert kwargs['backends']==['minyeong_svl','vast_4090']
+        assert record['migration_routing']['proof']==record['pending_migration_source']['proof']
         events.append('enqueue'); record['status'] = 'external_submission'; save()
     monkeypatch.setattr(m, 'enqueue_record', enqueue)
     saved = []
@@ -109,3 +115,16 @@ def test_restart_after_publication_boundary_only_retries_idempotent_enqueue(tmp_
     monkeypatch.setattr(m.boundary, 'migrate_record', lambda *a, **kw: pytest.fail('no recancel'))
     assert m.migrate_pending_queue(tmp_path, row, lambda: None, {}, owner='owner')
     assert calls == [50000200]
+
+
+def test_old_prepared_replacement_recovers_original_routes_before_enqueue(tmp_path, monkeypatch):
+    row, *_ = source(tmp_path, monkeypatch)
+    row = m.prepare_replacement(tmp_path, row)
+    row.pop('migration_routing');row['dispatch_backends']=['vast_4090','vast_5090']
+    proof = write(tmp_path/'proof.json', {'never_started': True})
+    row['pending_migration_source']['proof']={'path':str(proof),'sha256':file_digest(proof)}
+    calls=[]
+    monkeypatch.setattr(m,'enqueue_record',lambda *args,**kwargs:calls.append(kwargs['backends']))
+    monkeypatch.setattr(m.boundary,'migrate_record',lambda *a,**k:pytest.fail('do not recancel'))
+    assert m.migrate_pending_queue(tmp_path,row,lambda:None,{},owner='owner')
+    assert calls==[['minyeong_svl','vast_4090']]

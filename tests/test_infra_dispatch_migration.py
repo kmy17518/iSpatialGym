@@ -98,7 +98,22 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(M.file_digest(report['path']),report['sha256'])
         intent=M.read(self.root/'dispatch/ready/new.json')
         self.assertEqual(intent['identity']['start'],50000100)
-        self.assertEqual(intent['backends'],['vast_5090','vast_4090'])
+        self.assertEqual(intent['backends'],['vast_5090'])
+        self.assertEqual(intent['migration_routing']['source_intent']['path'], str(self.root/'dispatch/ready/old.json'))
+
+    def test_publish_preserves_compatible_original_clusters(self):
+        self.payload['backends'] = ['shiyuc_svl','minyeong_svl','vast_5090']
+        D.shared_json(self.root/'dispatch/ready/old.json', self.payload)
+        path,request=self.request()
+        request['record']['migration']={'never_started':True,'original_allocation':self.allocation,
+            'after':{'accounting':{'state':'CANCELLED','start':'Unknown'}},
+            'final_execution_proof':{'nonempty_execution_artifacts':[]}}
+        D.shared_json(path,request)
+        with patch.object(M.getpass,'getuser',return_value='minyeong'):
+            self.assertEqual(M.publish(self.root), ['new'])
+        new=M.read(self.root/'dispatch/ready/new.json')
+        self.assertEqual(set(new['backends']),set(self.payload['backends']))
+        self.assertNotIn('shiyuc_viscam',new['backends'])
 
     def test_started_during_handoff_is_not_replaced_and_unpauses_source(self):
         path,request=self.request()
