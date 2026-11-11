@@ -189,7 +189,7 @@ def group_budget(cfg, task):
 
 
 def source_release(template, env, cfg):
-    if template.split not in ("eval_model", "eval_category"):
+    if template.split not in ("eval_model", "eval_category") and not cfg.get("preserve_source_release", False):
         return cfg["v2_root"]
     require(all(env.get(key) for key in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS")),
             "model source has no exact native grasp/map release")

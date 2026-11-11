@@ -156,6 +156,7 @@ def test_model_admission_never_converts_source_or_falls_back_to_training(tmp_pat
             admission.scoped_template(replace(template, split=split), cfg)
     with pytest.raises(c.ContractError, match="explicit class ownership"):
         admission.scoped_template(template, {"admission_split": "eval_model"})
+
     counts = {"evaluation": {0: 6}, "train_buckets": {}, "class_remaining": 0, "task_remaining": 0}
     decision = admission.admission_decision(template, counts, cfg)
     assert decision["phase"] == "eval_model" and decision["groups"] == 1
@@ -169,6 +170,20 @@ def test_model_admission_never_converts_source_or_falls_back_to_training(tmp_pat
         admission.model_class_pin(changed, state, cfg)
     assert admission.group_budget({"group_budgets_by_task": {"configuration_matching-block_design": 9000}},
                                   "configuration_matching-block_design") == 9000
+
+
+def test_standard_opt_in_preserves_passed_native_map_release(tmp_path):
+    from types import SimpleNamespace
+    template = SimpleNamespace(split="eval_standard")
+    release = tmp_path / "native_prefix_maps"
+    (release / "glib").mkdir(parents=True); (release / "maps").mkdir()
+    env = {"ISPATIALGYM_GRASP_LIBRARY_V2": str(release / "glib"),
+           "ISPATIALGYM_REACH_MAPS": str(release / "maps")}
+    cfg = {"v2_root": "/historical_default", "preserve_source_release": True}
+    assert admission.source_release(template, env, cfg) == str(release)
+    assert admission.source_release(template, env, {"v2_root": "/historical_default"}) == "/historical_default"
+    with pytest.raises(c.ContractError, match="native grasp/map release"):
+        admission.source_release(template, {}, cfg)
 
 
 def test_category_admission_requires_its_own_proof_and_one_template_per_task(tmp_path, monkeypatch):
