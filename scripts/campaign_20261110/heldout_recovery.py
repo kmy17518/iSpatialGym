@@ -116,10 +116,11 @@ def publish(root):
             if str(config.resolve())not in known:
                 workers.append({'name':directory.name,'config':str(config),'state':str(directory/'state.json')})
                 known.add(str(config.resolve()))
-    jar=root/'infra/heldout_recovery/prepared_category_jar_upper_r1.json'
-    if jar.exists():
-        directory=pathlib.Path(load(jar)['controller'])
-        workers.append({'name':directory.name,'config':str(directory/'config.json'),'state':str(directory/'state.json')})
+    for filename in ('prepared_category_jar_upper_r1.json','prepared_scoped_refill_r1.json'):
+        receipt=root/'infra/heldout_recovery'/filename
+        if receipt.exists():
+            directory=pathlib.Path(load(receipt)['controller'])
+            workers.append({'name':directory.name,'config':str(directory/'config.json'),'state':str(directory/'state.json')})
     pipeline=load(root/'manifests/pipeline_status.json');prepared=defaultdict(list)
     for r in pipeline['rows']:
         if r['split']in SPLITS:prepared[(r['split'],r['class_id']if r['split']=='eval_model'else r['task'])].append(r)
@@ -168,6 +169,24 @@ def publish(root):
             for r in st.get('records',{}).values():
                 if isinstance(r,dict)and r.get('admission_id'):observation(r,worker,cfg,st)
         except (OSError,ValueError,KeyError,TypeError)as exc:errors.append({'source':worker['name'],'error':type(exc).__name__+': '+str(exc)})
+    engineering=root/'infra/heldout_recovery/engineering_actions.json'
+    if engineering.exists():
+        valid_scopes={(r['split'],r['class_id'])for r in rows}
+        for entry in load(engineering)['rows']:
+            key=(entry['split'],entry['class_id']);require(key in valid_scopes,'unknown engineering scope')
+            source=entry['evidence'][0];require(file_digest(source['path'])==source['sha256'],'engineering evidence changed')
+            records=entry.get('jobs')or[None]
+            for job in records:
+                if job:
+                    job=dict(job,active=True,worker_status='scheduler_state_not_observed')
+                    vp=root/'vast/state/jobs'/(job['job_id']+'.json')
+                    if vp.exists():
+                        v=load(vp);job.update(worker_status=v['status'],active=v['status']not in ('synced','failed','cancelled'))
+                observations[key].append({'controller':'owned_native_engineering','controller_state':str(engineering),
+                    'controller_config':str(engineering),'configuration':entry.get('configuration'),
+                    'runtime':entry.get('runtime'),'bucket':entry.get('bucket'),'job':job,'failures':[],
+                    'status':'native_preparation','reason':entry['blocker'],'next_action':entry['next_action'],
+                    'last_progress_epoch':entry['observed_unix'],'observed_at':iso(now),'evidence':entry['evidence']})
     jobs=[o['job']for obs in observations.values()for o in obs if o['job']]
     sched,serrors=scheduler_states({j['job_id']for j in jobs if j['active']and j['worker_status']=='scheduler_state_not_observed'})
     errors.extend(serrors)
@@ -190,6 +209,8 @@ def publish(root):
         elif state=='unattempted'and prep:
             blocker=prep[-1]['stage']+': '+prep[-1]['reason']
             action='Inspect exact candidate and unmet native dependencies in '+', '.join(e['path']for e in prep[-1]['evidence'])+'; prepare a bounded native geometry proof before demo/replay admission.'
+        if remain and (latest or{}).get('next_action'):
+            action=latest['next_action']
         row.update(accepted=n,historical_accepted=rawcounts[countkey],remaining=remain,owner='/root/templates_assets',state=state,blocker=blocker,next_action=action,
             configuration=(latest or{}).get('configuration'),runtime=(latest or{}).get('runtime'),controller=sorted(set(ownership[key]+[o['controller']for o in obs])),active_jobs=list(jobs.values()),
             last_accepted_at=iso(last[countkey]),last_accepted_time_kind='immutable committed-group export mtime; exact commit timestamp not recorded'if last[countkey]else'unavailable',
