@@ -284,6 +284,22 @@ def test_template_customs_dependency_refuses_external_source(tmp_path):
         template_customs_inputs({'TEMPLATE': str(template)}, root)
 
 
+def test_exact_external_customs_requires_both_source_and_template_hashes(tmp_path):
+    import pytest
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import template_customs_inputs
+    root=tmp_path/'campaign';template=root/'templates/task/instance';template.mkdir(parents=True)
+    external=tmp_path/'original_customs.json';external.write_text('{"original":"approved"}')
+    metadata=template/'template_meta.json';metadata.write_text(json.dumps({'customs':str(external)}))
+    receipt=root/'manifests/external_template_customs_inputs.json';receipt.parent.mkdir()
+    receipt.write_text(json.dumps({'schema':'isg-exact-external-template-customs-v1','campaign_id':'campaign_20261110',
+        'sources':{str(external):{'sha256':sha(external),'templates':{str(template):sha(metadata)}}}}))
+    assert template_customs_inputs({'TEMPLATE':str(template)},root)==[{'path':str(external),'sha256':sha(external)}]
+    metadata.write_text(json.dumps({'customs':str(external),'changed':True}))
+    with pytest.raises(ValueError,match='identity differ'):template_customs_inputs({'TEMPLATE':str(template)},root)
+    metadata.write_text(json.dumps({'customs':str(external)}));external.write_text('{"changed":true}')
+    with pytest.raises(ValueError,match='identity differ'):template_customs_inputs({'TEMPLATE':str(template)},root)
+
+
 def test_camera_context_stages_checked_source_proof_and_review_image_closure(tmp_path):
     from dataclasses import asdict
     import json

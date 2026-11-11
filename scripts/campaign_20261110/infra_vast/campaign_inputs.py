@@ -153,7 +153,16 @@ def template_customs_inputs(env, root):
         if not value: continue
         path = Path(value).resolve()
         if not path.exists(): continue
-        require(path.is_relative_to(root), 'template customs dependency outside owned campaign')
+        if not path.is_relative_to(root):
+            receipt=root/'manifests/external_template_customs_inputs.json'
+            require(receipt.is_file(), 'template customs dependency outside owned campaign')
+            approved=json.loads(receipt.read_text())
+            require(approved.get('schema')=='isg-exact-external-template-customs-v1' and
+                    approved.get('campaign_id')=='campaign_20261110','external customs receipt identity differs')
+            source=approved.get('sources',{}).get(str(path),{})
+            require(source.get('sha256')==sha(path) and
+                    source.get('templates',{}).get(str(template))==sha(template/'template_meta.json'),
+                    'external template customs bytes or template identity differ')
         require(path.is_file() and isinstance(json.loads(path.read_text()), dict), 'invalid template customs dependency')
         result.append({'path': str(path), 'sha256': sha(path)})
     return result
