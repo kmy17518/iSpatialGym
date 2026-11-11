@@ -487,10 +487,12 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
         if relation == "inside" and scale == "small":
             plan["release_policy"] = "native_grasp_height"
+        from ispatialgym.sampling.campaign_tabletop_starts import source_stance_hint_enabled
+        if source_stance_hint_enabled(relation, scale, template.class_id):
             source_stance = anchor['summary'].get('manipulation_stance')
             if source_stance is not None:
                 proof = anchor['sources']['summary']
-                require(file_digest(proof['path']) == proof['sha256'], 'inside source summary changed after audit')
+                require(file_digest(proof['path']) == proof['sha256'], 'pair source summary changed after audit')
                 plan['anchor_manipulation_stance'] = {
                     **{k: source_stance[k] for k in ('base_pose2d', 'focus', 'translate', 'tilt')},
                     'source_summary_sha256': proof['sha256']}
@@ -677,7 +679,11 @@ def submission_command(group_dir, *, snapshot, campaign_root, v2_root, base_inde
            "--root", str(root), "--ledger", str(root / "manifests/goal_group_allocations.tsv"), "--base-index", str(base_index),
            "--tag", "goal_groups", "--job-prefix", "isg261110_", "--grasps", "v2only", "--v2-root", str(v2_root),
            "--alias-memory", "off", "--no-memory-aggregate", "--kcollect", "2", "--sample-limit-s", str(int(budget + 1800)),
-           "--time-s", str(int(budget + (7200 if plan['task'] == 'configuration_matching-block_design' else 3600))),
+           # job_fast stops collector intake at JOB_END - DEMO_LIMIT_S - 420.
+           # Include the sampler's 1800s startup allowance and a full 3600s
+           # demo window for every class, not only block design. Otherwise a
+           # 900s group can lose its collectors after just 480s (job1409).
+           "--time-s", str(int(budget + 7200)),
            "--acct", account, "--part", partition, "--gres", gres]
     for name, value in env.items():
         cmd += ["--extra-env", f"{name}={value}"]

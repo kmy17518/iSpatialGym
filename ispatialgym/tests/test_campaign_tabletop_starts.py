@@ -55,3 +55,29 @@ def test_source_stance_requires_exact_summary_provenance_and_finite_pose():
     for key, value in [('source_summary_sha256','b'*64), ('focus',[0.,float('nan'),0.]), ('translate',True)]:
         changed=copy.deepcopy(raw);changed['anchor_manipulation_stance'][key]=value
         with pytest.raises(GoalPlanError):anchor_manipulation(changed)
+
+
+def test_source_stance_nextto_scope_does_not_enable_other_pair_classes():
+    from ispatialgym.sampling.campaign_tabletop_starts import source_stance_hint_enabled
+    assert source_stance_hint_enabled('nextto', 'small', 'inter_object_relation_satisfaction-nextto_02')
+    assert source_stance_hint_enabled('inside', 'small', 'inter_object_relation_satisfaction-inside_01')
+    for relation, scale, cls in [('nextto','large','inter_object_relation_satisfaction-nextto_02'),
+            ('touching','small','inter_object_relation_satisfaction-touching_02'),
+            ('nextto','small','inter_object_relation_satisfaction-nextto_01')]:
+        assert not source_stance_hint_enabled(relation, scale, cls)
+
+
+def test_nextto_reference_stance_is_tried_without_replacing_native_candidates():
+    from types import SimpleNamespace
+    from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
+    # Source1207 at0.45m stand-off reaches the fixed release; group1397's
+    # frame-ranked shortlist repeatedly uses stances~0.15m farther away.
+    source={'base_pose2d':[5.389566,3.647212,-.002552], 'focus':[6.219768,3.725094,.890702],
+            'translate':0.,'tilt':-.610867}
+    candidates=[SimpleNamespace(base_pose2d=[5.239566,3.647212,-.002552],focus=[6.35,3.73,.89],translate=.75,tilt=-.19) for _ in range(8)]
+    candidates.append(SimpleNamespace(**source))
+    order=list(range(9));ranked=prioritize_written_stances(order,candidates,[source])
+    assert ranked[:4]==order[:4]
+    assert 8 in ranked[:6]
+    assert sorted(ranked)==order
+    assert len(set(ranked))==len(order)

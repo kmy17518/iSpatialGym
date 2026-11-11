@@ -7,6 +7,12 @@ import math
 from ispatialgym.sampling.campaign_held_goals import _require
 
 
+def source_stance_hint_enabled(relation, scale, class_id):
+    """Scope source candidate ranking to the measured pair recoveries."""
+    return scale == 'small' and (relation == 'inside' or
+        (relation == 'nextto' and class_id == 'inter_object_relation_satisfaction-nextto_02'))
+
+
 def anchor_base(raw):
     value = raw.get('anchor_base_pose2d')
     if value is None:
