@@ -3,6 +3,38 @@ from types import SimpleNamespace
 from scripts.campaign_20261110.controller_groups import next_work, reserve_pending_counts, ranges
 
 
+def test_briefcase_refill_audits_source_context_before_dispatch(tmp_path):
+    import copy
+    import pytest
+    from scripts.campaign_20261110 import contracts as c
+    from scripts.campaign_20261110.controller_groups import audit_authored_source_context
+    from ispatialgym.sampling.campaign_floor_push_proposals import author_hint, CLASS_ID, FIELD
+    summary = {'manipulation_stance': {'base_pose2d': [1., 2., .3], 'focus': [2., 2., .8],
+               'translate': .5, 'tilt': -1.2}, 'arm': {'arm': 'right'}, 'grasp': {'name': 'top_0~r180'}}
+    source = tmp_path/'source_summary.json'; c.write_json_atomic(source, summary)
+    anchor = {'summary': summary, 'sources': {'summary': {'path': str(source), 'sha256': c.file_digest(source)}}}
+    template = SimpleNamespace(class_id=CLASS_ID)
+    plan = {'class_id': CLASS_ID, 'anchor_sources': anchor['sources'], 'goal_selection': 'fresh_anchor',
+            FIELD: author_hint(anchor, CLASS_ID)}
+    path = tmp_path/'groups'/'one'/'goal_plan.json'; queue = tmp_path/'queues'/'one'/'queue.json'
+    def publish(value):
+        c.write_json_atomic(path, value)
+        c.write_json_atomic(queue, {'entries': [{'path': str(path), 'sha256': c.file_digest(path)}]})
+    publish(plan)
+    evidence = audit_authored_source_context({'queue': str(queue)}, anchor, template, tmp_path)
+    assert c.file_digest(evidence['path']) == evidence['sha256']
+    for change in ('missing', 'wrong_stance', 'stale_hash', 'different_goal'):
+        bad = copy.deepcopy(plan)
+        if change == 'missing': del bad[FIELD]
+        if change == 'wrong_stance': bad[FIELD]['tilt'] = 0.
+        if change == 'stale_hash': bad[FIELD]['source_summary_sha256'] = '0'*64
+        if change == 'different_goal': bad['goal_selection'] = 'changed'
+        publish(bad)
+        with pytest.raises(Exception, match='proposal|hash'):
+            audit_authored_source_context({'queue': str(queue)}, anchor, template, tmp_path)
+    assert audit_authored_source_context({}, {}, SimpleNamespace(class_id='unrelated'), tmp_path) is None
+
+
 def counts(**kwargs):
     return {"evaluation": {}, "train_buckets": {}, "class_remaining": 1000, "task_remaining": 4000, **kwargs}
 

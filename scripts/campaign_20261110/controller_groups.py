@@ -145,6 +145,37 @@ def next_work(template, counts, *, max_groups=6, training_validated=False, mode=
     return None
 
 
+def audit_authored_source_context(prepared, anchor, template, root):
+    """Reject a lost briefcase recovery hint before any GPU dispatch.
+
+    The native sampler still checks all proposals. This CPU audit makes a
+    refill author regression actionable without burning an unchanged group.
+    """
+    from ispatialgym.sampling.campaign_floor_push_proposals import CLASS_ID, FIELD, author_hint, checked_hint
+    if template.class_id != CLASS_ID:
+        return None
+    expected = author_hint(anchor, template.class_id)
+    queue = read(prepared['queue'])
+    plans = []
+    require(queue.get('entries'), 'briefcase queue has no source-bound plans')
+    for entry in queue['entries']:
+        path = Path(entry['path']).resolve()
+        require(path.is_relative_to(Path(root).resolve() / 'groups')
+                and file_digest(path) == entry['sha256'], 'briefcase authored plan identity changed')
+        plan = read(path)
+        actual = checked_hint(plan, relation='under', scale='large')
+        require(actual == expected and plan.get('goal_selection') == 'fresh_anchor',
+                'briefcase refill lost or changed its audited source proposal')
+        plans.append({'path': str(path), 'sha256': entry['sha256']})
+    evidence = {'schema': 'isg-authored-source-context-v1', 'class_id': CLASS_ID,
+                'field': FIELD, 'source_summary': anchor['sources']['summary'],
+                'expected_context_sha256': digest(expected), 'plans': plans,
+                'scope': 'Author propagation only; native feasibility and acceptance remain required.'}
+    path = Path(prepared['queue']).parent / 'source_context_audit.json'
+    write_json_atomic(path, evidence)
+    return {'path': str(path), 'sha256': file_digest(path)}
+
+
 def prepare_queue(spec, state, decision, cfg, root, template, save):
     from scripts.campaign_20261110.goal_groups import successful_anchor, read_env
     from scripts.campaign_20261110.goal_batches import prepare_batch, submission_command
@@ -169,6 +200,7 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
         seed=cfg["seed"] + number * 1009 + spec["seed_offset"], campaign_id=cfg["campaign_id"],
         code_sha256=key["code_sha256"], physics_sha256=key["physics_sha256"], data_sha256=key["data_sha256"],
         budget_seconds=spec.get("group_budget_seconds", 900))
+    context_audit = audit_authored_source_context(prepared, anchor, template, root)
     actual = read(prepared["config"])["validation_key"]
     if phase == seed_config["split"]:
         require(actual == key, "generic author changed an already validated source key")
@@ -188,6 +220,8 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     record = {"queue": prepared["queue"], "prepared": prepared, "directory": str(Path(prepared["queue"]).parent),
         "validation_key": actual, "phase": phase, "index": index, "count": prepared["candidate_instances"],
         "command": command, "status": "ready", "needs_new_gate": decision["needs_new_gate"], "decision": dict(decision)}
+    if context_audit is not None:
+        record['source_context_audit'] = context_audit
     if spec.get('dispatch_backends'):
         record['dispatch_backends'] = spec['dispatch_backends']
     elif template.task == 'alignment-world_vertical':
