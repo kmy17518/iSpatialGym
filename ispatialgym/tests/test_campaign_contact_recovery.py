@@ -105,3 +105,16 @@ def test_invalid_stroke_policy_never_enters_native_program(monkeypatch,value):
     bind(monkeypatch,'inter_object_relation_satisfaction-touching_04',
         'inter_object_relation_satisfaction-touching_small_scale',{'touching_push_stroke_m':value})
     with pytest.raises(ContractError,match='finite'):CR.touching_push_stroke_m()
+
+
+@pytest.mark.parametrize('option', ['shelf_board_draw','shelf_other_arm'])
+def test_shelf_options_are_bound_to_exact_released_class(monkeypatch, option):
+    from types import SimpleNamespace
+    from scripts.campaign_20261110.contracts import ContractError
+    monkeypatch.setattr(CR, 'active', lambda: True)
+    template=SimpleNamespace(class_id='inter_object_relation_satisfaction-touching_03',
+        task='inter_object_relation_satisfaction-touching_small_scale',scene_setup={'recovery_options':{option:True}})
+    monkeypatch.setattr(CR,'configuration',lambda:({},template,None,None))
+    assert CR.contact_recovery(option)
+    template.class_id='inter_object_relation_satisfaction-touching_04'
+    with pytest.raises(ContractError):CR.contact_recovery(option)

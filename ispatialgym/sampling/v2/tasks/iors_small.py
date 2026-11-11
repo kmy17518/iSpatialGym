@@ -276,6 +276,11 @@ SHELF_BOARD_DRAW_ENV = "ISPATIALGYM_SHELF_BOARD_DRAW"
 
 def shelf_board_draw_on(s=None) -> bool:
     """``ISPATIALGYM_SHELF_BOARD_DRAW`` (i7-t03both, owner A5; default off - not in ``alias_switches.SHELF_TIP_DEFAULTS``)."""
+    from ispatialgym.sampling import campaign_runtime as CR
+    if CR.contact_recovery('shelf_board_draw'):
+        if os.environ.get(SHELF_BOARD_DRAW_ENV, '').strip() and not _AS.switch_on(SHELF_BOARD_DRAW_ENV, s):
+            raise ValueError('shelf environment conflicts with the exact campaign configuration')
+        return True
     return _AS.switch_on(SHELF_BOARD_DRAW_ENV, s)
 
 
@@ -311,6 +316,11 @@ SHELF_OTHER_ARM_ENV = "ISPATIALGYM_SHELF_OTHER_ARM"
 
 
 def shelf_other_arm_on(s=None) -> bool:
+    from ispatialgym.sampling import campaign_runtime as CR
+    if CR.contact_recovery('shelf_other_arm'):
+        if os.environ.get(SHELF_OTHER_ARM_ENV, '').strip() and not _AS.switch_on(SHELF_OTHER_ARM_ENV, s):
+            raise ValueError('shelf environment conflicts with the exact campaign configuration')
+        return True
     return _AS.switch_on(SHELF_OTHER_ARM_ENV, s)
 
 

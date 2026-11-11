@@ -120,7 +120,7 @@ def materialize(root, release, code, output, classes):
                     block['whitelist'].setdefault(role,{}).setdefault(category,[])
                     if mid not in block['whitelist'][role][category]:block['whitelist'][role][category].append(mid)
                     if role=='target':spec.setdefault('grasp_keys',{})[key]=dep['routes'][req['entry_id']]['alias']
-            entry['scenes']={baseline.scene:block};entry['constraints']=[]
+            entry['scenes']={baseline.scene:block}  # Retain every original symbolic/geometric constraint.
             entry['generation'].update(templates_max=1,instances_per_template=1)
             for key in list(entry['generation']):
                 if key.startswith('_'):entry['generation'].pop(key)

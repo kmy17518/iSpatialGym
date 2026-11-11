@@ -93,6 +93,10 @@ def contact_recovery(option: str) -> bool:
         'axial_spoon_slow_pad': ('alignment-axial_05', 'alignment-axial'),
         'touching_push_mass_center': ('inter_object_relation_satisfaction-touching_04',
                                      'inter_object_relation_satisfaction-touching_small_scale'),
+        'shelf_board_draw': ('inter_object_relation_satisfaction-touching_03',
+                             'inter_object_relation_satisfaction-touching_small_scale'),
+        'shelf_other_arm': ('inter_object_relation_satisfaction-touching_03',
+                            'inter_object_relation_satisfaction-touching_small_scale'),
         'marker_gentle_pinch': ('inter_object_relation_satisfaction-nextto_01',
                                 'inter_object_relation_satisfaction-nextto_small_scale'),
     }
