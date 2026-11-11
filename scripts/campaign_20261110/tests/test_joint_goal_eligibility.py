@@ -1,7 +1,7 @@
 from dataclasses import replace
 import pytest
 from scripts.campaign_20261110 import contracts as c
-from scripts.campaign_20261110.joint_goal_eligibility import bind_standard_opening, eligible_buckets
+from scripts.campaign_20261110.joint_goal_eligibility import bind_standard_opening, bind_opening, eligible_buckets
 from scripts.campaign_20261110.controller_groups import next_work
 from scripts.campaign_20261110.tests.test_goal_groups import GoalGroupControllerTests
 
@@ -35,3 +35,30 @@ def test_changed_or_unprobed_goal_fails_closed(tmp_path):
     c.write_json_atomic(tmp_path/'template_meta.json',anchor['template_meta'])
     with pytest.raises(c.ContractError,match='source bytes changed'):eligible_buckets(template)
     with pytest.raises(c.ContractError,match='not physically probed'):bind_standard_opening(original,anchor)
+
+
+@pytest.mark.parametrize('split,high_quota', [('eval_model',4), ('eval_category',1)])
+def test_held_fixed_goal_only_fills_its_actual_strict_bucket(tmp_path,split,high_quota):
+    original,anchor=fixture(tmp_path);original=replace(original,split=split)
+    template=bind_opening(original,anchor)
+    assert eligible_buckets(template)==(1,)
+    counts={'evaluation':{},'train_buckets':{},'class_remaining':1000,'task_remaining':2000}
+    decision=next_work(template,counts)
+    assert decision['phase']==split and decision['bucket']==1
+    assert next_work(template,{**counts,'evaluation':{1:high_quota}}) is None
+    assert template.objects==original.objects and template.definition_sha256==original.definition_sha256
+    with pytest.raises(c.ContractError,match='standard split'):bind_standard_opening(original,anchor)
+
+
+def test_held_revision_is_explicit_and_does_not_change_legacy_identity(tmp_path):
+    from scripts.campaign_20261110.controller_admission import admission_id
+    original,anchor=fixture(tmp_path);template=replace(original,split='eval_model')
+    (tmp_path/'.snapshot_commit').write_text('a'*40+'\n')
+    legacy=admission_id(template,tmp_path,{},'eval_model')
+    revised=admission_id(template,tmp_path,{},'eval_model','held_native_opening_v1')
+    assert legacy!=revised and legacy==admission_id(template,tmp_path,{},'eval_model')
+    for split in ('train','eval_standard'):
+        with pytest.raises(c.ContractError,match='unsupported admission author revision'):
+            admission_id(template,tmp_path,{},split,'held_native_opening_v1')
+    with pytest.raises(c.ContractError,match='evaluated small articulation'):
+        bind_opening(replace(template,split='train'),anchor)

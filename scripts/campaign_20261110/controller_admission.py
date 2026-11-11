@@ -136,7 +136,9 @@ def admission_id(template, snapshot, perturbations, split="train", author_revisi
     if split != "train":  # Preserve every existing training admission identity.
         identity["admission_split"] = split
     if author_revision is not None:
-        require(split == 'eval_standard' and author_revision in ('standard_native_coverage_v1', 'standard_native_opening_v1'), 'unsupported admission author revision')
+        standard = split == 'eval_standard' and author_revision in ('standard_native_coverage_v1', 'standard_native_opening_v1')
+        held_opening = split in ('eval_model', 'eval_category') and author_revision == 'held_native_opening_v1'
+        require(standard or held_opening, 'unsupported admission author revision')
         identity['author_revision'] = author_revision
     return digest(identity)
 
@@ -279,6 +281,10 @@ def prepare(proof, allocation, cfg, root):
     if cfg.get('author_revision') == 'standard_native_opening_v1':
         from scripts.campaign_20261110.joint_goal_eligibility import bind_standard_opening
         template = bind_standard_opening(template, anchor)
+    if cfg.get('author_revision') == 'held_native_opening_v1':
+        from scripts.campaign_20261110.joint_goal_eligibility import bind_opening
+        require(template.split in ('eval_model', 'eval_category'), 'held opening author requires held evaluation')
+        template = bind_opening(template, anchor)
     if template.task.startswith("alignment-") and not template.scene_setup.get("bucket_policy"):
         from scripts.campaign_20261110.goal_groups import with_alignment_buckets
         template = with_alignment_buckets(template, anchor["template_meta"].get("template_facts", {}).get("deviation_range_applied_deg"),

@@ -1,4 +1,4 @@
-"""Bind a fixed, physically probed opening goal to its strict standard bucket."""
+"""Bind a fixed, physically probed opening goal to its strict evaluation bucket."""
 from dataclasses import asdict, replace
 import json
 import math
@@ -10,8 +10,9 @@ SCHEMA = 'isg-standard-native-opening-eligibility-v1'
 
 
 def measure(template, tro, metadata):
-    require(template.split == 'eval_standard' and template.task == 'configuration_matching-articulation_open_small_scale',
-            'fixed opening eligibility requires standard small articulation opening')
+    require(template.split in ('eval_standard', 'eval_model', 'eval_category')
+            and template.task == 'configuration_matching-articulation_open_small_scale',
+            'fixed opening eligibility requires evaluated small articulation opening')
     targets = [o for o in template.objects if o.role == 'target']
     require(len(targets) == 1 and targets[0].joint, 'ambiguous opening target joint')
     target = targets[0]
@@ -36,7 +37,7 @@ def measure(template, tro, metadata):
             'target_sha256':digest(asdict(target))}
 
 
-def bind_standard_opening(template, anchor):
+def bind_opening(template, anchor):
     meta = Path(anchor['template_dir'])/'template_meta.json'
     tro = Path(anchor['sources']['tro']['path'])
     require(file_digest(tro) == anchor['sources']['tro']['sha256'] and json.loads(meta.read_text()) == anchor['template_meta'],
@@ -52,9 +53,14 @@ def bind_standard_opening(template, anchor):
     return replace(template,scene_setup={**template.scene_setup,FIELD:record})
 
 
+def bind_standard_opening(template, anchor):
+    require(template.split == 'eval_standard', 'standard opening author requires standard split')
+    return bind_opening(template, anchor)
+
+
 def eligible_buckets(template):
     record = getattr(template,'scene_setup',{}).get(FIELD)
-    if record is None or template.split != 'eval_standard':return None
+    if record is None or template.split not in ('eval_standard', 'eval_model', 'eval_category'):return None
     require(record.get('schema') == SCHEMA, 'invalid native opening eligibility')
     sources={}
     for name,source in record['sources'].items():
