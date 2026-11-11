@@ -123,11 +123,14 @@ def build(root, now=None):
             verification=r.get('flat_progress_investigation'), acceptance=stages['accepted']['evidence'], blocker=r.get('blocker'),
             next_action=r.get('next_action') or 'Reconcile this held-out bucket with current artifacts and assign the next action.'))
     for i,r in enumerate(records(values['pipeline'].get('records'))):
+        submission = r.get('native_submission')
+        work = [v for v in (r.get('allocation'), submission) if isinstance(v, dict) and v]
         result.append(row(f"pipeline:{r.get('candidate_id')}:{r.get('start',i)}", 'pipeline_canary', '/root/dataset_contract', refs['pipeline'],
             configuration_id=r.get('candidate_id'), class_id=r.get('class_id'), status=r.get('status'), runtime=r.get('native_runtime'),
-            configuration_sha256=r.get('configuration_sha256'), start=r.get('start'), count=r.get('count'), dependencies=r.get('dependencies',[]), active_work=[r.get('allocation',{})],
+            configuration_sha256=r.get('configuration_sha256'), start=r.get('start'), count=r.get('count'), dependencies=r.get('dependencies',[]), active_work=work,
             artifacts=[v for v in (r.get('request'),r.get('native'),r.get('review')) if v],
-            stages={**{s:stage() for s in STAGES}, 'native':stage(r.get('native')), 'accepted':{'status':'excluded_zero_credit'}},
+            stages={**{s:stage() for s in STAGES}, 'submitted':stage(submission),
+                    'native':stage(r.get('native')), 'accepted':{'status':'excluded_zero_credit'}},
             next_action=r.get('next_action') or 'Owner reconciles completed stages into own physics replay, hard QA and batched restoration; no benchmark credit.'))
     counts = values['eligibility'].get('counts',{}).get('current_eligible')
     gaps = status.get('scope_gaps', manifest.get('scope_gaps', ['Full selected configuration expansion has not been observed.']))

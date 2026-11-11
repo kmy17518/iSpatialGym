@@ -34,5 +34,19 @@ class ExecutionLedgerTests(unittest.TestCase):
         self.assertEqual(r['stages']['accepted']['status'],'excluded_zero_credit')
         self.assertTrue(r['sources'][0]['sha256'])
 
+    def test_native_submission_is_visible_without_inventing_execution(self):
+        receipt={'job_id':'18444227','request_sha256':'exact-request',
+                 'scheduler_state':'unavailable','receipt':{'path':'submission.json','sha256':'exact-receipt'}}
+        self.put('pipeline',{'records':[{'candidate_id':'pool','status':'native_submitted',
+                                       'native_submission':receipt}]})
+        r=build(self.root,1001)['rows'][0]
+        self.assertEqual(r['active_work'],[receipt])
+        self.assertEqual(r['stages']['submitted']['evidence'],receipt)
+        for name in ('native','demo','physics_replay','rendering'):
+            self.assertEqual(r['stages'][name]['status'],'unobserved')
+        self.assertEqual(r['stages']['accepted']['status'],'excluded_zero_credit')
+        self.put('pipeline',{'records':[{'candidate_id':'missing'}]})
+        self.assertEqual(build(self.root,1001)['rows'][0]['active_work'],[])
+
 
 if __name__=='__main__':unittest.main()
