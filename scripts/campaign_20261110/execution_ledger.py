@@ -22,7 +22,7 @@ SOURCES = {
     'standard': 'infra/standard_recovery/ledger.json',
     'heldout': 'infra/heldout_recovery/ledger.json',
     'pipeline': 'training_pipeline_canaries/pipeline_status.json',
-    'queue': 'infra/capacity_recovery/vast_excluded_queue_audit_r2.json',
+    'queue': 'infra/capacity_recovery/vast_excluded_queue_audit_r3.json',
     'capacity': 'infra/capacity_recovery/ledger.json',
     'eligibility': 'accounting/current_eligibility.json',
     'production_gate': 'controllers/training_production_gate.json',
