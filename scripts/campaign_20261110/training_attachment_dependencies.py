@@ -81,7 +81,23 @@ def verify_pair_request(job, pair, configuration):
                 'pair dependency differs from ready source asset')
 
 
-def prepare(root, code, output, classes):
+def verify_candidate_axis(job,candidates):
+    measured=candidates.get('log',{}).get('attach_axis',{})
+    frames=measured.get('mates',[])
+    require(frames,'candidate mating-frame provenance missing')
+    if job['attach_axis']=='seat':
+        from ispatialgym.grasping.candidates import attach_seat_record
+        require(job.get('attach_seat_proof'),'scaled seat-rule entry lacks exact native seat proof')
+        require(attach_seat_record(job) is not None,'scaled native seat proof is unavailable')
+        require(measured.get('seat_record') is True and all(f.get('source')=='seat' for f in frames),
+                'scaled seat-rule candidates used a metadata fallback')
+    else:
+        require(job['attach_axis']=='meta_z' and all(f.get('source') in ('meta_z','bottom_centre') for f in frames),
+                'metadata-axis candidates used a different mating rule')
+    return measured
+
+
+def prepare(root, code, output, classes, *, seat_facts=None):
     from ispatialgym.grasping import schema as S
     from ispatialgym.sampling import grasp_library as G
     root,code,output=map(lambda p:Path(p).resolve(),(root,code,output))
@@ -130,6 +146,14 @@ def prepare(root, code, output, classes):
                 source='campaign_attachment_coupled_scale',campaign_classes=[cls],
                 campaign_profile=profile['id'],campaign_scale_slot=slot,ready=True,
                 readiness_source=target['readiness_source'],asset_sha256=target['asset_sha256'])
+            job['cand_overrides']={'attach_axis':job['attach_axis']}
+            if job['attach_axis']=='seat' and seat_facts:
+                from ispatialgym.grasping.candidates import attach_seat_record
+                seat_path=Path(seat_facts).resolve();require(seat_path.is_relative_to(root),'seat facts outside campaign')
+                job['attach_seat_proof']={'path':str(seat_path),'sha256':file_digest(seat_path),
+                    'partner':{'category':partner['category'],'model':partner['model'],
+                               'scale':profile['absolute_scales']['partner'][slot]}}
+                require(attach_seat_record(job) is not None,'exact paired native seat proof missing')
             job['id']=S.entry_id(job['category'],job['model'],scale,job['constraint'],job['rest_hint_wxyz'])
             jobs.append(job)
             pairs.append(dict(id=cls+'__'+profile['id'][:12]+'__s'+str(slot),class_id=cls,
@@ -188,6 +212,7 @@ def ready_map_requests(root, batch):
             require(log.is_file() and 'GB_VALIDATE_DONE' in log.read_text(),'entry physics validation is incomplete')
             lp=batch/'build/glib/models'/job['id']/'library.json'
             libdata=positive_library(job,lp,policy)
+            axis=verify_candidate_axis(job,json.loads(lp.with_name('candidates.json').read_text()))
             lib=S.load_model(job['category'],job['model'],job['scale'],str(batch/'build/glib'),
                 constraint=job['constraint'],rest_hint_wxyz=job.get('rest_hint_wxyz'))
             require(lib is not None and Path(lib.path).resolve()==lp.resolve() and bool(lib.grasps()),
@@ -223,6 +248,7 @@ def ready_map_requests(root, batch):
                 write_json_atomic(output/name,value)
             request=dict(schema='campaign-training-attachment-map-request-v1',class_id=pair['class_id'],
                 pair=attach_pair,library=evidence(lp),library_validation_log=evidence(log),
+                candidate_axis=axis,candidate_axis_evidence=evidence(lp.with_name('candidates.json')),
                 positive_grasps=len(libdata['grasps']),measured_support_slots=probes,
                 reservation_sha256=pointer['policy_sha256'],parent_dependencies=evidence(batch/'dependencies.json'),
                 input_files=[evidence(batch/name) for name in ('jobs.json','pairs_pending.json','profiles.json','sources.json')],
@@ -239,13 +265,14 @@ def ready_map_requests(root, batch):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root',type=Path,required=True);p.add_argument('--batch',type=Path)
+    p.add_argument('--seat-facts',type=Path)
     for name in ('code','output'):p.add_argument('--'+name,type=Path)
     p.add_argument('--class-id',action='append',default=[]);a=p.parse_args()
     if a.batch:
         report=ready_map_requests(a.root,a.batch)
         print(json.dumps({'ready':len(report['ready']),'blocked':report['blocked'],'production_admitted':False}));return
     require(a.code and a.output and a.class_id,'preparation needs code, output and class IDs')
-    report=prepare(a.root,a.code,a.output,set(a.class_id))
+    report=prepare(a.root,a.code,a.output,set(a.class_id),seat_facts=a.seat_facts)
     print(json.dumps({k:report[k] for k in ('jobs','pairs','production_admitted')}|{
         'measured_support_slots':len(report['measured_support_slots'])}))
 

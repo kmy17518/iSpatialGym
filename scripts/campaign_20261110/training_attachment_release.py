@@ -13,7 +13,7 @@ import numpy as np
 from scripts.campaign_20261110.contracts import digest, file_digest, require, write_json_atomic
 from scripts.campaign_20261110.height_dependency_jobs import evidence, measured_probe, positive_library
 from scripts.campaign_20261110.reservation_policy import active_policy
-from scripts.campaign_20261110.training_attachment_dependencies import permitted, verify_pair_request
+from scripts.campaign_20261110.training_attachment_dependencies import permitted, verify_pair_request, verify_candidate_axis
 
 
 def positive_lattice(native, statuses):
@@ -39,6 +39,8 @@ def audit(root,batch,request_dir,height_slot):
     sources={x['class_id']:x for x in json.loads((batch/'sources.json').read_text())}
     verify_pair_request(job,pair,sources[pair['class_id']]['configuration']);permitted(pair['partner'],policy)
     lp=Path(req['library']['path']);data=positive_library(job,lp,policy)
+    candidate_path=lp.with_name('candidates.json')
+    axis=verify_candidate_axis(job,json.loads(candidate_path.read_text()))
     lib=S.load_model(job['category'],job['model'],job['scale'],str(lp.parent.parent.parent),
         constraint=job['constraint'],rest_hint_wxyz=job.get('rest_hint_wxyz'))
     require(lib is not None and Path(lib.path).resolve()==lp.resolve() and bool(lib.grasps()),'native scaled library differs')
@@ -92,8 +94,10 @@ def audit(root,batch,request_dir,height_slot):
         positive_grasps=len(data['grasps']),arms=['right','left'],maps=table_maps,attachment_maps=attach_maps,
         attachment_spec=evidence(sp),partner_geometry=evidence(sp.with_name('partner_geometry.json')),
         attachment_spec_digest=spec.digest(),status='native_dependencies_verified_layout_pending',production_admitted=False)
+    row.update(candidate_axis=axis,candidate_axis_evidence=evidence(candidate_path))
     refs=[row[k] for k in ('probe','stable_scene','library','attachment_spec','partner_geometry')]
     refs += [ref for record in table_maps+attach_maps for ref in (record,record['npz'])]
+    refs.append(evidence(candidate_path))
     return dict(schema='isg-training-attachment-native-audit-v1',campaign_id='campaign_20261110',
         observed_at=datetime.now(timezone.utc).isoformat(),active_policy_sha256=pointer['policy_sha256'],
         request=evidence(request_dir/'request.json'),requests=1,verified=1,failures=[],checked=[row],

@@ -3,7 +3,7 @@ import copy
 import pytest
 
 from scripts.campaign_20261110.training_attachment_dependencies import (
-    coupled_profile, permitted, shared_support_requests, verify_pair_request,
+    coupled_profile, permitted, shared_support_requests, verify_pair_request, verify_candidate_axis,
 )
 
 
@@ -65,3 +65,10 @@ def test_map_request_rejects_independently_changed_partner_scale():
     verify_pair_request(job,pair,source)
     pair['partner']['scale']=[.65,.65,.65]
     with pytest.raises(ValueError,match='coupled draw'):verify_pair_request(job,pair,source)
+
+
+def test_scaled_seat_rule_cannot_advance_with_metadata_axis_fallback():
+    candidates={'log':{'attach_axis':{'mode':'seat','seat_record':False,'mates':[{'source':'meta_z'}]}}}
+    with pytest.raises(ValueError,match='exact native seat proof'):
+        verify_candidate_axis({'attach_axis':'seat'},candidates)
+    assert verify_candidate_axis({'attach_axis':'meta_z'},candidates)['mates'][0]['source']=='meta_z'
