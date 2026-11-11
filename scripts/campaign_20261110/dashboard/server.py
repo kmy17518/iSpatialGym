@@ -60,6 +60,10 @@ def compact_execution(value):
     for r in value.get('rows',[]):
         if r.get('kind')=='requirement':continue
         row={k:v for k,v in r.items() if k not in ('verification','artifacts','inputs')}
+        row['artifacts']=proof_refs(r.get('artifacts',[]))
+        verification=r.get('verification',{})
+        row['verification']={k:v for k,v in verification.items() if k in
+            ('status','path','sha256','verification_requires_original_artifacts')} if isinstance(verification,dict) else verification
         row['stages']={k:{**{a:b for a,b in v.items() if a!='evidence'},
             'evidence':{a:b for a,b in v.get('evidence',{}).items() if a in
                 ('path','sha256','status','success','written','attempts','successful_members','source_job_id','validated_at','count','remaining','last_accepted_at')}}
