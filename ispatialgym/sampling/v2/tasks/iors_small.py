@@ -8051,6 +8051,12 @@ class IORSSmall(SamplerV2):
         log.info("%s: touching push %s in %d strokes of <= %.3f m over %.3f m (TOUCH_PUSH_STROKE_M)", self.gp.variant, kind, plan["n"], stroke, float(dist))
         out = {"strokes": plan, "face_half_m": round(C.FINGERTIP_LENGTH, 5), "blade_standoff_m": round(C.FINGERTIP_LENGTH + clearance, 5),
                "contact_strips_m": [[round(c, 5), round(hw, 5)] for c, hw in strips], "contact_band_m": list(TOUCH_PUSH_STROKE_BAND_M)}
+        if campaign_runtime.contact_recovery('touching_push_straight_retreat'):
+            # Native50270800 reached its goal, then the dynamic escape averaged
+            # table-up with partner-back and projected the radial leg downward.
+            # Keep the recorded, native-checked horizontal retreat instead.
+            # This does not change the executor's collision or QA checks.
+            out['straight_retreat'] = True
         cp = extras.get("contact_point")
         if root_xy is not None and direction is not None and cp is not None:
             # the stroke's fallback without the live hull in its band: the target's back = its root less this along the push

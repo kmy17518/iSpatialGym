@@ -101,6 +101,8 @@ def contact_recovery(option: str) -> bool:
                                         'inter_object_relation_satisfaction-touching_small_scale'),
         'touching_push_mass_center': ('inter_object_relation_satisfaction-touching_04',
                                      'inter_object_relation_satisfaction-touching_small_scale'),
+        'touching_push_straight_retreat': ('inter_object_relation_satisfaction-touching_04',
+                                         'inter_object_relation_satisfaction-touching_small_scale'),
         'shelf_board_draw': ('inter_object_relation_satisfaction-touching_03',
                              'inter_object_relation_satisfaction-touching_small_scale'),
         'shelf_other_arm': ('inter_object_relation_satisfaction-touching_03',
