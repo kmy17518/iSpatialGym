@@ -18,6 +18,13 @@ from ispatialgym.sampling.v2.stances import Stance
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 
 VARIANT = "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl"
+
+
+@pytest.fixture(autouse=True)
+def _heel_tight_off(monkeypatch):
+    """ISPATIALGYM_PUSH_HEEL_TIGHT is default on since lead #100j; the tests of the former heel_first behaviour run with it off, and the
+    switch's own tests set it themselves."""
+    monkeypatch.setenv("ISPATIALGYM_PUSH_HEEL_TIGHT", "0")
 HEEL, TOE = 0.128, 0.117
 YAWS = [k * 2.0 * math.pi / 16 for k in range(16)]
 PUSH = (1.0, 0.0)  # the push along +x: the robot behind the target at -x
@@ -239,8 +246,13 @@ def test_the_heel_is_memoised_per_target():
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def test_heel_tight_off_by_default(monkeypatch):
+def test_heel_tight_default_on(monkeypatch):
     monkeypatch.delenv(IL.PUSH_HEEL_TIGHT_ENV, raising=False)
+    assert IL.push_heel_tight_tol_deg() == pytest.approx(IL.PUSH_HEEL_TIGHT_TOL_DEG)
+
+
+def test_heel_tight_off(monkeypatch):
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "0")
     s = _sampler(push_under_yaw="heel_first")
     assert IL.push_heel_tight_tol_deg() is None and s.push_heel_tight() is None
     assert s.push_yaw_tol_deg() == pytest.approx(22.5) and s.init_yaw_jitter() == pytest.approx(IL.TARGET_JITTER)
@@ -346,7 +358,7 @@ def _j4_sampler(witnesses, **gen):
 def test_heel_tight_left_j4_check(monkeypatch):
     fail = [_wit("retreat", 8, retreat=-2.0921)]
     ok = [_wit("place", 8, carry=-2.0320)]
-    monkeypatch.delenv(IL.PUSH_HEEL_TIGHT_ENV, raising=False)
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "0")
     s = _j4_sampler(fail)
     s.heel_tight_left_j4_check()  # off: nothing judged
     assert s.kit.stats == {}

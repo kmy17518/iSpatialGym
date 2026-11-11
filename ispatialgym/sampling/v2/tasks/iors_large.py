@@ -781,9 +781,10 @@ def left_j4_margin(witnesses: Sequence[Dict[str, Any]], j: int, lo: float) -> Op
 
 
 def push_heel_tight_tol_deg() -> Optional[float]:
-    """:data:`PUSH_HEEL_TIGHT_ENV`: heel_first's tolerance (deg) under the switch, None when it is off (default). ``ValueError`` for a
-    value that is neither on / off nor a positive angle."""
-    v = os.environ.get(PUSH_HEEL_TIGHT_ENV, "").strip().lower()
+    """:data:`PUSH_HEEL_TIGHT_ENV`: heel_first's tolerance (deg) under the switch, None when it is off. Default ON since lead #100j
+    (2026-11-11; A/B uh3_ul01_on 20/8/7 at 0.575 GPU-h per ok vs OFF 26/8/6 at 1.35); "0" / "off" restores the former tolerance.
+    ``ValueError`` for a value that is neither on / off nor a positive angle."""
+    v = os.environ.get(PUSH_HEEL_TIGHT_ENV, "1").strip().lower()
     if v in ("", "0", "off", "false", "no", "none"):
         return None
     if v in _ON:
