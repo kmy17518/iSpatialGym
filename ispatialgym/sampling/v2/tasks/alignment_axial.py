@@ -210,6 +210,9 @@ class AlignmentAxial(SamplerV2):
         ev = self.g("edge_visibility") or {}
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
+                campaign_plan = getattr(self, "_campaign_surface_active", None)
+                if campaign_plan is not None and not self._campaign_edge_matches_goal(st):
+                    raise Reject("campaign_alignment_direction", "edge cannot produce the fixed goal orientation")
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
                 # A1: the left contact band of the target's height class (stop-edge brace); §4.4 margins over the union
                 if TT.contact_maps_on():
@@ -232,6 +235,11 @@ class AlignmentAxial(SamplerV2):
                     trials = [cand] + [cand.with_trunk(t, 0.0, "init") for t in sorted(np.linspace(t_lo, t_hi, 5).tolist(), reverse=True) if abs(t - cand.translate) > 1e-6]
                     n_vis = 0
                     for st_try in trials:
+                        if campaign_plan is not None:
+                            goal = (th.tensor(campaign_plan.position), th.tensor(campaign_plan.orientation))
+                            if not TT.in_frame(self, self.camera_pose_at(st_try),
+                                               TT.hull_corners_world(self.hull, goal), TT.IN_FRAME_MARGIN):
+                                continue
                         n_vis, n_in = self._edge_visible_points(st_try, self.camera_pose_at(st_try), 0.0, None, with_in_frame=True)
                         if n_vis >= int(ev.get("min_visible", 3)) and (st_try is cand or (self.ikc.stance_collision_free(st_try) and TT.trunk_sweep_free(self, st_try))):
                             if st_try is not cand:
@@ -297,6 +305,14 @@ class AlignmentAxial(SamplerV2):
         target_dir = -stance.inward
         f = self.front_axis[:2] if getattr(self, "rest_quat", None) is None else C.quat_rotate(getattr(self, "rest_quat", None), self.front_axis.float())[:2]
         return C.wrap_angle(math.atan2(float(target_dir[1]), float(target_dir[0])) - math.atan2(float(f[1]), float(f[0])))
+
+    def _campaign_edge_matches_goal(self, stance: Stance) -> bool:
+        """Apply the existing placement orientation gate before selecting an edge."""
+        plan = getattr(self, "_campaign_surface_active", None)
+        if plan is None:
+            return True
+        native = CPZ.axial_rest_pose(getattr(self, "rest_quat", None), self._aligned_yaw(stance))
+        return float(C.quat_angle(native, th.tensor(plan.orientation))) <= self.ikc.WITNESS_ANG_TOL
 
     # ------------------------------------------------------------------ i7-axialrest: the settled rest
 
@@ -468,7 +484,9 @@ class AlignmentAxial(SamplerV2):
             plan = [(k, (d, f)) for k, d, f in scan]
             self._a5_scan = {"candidates": len(order[:6]), "push_feasible": len(scan), "paired": sum(1 for _k, d, _f in scan if self._draw_paired(d))}
             if not plan:
-                raise Reject("target_placement", f"no manipulation candidate of {len(order[:6])} has a push-feasible placement on the push_blade map")
+                detail = getattr(self, "_campaign_scan_rejections", None)
+                raise Reject("target_placement", f"no manipulation candidate of {len(order[:6])} has a push-feasible placement on the push_blade map"
+                             + (f"; fixed-goal scan rejections={detail}" if detail is not None else ""))
         for k, pre in plan:
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
@@ -835,6 +853,7 @@ class AlignmentAxial(SamplerV2):
         push_blade / axial_brace maps until a draw has a pair (an end whose push and stop brace fit). Returns ``(k, draw, fails)`` per
         candidate with a push-feasible draw - the candidates with a pair first (in order), then the push-only ones (their first draw)."""
         paired, push_only = [], []
+        self._campaign_scan_rejections = {} if getattr(self, "_campaign_surface_active", None) is not None else None
         cam_init = self.camera_pose_at(init)
         z_brace = TT.contact_height(self.top.z, self.extents["height"])
         half_len = 0.5 * self.extents["long"] - END_INSET
@@ -846,6 +865,9 @@ class AlignmentAxial(SamplerV2):
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus = cand.focus
             draws, fails = self._placement_draws(rng, manip, cam_init, self._aligned_yaw(manip), geo0[1], z_brace, half_len, stop_at="pair")
+            if self._campaign_scan_rejections is not None:
+                for reason, count in fails.items():
+                    self._campaign_scan_rejections[reason] = self._campaign_scan_rejections.get(reason, 0) + count
             d = self._pick_draw(draws)
             if d is None:
                 continue

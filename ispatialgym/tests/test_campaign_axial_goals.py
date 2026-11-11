@@ -22,6 +22,36 @@ def test_start_turn_preserves_fixed_goal_com_with_noncentral_tilted_root():
     assert float(C.quat_angle(start[1], th.tensor(goal[1]))) == pytest.approx(math.radians(37), abs=1e-6)
 
 
+def test_fixed_goal_rejects_incompatible_edge_before_expensive_band_work(monkeypatch):
+    s = ax.AlignmentAxial.__new__(ax.AlignmentAxial)
+    s._campaign_surface_active = SimpleNamespace(orientation=[0., 0., 0., 1.])
+    s.front_axis = th.tensor([1., 0., 0.])
+    s.rest_quat = None
+    s.ikc = SimpleNamespace(WITNESS_ANG_TOL=.05)
+    s.g = lambda key: {}
+    s.top = object()
+    s.band_spec = object()
+    s.gp = SimpleNamespace(variant='fixed_goal')
+    good = SimpleNamespace(inward=th.tensor([-1., 0.]))
+    wrong = SimpleNamespace(inward=th.tensor([0., -1.]))
+    calls = []
+    monkeypatch.setattr(ax.TT, 'edge_candidates', lambda *args: [
+        (SimpleNamespace(name='wrong'), wrong), (SimpleNamespace(name='good'), good)])
+    def stop_at_bands(*args, **kwargs):
+        calls.append(kwargs['edge'].name)
+        raise Reject('probe_stop', 'band stage reached')
+    monkeypatch.setattr(ax.TT, 'ensure_bands', stop_at_bands)
+    errors = []
+    assert s._start_search(None, {'H_max': .02, 'w_diag': .1}, errors) is False
+    assert calls == ['good']
+    assert 'campaign_alignment_direction' in errors[0]
+    # Ordinary single-instance sampling retains its old edge search.
+    s._campaign_surface_active = None
+    calls.clear()
+    s._start_search(None, {'H_max': .02, 'w_diag': .1}, [])
+    assert calls == ['wrong', 'good']
+
+
 def test_native_stop_geometry_reaches_fixed_pose_before_contact_checks():
     s = _ax(rest=SPOON_REST)
     goal_q = C.qmul(C.quat_from_yaw(.8), _unit(SPOON_REST))
