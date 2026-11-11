@@ -97,6 +97,12 @@ def return_report(output):
                 f"{f['fleet_window_unattributed_gpu_seconds']/3600:.3f} not yet attributed.",
                 f.get('boundary_precision', ''),
                 'This includes fleet startup, idle and failed attempts. It is not a completed-group yield denominator; active work and historical gaps remain separate.']
+            if f.get('recorded_fleet_estimated_gpu_seconds') is not None:
+                lines += [f"All recorded campaign rentals: {f['recorded_fleet_estimated_gpu_seconds']/3600:.3f} estimated GPU-hours; "
+                    f"{f['recorded_fleet_measured_attributed_worker_gpu_seconds']/3600:.3f} measured worker GPU-hours; "
+                    f"{f['recorded_fleet_unattributed_gpu_seconds']/3600:.3f} unattributed GPU-hours.",
+                    f"Historical GPU counts recovered for {f.get('historical_count_recovery',{}).get('recovered_rentals',0)} rentals from exact offer/machine evidence. "
+                    'Approximate rental boundaries and unavailable per-group idle attribution prevent a full accepted/GPU-hour ratio.']
     cluster_fleet_path = output / CLUSTER_FLEET_FILE
     if cluster_fleet_path.exists():
         f = json.loads(cluster_fleet_path.read_text())

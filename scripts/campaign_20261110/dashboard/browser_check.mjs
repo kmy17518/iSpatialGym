@@ -32,6 +32,9 @@ assert.ok(goalYield.text.includes('native draws'),'Retry-inclusive attempt denom
 const fleetTime=await evaluate(`({available:current.sources.fleet_gpu_time.available,text:document.querySelector('#fleet-gpu-time').innerText,seconds:current.fleet_gpu_time.fleet_window_estimated_gpu_seconds})`);
 assert.ok(fleetTime.available&&fleetTime.seconds>=0,'Authoritative fleet GPU time is available');
 assert.ok(fleetTime.text.includes('not divided by this partial time window'),'No mixed-window yield inference');
+const recordedFleet=await evaluate('current.fleet_gpu_time.recorded_fleet_estimated_gpu_seconds');
+assert.ok(recordedFleet>=fleetTime.seconds,'Recovered rental history contains the instrumented window');
+assert.ok(fleetTime.text.includes('All recorded campaign rentals')&&fleetTime.text.includes((recordedFleet/3600).toFixed(2)),'Recovered rental hours and scope rendered');
 const clusterTime=await evaluate(`({available:current.sources.cluster_fleet_gpu_time.available,text:document.querySelector('#cluster-fleet-gpu-time').innerText,seconds:current.cluster_fleet_gpu_time.verified_allocated_gpu_seconds})`);
 assert.ok(clusterTime.available&&clusterTime.seconds>=0,'Verified cluster allocation accounting is available');
 assert.ok(clusterTime.text.includes('no accepted count or throughput is inferred'),'Broader allocation time remains separate from group yield');
