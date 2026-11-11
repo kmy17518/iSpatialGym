@@ -200,6 +200,9 @@ def observe(root, *, now=None):
                     stage['status']='completed_without_complete_probe'
             batch['stages'].append(stage)
         if all(s['status'] == 'verified' for s in batch['stages']): batch['status'] = 'batch_restoration_verified'
+        elif any(s['status'] in ('failed_execution','failed_validation')for s in batch['stages']):batch['status']='failed_validation'
+        elif any(s['status']=='completed_without_complete_probe'for s in batch['stages']):batch['status']='incomplete_terminal_evidence'
+        elif submissions:batch['status']='submitted'
         result['batch_stages'].append(batch)
     keys = [(r['candidate_id'], r['start']) for r in result['records']]
     require(len(keys) == len(set(keys)), 'duplicate exact canary attempt in projection')

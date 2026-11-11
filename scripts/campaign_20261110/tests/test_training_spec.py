@@ -39,3 +39,17 @@ def test_large_source_records_stay_in_source_not_requirement_payload(tmp_path):
     family={'task':'disembedding','aba_restoration':{'physics':{'status':'failed','attempts':[huge]*100}},'exact_validation':{'status':'partial','evidence':[huge]*100}}
     import json
     assert len(json.dumps(compact_family(family)))<1000
+
+
+def test_pool_mechanics_and_failed_restore_stay_narrow_partial_evidence(tmp_path):
+    write_json_atomic(tmp_path/'training_preparation/pool_pair_r1/status.json',{
+        'campaign_id':'campaign_20261110','observed_at':'2026-11-11T16:00:00Z','status':'repair_prepared',
+        'required_model_count':2,'attempts':[{'job_id':'1','stage':'native_pool_switch','mechanics_passed':True,
+        'independent_load_render_passed':False,'observed_stages':3,'failure':{'message':'teardown failed'}}],
+        'unverified':['TRO_integration','physics_action_replay'],'next_action':'Run corrected restore.'})
+    row=next(r for r in executed_audit(tmp_path,tmp_path,[])['requirements']if r['id']=='G16')
+    assert row['status']=='partial'and not row['chain']['verification']['complete_requirement']
+    facts=row['evidence'][0]['facts']
+    assert facts['attempts'][0]['failure']['message']=='teardown failed'
+    assert facts['unverified']==['TRO_integration','physics_action_replay']
+    assert row['next_action']=='Run corrected restore.'
