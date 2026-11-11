@@ -322,6 +322,9 @@ def prepare(proof, allocation, cfg, root, *, prepared_source=None, prepared_indi
     keys = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR",
             "ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY")
     extras = [k + "=" + env[k] for k in keys if env.get(k)] + ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"]
+    registry = groups.source_registry_context(env, root)
+    if registry:
+        extras += [name + '=' + value for name, value in registry['environment'].items()]
     command = submission_command(prepared["queue"], snapshot=cfg["snapshot"], campaign_root=root, v2_root=v2_root,
         base_index=index, extra_env=extras)
     if env.get("START_PER_ATTEMPT") == "0":
@@ -334,6 +337,7 @@ def prepare(proof, allocation, cfg, root, *, prepared_source=None, prepared_indi
         "decision": decision, "needs_new_gate": True, "status": "ready", "dry_run_passed": dry_run,
         "admission_id": identity, "source_proof": proof, "v2_root": v2_root}
     if index_proof is not None:record['index_reservation']=index_proof
+    if registry is not None:record['source_environment_audit']=registry
     backends = cfg.get('dispatch_backends')
     if backends is None and template.task == 'alignment-world_vertical':
         # Native wall provenance includes provider JSON symlinks. Keep those
@@ -521,6 +525,14 @@ def recent_gates(root):
 
 
 def require_source_runtime(proof, cfg, root):
+    exact_config = cfg.get('required_source_config')
+    if exact_config is not None:
+        path = Path(exact_config['path']).resolve()
+        source_path = Path(proof['config']['path']).resolve()
+        require(path.is_relative_to(root) and source_path.is_relative_to(root)
+                and file_digest(path) == file_digest(source_path) == exact_config['sha256']
+                and proof['config']['sha256'] == exact_config['sha256'],
+                'source has not passed the required exact configuration')
     expected = cfg.get("required_source_snapshot")
     if expected is None:
         return

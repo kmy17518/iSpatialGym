@@ -413,3 +413,14 @@ def test_planning_wait_has_a_finite_deadline(tmp_path, monkeypatch):
     with pytest.raises(FileExistsError,match='still live'):
         with admission.admission_planning_lock(tmp_path,wait_seconds=1):pass
     assert now[0]==1
+
+
+def test_exact_source_configuration_pin_preserves_byte_identical_migration(tmp_path):
+    original=tmp_path/'original.json'; c.write_json_atomic(original,{'native':'exact'})
+    copy=tmp_path/'migrated.json';copy.write_bytes(original.read_bytes())
+    cfg={'required_source_config':{'path':str(original),'sha256':c.file_digest(original)}}
+    proof={'config':{'path':str(copy),'sha256':c.file_digest(copy)}}
+    admission.require_source_runtime(proof,cfg,tmp_path)
+    c.write_json_atomic(copy,{'native':'changed'})
+    with pytest.raises(c.ContractError,match='exact configuration'):
+        admission.require_source_runtime(proof,cfg,tmp_path)
