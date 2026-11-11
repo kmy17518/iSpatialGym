@@ -85,9 +85,25 @@ def audit(root, inputs):
                     'native_identity_key': lib.identity_key(), 'positive_grasps': count,
                     'physics_profile': data['physics_profile'], 'policy_key': data['policy_key'],
                     'rest_ids': sorted(lib.rests), 'files': closure})
-            except (ValueError, OSError, KeyError, TypeError) as exc:
-                failed.append({**row, 'status': 'failed', 'library': reference(path),
-                               'reason': str(exc), 'error_type': type(exc).__name__})
+            except OSError as exc:
+                # Shared-account atomic files can exist without being readable.
+                # An observation failure is not evidence of failed physics, and
+                # trying to hash the same unreadable file would abort the batch.
+                missing.append({**row, 'status': 'unavailable',
+                    'library': {'path': str(path.resolve()), 'sha256': None},
+                    'reason': str(exc), 'error_type': type(exc).__name__})
+            except (ValueError, KeyError, TypeError) as exc:
+                try:
+                    library_ref = reference(path)
+                except OSError as observation_error:
+                    missing.append({**row, 'status': 'unavailable',
+                        'library': {'path': str(path.resolve()), 'sha256': None},
+                        'reason': str(observation_error),
+                        'error_type': type(observation_error).__name__,
+                        'unconfirmed_validation_error': str(exc)})
+                else:
+                    failed.append({**row, 'status': 'failed', 'library': library_ref,
+                                   'reason': str(exc), 'error_type': type(exc).__name__})
     return dict(schema='isg-native-library-harvest-v1', campaign_id='campaign_20261110',
         observed_at=datetime.now(timezone.utc).isoformat(), owner='/root/templates_assets',
         reservation_policy=pointer, inputs=inputs, native_reader=reference(S.__file__),
