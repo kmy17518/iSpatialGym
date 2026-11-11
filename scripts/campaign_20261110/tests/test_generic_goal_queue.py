@@ -107,6 +107,21 @@ def test_block_queue_requires_actual_four_targets_board_and_preserves_collection
         q.read_queue(manifest, config)
 
 
+def test_attachment_queue_keeps_collectors_alive_through_sampler_startup(tmp_path, monkeypatch):
+    from scripts.campaign_20261110 import held_goal_batches as batches
+    manifest, config, _ = generic_fixture(tmp_path, monkeypatch, "configuration_matching-attachment")
+    raw = json.loads(manifest.read_text())
+    raw["config_path"] = str(config)
+    write_json_atomic(manifest, raw)
+    command = ["python", "submit", "attachment", "3", "--time-s", "1", "--sample-limit-s", "1",
+               "--extra-env", "ISPATIALGYM_CAMPAIGN_GOAL_PLAN=first"]
+    monkeypatch.setattr(batches.g, "submission_command", lambda *args, **kwargs: list(command))
+    submitted = batches.submission_command(manifest)
+    sampling = int(submitted[submitted.index("--sample-limit-s") + 1])
+    allocation = int(submitted[submitted.index("--time-s") + 1])
+    assert allocation - 3600 - 420 > sampling
+
+
 def test_joint_queue_rejects_other_bound_joint_and_task(tmp_path, monkeypatch):
     manifest, config, entries = generic_fixture(tmp_path, monkeypatch, "configuration_matching-articulation_close_small_scale")
     raw = json.loads(open(entries[0]["path"]).read())
