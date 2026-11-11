@@ -68,7 +68,11 @@ def main():
              'scope': 'All models in the ready standard contract; every declared target/distractor category covered; finite copy maximum'}
     pool, selection = make_pool(template, customs[alias], maximum=a.max_distractors, provenance=proof)
     check_reservations(pool.audit_template(), active[1], active[2])
-    out.mkdir(parents=True); bound = bind_variant(template, write_pool(out/'binding_pool.json', pool), selection)
+    out.mkdir(parents=True)
+    # Legacy standard contracts named only source_alias. Explicit template
+    # customs submission needs the same audited native alias in this field.
+    explicit = replace(template, scene_setup={**template.scene_setup, 'customs_alias': alias})
+    bound = bind_variant(explicit, write_pool(out/'binding_pool.json', pool), selection)
     check_reservations(bound, active[1], active[2])
     key = {**config['validation_key'], 'template_sha256': bound.fingerprint,
            'code_sha256': file_digest(a.snapshot/'.snapshot_commit')}
