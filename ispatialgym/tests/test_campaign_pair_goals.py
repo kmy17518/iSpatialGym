@@ -320,6 +320,10 @@ def test_nextto_source_hint_survives_plan_validation_with_exact_goal_and_provena
     validated=check(raw)
     assert validated.anchor_manipulation_stance['translate']==0.
     assert validated.goal==validated.release==((1.,2.,.8),(0.,0.,0.,1.))
+    touching=copy.deepcopy(raw);touching['task']='inter_object_relation_satisfaction-touching_small_scale'
+    touching['place_pose']={'position':[.95,2.,.8],'orientation':[0.,0.,0.,1.]}
+    assert check(touching,'touching').anchor_manipulation_stance==validated.anchor_manipulation_stance
+    assert check(touching,'touching').place[0][0]==.95
     changed=copy.deepcopy(raw);changed['anchor_manipulation_stance']['source_summary_sha256']='c'*64
     with pytest.raises(GoalPlanError,match='provenance'):check(changed)
     changed=copy.deepcopy(raw);changed['task']='inter_object_relation_satisfaction-ontop_small_scale'

@@ -60,6 +60,7 @@ def test_source_stance_requires_exact_summary_provenance_and_finite_pose():
 def test_source_stance_nextto_scope_does_not_enable_other_pair_classes():
     from ispatialgym.sampling.campaign_tabletop_starts import source_stance_hint_enabled
     assert source_stance_hint_enabled('nextto', 'small', 'inter_object_relation_satisfaction-nextto_02')
+    assert source_stance_hint_enabled('touching', 'small', 'inter_object_relation_satisfaction-touching_01')
     assert source_stance_hint_enabled('inside', 'small', 'inter_object_relation_satisfaction-inside_01')
     for relation, scale, cls in [('nextto','large','inter_object_relation_satisfaction-nextto_02'),
             ('touching','small','inter_object_relation_satisfaction-touching_02'),
