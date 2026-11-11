@@ -52,6 +52,42 @@ def destination_side_at_anchor(source, destination, anchor):
     return "left" if lateral > 0 else "right"
 
 
+def reference_start_proposal(template):
+    """A hash-bound search hint for the audited embedded-figure recovery.
+
+    The author verifies the reference files before embedding these coordinates.
+    This does not import a goal, grasp, IK solution, or physical verdict.
+    """
+    hint = template.scene_setup.get('reference_start_proposal')
+    if hint is None:
+        return None
+    _require(template.task == 'disembedding' and template.class_id == 'disembedding_01'
+             and template.split == 'eval_standard', 'reference tray proposal has wrong scope')
+    _require(isinstance(hint, dict), 'invalid reference tray proposal')
+    for key in ('sidecar_sha256', 'tro_sha256', 'report_sha256'):
+        value = hint.get(key)
+        _require(isinstance(value, str) and len(value) == 64 and all(c in '0123456789abcdef' for c in value),
+                 'reference tray proposal lacks '+key)
+    initial = anchor_base({'anchor_base_pose2d': hint.get('initial_base_pose2d')})
+    _require(initial is not None, 'reference tray proposal lacks initial viewpoint')
+    manip = hint.get('manipulation')
+    _require(isinstance(manip, dict), 'reference tray proposal lacks manipulation stance')
+    for key, size in (('base_pose2d', 3), ('focus', 3)):
+        _vector(manip.get(key, ()), size, 'reference manipulation '+key)
+    for key in ('translate', 'tilt'):
+        value = manip.get(key)
+        _require(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value),
+                 'invalid reference manipulation torso')
+    return {'initial_base_pose2d': initial, 'manipulation': manip}
+
+
+def configured_reference_start():
+    if not os.environ.get('ISPATIALGYM_CAMPAIGN_CONFIG'):
+        return None
+    from ispatialgym.sampling.campaign_runtime import configuration
+    return reference_start_proposal(configuration()[1])
+
+
 @dataclass(frozen=True)
 class TrayGoalPlan:
     campaign_id: str

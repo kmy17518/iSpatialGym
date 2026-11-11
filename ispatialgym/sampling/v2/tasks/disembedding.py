@@ -922,6 +922,9 @@ class Disembedding(SamplerV2):
             self._campaign_tray_active = self.campaign_tray_plan()
         from ispatialgym.sampling import campaign_tabletop_starts as CTS
         anchor = getattr(getattr(self, "_campaign_tray_active", None), "anchor_base_pose2d", None)
+        reference = CTG.configured_reference_start()
+        if anchor is None and reference is not None:
+            anchor = reference['initial_base_pose2d']
         # §4.2 has no preference among the edges and §4.4 checks floor + collision per lateral position (Phase 1c), so
         # every edge with a free-floor run in front of it is tried (a third of its 10 cm lateral raster at s = 0.45 on
         # free floor, as the IORS reference task does) instead of ``edge_candidates``, which drops an edge when its
@@ -1374,6 +1377,10 @@ class Disembedding(SamplerV2):
         # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the manipulation stance candidates (alias_memory.reorder_pick: a
         # flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
         order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: self.segment_arms[0], rng)
+        reference = CTG.configured_reference_start()
+        if reference is not None:
+            from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
+            order = prioritize_written_stances(order, self.manip_candidates, [reference['manipulation']], explore=1, exploit=3)
         for k in order[:6]:
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")

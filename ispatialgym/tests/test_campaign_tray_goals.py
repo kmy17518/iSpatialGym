@@ -10,6 +10,22 @@ from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.v2.tasks.disembedding import Disembedding
 
 
+def test_reference_start_proposal_is_scoped_and_provenance_required():
+    from ispatialgym.sampling.campaign_tray_goals import reference_start_proposal
+    from ispatialgym.sampling.campaign_held_goals import GoalPlanError
+    hint={'sidecar_sha256':'a'*64,'tro_sha256':'b'*64,'report_sha256':'c'*64,
+          'initial_base_pose2d':[1,2,.3],
+          'manipulation':{'base_pose2d':[1,2,.3],'focus':[2,3,.8],'translate':0.,'tilt':-.61}}
+    t=SimpleNamespace(task='disembedding',class_id='disembedding_01',split='eval_standard',scene_setup={})
+    assert reference_start_proposal(t) is None
+    t.scene_setup={'reference_start_proposal':hint}
+    assert reference_start_proposal(t)['initial_base_pose2d']==(1.,2.,.3)
+    t.class_id='disembedding_05'
+    with pytest.raises(GoalPlanError,match='wrong scope'):reference_start_proposal(t)
+    t.class_id='disembedding_01';hint['sidecar_sha256']='missing'
+    with pytest.raises(GoalPlanError,match='sidecar_sha256'):reference_start_proposal(t)
+
+
 def plan():
     return TrayGoalPlan("fresh", "g1", "eval_standard", "template", "a" * 64, "target", "source", "dest",
                         ((1., 2., .8), (0., 0., 0., 1.)), ((0., 2., .7), (0., 0., 0., 1.)),
