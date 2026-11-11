@@ -50,6 +50,17 @@ def test_model_and_category_queues_never_become_training():
     assert next_work(category, counts(evaluation={0:3,1:4,2:3})) is None
 
 
+def test_eval_only_held_refill_preserves_strict_deficits_and_stops_at_quota():
+    template = SimpleNamespace(task="mental_rotation", split="eval_standard")
+    assert next_work(template, counts(evaluation={0:3,1:4,2:2}), mode="eval_only") == {
+        "phase": "eval_standard", "bucket": 2, "groups": 1, "needs_new_gate": False}
+    complete = counts(evaluation={0:3,1:4,2:3})
+    assert next_work(template, complete, mode="eval_only", training_validated=True) is None
+    assert next_work(template, complete)["phase"] == "train"
+    with pytest.raises(ContractError, match="unknown held collection mode"):
+        next_work(template, complete, mode="typo")
+
+
 def test_private_native_customs_and_definition_are_preserved_and_hash_checked(tmp_path):
     from scripts.campaign_20261110.controller_held import source_environment
     from scripts.campaign_20261110.contracts import file_digest

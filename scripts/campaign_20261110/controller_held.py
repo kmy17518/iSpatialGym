@@ -81,7 +81,8 @@ def read_counts(root, template, standards, room_plan):
             "room_remaining": max(0, cap-room_used), "evaluation_sibling_reserve": reserve}
 
 
-def next_work(template, counts, *, max_groups=6, training_validated=False):
+def next_work(template, counts, *, max_groups=6, training_validated=False, mode="eval_then_train"):
+    require(mode in ("eval_only", "eval_then_train"), "unknown held collection mode")
     quota = next(q for q in task_quotas() if q.task == template.task)
     split = template.split
     quotas = {"eval_standard": quota.standard_buckets, "eval_model": quota.model_buckets,
@@ -93,7 +94,7 @@ def next_work(template, counts, *, max_groups=6, training_validated=False):
         if split == "eval_standard":
             groups = min(groups, counts["class_remaining"], counts["room_remaining"])
         return {"phase": split, "bucket": bucket, "groups": groups, "needs_new_gate": False} if groups else None
-    if split not in ("train", "eval_standard"):
+    if mode == "eval_only" or split not in ("train", "eval_standard"):
         return None
     spare = min(counts["class_remaining"], max(0, counts["room_remaining"]-counts["evaluation_sibling_reserve"]))
     if spare <= 0:
@@ -384,7 +385,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
         if adapter is None:
             counts = read_counts(root, template, read(cfg["standard_contracts"])["templates"], read(cfg["room_plan"]))
             reserved=reserve_pending_counts(counts,template,pending_held(root))
-            decision = next_work(template, reserved, max_groups=spec.get("groups_per_batch", 6), training_validated="train" in gates)
+            decision = next_work(template, reserved, max_groups=spec.get("groups_per_batch", 6),
+                                 training_validated="train" in gates, mode=spec.get("mode", "eval_then_train"))
         else:
             counts = adapter.read_counts(root, template)
             reserved = adapter.reserve_pending_counts(counts, template, adapter.pending(root))
