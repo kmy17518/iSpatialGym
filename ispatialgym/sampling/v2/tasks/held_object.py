@@ -897,6 +897,17 @@ class HeldObjectV2(SamplerV2):
         """Random free cell of the eroded map inside the task room + yaw ~ U(−π, π) at which the instance's start
         configuration ``q_rel`` is whole-body collision-free (2 cm; the object is checked once it is attached)."""
         pts = self.kit.random_free_points(rng, 30, room_filter=self.in_room)
+        from ispatialgym.sampling import campaign_held_floor as CHF
+        choice = self.choice.models["target"]
+        floor = self.obj("floor")
+        if CHF.enabled(task=self.activity, category=choice.category, model=choice.model,
+                       scene=self.scene, rooms=self.choice.rooms, floor_name=floor.name):
+            proposed = len(pts)
+            pts = CHF.matching_points(pts, expected_floor=floor,
+                                      floor_under=self.world.floor_object_under)
+            self.template_facts["campaign_bound_floor_start"] = {
+                "bound_floor": floor.name, "proposed": proposed, "matching": len(pts),
+                "existing_room_and_collision_checks_retained": True}
         if not pts:
             raise Reject("no_stance", "no free eroded cell in the task room")
         cands = [(float(xy[0]), float(xy[1]), float(rng.uniform(-math.pi, math.pi))) for xy in pts]
