@@ -6163,8 +6163,9 @@ symbolic_only, arm_stutter) are the briefcase's own push problem (#72, owner).
 ## The eval-measure change: the lying briefcase and free yaw for round objects (branch `i7-measure`, owner A2 + A4, 2026-11-09)
 
 The owner decided two success-measure changes on 2026-11-09 (`tmp/outputs/owner_review_20261109.md` A2 option (b), A4) and asked for them
-to ship together, so that scores change once. Both are behind switches that are default OFF, and **they are flipped together in one
-commit** (the eval-measure commit). The success measure is the one the demo QA, replay and policy eval all read (`pose_reached` through
+to ship together, so that scores change once. Both were built behind default-OFF switches. **Owner #100 (2026-11-10):** A2 stays off
+(under_large_02 keeps the standing guide-wall push, which beat lying), and A4 ships in the eval bundle with the block_design pose
+tiebreak instead (branch i7-evalbundle). The success measure is the one the demo QA, replay and policy eval all read (`pose_reached` through
 `eval.tro.apply_targets_to_scope`).
 
 **A2: `ISPATIALGYM_BRIEFCASE_LYING` (iors_large).** under_large_02's briefcase (lwbctq) stands on its 0.12 x 0.33 edge, 0.27 m tall. In the

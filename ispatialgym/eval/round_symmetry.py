@@ -7,8 +7,8 @@ turned 0.22 rad on the way ended ``symbolic_only`` (i7-floorpush A). The demo QA
 rotations as free in two places (``oracle.executor.Executor.placed_orientation_report``): a cylinder of ``assets/icl/revolution_axes.json``
 modulo rotation about its long axis, and any push-under target modulo the world vertical.
 
-With ``ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC=1`` (default OFF; it flips only in the eval-measure commit, together with A2's
-``ISPATIALGYM_BRIEFCASE_LYING``) one symmetry notion serves both:
+With ``ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC=1`` (owner #100, 2026-11-10: shipped in the eval bundle with the block_design pose tiebreak,
+without A2 - under_large_02 stays standing) one symmetry notion serves both:
 
 * the table: :data:`ROUND_AXES_PATH` (``scripts/symmetry/revolution_axes.py --rule round``) - every model whose ICL ``symmetry`` column
   (``assets/icl/roles/candidates.csv``: the rotations under which geometry AND texture are identical, the 2026-09-15 review applied; the
@@ -42,7 +42,7 @@ import torch as th
 log = logging.getLogger(__name__)
 
 SUCCESS_YAW_FREE_ENV = "ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC"
-#: default OFF (owner: ship with another eval-measure change, so scores change once - A2's lying briefcase; one commit flips both)
+#: owner #100: ships in the eval bundle with the block_design pose tiebreak (not with A2); the flip commit sets the default
 SUCCESS_YAW_FREE_DEFAULT = "0"
 _ON = ("1", "true", "yes", "on")
 

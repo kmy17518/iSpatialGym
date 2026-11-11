@@ -209,7 +209,7 @@ def push_chain_live_b_on() -> bool:
     return os.environ.get(PUSH_CHAIN_LIVE_B_ENV, "1").strip().lower() not in ("0", "off", "false", "no", "")
 
 
-#: i7-measure 2026-11-09 (owner decision A2, option (b); one eval-measure change with A4, ``ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC``): the
+#: i7-measure 2026-11-09 (owner decision A2, option (b); owner #100: stays OFF - under_large_02 keeps the standing push with the guide wall): the
 #: push-under target DROPPED LYING FLAT instead of standing as it was picked. under_large_02's briefcase (lwbctq, 0.27 tall on its 0.12 x
 #: 0.33 edge) topples in the floor push: the yaw grows within a stroke, the hand meets the end face's corner and it falls over (84-93 deg;
 #: i7-floorpush D / r2, DECISIONS #60 / #72) - 1 kept demo in 4. Lying on its 0.33 x 0.27 face (0.12 tall, the centre of mass 0.06 m up)
@@ -312,7 +312,7 @@ def partial_landing(hull: th.Tensor, q_lying, axis_world, tilt_deg: float) -> Tu
 
 
 def briefcase_lying_on() -> bool:
-    # default OFF (i7-measure, owner A2 option (b) - the default flips only in the eval-measure commit, with A4); "1" on
+    # default OFF (i7-measure, owner A2 option (b); owner #100: stays off, the standing guide-wall push beat it); "1" on
     return os.environ.get(BRIEFCASE_LYING_ENV, "0").strip().lower() in _ON
 
 
