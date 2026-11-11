@@ -3697,7 +3697,7 @@ class IORSLarge(SamplerV2):
                 continue
             if chosen is None:
                 try:
-                    chosen = self.free_start_stance(manip[0].focus[:2].clone(), top.z, height, rng)
+                    chosen = self.free_start_stance(manip[0].focus[:2].clone(), top.z, height, rng, manipulation=manip)
                 except Reject as e:
                     errors.append(f"{edge.name}: goal_region_not_visible at the edge; free start: {e}")
                     continue
@@ -4040,7 +4040,7 @@ class IORSLarge(SamplerV2):
         _, height = self.target_dims()
         return float(height) + float(m)
 
-    def free_start_stance(self, c_xy: th.Tensor, z_top: float, height: float, rng: np.random.Generator) -> Stance:
+    def free_start_stance(self, c_xy: th.Tensor, z_top: float, height: float, rng: np.random.Generator, manipulation=None) -> Stance:
         """Opt-in ``generation.free_start`` (oracle-fix 2026-11-04, owner item 2; ``{distance_range_m, tries}``, default 0.6-2.5 m, 120): a
         start pose anywhere on free floor (eroded map, the task rooms) ``distance_range_m`` from the target's cell ``c_xy`` on its support
         (top at ``z_top``), facing it, from which the target (its hull at rest on the top) and the partner's goal region
@@ -4050,7 +4050,9 @@ class IORSLarge(SamplerV2):
         c_xy = th.as_tensor([float(c_xy[0]), float(c_xy[1])])
         focus = th.tensor([float(c_xy[0]), float(c_xy[1]), float(z_top) + height / 2])
         pts = G.local_points_world(self.hull, (th.tensor([float(c_xy[0]), float(c_xy[1]), float(z_top) + self.world.bottom_offset(self.hull, self.rest)]), self.rest))
-        return free_floor_stance(self, c_xy, focus, lambda st, cam: P0.in_frame(self, cam, pts) and self.goal_region_visible(st, from_xy=c_xy), rng,
+        from ispatialgym.sampling.campaign_jar_start import connection_filter
+        connected = connection_filter(self, manipulation)
+        return free_floor_stance(self, c_xy, focus, lambda st, cam: connected(st) and P0.in_frame(self, cam, pts) and self.goal_region_visible(st, from_xy=c_xy), rng,
                                  what="the goal region")
 
     # ------------------------------------------------------------------ stance C (placement)
