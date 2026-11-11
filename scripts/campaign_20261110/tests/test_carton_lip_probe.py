@@ -1,10 +1,22 @@
 import copy
 import unittest
-from scripts.campaign_20261110.carton_lip_probe import ASSET_SHA256,contact_variants
+from scripts.campaign_20261110.carton_lip_probe import ASSET_SHA256,contact_variants,capture_step_observations
 from scripts.campaign_20261110.contracts import ContractError
 
 
 class ContactProbeTests(unittest.TestCase):
+    def test_force_observer_preserves_step_results_and_restores_on_failure(self):
+        class World:
+            def step(self, action, scale=1):return {'force':action*scale}
+        world=World();original=world.step
+        with capture_step_observations(world,lambda r:dict(r)) as observations:
+            self.assertEqual(world.step(3,scale=2),{'force':6})
+        self.assertEqual(observations,[{'force':6}]);self.assertEqual(world.step,original)
+        def fail(_):raise RuntimeError('missing contact view')
+        with self.assertRaisesRegex(RuntimeError,'missing contact view'):
+            with capture_step_observations(world,fail):world.step(1)
+        self.assertEqual(world.step,original)
+
     def audit(self):
         return {'schema':'isg-carton-lip-contact-audit-v1','asset_sha256':ASSET_SHA256,
                 'scale':[1,1,1],'joint_initial_rad':0.,'results':[

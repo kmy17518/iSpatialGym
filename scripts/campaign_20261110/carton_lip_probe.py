@@ -8,6 +8,7 @@ body-contact QA, initial-to-goal uniqueness, demo and independent replay.
 from __future__ import annotations
 import argparse
 import copy
+from contextlib import contextmanager
 import json
 import time
 from pathlib import Path
@@ -17,6 +18,22 @@ from scripts.campaign_20261110.contracts import file_digest, require, write_json
 ALIAS = 'configuration_matching-articulation_open_small_scale-carton-breakfast_table'
 ASSET_SHA256 = '2705cd76c20b11802698088fdcf75d59420eff135a08db2cf8a92c0f48add649'
 KIND = 'diagnostic_single_closed_lid_lift'
+
+
+@contextmanager
+def capture_step_observations(world, observe):
+    """Record an isolated diagnostic without changing actions or step results."""
+    original = world.step
+    observations = []
+    def step(*args, **kwargs):
+        result = original(*args, **kwargs)
+        observations.append(observe(result))
+        return result
+    world.step = step
+    try:
+        yield observations
+    finally:
+        world.step = original
 
 
 def contact_variants(audit, arm):
@@ -59,8 +76,10 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--audit',required=True);p.add_argument('--customs',required=True)
     p.add_argument('--out',required=True);p.add_argument('--arm',choices=['right','left'],required=True)
+    p.add_argument('--max-trials',type=int,choices=[1,2],default=2)
+    p.add_argument('--observe-contact-forces',action='store_true')
     a=p.parse_args();out=Path(a.out).resolve();require(not out.exists(),'preserve existing diagnostic output')
-    audit=json.loads(Path(a.audit).read_text());variants=contact_variants(audit,a.arm)
+    audit=json.loads(Path(a.audit).read_text());variants=contact_variants(audit,a.arm)[:a.max_trials]
     # All imports of simulation infrastructure occur after bounded inputs pass.
     from ispatialgym import REPO_ROOT
     from ispatialgym.grasping import validate_tabletop as VT
@@ -89,13 +108,14 @@ def main():
     # Disable the extra contact retry. The validator's initial IK fallback is
     # still explicitly labelled start_at=contact and never proves an approach.
     mw=ProbeWorld(VA.ArticWorld(world,VA.ArticConfig(max_segments=1)),
-                  VA.MotionConfig(max_trials=2,contact_retry=False))
+                  VA.MotionConfig(max_trials=a.max_trials,contact_retry=False))
     out.mkdir(parents=True);t0=time.time();ctx=None
     report={'schema':'isg-carton-lip-native-probe-v1','campaign_id':'campaign_20261110','owner':'/root',
             'diagnostic_only':True,'benchmark_credit':0,'library_exported':False,'arm':a.arm,
             'audit':str(Path(a.audit).resolve()),'audit_sha256':file_digest(a.audit),
             'customs_sha256':file_digest(a.customs),'runtime':str(native),
-            'max_trials':2,'trials':[],'started_at':t0,
+            'max_trials':a.max_trials,'contact_force_observation':a.observe_contact_forces,
+            'trials':[],'started_at':t0,
             'limitations':'Contact/motion diagnosis only. No native program, approach/body-contact certificate, demo, replay or acceptance pass.'}
     write_json_atomic(out/'probe.json',report)
     try:
@@ -110,8 +130,29 @@ def main():
         motion.update(motion=KIND,diagnostic_only=True,q_start=0.,q_goal=.3,q_arc_end=.35,variants=variants)
         report['motion']=motion
         state,rest_sim=ctx['state']
+        def contact_observation(forces):
+            # The existing probe returns maxima over all physics substeps.
+            # Per-link forces below are the final substep, explicitly separate.
+            import numpy as np
+            probe=world.probe
+            F=probe.view.get_contact_force_matrix(dt=probe.og.sim.get_physics_dt()).detach().cpu().numpy()
+            return {'force_maxima_N':dict(forces),
+                    'actual_finger_joint_positions_m':world.robot.get_joint_positions()[world.robot.gripper_control_idx[a.arm]].tolist(),
+                    'final_substep_finger_link_forces_N':{
+                        name:float(np.linalg.norm(F[probe.finger_rows,probe.obj_col0+i],axis=-1).sum())
+                        for i,(name,_)in enumerate(probe.obj_links)}}
         for variant in variants:
-            trial=mw.trial(ctx['obj'],motion,variant,state,rest_sim,ctx['geom'])
+            if a.observe_contact_forces:
+                with capture_step_observations(world,contact_observation) as observations:
+                    trial=mw.trial(ctx['obj'],motion,variant,state,rest_sim,ctx['geom'])
+                trajectory=trial.get('trajectory',[])
+                require(len(observations)>=len(trajectory),'missing diagnostic step observations')
+                # MotionWorld appends one trajectory row per final motion step;
+                # preparation/restoration steps occur before this trailing run.
+                for frame,observation in zip(trajectory,observations[-len(trajectory):] if trajectory else []):
+                    frame['contact_observation']=observation
+            else:
+                trial=mw.trial(ctx['obj'],motion,variant,state,rest_sim,ctx['geom'])
             trial.update(diagnostic_only=True,benchmark_credit=0)
             report['trials'].append(trial);report['updated_at']=time.time()
             write_json_atomic(out/'probe.json',report)
