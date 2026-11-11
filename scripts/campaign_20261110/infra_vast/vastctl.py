@@ -43,7 +43,7 @@ try:
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
-    from .async_staging import StagingReservations
+    from .async_staging import StagingReservations, staging_parallelism, staging_compression_threads
     from .lifecycle import retain_attempt
     from .cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
@@ -55,7 +55,7 @@ except ImportError:
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
-    from async_staging import StagingReservations
+    from async_staging import StagingReservations, staging_parallelism, staging_compression_threads
     from lifecycle import retain_attempt
     from cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from funding import read_snapshot as read_credit_snapshot, remaining_credit
@@ -102,6 +102,7 @@ DEFAULT_CONFIG = {"gpus": ["RTX 4090"], "default_gpu": "RTX 4090", "max_instance
                   "vram_per_job_gb": 20, "ram_per_job_gb": 40, "cpus_per_job": 9, "max_jobs_per_instance": 2, "retries": 2,
                   "search_every_s": 300, "max_contracts_per_machine": 4, "market_limit": 1000}
 STAGER = None
+STAGE_COMPRESSION_THREADS = 4
 
 
 def now():
@@ -206,7 +207,7 @@ def s5(*args, check=True, timeout=7200):
 
 def tar_put(listfile, key, level=3):
     """tar (rooted at /, --no-recursion: the list names every dir and file; mtimes kept) | zstd -> R2 key under JOB_S3."""
-    cmd = (f"tar -C / --format=posix --no-recursion -cf - -T {shlex.quote(listfile)} | zstd -q -T4 -{level} | "
+    cmd = (f"tar -C / --format=posix --no-recursion -cf - -T {shlex.quote(listfile)} | zstd -q -T{STAGE_COMPRESSION_THREADS} -{level} | "
            f"s5cmd --endpoint-url {shlex.quote(os.environ['S3_ENDPOINT_URL'])} pipe {shlex.quote(JOB_S3 + '/' + key)}")
     subprocess.run(["bash", "-o", "pipefail", "-c", cmd], check=True, timeout=7200, stdout=subprocess.DEVNULL)
 
@@ -858,7 +859,8 @@ def stage_bounded(rec, C):
     base = os.path.join(VJ, "logs", f"stage_{rec['id']}_{attempt}")
     result = base + ".json"
     timeout = min(900, max(30, int(C.get("stage_timeout_s", 600))))
-    command = [sys.executable, os.path.abspath(__file__), "stage", rec['id'], "--output", result]
+    command = [sys.executable, os.path.abspath(__file__), "stage", rec['id'], "--output", result,
+               "--compression-threads", str(staging_compression_threads(C))]
     coordinator_progress("staging", job_id=rec['id'], log=base + ".log", timeout_seconds=timeout)
     try:
         run_bounded(command, base + ".log", timeout=timeout,
@@ -888,6 +890,8 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
                          "assigned_jobs":assigned_to.get(iid,[]), 'staging_jobs':staging.get(iid,[])} for iid,i in live.items()]
     metrics = {"observed_at_unix": t, "assignments_observed_at_unix": now(), "coordinator_phase": phase, "account_listing_complete": list_ok, "running_gpus": sum(int(i.get("num_gpus") or 1) for i in live.values() if i.get("actual_status") == "running") if list_ok else None,
                "instances": instance_metrics,
+               "staging_scheduler": {**STAGER.metrics(now()),
+                    'compression_threads_per_stage': staging_compression_threads(C)} if STAGER else None,
                "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='boot') if list_ok else None,
                "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] in ('ready','run')) if list_ok else None,
                "worker_running_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['assigned_jobs'] and i['actual_status']=='running') if list_ok else None,
@@ -928,7 +932,9 @@ def tick(c, s3, state):
     tot, live_ids, created = spend()
     if STAGER is None:
         STAGER = StagingReservations(os.path.join(VJ,'state','staging'),os.environ.get('SLURM_JOB_ID','pid'+str(os.getpid())),
-                                    min(8,max(1,int(C.get('staging_parallelism',4)))))
+                                    staging_parallelism(C))
+    else:
+        STAGER.resize(staging_parallelism(C))
     def owner_alive(owner):
         if not str(owner).isdigit():return True  # unknown former local owner requires explicit reconciliation
         result=subprocess.run(['squeue','-h','-j',str(owner),'-o','%T'],capture_output=True,text=True,timeout=30,check=True)
@@ -1244,6 +1250,7 @@ def status(c, s3):
 
 
 def main():
+    global STAGE_COMPRESSION_THREADS
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("loop").add_argument("--every", type=int, default=60)
@@ -1254,6 +1261,7 @@ def main():
     sg = sub.add_parser("stage")
     sg.add_argument("id")
     sg.add_argument("--output")
+    sg.add_argument("--compression-threads", type=int, default=4)
     d = sub.add_parser("destroy")
     d.add_argument("instance")
     sub.add_parser("stop-all")
@@ -1294,6 +1302,7 @@ def main():
             print(fmt_offer(o))
         return 0
     if a.cmd == "stage":
+        STAGE_COMPRESSION_THREADS = staging_compression_threads({'stage_compression_threads': a.compression_threads})
         result = stage(s3, staging_record(STATE, a.id), {})
         if a.output:
             with open(a.output, "x") as stream:

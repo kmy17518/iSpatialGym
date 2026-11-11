@@ -7,16 +7,64 @@ import time
 import uuid
 
 
+def staging_parallelism(config):
+    """An explicit I/O concurrency limit, independent of the rental fleet size."""
+    value = config.get('staging_parallelism', 4)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError('staging_parallelism must be a positive integer')
+    return value
+
+
+def staging_compression_threads(config):
+    value = config.get('stage_compression_threads', 4)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError('stage_compression_threads must be a positive integer')
+    return value
+
+
 class StagingReservations:
     active_statuses = {'preparing', 'ready', 'assigning'}
 
     def __init__(self, root, owner, max_workers=4):
         self.root = Path(root); self.root.mkdir(parents=True, exist_ok=True)
         self.owner = str(owner)
-        self.limit = max_workers
+        self.limit = staging_parallelism({'staging_parallelism': max_workers})
         self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        self.previous_pools = []
         self.futures = {}
         self.records = {p.stem:json.loads(p.read_text()) for p in self.root.glob('*.json')}
+
+    def resize(self, max_workers):
+        """Apply config changes without cancelling a future or releasing its owner.
+
+        All old and new futures share the admission count. A reduction stops
+        new submissions until existing work falls below the new limit.
+        """
+        limit = staging_parallelism({'staging_parallelism': max_workers})
+        if limit == self.limit:
+            return
+        replacement = concurrent.futures.ThreadPoolExecutor(max_workers=limit)
+        old = self.pool
+        self.pool, self.limit = replacement, limit
+        self.previous_pools.append(old)
+        old.shutdown(wait=False)
+
+    def close(self):
+        for pool in self.previous_pools + [self.pool]:
+            pool.shutdown(wait=True)
+
+    def metrics(self, timestamp=None):
+        timestamp = time.time() if timestamp is None else timestamp
+        active = list(self.active().values())
+        preparing = [r for r in active if r['status'] == 'preparing']
+        ready = [r for r in active if r['status'] == 'ready']
+        return {'parallelism': self.limit, 'in_flight': len(self.futures),
+                'completed_waiting_for_poll': sum(f.done() for f in self.futures.values()),
+                'available_submission_slots': max(0, self.limit - len(self.futures)),
+                'preparing': len(preparing), 'ready': len(ready),
+                'assigning': sum(r['status'] == 'assigning' for r in active),
+                'oldest_preparing_seconds': max((max(0, timestamp-r['started_at']) for r in preparing), default=0),
+                'oldest_ready_seconds': max((max(0, timestamp-r['stage_completed_at']) for r in ready), default=0)}
 
     def save(self, record):
         path = self.root / (record['id'] + '.json')

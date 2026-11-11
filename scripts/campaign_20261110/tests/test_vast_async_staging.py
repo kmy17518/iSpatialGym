@@ -5,13 +5,13 @@ import threading
 import time
 import unittest
 
-from scripts.campaign_20261110.infra_vast.async_staging import StagingReservations
+from scripts.campaign_20261110.infra_vast.async_staging import StagingReservations, staging_parallelism, staging_compression_threads
 
 
 class AsyncStagingTests(unittest.TestCase):
     def manager(self, root, owner='100'):
         manager=StagingReservations(root,owner,2)
-        self.addCleanup(manager.pool.shutdown,wait=True)
+        self.addCleanup(manager.close)
         return manager
 
     def test_slow_stage_does_not_block_other_completed_stage_or_duplicate_reservation(self):
@@ -83,6 +83,45 @@ class AsyncStagingTests(unittest.TestCase):
             self.assertNotIn('extra_env',saved['worker'])
             self.assertNotIn('secret',json.dumps(saved))
             self.assertEqual(saved['worker'],{key:value for key,value in worker.items() if key!='extra_env'})
+
+    def test_explicit_concurrency_is_not_silently_capped_at_eight(self):
+        self.assertEqual(staging_parallelism({'staging_parallelism': 64}), 64)
+        self.assertEqual(staging_compression_threads({'stage_compression_threads': 1}), 1)
+        for value in (0, -1, True, 3.5, '32'):
+            with self.assertRaises(ValueError):
+                staging_parallelism({'staging_parallelism': value})
+            with self.assertRaises(ValueError):
+                staging_compression_threads({'stage_compression_threads': value})
+
+    def test_resize_fills_more_workers_without_losing_inflight_ownership(self):
+        with tempfile.TemporaryDirectory() as root:
+            manager = self.manager(root)
+            gate = threading.Event(); self.addCleanup(gate.set)
+            started = set(); lock = threading.Lock()
+            def stage(job, config):
+                with lock: started.add(job['id'])
+                gate.wait(2)
+                return {'id': job['id']}
+            for n in range(2):
+                self.assertTrue(manager.submit({'id': str(n)}, str(n), {}, {}, stage))
+            self.assertFalse(manager.submit({'id': '2'}, '2', {}, {}, stage))
+            manager.resize(24)
+            for n in range(2, 24):
+                self.assertTrue(manager.submit({'id': str(n)}, str(n), {}, {}, stage))
+            deadline = time.time() + 1
+            while len(started) < 24 and time.time() < deadline: time.sleep(.01)
+            self.assertEqual(len(started), 24)
+            self.assertEqual(len(manager.reservations()), 24)
+            self.assertEqual(manager.metrics()['in_flight'], 24)
+            manager.resize(1)
+            self.assertFalse(manager.submit({'id': '25'}, '25', {}, {}, stage))
+            self.assertEqual(len(manager.reservations()), 24)
+            self.assertEqual(manager.metrics()['available_submission_slots'], 0)
+            gate.set()
+            deadline = time.time() + 1
+            while manager.futures and time.time() < deadline: manager.poll(); time.sleep(.01)
+            self.assertEqual(len(manager.ready()), 24)
+            self.assertEqual(len(started), 24)  # no duplicated staging on resize
 
 
 if __name__=='__main__':unittest.main()
