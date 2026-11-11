@@ -9,6 +9,7 @@ import argparse
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
+import hashlib
 from pathlib import Path
 
 from scripts.campaign_20261110.acceptance import artifact, read
@@ -68,10 +69,12 @@ def audit_historical_canary(job, gate_path, *, root, started_at, policy_referenc
     """
     root=Path(root).resolve();path=Path(policy_reference['path']).resolve()
     history=root/'infra/training_production_gate'
-    require(path.is_relative_to(history) and path.is_file()
-            and file_digest(path)==policy_reference['sha256'],
+    require(path.is_relative_to(history) and path.is_file(),
             'historical canary policy bytes missing or changed')
-    policy=read(path)
+    payload=path.read_bytes()
+    require(hashlib.sha256(payload).hexdigest()==policy_reference['sha256'],
+            'historical canary policy bytes missing or changed')
+    policy=json.loads(payload)
     require(policy.get('schema')=='isg-training-production-gate-v1'
             and policy.get('campaign_id')=='campaign_20261110',
             'historical canary policy identity differs')

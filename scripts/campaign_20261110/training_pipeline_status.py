@@ -224,8 +224,17 @@ def _historical_render_stamps(root, reference, policy_reference):
             seen.add(path)
             if path.is_dir():return
             watched[str(path)]=_stamp(path)
-            if path.is_file() and path.suffix=='.json':visit(read(path))
     visit(reference)
+    proof=read(reference['path']);visit(proof)
+    # The collector review manifest contains the original/copy identity pairs.
+    # Read that one declared manifest, not arbitrary JSON links such as full
+    # held-out coverage observations or unrelated source histories.
+    manifest=(proof.get('authorization')or{}).get('review_manifest')
+    if manifest:
+        path=Path(manifest['path']).resolve()
+        require(path.is_relative_to(root) and file_digest(path)==manifest['sha256'],
+                'historical collector review manifest changed')
+        visit(read(path))
     # The policy file is immutable evidence. Other canaries registered in it
     # are unrelated to this review and must not trigger global history scans.
     watched[policy_reference['path']]=_stamp(policy_reference['path'])

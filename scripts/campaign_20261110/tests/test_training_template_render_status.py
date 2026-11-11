@@ -179,3 +179,14 @@ def test_historical_render_does_not_need_current_permission_but_rejects_changed_
         status.historical_render_association(tmp_path,row,rendering,auditor=lambda *a,**k:bad)
     observed=status.historical_render_association(tmp_path,row,rendering,auditor=lambda *a,**k:status.read(reviews/'old.json'))
     assert observed['current_review'] is None and not observed['current_permission_from_this_evidence']
+
+
+def test_historical_watch_does_not_expand_unrelated_authorization_history(tmp_path):
+    row,rendering,policies,reviews,gate=historical_fixture(tmp_path)
+    unrelated=tmp_path/'unrelated_instance.json';write_json_atomic(unrelated,{'path':str(tmp_path/'not_owned')})
+    proof=status.read(reviews/'old.json');proof['authorization']={'heldout_observation':status.ref(unrelated)}
+    write_json_atomic(reviews/'old.json',proof);reference=status.ref(reviews/'old.json')
+    watched=status._historical_render_stamps(tmp_path,reference,status.ref(policies/'before_previous_policy.json'))
+    assert str(unrelated) in watched
+    assert str(tmp_path/'not_owned') not in watched
+    assert str(policies/'observation.json') not in watched
