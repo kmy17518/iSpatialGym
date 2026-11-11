@@ -91,3 +91,63 @@ def test_full_program_rejection_keeps_checked_alternative_stances_searchable(mon
             assert not resets and not result.summary
     assert attempted == (['first', 'second'] if enabled else ['first'])
     assert screened == (['first', 'second'] if enabled else [])
+
+
+@pytest.mark.parametrize('enabled,all_rejected', [(False, False), (True, False), (True, True)])
+def test_existing_hand_chains_are_rechecked_before_discarding_a_stance(monkeypatch, enabled, all_rejected):
+    import torch
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2.tasks import iors_large_nextto as nextto
+
+    s = sampler(enabled)
+    s.gp.gen = lambda name, default=None: enabled if name == recovery.OTTOMAN_CANDIDATE_SCREEN else default
+    checked, generated, resets, sweeps = [], [], [], []
+    s._check_deadline = lambda label: None
+    s.ikc = SimpleNamespace(stances_collision_free=lambda candidates: torch.ones(len(candidates), dtype=torch.bool))
+    s.sidecar = SimpleNamespace(add_stance=lambda stance: None, reset_instance=lambda: resets.append(True))
+    s.record_leg_a_b = lambda *args: 'checked_leg'
+    st = SimpleNamespace(base_pose2d=(0., 0., 0.), translate=.5, tilt=0., with_trunk=lambda *args: SimpleNamespace())
+    cands = [(st, {'reach_margin': .2, 'arm': 'right'})]
+    monkeypatch.setattr(nextto, 'knob', lambda *args: 1)
+    monkeypatch.setattr(nextto, 'shifted_pose2d', lambda *args: (1., 0., 0.))
+    monkeypatch.setattr(nextto, '_sweep_ok', lambda *args: sweeps.append(args[4]) or True)
+    monkeypatch.setattr(nextto, '_stance_a', lambda *args: 'checked_start')
+    monkeypatch.setattr(nextto, '_record', lambda *args: SimpleNamespace(chain=args[5]['id'], summary={}))
+    first = {'id': 'first_native_chain', 'q': [1.]}
+
+    def alternatives(*args):
+        for name in ('first_native_chain', 'second_native_chain'):
+            generated.append(name)
+            yield {'id': name, 'q': [len(generated)]}
+
+    def screen(sampler, draft):
+        checked.append(draft.chain)
+        return 'program_check_failed: retreat collision' if all_rejected or draft.chain == 'first_native_chain' else None
+
+    monkeypatch.setattr(recovery, '_candidate_program_rejection', screen)
+    stats = {}
+    args = (s, None, cands, lambda *args: first, None, '+x', 0., None, None, None, 1., .1, .2, None, stats)
+    if all_rejected:
+        with pytest.raises(Reject, match='retreat collision'):
+            nextto._complete(*args, chain_options_of=alternatives)
+        assert stats['candidate_program_rejected'] == 2 and len(resets) == 2
+    else:
+        result = nextto._complete(*args, chain_options_of=alternatives)
+        assert result.chain == ('second_native_chain' if enabled else 'first_native_chain')
+        if enabled:
+            assert result.summary['campaign_early_program_screen']['final_check_required']
+    assert generated == (['first_native_chain', 'second_native_chain'] if enabled else [])
+    assert checked == generated
+    assert len(sweeps) == (2 if enabled else 1)
+
+
+def test_ordinary_two_hand_chain_still_selects_first_without_evaluating_later(monkeypatch):
+    from ispatialgym.sampling.v2.tasks import iors_large_nextto as nextto
+    first = {'native': 'first'}
+
+    def options(*args):
+        yield first
+        pytest.fail('ordinary native path evaluated an extra hand chain')
+
+    monkeypatch.setattr(nextto, '_push_chain_pairs', options)
+    assert nextto._push_chain_pair(None, None, None, None, None, None) is first

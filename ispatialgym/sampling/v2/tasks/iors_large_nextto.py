@@ -1098,7 +1098,8 @@ def _push_and_stances(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Ten
         raise Reject("no_push_stance", f"face {face}: no stance passes floor / reach / camera ({ {k: v for k, v in stats.items() if k.startswith('stance')} })")
     pre_m = float(knob(s, "push_pre_m"))
     return _complete(s, rng, cands, lambda st, info, why: _push_chain(s, st, info["arm"], info["point"], d2, pre_m, why), side, face, yaw, d2, init_pose,
-                     goal_pose, dist, gap, bound, nt, stats)
+                     goal_pose, dist, gap, bound, nt, stats,
+                     chain_options_of=lambda st, info, why: _hand_chains(s, st, info["arm"], info["point"], d2, pre_m, why))
 
 
 def _push_two_hands(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Tensor, init_pose: G.Pose, goal_pose: G.Pose, dist: float, gap: float,
@@ -1143,11 +1144,13 @@ def _push_two_hands(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Tenso
         raise Reject("no_push_stance", f"face {face}: no two-hand stance passes floor / reach / camera ({ {k: v for k, v in stats.items() if k.startswith('stance')} })")
     pre_m = float(knob(s, "push_pre_m"))
     return _complete(s, rng, cands, lambda st, info, why: _push_chain_pair(s, st, [(a, info["points"][a]) for a in info["arms"]], d2, pre_m, why), side, face,
-                     yaw, d2, init_pose, goal_pose, dist, gap, bound, nt, stats)
+                     yaw, d2, init_pose, goal_pose, dist, gap, bound, nt, stats,
+                     chain_options_of=lambda st, info, why: _push_chain_pairs(
+                         s, st, [(a, info["points"][a]) for a in info["arms"]], d2, pre_m, why))
 
 
 def _complete(s, rng, cands: List[Tuple[Stance, Dict[str, Any]]], chain_of, side: EdgeFrame, face: str, yaw: float, d2: th.Tensor, init_pose: G.Pose,
-              goal_pose: G.Pose, dist: float, gap: float, bound: float, nt: Optional[bool], stats: Dict[str, int]) -> Draft:
+              goal_pose: G.Pose, dist: float, gap: float, bound: float, nt: Optional[bool], stats: Dict[str, int], *, chain_options_of=None) -> Draft:
     """The push stances that pass floor / reach / camera, whole-body collision-free with the target placed, best reach first; per stance
     (up to ``push_ik_max``) the chain (``chain_of(stance, info, why)``), the sweep along the line with the pushing arms at contact, the
     push end, stance A and the A -> B leg; the record of the first that passes them all."""
@@ -1158,12 +1161,26 @@ def _complete(s, rng, cands: List[Tuple[Stance, Dict[str, Any]]], chain_of, side
         raise Reject("no_push_stance", f"face {face}: every push stance collides (target placed)")
     cands.sort(key=lambda c: -min(round(c[1]["reach_margin"] / 0.05) * 0.05, 0.25))
     why: List[str] = []
-    for st, info in cands[: int(knob(s, "push_ik_max"))]:
-        s._check_deadline("nextto push stance IK")
-        chain = chain_of(st, info, why)
-        if chain is None:
-            count(stats, "push_ik")
-            continue
+    from ispatialgym.sampling.campaign_large_recovery import ottoman_candidate_program_screen, ottoman_candidate_program_rejection
+    screen_candidates = ottoman_candidate_program_screen(s)
+
+    def checked_chains():
+        for st, info in cands[: int(knob(s, "push_ik_max"))]:
+            s._check_deadline("nextto push stance IK")
+            options = (chain_options_of(st, info, why) if screen_candidates and chain_options_of is not None
+                       else (chain_of(st, info, why),))
+            any_chain = False
+            for chain in options:
+                if chain is None:
+                    continue
+                if screen_candidates:
+                    s._check_deadline("nextto push hand-chain program")
+                any_chain = True
+                yield st, info, chain
+            if not any_chain:
+                count(stats, "push_ik")
+
+    for st, info, chain in checked_chains():
         end2d = shifted_pose2d(st.base_pose2d, d2, dist)
         if not _sweep_ok(s, st, end2d, info.get("arms") or [info["arm"]], chain.get("q_both", chain["q"]), why):
             count(stats, "push_sweep")
@@ -1192,8 +1209,7 @@ def _complete(s, rng, cands: List[Tuple[Stance, Dict[str, Any]]], chain_of, side
             continue
         s.sidecar.add_stance(end)
         draft = _record(s, init, st, end, info, chain, side, face, yaw, d2, init_pose, goal_pose, dist, gap, bound, nt, leg)
-        from ispatialgym.sampling.campaign_large_recovery import ottoman_candidate_program_screen, ottoman_candidate_program_rejection
-        if ottoman_candidate_program_screen(s):
+        if screen_candidates:
             failure = ottoman_candidate_program_rejection(s, draft)
             if failure is not None:
                 count(stats, 'candidate_program_rejected')
@@ -1216,11 +1232,16 @@ def _push_chain(s, st: Stance, arm: str, point: th.Tensor, d2: th.Tensor, pre_m:
 
 
 def _push_chain_pair(s, st: Stance, hands: Sequence[Tuple[str, th.Tensor]], d2: th.Tensor, pre_m: float, why: List[str]) -> Optional[Dict[str, Any]]:
+    """The first checked two-hand chain; ordinary native selection is unchanged."""
+    return next(_push_chain_pairs(s, st, hands, d2, pre_m, why), None)
+
+
+def _push_chain_pairs(s, st: Stance, hands: Sequence[Tuple[str, th.Tensor]], d2: th.Tensor, pre_m: float, why: List[str]) -> Iterator[Dict[str, Any]]:
     """Both hands' chains from one stance (item C): each chain of the first arm (:func:`_hand_chains`, the second arm at the stance
     posture), then the second arm's at the same pitch, either wrist turn, its fingertips in the camera frame, solved by
     ``program_check.second_hand_chain`` (its pre-contact with the first hand at its pre-contact, its approach with the first hand locked
     at its contact, both hands at contact whole-body free). The first arm's chain with ``second`` (the other hand's poses and witnesses)
-    and ``q_both`` (both hands at contact), or None."""
+    and ``q_both`` (both hands at contact), in the existing native proposal order."""
     (arm1, p1), (arm2, p2) = hands
     check_frame = os.environ.get("ISG_FINGERTIP_FRAME_CHECK", "on").lower() not in ("off", "0", "false")
     for c1 in _hand_chains(s, st, arm1, p1, d2, pre_m, why):
@@ -1243,8 +1264,7 @@ def _push_chain_pair(s, st: Stance, hands: Sequence[Tuple[str, th.Tensor]], d2: 
                     blame_push_pre(s, st, arm2, pre, tag, r["why"], q2, check_frame)
                 continue
             second = {"arm": arm2, "pre": pre, "contact": contact, "q_pre": r["q_pre"], "q": r["q"], "pitch_deg": c1["pitch_deg"], "wrist": wrist}
-            return {**c1, "q_both": r["q"].clone(), "second": second}
-    return None
+            yield {**c1, "q_both": r["q"].clone(), "second": second}
 
 
 def _hand_chains(s, st: Stance, arm: str, point: th.Tensor, d2: th.Tensor, pre_m: float, why: List[str]) -> Iterator[Dict[str, Any]]:
