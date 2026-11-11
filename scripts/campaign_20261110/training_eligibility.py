@@ -30,10 +30,28 @@ def classify_record(row, group=None):
         return {'status': 'unverified', 'category': 'unverified', 'reasons': ['group_member_record_mismatch']}
     if allocations.get('eval_standard') == 1 and 1 <= allocations.get('train', 0) <= 2 and sum(allocations.values()) <= 3:
         return {'status': 'eligible', 'category': 'eval_sibling', 'reasons': ['committed_standard_eval_with_training_sibling']}
-    if allocations == {'train': 1} and len(members) == 1:
+    if allocations == {'train': 1} and len(members) == 1 and not group.get('deferred'):
         return {'status': 'eligible', 'category': 'eval_singleton', 'reasons': ['successful_standard_group_singleton_fallback']}
     return {'status': 'excluded', 'category': 'eval_overflow',
             'reasons': ['training_only_multi_member_group_has_no_standard_eval_purpose_remaining']}
+
+
+_PROJECTION_CACHE = {}
+
+
+def projection_records(root):
+    path = Path(root)/'accounting/training_eligibility.json'
+    if not path.exists(): return {}
+    stat = path.stat()
+    signature = (stat.st_ino, stat.st_size, stat.st_mtime_ns)
+    cached = _PROJECTION_CACHE.get(str(path))
+    if cached and cached[0] == signature: return cached[1]
+    value = json.loads(path.read_text())
+    if value.get('campaign_id') != 'campaign_20261110' or value.get('status') != 'complete':
+        raise ValueError('training eligibility projection unavailable')
+    records = value.get('records', {})
+    _PROJECTION_CACHE[str(path)] = (signature, records)
+    return records
 
 
 def eligible_training_records(db, task=None, *, root=None):
@@ -42,14 +60,7 @@ def eligible_training_records(db, task=None, *, root=None):
     Committed allocator records already carry their independently audited native,
     demo and replay provenance. The projection separately rechecks their bytes.
     """
-    projection = {}
-    if root is not None:
-        path = Path(root)/'accounting/training_eligibility.json'
-        if path.exists():
-            value = json.loads(path.read_text())
-            if value.get('campaign_id') != 'campaign_20261110' or value.get('status') != 'complete':
-                raise ValueError('training eligibility projection unavailable')
-            projection = value.get('records', {})
+    projection = projection_records(root) if root is not None else {}
     groups = {}
     query = "SELECT record FROM members WHERE split='train'" + (' AND task=?' if task else '')
     result = []
