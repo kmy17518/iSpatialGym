@@ -254,21 +254,23 @@ def test_heel_tight_off_by_default(monkeypatch):
 def test_heel_tight_drops_the_off_grid_neighbours_and_caps_the_jitter(monkeypatch):
     monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "1")
     s = _sampler(push_under_yaw="heel_first")
-    assert s.push_yaw_tol_deg() == pytest.approx(IL.PUSH_HEEL_TIGHT_TOL_DEG)
+    assert s.push_yaw_tol_deg() == pytest.approx(22.5)  # today's tolerance; the tight window is applied inside it
     assert s.push_yaw_kept(_q(s, 0.0), PUSH) and s.push_yaw_kept(_q(s, math.radians(-4.0)), PUSH)
     assert not s.push_yaw_kept(_q(s, YAWS[15]), PUSH) and not s.push_yaw_kept(_q(s, -0.12), PUSH)
     assert s.kit.stats["push_heel_tight.dropped"] == 2
     assert not s.push_yaw_kept(_q(s, math.pi), PUSH) and s.kit.stats["push_heel_tight.dropped"] == 2  # the toe: today drops it too
     assert s.init_yaw_jitter() == pytest.approx(math.radians(IL.PUSH_HEEL_TIGHT_TOL_DEG) * IL.PUSH_HEEL_TIGHT_JITTER_FRAC)
     assert s.kit.stats["push_heel_tight.jitter_capped"] == 1
-    assert s.template_facts["push_under_yaw"]["tol_deg"] == pytest.approx(IL.PUSH_HEEL_TIGHT_TOL_DEG)
+    assert s.template_facts["push_under_yaw"]["tight_tol_deg"] == pytest.approx(IL.PUSH_HEEL_TIGHT_TOL_DEG)
     assert abs(s.template_facts["push_under_yaw"]["heel_angle_rest_deg"]) == pytest.approx(180.0, abs=1e-3)
     # the chain-first screen keeps the heel-back grid yaw only
     assert _chain_first(s, YAWS)[2] == [0.0]
-    # a number is the tolerance in degrees; never wider than the spec's
+    # a number is the window in degrees; inside the spec's tolerance
     monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "8")
-    assert _sampler(push_under_yaw="heel_first").push_yaw_tol_deg() == pytest.approx(8.0)
-    assert _sampler(push_under_yaw="heel_first", push_under_yaw_tol_deg=3.0).push_yaw_tol_deg() == pytest.approx(3.0)
+    s8 = _sampler(push_under_yaw="heel_first")
+    assert s8.push_heel_tight() == pytest.approx(8.0) and s8.push_yaw_kept(_q(s8, math.radians(-7.0)), PUSH)
+    s3 = _sampler(push_under_yaw="heel_first", push_under_yaw_tol_deg=3.0)
+    assert not s3.push_yaw_kept(_q(s3, math.radians(-5.0)), PUSH)
     monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "-2")
     with pytest.raises(ValueError):
         IL.push_heel_tight_tol_deg()
@@ -279,3 +281,14 @@ def test_heel_tight_acts_only_on_the_heel_first_lock(monkeypatch):
     s = _sampler()
     assert s.push_heel_tight() is None and s.push_yaw_tol_deg() == pytest.approx(22.5) and s.init_yaw_jitter() == pytest.approx(IL.TARGET_JITTER)
     assert s.kit.stats == {}
+
+
+def test_heel_tight_window_is_around_the_grid_yaw_nearest_heel_back(monkeypatch):
+    # uh_ul01_on r1: the sandal chgcrm's heel stands 6 deg off heel-back at yaw 0 - a window around heel-back kept none of the 16 yaws
+    monkeypatch.setenv(IL.PUSH_HEEL_TIGHT_ENV, "1")
+    pts = G.local_points_world(_sandal(), (th.zeros(3), G.quat_from_yaw(math.radians(6.0))))
+    s = _sampler(hull=pts, push_under_yaw="heel_first")
+    assert s.push_yaw_kept(_q(s, 0.0), PUSH) and s.push_yaw_kept(_q(s, math.radians(4.0)), PUSH) and s.push_yaw_kept(_q(s, math.radians(-4.0)), PUSH)
+    assert not s.push_yaw_kept(_q(s, YAWS[15]), PUSH) and not s.push_yaw_kept(_q(s, math.radians(-8.0)), PUSH)
+    assert _chain_first(s, YAWS)[2] == [0.0]
+    assert abs(abs(s.template_facts["push_under_yaw"]["heel_angle_rest_deg"]) - 174.0) < 0.6

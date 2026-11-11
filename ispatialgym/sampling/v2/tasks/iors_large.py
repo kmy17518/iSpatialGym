@@ -726,7 +726,8 @@ PUSH_GUIDE_HAND_AHEAD_M = (0.49, 0.875)
 # rad or the grid's -22.5 deg ended not_reached (28, residual 0.18-0.19 m, the sandal sliding 26 mm sideways in stroke 1 and 75 mm off
 # the line by stroke 3, beyond the 30 mm re-aim cap) or plan_failed (6), 0 ok; the jittered -0.12..-0.24 rad ended symbolic_only (7 of 7,
 # turned 0.19-0.31 rad); the carried yaws within 0.04 rad of 0 gave 78 ok of 96. ``ISPATIALGYM_PUSH_HEEL_TIGHT`` (default OFF; "1" =
-# :data:`PUSH_HEEL_TIGHT_TOL_DEG`, a number = that many degrees) narrows heel_first's tolerance to it (never wider than the spec's) and caps
+# :data:`PUSH_HEEL_TIGHT_TOL_DEG`, a number = that many degrees) keeps only the yaws within it of the GRID yaw nearest heel-back (r2: the
+# sandal's heel stands 6 deg off at yaw 0, so a window around heel-back itself kept none) inside today's tolerance, and caps
 # the init-yaw jitter at :data:`PUSH_HEEL_TIGHT_JITTER_FRAC` of it - only where the heel_first lock is set (the sandal-under-bed
 # variants). Kit counters ``push_heel_tight.dropped`` (a yaw the default tolerance keeps and the tight one does not) and
 # ``push_heel_tight.jitter_capped`` (a draw whose jitter it capped).
@@ -747,6 +748,11 @@ def push_heel_tight_tol_deg() -> Optional[float]:
     if not (math.isfinite(f) and f > 0.0):
         raise ValueError(f"{PUSH_HEEL_TIGHT_ENV}={v!r}: on / off or a positive angle (deg)")
     return f
+
+
+def push_heel_error(h, d) -> float:
+    """The signed angle (rad) from the push's reverse ``-d`` to the heel direction ``h`` (both xy)."""
+    return math.atan2(float(h[1]), float(h[0])) - math.atan2(-float(d[1]), -float(d[0]))
 
 
 def push_guide_wall_on() -> bool:
@@ -2491,9 +2497,7 @@ class IORSLarge(SamplerV2):
     def push_yaw_tol_deg(self) -> float:
         """heel_first's largest angle between the heel's direction and the push's reverse (``generation.push_under_yaw_tol_deg``; default one
         step of the yaw grid, :meth:`yaws`: 22.5 deg at 16 - the two grid yaws on either side of the exact heel-first yaw)."""
-        base = float(self.num("push_under_yaw_tol_deg", 360.0 / max(1, int(self.num("n_yaws", 16)))))
-        tight = self.push_heel_tight()
-        return base if tight is None else min(base, tight)
+        return float(self.num("push_under_yaw_tol_deg", 360.0 / max(1, int(self.num("n_yaws", 16)))))
 
     def push_heel_tight(self) -> Optional[float]:
         """i7-ul01reach (:data:`PUSH_HEEL_TIGHT_ENV`): the tight heel_first tolerance (deg) when the switch is on and the lock is heel_first,
@@ -2522,8 +2526,9 @@ class IORSLarge(SamplerV2):
             # i7-ul01reach: the heel's direction at the rest orientation (yaw 0), for judging the tight tolerance's window around the grid
             ang = math.degrees(math.atan2(float(h[1]), float(h[0])))
             self.template_facts["push_under_yaw"]["heel_angle_rest_deg"] = round(ang, 2)
-            log.info("%s: push-under yaw lock heel_first: tolerance %.1f deg (%s), the heel at the rest orientation %.2f deg (heel %.3f m, toe %.3f m)",
-                     self.gp.variant, self.push_yaw_tol_deg(), PUSH_HEEL_TIGHT_ENV, ang, heel, toe)
+            self.template_facts["push_under_yaw"]["tight_tol_deg"] = round(float(self.push_heel_tight()), 2)
+            log.info("%s: push-under yaw lock heel_first: tolerance %.1f deg around the grid yaw nearest heel-back (%s), the heel at the rest orientation %.2f deg (heel %.3f m, toe %.3f m)",
+                     self.gp.variant, self.push_heel_tight(), PUSH_HEEL_TIGHT_ENV, ang, heel, toe)
         return self._push_heel[1]
 
     def push_yaw_kept(self, quat, d2, off: Optional[float] = None) -> bool:
@@ -2545,11 +2550,22 @@ class IORSLarge(SamplerV2):
         h = G.local_points_world(h_local.reshape(1, 3), (th.zeros(3), G.t(quat)))[0, :2]
         d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
         cos = -float(h @ d) / max(float(th.linalg.norm(h)) * float(th.linalg.norm(d)), 1e-9)
-        if cos < math.cos(math.radians(self.push_yaw_tol_deg())) - 1e-6:
-            if self.push_heel_tight() is not None:
-                base = float(self.num("push_under_yaw_tol_deg", 360.0 / max(1, int(self.num("n_yaws", 16)))))
-                if cos >= math.cos(math.radians(base)) - 1e-6:
-                    TT._count(self, "push_heel_tight.dropped")  # i7-ul01reach: today's tolerance keeps this yaw
+        tight = self.push_heel_tight()
+        if tight is not None:
+            # i7-ul01reach r2: the window is around the GRID yaw nearest heel-back, not around heel-back itself - the sandal chgcrm's heel
+            # stands 6 deg off at yaw 0 (uh_ul01_on r1: 'kept 0 of 16 yaws' with a 5 deg window around heel-back), and the data's good
+            # yaw is that grid yaw (0: 78 ok of 96; -7..-14 deg: 7/7 symbolic_only)
+            base = float(self.num("push_under_yaw_tol_deg", 360.0 / max(1, int(self.num("n_yaws", 16)))))
+            if cos < math.cos(math.radians(base)) - 1e-6:
+                return False
+            e_q = push_heel_error(h, d)
+            h0 = G.local_points_world(h_local.reshape(1, 3), (th.zeros(3), G.t(c_quat_of(self, 0.0))))[0, :2]
+            step = 2.0 * math.pi / max(1, int(self.num("n_yaws", 16)))
+            e_best = math.remainder(push_heel_error(h0, d), step)
+            if abs(math.remainder(e_q - e_best, 2.0 * math.pi)) > math.radians(tight) + 1e-6:
+                TT._count(self, "push_heel_tight.dropped")  # today's tolerance keeps this yaw
+                return False
+        elif cos < math.cos(math.radians(self.push_yaw_tol_deg())) - 1e-6:
             return False
         if off is None:
             off = self.push_contact_offset(quat, d2)
