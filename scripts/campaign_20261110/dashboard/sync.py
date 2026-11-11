@@ -14,6 +14,7 @@ FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group
 FLEET_FILE = 'vast_fleet_gpu_time.json'
 CLUSTER_FLEET_FILE = 'cluster_fleet_gpu_time.json'
 AUDIT_FILES = {'gate_quality_audit.json': 'validation/gate_quality_audit.json',
+               'standard_recovery.json': 'infra/standard_recovery/ledger.json',
                'cohort_rental_denominator_coverage.json': 'accounting/cohort_rental_denominator_coverage.json'}
 
 
@@ -76,6 +77,26 @@ def return_report(output):
     for key, title in names.items():
         value, target = evidence['counts'][key], evidence['targets'][key]
         lines.append(f'{title}: {value:,} / {target:,}; {max(0, target-value):,} remaining')
+    recovery_path=output/'standard_recovery.json'
+    if recovery_path.exists():
+        recovery=json.loads(recovery_path.read_text())
+        if recovery.get('campaign_id')=='campaign_20261110':
+            lines += ['', 'STANDARD EVAL RECOVERY — COVERAGE PRIORITY',
+                'Ledger observation: '+chicago(recovery.get('observed_at')),
+                f"Covered classes: {recovery['covered_classes']}/{recovery['standard_classes']}; zero classes: {recovery['zero_classes']}.",
+                'New first accepted eval classes: '+(', '.join(recovery['newly_covered']) or 'none yet'),
+                'Zero tasks: '+', '.join(recovery['zero_tasks']), recovery['activity_semantics'],
+                'Exact per-class ledger: http://127.0.0.1:8765/#standard-recovery']
+            report_lines=['STANDARD EVAL RECOVERY — campaign_20261110', 'Observed: '+chicago(recovery.get('observed_at')),
+                f"Covered classes: {recovery['covered_classes']}/{recovery['standard_classes']}; remaining zero: {recovery['zero_classes']}",
+                'First accepted eval since baseline: '+(', '.join(recovery['newly_covered']) or 'none yet'), recovery['activity_semantics'], '']
+            for row in recovery['classes']:
+                report_lines += [f"{row['class_id']}: {row['accepted_standard']}/10 accepted — {row['state']}",
+                    f"Owner: {row['owner']}; engineering: {row['engineering_status']}; worker observation: {row['worker_observed_at']}",
+                    'Blocker: '+str(row['blocker']), 'Next action: '+str(row['next_action']),
+                    'Active jobs/controller: '+json.dumps([row['active_jobs'],row['controller']]),
+                    'Exact configuration/runtime/native/demo/replay: '+json.dumps({k:row.get(k) for k in ('configuration','runtime','native','demo','replay')}), '']
+            target=output.parent/'STANDARD_RECOVERY.txt';temp=target.with_suffix('.tmp');temp.write_text('\n'.join(report_lines)+'\n');temp.replace(target)
     lines += ['', 'Resource observation: ' + chicago(live.get('cluster_observed_at')),
         f"Campaign cluster: {live.get('campaign_cluster_running_gpus', 'unavailable')} GPUs running; "
         f"{live.get('campaign_cluster_pending_gpus', 'unavailable')} GPUs pending."]

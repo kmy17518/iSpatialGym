@@ -45,6 +45,7 @@ def snapshot(root, inventory):
     cluster, cs = read_source(root / 'infra/cluster_snapshot.json')
     evidence, es = read_source(root / 'dashboard/dashboard_evidence.json')
     group_yield, ys = read_source(root / 'dashboard/goal_group_yield.json')
+    recovery, rs = read_source(root / 'dashboard/standard_recovery.json')
     fleet, fs = read_source(root / 'dashboard/vast_fleet_gpu_time.json')
     cluster_fleet, cfs = read_source(root / 'dashboard/cluster_fleet_gpu_time.json')
     yield_error, yes = read_source(root / 'dashboard/goal_group_yield_error.json')
@@ -58,6 +59,8 @@ def snapshot(root, inventory):
         evidence = {}; es = {'available': False, 'error': 'Campaign identity mismatch'}
     if group_yield and group_yield.get('campaign_id') != 'campaign_20261110':
         group_yield = {}; ys = {'available': False, 'error': 'Campaign identity mismatch'}
+    if recovery and recovery.get('campaign_id') != 'campaign_20261110':
+        recovery = {}; rs = {'available': False, 'error': 'Campaign identity mismatch'}
     if fleet and fleet.get('campaign_id') != 'campaign_20261110':
         fleet = {}; fs = {'available': False, 'error': 'Campaign identity mismatch'}
     if cluster_fleet and cluster_fleet.get('campaign_id') != 'campaign_20261110':
@@ -88,7 +91,8 @@ def snapshot(root, inventory):
     cluster_view['jobs'] = jobs
     return sanitize({'campaign_id': 'campaign_20261110', 'served_at': datetime.now(timezone.utc).isoformat(),
         'targets': TARGETS, 'deadline': '2026-11-12T19:00:00Z', 'refresh_seconds': 30,
-        'sources': {'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss, 'group_yield': ys, 'fleet_gpu_time': fs, 'cluster_fleet_gpu_time': cfs},
+        'sources': {'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss, 'group_yield': ys, 'fleet_gpu_time': fs, 'cluster_fleet_gpu_time': cfs, 'standard_recovery': rs},
+        'standard_recovery': recovery,
         'cluster_fleet_gpu_time': {**{k:v for k,v in cluster_fleet.items() if k != 'records'}, 'allocation_count': len(cluster_fleet.get('records', []))},
         'fleet_gpu_time': {k:v for k,v in fleet.items() if k not in ('rentals','sources','attempts_missing_complete_intervals')},
         'group_yield': {k:v for k,v in group_yield.items() if k not in ('sources','groups','jobs')},
@@ -115,6 +119,7 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 return self.send_body(404, b'Report unavailable', 'text/plain')
         audits = {'/reports/reconciliation': 'reconciliation.json',
+            '/reports/standard-recovery': 'standard_recovery.json',
             '/reports/replay-quality': 'gate_quality_audit.json',
             '/reports/gpu-denominator-coverage': 'cohort_rental_denominator_coverage.json',
             '/reports/cluster-fleet-gpu-time': 'cluster_fleet_gpu_time.json',
@@ -124,7 +129,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
+            if path in ('/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,

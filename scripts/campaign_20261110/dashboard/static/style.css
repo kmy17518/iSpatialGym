@@ -3,3 +3,5 @@
 .yield-hist{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:14px 0}.yield-hist div{display:flex;flex-direction:column;text-align:center;background:#f4f7f8;padding:8px 3px;border-radius:6px}.yield-hist strong{font-size:21px;font-variant-numeric:tabular-nums}.yield-hist span{font-size:10px;color:var(--muted)}#yield-summary p{font-size:11px}#yield-summary .value{font-size:31px}.yield-table{max-height:620px;margin-bottom:18px}.yield-table th{position:sticky;top:0;z-index:2}#yield-fixes,#yield-changes{max-height:420px;overflow:auto}@media(max-width:650px){#yield-summary{grid-template-columns:1fr}#yield-summary article:last-child{grid-column:auto}}
 
 .grid>*{min-width:0}.observation,.alert{max-width:100%;overflow-wrap:anywhere}.section-head>div{min-width:0}@media(max-width:650px){.section-head{flex-wrap:wrap}.section-head>a{font-size:12px}.filters>label{max-width:100%}select{max-width:100%}}
+
+.recovery-evidence{max-width:38rem;max-height:30rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.75rem}#recovery-rows td{min-width:10rem;vertical-align:top}#recovery-rows .reason{min-width:16rem;max-width:25rem}

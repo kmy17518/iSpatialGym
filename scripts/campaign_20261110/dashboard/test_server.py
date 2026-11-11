@@ -102,6 +102,20 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         data = snapshot(self.root, self.root / 'inventory')
         self.assertEqual([j['id'] for j in data['cluster']['jobs']], ['101', '18423963'])
 
+    def test_standard_recovery_is_read_only_sanitized_and_campaign_scoped(self):
+        value={'campaign_id':'campaign_20261110','zero_classes':59,
+               'classes':[{'class_id':'inside_01','accepted_standard':0,'api_key':'HIDDEN'}]}
+        self.write('dashboard/standard_recovery.json',value)
+        before=self.hashes()
+        code,raw=self.request('GET','/reports/standard-recovery')
+        self.assertEqual(code,200);self.assertNotIn(b'HIDDEN',raw)
+        data=json.loads(self.request('GET','/api/status')[1])
+        self.assertEqual(data['standard_recovery']['zero_classes'],59)
+        self.assertEqual(before,self.hashes())
+        self.write('dashboard/standard_recovery.json',{'campaign_id':'older'})
+        self.assertEqual(self.request('GET','/reports/standard-recovery')[0],404)
+        self.assertEqual(snapshot(self.root,self.root/'inventory')['standard_recovery'],{})
+
     def test_audit_report_arrays_are_readable_and_sanitized(self):
         self.write('dashboard/vast_runtime_resources.json', [{'cpu_affinity': '1-9', 'api_key': 'HIDDEN'}])
         status, raw = self.request('GET', '/reports/vast-runtime')
