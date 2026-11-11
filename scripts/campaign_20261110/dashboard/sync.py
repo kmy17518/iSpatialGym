@@ -13,7 +13,7 @@ REMOTE = '/vision/u/minyeong/projects/isg_home/campaign_20261110/infra'
 FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group_yield.json', 'goal_group_yield_error.json')
 FLEET_FILE = 'vast_fleet_gpu_time.json'
 CLUSTER_FLEET_FILE = 'cluster_fleet_gpu_time.json'
-AUDIT_FILES = {'capacity_recovery.json': 'infra/capacity_recovery/ledger.json', 'heldout_recovery.json': 'infra/heldout_recovery/ledger.json','canonical_validation.json': 'infra/standard_recovery/canonical_validation.json','gate_quality_audit.json': 'validation/gate_quality_audit.json',
+AUDIT_FILES = {'ik_observation.json': 'ik_exchange/observation.json', 'capacity_recovery.json': 'infra/capacity_recovery/ledger.json', 'heldout_recovery.json': 'infra/heldout_recovery/ledger.json','canonical_validation.json': 'infra/standard_recovery/canonical_validation.json','gate_quality_audit.json': 'validation/gate_quality_audit.json',
                'training_eligibility.json': 'accounting/training_eligibility.json',
                'training_production_gate.json': 'controllers/training_production_gate.json',
                'training_containment.json': 'infra/training_production_gate/containment_status.json',
@@ -131,6 +131,13 @@ def return_report(output):
             lines += ['','BOUNDED EXISTING-NATIVE PIPELINE REVIEWS', 'Observed: '+chicago(review.get('observed_at')),
                 'These canaries earn zero benchmark credit. Original native states are retained; each collection, replay and restoration stage requires its own evidence.',
                 *[key+': '+str(row.get('status'))+'; job '+str(row.get('allocation',{}).get('jobid',row.get('job_id','unobserved')))+'; '+str(row.get('error',row.get('reason',''))) for key,row in review.get('records',{}).items()]]
+    ik_path=output/'ik_observation.json'
+    if ik_path.exists():
+        ik=json.loads(ik_path.read_text())
+        if ik.get('campaign_id')=='campaign_20261110':
+            lines += ['','EXACT-IK CACHE REUSE', 'Observed: '+chicago(ik.get('observed_at')), ik.get('semantics',''),
+                *[row['account']+': '+row['status']+'; registered instrumented jobs '+str(row['registered_jobs'])+'; measured counters '+json.dumps(row['counters']) for row in ik.get('accounts',[])],
+                ik.get('roundtrip_status','Roundtrip unverified'), 'Evidence: http://127.0.0.1:8765/#ik-cache']
     canonical_path=output/'canonical_validation.json'
     if canonical_path.exists():
         canonical=json.loads(canonical_path.read_text())

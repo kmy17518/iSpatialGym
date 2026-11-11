@@ -179,7 +179,7 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertEqual(snapshot(self.root,self.root/'inventory')['training_eligibility'],{})
 
     def test_training_gate_and_requirements_routes_are_scoped_and_never_write(self):
-        for name,route in [('training_production_gate','training-production-gate'),('training_requirements','training-requirements'),('training_stream','training-stream'),('existing_native_reviews','existing-native-reviews'),('change_impact','change-impact'),('current_eligibility','current-eligibility')]:
+        for name,route in [('training_production_gate','training-production-gate'),('training_requirements','training-requirements'),('training_stream','training-stream'),('existing_native_reviews','existing-native-reviews'),('ik_observation','ik-cache'),('change_impact','change-impact'),('current_eligibility','current-eligibility')]:
             self.write('dashboard/'+name+'.json',{'campaign_id':'campaign_20261110','status':'closed','command':'DO NOT EXECUTE'})
             before=self.hashes();code,raw=self.request('GET','/reports/'+route)
             self.assertEqual(code,200);self.assertNotIn(b'DO NOT EXECUTE',raw)
