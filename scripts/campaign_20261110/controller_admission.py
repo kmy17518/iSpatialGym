@@ -367,6 +367,16 @@ def observe_gate(path):
         return None
 
 
+def gate_observation_cached(observation, sha, *, now=None):
+    """Pending quota reservations may expire; immutable validation failures do not."""
+    if observation.get('sha256') != sha:
+        return False
+    if observation.get('reason') == 'ContractError: class has no unreserved admission capacity':
+        now = time.time() if now is None else now
+        return now < float(observation.get('observed_at', 0)) + 120
+    return True
+
+
 def recent_gates(root):
     rows = []
     for path in (root / "validation/open_loop").glob("*/*/gate.json"):
@@ -450,7 +460,7 @@ def main():
                 except Exception as exc:
                     record["error"] = {"at": time.time(), "reason": type(exc).__name__ + ": " + str(exc)}
                 save()
-            pending = sum(r["status"] not in ("admitted", "failed") for r in state["records"].values())
+            pending = sum(r["status"] not in ("admitted", "failed", "retired_after_claim") for r in state["records"].values())
             allowance = min(cfg.get("new_admissions_per_pass", 2), max(0, cfg.get("maximum_pending_admissions", 12) - pending))
             examined = 0
             for gate in recent_gates(root):
@@ -460,7 +470,7 @@ def main():
                 if observed is None:
                     continue
                 sha, gate_data = observed
-                if state["checked_gates"].get(str(gate), {}).get("sha256") == sha:
+                if gate_observation_cached(state["checked_gates"].get(str(gate), {}), sha):
                     continue
                 if gate_data.get("success") is not True:
                     continue

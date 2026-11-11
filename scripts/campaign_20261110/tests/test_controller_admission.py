@@ -352,3 +352,13 @@ def test_refill_mode_is_explicit_and_preserves_historical_defaults():
         with pytest.raises(ContractError):
             admission.refill_mode({"admission_split": split, "refill_mode": "eval_only"})
 
+
+
+def test_transient_reserved_capacity_does_not_permanently_hide_valid_source():
+    row={'sha256':'a'*64,'observed_at':100.,'reason':'ContractError: class has no unreserved admission capacity'}
+    assert admission.gate_observation_cached(row,'a'*64,now=219.)
+    assert not admission.gate_observation_cached(row,'a'*64,now=220.)
+    assert not admission.gate_observation_cached(row,'b'*64,now=101.)
+    for reason in ('ContractError: source identity differs','ContractError: replay QA missing'):
+        assert admission.gate_observation_cached({**row,'reason':reason},'a'*64,now=10000.)
+    assert admission.gate_observation_cached({'sha256':'a'*64,'admission_id':'kept'},'a'*64,now=10000.)
