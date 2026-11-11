@@ -73,6 +73,32 @@ def test_native_interior_registry_cannot_escape_campaign(tmp_path,monkeypatch):
         native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
 
 
+@pytest.mark.parametrize('class_id,option,valid', [
+    ('inter_object_relation_satisfaction-ontop_large_scale_01','1',True),
+    ('wardrobe_open','1',False),
+    ('inter_object_relation_satisfaction-ontop_large_scale_01','off',False),
+])
+def test_exact_soap_screen_is_pinned_without_becoming_a_file_dependency(tmp_path,monkeypatch,class_id,option,valid):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    entries=json.loads(manifest.read_text())
+    entries['jobs'][0]['class_id']=class_id
+    flag='ISPATIALGYM_CAMPAIGN_SOAP_LIFT_FRAME_SCREEN'
+    entries['jobs'][0]['environment'][flag]=option
+    manifest.write_text(json.dumps(entries))
+    if not valid:
+        with pytest.raises(ValueError,match='audited exact soap class'):
+            native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
+        return
+    job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
+    value=native.verify(job,tmp_path)
+    assert value['environment'][flag]=='1'
+    assert str(manifest) in value['files']
+    entries['jobs'][0]['environment'][flag]='off'
+    manifest.write_text(json.dumps(entries))
+    with pytest.raises(ValueError,match='bytes changed'):
+        native.enqueue(job,tmp_path)
+
+
 def test_existing_native_output_or_wrong_entrypoint_cannot_be_replaced(tmp_path,monkeypatch):
     manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
     out.mkdir(parents=True);(out/'sample.log').write_text('native started')
