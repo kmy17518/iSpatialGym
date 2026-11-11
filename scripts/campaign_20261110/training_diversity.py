@@ -179,8 +179,12 @@ def reserve_ticket(root, request_id, config_sha256, start, count, cell_id, plan_
         return ref
 
 
-def check_ticket(root, config_sha256, start, count, ticket_ref):
-    """Read-only exact-range check; a ticket itself never releases collection."""
+def check_ticket_identity(root, config_sha256, start, count, ticket_ref):
+    """Immutable membership only, for already-committed acceptance audits.
+
+    Dispatch must call check_ticket, which additionally rechecks live budgets.
+    This nonrecursive identity check cannot reserve or authorize work.
+    """
     root = Path(root).resolve(); _sha(config_sha256); _positive(start, 'start index'); _positive(count, 'instance count')
     path = _owned(root, ticket_ref['path']); _sha(ticket_ref['sha256'])
     require(file_digest(path) == ticket_ref['sha256'], 'ticket bytes changed')
@@ -190,10 +194,19 @@ def check_ticket(root, config_sha256, start, count, ticket_ref):
             and (row['start'], row['count']) == (start, count), 'ticket exact configuration/range differs')
     plan = load_plan(root, row['plan']['path'], row['plan']['sha256'])
     require(state['plans'].get(plan['task']) == row['plan'], 'ticket plan is no longer active')
-    _budget(root, plan, _ticket_rows(root, state))
     return {'ticket': ticket_ref, 'task': row['task'], 'class_id': row['class_id'],
             'cell_id': row['cell_id'], 'start': start, 'count': count,
             'config_sha256': config_sha256, 'production_authorization': False}
+
+
+def check_ticket(root, config_sha256, start, count, ticket_ref):
+    """Read-only exact-range and live-budget check for dispatch."""
+    proof = check_ticket_identity(root, config_sha256, start, count, ticket_ref)
+    state = _read_state(root)
+    plan_ref = state['plans'][proof['task']]
+    plan = load_plan(root, plan_ref['path'], plan_ref['sha256'])
+    _budget(root, plan, _ticket_rows(root, state))
+    return proof
 
 
 def claim_capacity(root, ticket_ref, instance_ids):

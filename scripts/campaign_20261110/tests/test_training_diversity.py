@@ -110,3 +110,12 @@ def test_external_plan_rejected(tmp_path,monkeypatch):
     p,_,_=setup(tmp_path,monkeypatch)
     root=tmp_path/'other';root.mkdir()
     with pytest.raises(ContractError,match='outside campaign'):d.load_plan(root,p,file_digest(p))
+
+
+def test_committed_identity_is_nonrecursive_but_dispatch_checks_budget(tmp_path,monkeypatch):
+    p,_,_=setup(tmp_path,monkeypatch)
+    ref=reserve(tmp_path,p)
+    def no_budget(*args):raise RuntimeError('budget called')
+    monkeypatch.setattr(d,'_records',no_budget)
+    assert d.check_ticket_identity(tmp_path,H,50000,2,ref)['count']==2
+    with pytest.raises(RuntimeError,match='budget called'):d.check_ticket(tmp_path,H,50000,2,ref)
