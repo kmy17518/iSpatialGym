@@ -159,8 +159,32 @@ def observe_next_native_control_step(env, observe, destination):
     return cleanup
 
 
+class ControlledEpisodeAbort(RuntimeError):
+    """A named diagnostic interruption handled by the ordinary episode finally."""
+
+
+def abort_after_native_control_step(env, destination):
+    """Complete one unchanged requested action, then exercise native error cleanup."""
+    step = env.step
+    original = vars(env).get('step')
+    had_step = 'step' in vars(env)
+    def cleanup():
+        if vars(env).get('step') is interrupted:
+            if had_step: env.step = original
+            else: del env.step
+    def interrupted(*args, **kwargs):
+        cleanup()
+        step(*args, **kwargs)
+        destination.update(native_control_calls_completed=1, physics_steps_added=0,
+                           exception_type='ControlledEpisodeAbort', injected=True)
+        raise ControlledEpisodeAbort('bounded restoration cleanup control after one native action')
+    env.step = interrupted
+    return cleanup
+
+
 def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_step=False,
-                                 next_native_control_step=False, pending_cleanups=None, observer=None):
+                                 next_native_control_step=False, pending_cleanups=None, observer=None,
+                                 abort_control=None):
     """Instrument only this diagnostic process; the ordinary loader is unchanged."""
     restore=runner.InstanceLoader.restore
     def observed_restore(loader, *args, **kwargs):
@@ -216,6 +240,11 @@ def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_
             cleanup=observe_next_native_control_step(loader.env,
                 lambda:restoration_observation(loader.tro.meta.raw['campaign'],loader.env.scene,runner.og.sim),destination)
             if pending_cleanups is not None:pending_cleanups.append(cleanup)
+        if abort_control is not None and abort_control.get('enabled') is True:
+            destination = {}
+            loader.report['campaign_restoration']['controlled_abort'] = destination
+            cleanup = abort_after_native_control_step(loader.env, destination)
+            if pending_cleanups is not None: pending_cleanups.append(cleanup)
         return result
     runner.InstanceLoader.restore=observed_restore
     return restore
@@ -226,11 +255,11 @@ def episode_order(value, kind):
     control = value.get('diagnostic_control')
     if control is None:
         return [0, 1, 0]
-    require(control == 'A_A' and kind == 'physics_action_open_loop'
+    require(control in ('A_A', 'A_ABORT_A', 'FRESH_A') and kind == 'physics_action_open_loop'
             and value.get('diagnostic_only') is True
             and value.get('production_released') is False,
             'unsupported or non-diagnostic restoration control')
-    return [0, 0]
+    return [0] if control == 'FRESH_A' else [0, 0]
 
 
 def run(root,request,output,kind):
@@ -260,12 +289,18 @@ def run(root,request,output,kind):
         from ispatialgym.fastflags import fast_on
         require(fast_on('COLLECTOR_PREBUILD'),'production template compatibility is disabled')
         pending_cleanups=[]
+        abort_control = {'enabled': False}
+        if value.get('diagnostic_control') == 'A_ABORT_A':
+            require(value.get('observe_reset_boundary') is True and
+                    value.get('observe_final_pre_action') is True and
+                    value.get('observe_next_native_control_step') is True,
+                    'controlled abort requires all native boundary observations')
         if value.get('observe_reset_boundary') is True:
             install_reset_boundary_probe(run_isg,
                 final_pre_action=value.get('observe_final_pre_action') is True,
                 next_native_step=value.get('observe_next_native_physics_step') is True,
                 next_native_control_step=value.get('observe_next_native_control_step') is True,
-                pending_cleanups=pending_cleanups)
+                pending_cleanups=pending_cleanups, abort_control=abort_control)
             common['reset_boundary_diagnostic']=True
             common['final_pre_action_diagnostic']=value.get('observe_final_pre_action') is True
         world=shared_world_proof(run_isg,records)
@@ -273,6 +308,7 @@ def run(root,request,output,kind):
         shared={'signature':world['signature'],
                 'compatible_template_dirs':set(map(os.path.abspath,world['compatible_template_dirs']))}
         for ordinal,index in enumerate(order):
+            abort_control['enabled'] = value.get('diagnostic_control') == 'A_ABORT_A' and ordinal == 0
             row=records[index];destination=output/('episode_'+str(ordinal))
             argv=['--instance',row['artifacts']['tro']['path'],'--mode','replay',
                   '--replay',row['artifacts']['demo']['path'],'--record','hdf5','--no-goal-override','--out',str(destination)]
@@ -285,7 +321,18 @@ def run(root,request,output,kind):
             entries.append({'canary_review':value['canaries'][index],'returncode':code,'result':result,
                             'report':{'path':str(report),'sha256':file_digest(report)}})
             write_json_atomic(output/'probe.json',common)
-            require(code==0 and result.get('success') is True,'native batch physics episode failed')
+            if abort_control['enabled']:
+                saved = json.loads(report.read_text())
+                interruption = saved.get('loader', {}).get('campaign_restoration', {}).get('controlled_abort', {})
+                require(code != 0 and result.get('success') is False and
+                        result.get('error', '').startswith('ControlledEpisodeAbort(') and
+                        interruption.get('injected') is True and
+                        interruption.get('native_control_calls_completed') == 1,
+                        'native episode did not execute the exact controlled-abort cleanup path')
+                entries[-1]['expected_controlled_abort'] = True
+                write_json_atomic(output/'probe.json', common)
+            else:
+                require(code==0 and result.get('success') is True,'native batch physics episode failed')
     else:
         require(kind=='kinematic_observation_rendering','unknown native probe kind')
         from ispatialgym.multienv import replay
