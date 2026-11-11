@@ -1,4 +1,4 @@
-"""Move owned, never-started aged pending work back to fresh controller authoring."""
+"""Move owned, never-started pending work back to fresh controller authoring."""
 from __future__ import annotations
 
 import argparse
@@ -12,6 +12,7 @@ import time
 from scripts.campaign_20261110.contracts import digest, require, write_json_atomic
 from scripts.campaign_20261110.controller_families import read
 from scripts.campaign_20261110.storage import atomic_directory_lock
+from scripts.campaign_20261110 import overflow_readiness
 
 
 def command(argv):
@@ -39,6 +40,7 @@ def no_execution_artifacts(job,root):
 
 
 def eligible(proof,*,owner,minimum_age,now):
+    overflow_readiness.pending_delay(minimum_age)
     info=proof['scheduler'];accounting=proof['accounting']
     require(info['UserId'].split('(')[0]==owner,'migration job belongs to another user')
     if info['JobState']!='PENDING' or accounting['state']!='PENDING':return False
@@ -64,6 +66,7 @@ def migrate_record(root,record,*,minimum_age,owner,save,execute=False):
     proposal=record.get('migration_intent') or {'schema':'isg-never-started-migration-v1','original_allocation':allocation,'before':before,
               'execution_proof':files,'minimum_pending_seconds':minimum_age,'record_sha256_before':digest(record)}
     if not execute:return proposal
+    if not recovering:proposal['overflow_readiness']=overflow_readiness.check(root,before['scheduler'])
     # Persist the cancellation intent before acting; an interrupted invocation
     # must reconcile this job, never author a replacement on an assumption.
     record['migration_intent']=proposal;save()
@@ -114,10 +117,11 @@ def controller_check(root,record,state,cfg,queue,save,*,family):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',required=True);parser.add_argument('--state',action='append',required=True)
-    parser.add_argument('--minimum-pending-seconds',type=float,default=300)
+    parser.add_argument('--minimum-pending-seconds',type=float,default=0)
     parser.add_argument('--execute',action='store_true');parser.add_argument('--interval',type=float,default=0)
     args=parser.parse_args();root=Path(args.root).resolve()
-    require(args.minimum_pending_seconds>=300 and 0<=args.interval<=60,'invalid pending migration limits')
+    overflow_readiness.pending_delay(args.minimum_pending_seconds)
+    require(0<=args.interval<=60,'invalid pending migration limits')
     while True:
         for value in args.state:
             path=Path(value).resolve();require(path.is_relative_to(root/'controllers'),'migration state outside campaign controllers')

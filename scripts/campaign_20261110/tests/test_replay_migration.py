@@ -109,3 +109,17 @@ def test_watcher_reads_only_its_replay_records(tmp_path,monkeypatch):
     result=watcher.vast_replay_states(tmp_path,{'source':{'replay_job_id':'900001234'},
         'cluster':{'replay_job_id':'18420000'},'waiting':{}})
     assert result=={'900001234':'assigned'} and seen==['900001234.json']
+
+
+@pytest.fixture(autouse=True)
+def funded_context(monkeypatch):
+    from scripts.campaign_20261110 import overflow_readiness
+    monkeypatch.setattr(overflow_readiness, 'check', lambda *a, **k: {'budget_usd': 3000, 'test': True})
+
+
+def test_zero_age_replay_keeps_exact_no_gpu_time_guard(tmp_path):
+    source,native,helper,out=fixture(tmp_path);e=entry(source,out);p=proof(tmp_path)
+    now=datetime.datetime(2026,11,10,tzinfo=datetime.timezone.utc).timestamp()
+    assert rm.eligible(p,e,tmp_path,0,now)
+    p['accounting']['elapsed_seconds']=1
+    assert not rm.eligible(p,e,tmp_path,0,now)

@@ -8,7 +8,7 @@ import subprocess
 import time
 
 from scripts.campaign_20261110.storage import atomic_directory_lock
-from scripts.campaign_20261110 import vast_replay
+from scripts.campaign_20261110 import vast_replay, overflow_readiness
 
 
 def require(value, message):
@@ -37,7 +37,7 @@ def never_started(proof, state):
 
 
 def eligible(proof, entry, root, minimum_age, timestamp):
-    require(minimum_age >= 300, 'replay migration requires at least 300 seconds pending')
+    overflow_readiness.pending_delay(minimum_age)
     info = proof['scheduler']
     require(proof['job_id'] == str(entry['replay_job_id']), 'replay scheduler identity differs')
     require(info['UserId'].split('(')[0] == 'minyeong', 'replay belongs to another owner')
@@ -79,6 +79,7 @@ def migrate(entry, root, native_snapshot, helper_snapshot, minimum_age, save):
         proof = scheduler_proof(entry['replay_job_id'])
         if not eligible(proof, entry, root, minimum_age, time.time()): return False
         output_empty(entry['output'], root)
+        readiness = overflow_readiness.check(root, proof['scheduler'])
         token = 'pending_' + entry['replay_job_id'] + '_' + entry['source_job_id']
         job = root / 'out/vast_replay' / token
         if not job.exists():
@@ -90,7 +91,7 @@ def migrate(entry, root, native_snapshot, helper_snapshot, minimum_age, save):
         jid = str(vast_replay.enqueue(job, root))  # Unactivated; no worker may execute it.
         intent = {'status': 'prepared', 'original_replay_job_id': entry['replay_job_id'],
                   'vast_job_id': jid, 'job_dir': str(job), 'before': proof,
-                  'minimum_pending_seconds': minimum_age, 'prepared_at_unix': time.time()}
+                  'minimum_pending_seconds': minimum_age, 'prepared_at_unix': time.time(), 'overflow_readiness': readiness}
         entry['vast_migration'] = intent; save()
     job = Path(intent['job_dir'])
     if intent['status'] in ('prepared', 'cancel_requested'):
@@ -99,6 +100,7 @@ def migrate(entry, root, native_snapshot, helper_snapshot, minimum_age, save):
             if not eligible(before, entry, root, minimum_age, time.time()):
                 intent.update(status='not_migrated_scheduler_advanced', after=before); save(); return False
             output_empty(entry['output'], root)
+            intent['overflow_readiness'] = overflow_readiness.check(root, before['scheduler'])
             intent['status'] = 'cancel_requested'; save()
             # Scheduler atomically filters out jobs which became RUNNING.
             subprocess.run(['scancel', '--state=PENDING', intent['original_replay_job_id']], check=True, timeout=30)

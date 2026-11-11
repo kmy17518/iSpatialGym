@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Durable watcher: submit one true open-loop gate per successful canary job."""
+import math
 import argparse,csv,datetime,fcntl,hashlib,json,os,pathlib,re,subprocess,time
 
 def atomic(path,data):
@@ -145,7 +146,7 @@ def main():
     ap=argparse.ArgumentParser();ap.add_argument('--root',type=pathlib.Path,required=True);ap.add_argument('--snapshot',required=True);ap.add_argument('--interval',type=float,default=30);ap.add_argument('--once',action='store_true');ap.add_argument('--ledger',type=pathlib.Path,action='append');ap.add_argument('--scene-helper',type=pathlib.Path);ap.add_argument('--dual-partition-replays',action='store_true');ap.add_argument('--vast-pending-seconds',type=float);ap.add_argument('--vast-helper-snapshot',type=pathlib.Path);a=ap.parse_args()
     a.root=a.root.resolve()
     if a.vast_pending_seconds is not None:
-        if a.vast_pending_seconds<300 or not a.vast_helper_snapshot:raise ValueError('Vast replay migration requires a frozen helper and >=300 seconds pending')
+        if not math.isfinite(a.vast_pending_seconds) or a.vast_pending_seconds<0 or not a.vast_helper_snapshot:raise ValueError('Vast replay migration requires a frozen helper and finite nonnegative delay')
         a.vast_helper_snapshot=a.vast_helper_snapshot.resolve()
         if not a.vast_helper_snapshot.is_relative_to(a.root/'code'):raise ValueError('Vast replay helper outside campaign')
     lease=(a.root/'validation/controller.service.lock').open('a')

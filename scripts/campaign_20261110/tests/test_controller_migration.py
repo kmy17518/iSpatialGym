@@ -81,3 +81,21 @@ def test_controller_owned_pass_bounds_checks_and_prefers_fresh_vast_refill(tmp_p
     cfg['_migration_checks_remaining']=1;queue['123'][2]='another_owner'
     migration.controller_check(tmp_path,record(tmp_path),state,cfg,queue,lambda:None,family='held')
     assert calls==['123']
+
+
+@pytest.fixture(autouse=True)
+def funded_context(monkeypatch):
+    from scripts.campaign_20261110 import overflow_readiness
+    monkeypatch.setattr(overflow_readiness, 'check', lambda *a, **k: {'budget_usd': 3000, 'test': True})
+
+
+def test_zero_age_preserves_pending_and_started_boundaries():
+    p=proof();now=time.time();p['scheduler']['SubmitTime']=datetime.datetime.fromtimestamp(now,datetime.timezone.utc).isoformat()
+    assert migration.eligible(p,owner='owner',minimum_age=0,now=now)
+    assert not migration.eligible(p,owner='owner',minimum_age=1,now=now)
+    p['accounting']['start']='2026-11-11T00:00:00'
+    with pytest.raises(ContractError,match='already started'):
+        migration.eligible(p,owner='owner',minimum_age=0,now=now)
+    for value in [-1,float('nan'),float('inf')]:
+        with pytest.raises(ContractError,match='nonnegative'):
+            migration.eligible(p,owner='owner',minimum_age=value,now=now)

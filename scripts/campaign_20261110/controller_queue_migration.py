@@ -85,9 +85,9 @@ def prepare_replacement(root, record):
     return value
 
 
-def migrate_pending_queue(root, record, save, scheduler, *, owner=None, minimum_age=300):
+def migrate_pending_queue(root, record, save, scheduler, *, owner=None, minimum_age=0):
     """Check at most once/minute; recover prepared cancellation/publish boundaries."""
-    require(minimum_age >= 300, 'migration requires at least five minutes pending')
+    boundary.overflow_readiness.pending_delay(minimum_age)
     root = Path(root).resolve(); owner = owner or getpass.getuser()
     if record.get('status') == 'ready' and record.get('pending_migration_source', {}).get('proof'):
         proof_ref = record['pending_migration_source']['proof']

@@ -1,4 +1,4 @@
-"""Migrate aged manual/family GPU intents through a proved never-started boundary.
+"""Migrate manual/family GPU intents through a proved never-started boundary.
 
 The primary account prepares fresh immutable inputs and publishes replacements.
 Each scheduler owner alone holds/cancels its jobs. Held/camera queue controllers
@@ -112,7 +112,7 @@ def fresh_replacement(root, payload, token, index):
     return result
 
 
-def prepare(root, limit=4, minimum_age=300):
+def prepare(root, limit=4, minimum_age=0):
     require(getpass.getuser() == 'minyeong', 'primary account must reserve and prepare replacements')
     response = subprocess.run(['squeue','-r','-h','-u','minyeong,shiyuc','-o','%i|%T|%u'],
                               capture_output=True, text=True, timeout=40, check=True)

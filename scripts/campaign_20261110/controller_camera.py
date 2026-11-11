@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from scripts.campaign_20261110 import controller_lifecycle as lifecycle
 
+import math
 import argparse
 from collections import Counter
 from pathlib import Path
@@ -304,7 +305,7 @@ def main():
     cfg = read(args.config)
     original_config_hash=digest(cfg)
     if args.migrate_pending_after is not None:
-        require(args.migrate_pending_after>=300,'pending migration requires at least five minutes');cfg['migrate_pending_seconds']=args.migrate_pending_after
+        require(math.isfinite(args.migrate_pending_after) and args.migrate_pending_after>=0,'pending migration requires a finite nonnegative delay');cfg['migrate_pending_seconds']=args.migrate_pending_after
     if args.dispatch_spool:cfg['dispatch_spool']=True
     if args.dispatch_backends:
         from scripts.campaign_20261110.infra_dispatch import BACKENDS
