@@ -3667,7 +3667,8 @@ class IORSLarge(SamplerV2):
         # stance, Phase 2) has no partner rule — only its target-in-frame rule.
         own_top = support is self.partner
         errors: List[str] = []
-        for edge, init in TT.edge_candidates(self, top, rng):
+        from ispatialgym.sampling.campaign_jar_start import rank_initial_edges
+        for edge, init in rank_initial_edges(self, TT.edge_candidates(self, top, rng)):
             try:
                 init = TT.phase1b_init_trunk(self, init, height, top=top)
                 chosen = None

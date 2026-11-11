@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 import pytest
 import torch
-from ispatialgym.sampling.campaign_jar_start import VARIANT, connection_filter
+from ispatialgym.sampling.campaign_jar_start import VARIANT, connection_filter, rank_initial_edges, _rank_component_edges
 from ispatialgym.sampling.v2 import navigation as nav
 
 
@@ -37,3 +37,44 @@ def test_only_explicit_exact_variant_can_use_connection_screen():
             gen=lambda key: {'connected_to_manipulation': cfg}))
         with pytest.raises(ValueError, match=message):
             connection_filter(sampler, [object()])
+
+
+def test_placement_component_order_keeps_disconnected_edges_as_fallback(monkeypatch):
+    grid = torch.ones((9, 9), dtype=torch.bool)
+    grid[4, :] = False
+    monkeypatch.setattr(nav, 'eroded_map', lambda kit: grid)
+    monkeypatch.setattr(nav, '_to_map', lambda kit, xy: tuple(int(v) for v in xy))
+    s = SimpleNamespace(kit=object(), template_facts={})
+    rows = [(SimpleNamespace(name=name), SimpleNamespace(base_pose2d=(x, y, 0)))
+            for name, x, y in [('south', 1, 2), ('north_a', 7, 2), ('north_b', 7, 5)]]
+    result = _rank_component_edges(s, iter(rows), [7, 6], nav)
+    assert result == [rows[1], rows[2], rows[0]]
+    assert all(any(pair is original for original in rows) for pair in result)
+    assert s.template_facts['placement_component_edge_order']['all_original_candidates_retained']
+
+
+def test_component_order_is_lazy_and_unchanged_by_default():
+    def fail():
+        raise AssertionError('default must not consume edge generator')
+        yield
+    candidates = fail()
+    s = SimpleNamespace(gp=SimpleNamespace(gen=lambda key: {'connected_to_manipulation': True}))
+    assert rank_initial_edges(s, candidates) is candidates
+
+
+def test_component_hint_rejects_other_variant_or_unowned_proof():
+    for variant, hint, message in [('other', {}, 'audited jar'),
+                                 (VARIANT, {'source_path': '/tmp/proof.json', 'source_sha256': 'x'}, 'outside')]:
+        s = SimpleNamespace(gp=SimpleNamespace(variant=variant, gen=lambda key: {'prefer_placement_component': hint}))
+        with pytest.raises(ValueError, match=message):
+            rank_initial_edges(s, [])
+
+
+def test_component_hint_rejects_changed_diagnostic(monkeypatch):
+    from pathlib import Path
+    monkeypatch.setattr(Path, 'read_bytes', lambda path: b'changed proof')
+    hint = {'source_path': '/vision/u/minyeong/projects/isg_home/campaign_20261110/diagnostics/test/diagnosis.json',
+            'source_sha256': '0' * 64}
+    s = SimpleNamespace(gp=SimpleNamespace(variant=VARIANT, gen=lambda key: {'prefer_placement_component': hint}))
+    with pytest.raises(ValueError, match='diagnostic changed'):
+        rank_initial_edges(s, [])
