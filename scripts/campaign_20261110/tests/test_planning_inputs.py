@@ -75,7 +75,8 @@ def test_mid_audit_change_and_wrong_reservation_are_rejected(tmp_path, monkeypat
         p.prepare_anchor(job, **args)
 
 
-def test_refill_prepares_before_lock_but_counts_and_save_remain_locked(tmp_path, monkeypatch):
+@pytest.mark.parametrize("mode", ["available", "taken_during_audit", "already_complete"])
+def test_refill_prepares_before_lock_but_counts_and_save_remain_locked(tmp_path, monkeypatch, mode):
     from scripts.campaign_20261110.tests.test_goal_groups import GoalGroupControllerTests
     _, _, _, original, _ = GoalGroupControllerTests().fixture(tmp_path)
     template = replace(original, split='eval_model')
@@ -89,17 +90,27 @@ def test_refill_prepares_before_lock_but_counts_and_save_remain_locked(tmp_path,
     def prepare_source(*a):
         assert not lock.exists(); order.append('audit'); return 'checked'
     def counts(*a):
-        assert lock.exists(); order.append('quota'); return {}
+        order.append('quota' if lock.exists() else 'preview'); return {}
     def author(*a, **kw):
         assert lock.exists() and kw == {'prepared_source':'checked'}
         order.append('reserve_and_save')
         raise RuntimeError('stop after reservation boundary')
+    decisions = []
+    def next_work(*a, **kw):
+        decisions.append(True)
+        return None if mode == 'already_complete' or (mode == 'taken_during_audit' and len(decisions)==2) else {'groups':1}
     adapter = SimpleNamespace(supports=lambda task:True, prepare_source=prepare_source,
         read_counts=counts, pending=lambda root:[], reserve_pending_counts=lambda *a:{},
-        next_work=lambda *a,**k:{'groups':1}, prepare_queue=author)
-    with pytest.raises(RuntimeError, match='reservation boundary'):
-        held.advance(spec, {}, {"root":str(tmp_path), "stop_at":1e12}, tmp_path, [], {}, 1, lambda:None, adapter=adapter)
-    assert order == ['audit', 'quota', 'reserve_and_save'] and not lock.exists()
+        next_work=next_work, prepare_queue=author)
+    invoke = lambda: held.advance(spec, {}, {"root":str(tmp_path), "stop_at":1e12}, tmp_path, [], {}, 1, lambda:None, adapter=adapter)
+    if mode == 'available':
+        with pytest.raises(RuntimeError, match='reservation boundary'):
+            invoke()
+        assert order == ['preview', 'audit', 'quota', 'reserve_and_save']
+    else:
+        assert invoke() == 0
+        assert order == (['preview'] if mode == 'already_complete' else ['preview', 'audit', 'quota'])
+    assert not lock.exists()
 
 
 def test_failed_dry_run_stays_reserved_and_cannot_be_marked_passed(tmp_path, monkeypatch):

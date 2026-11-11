@@ -469,10 +469,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
     if zero_tail >= cfg.get("maximum_empty_queues", 3):
         state["status"] = "needs_feasibility_diagnosis"
         return 0
-    # Large immutable demo/source hashes do not serialize unrelated classes.
-    source_preparer = getattr(adapter, 'prepare_source', None) if adapter else prepare_source
-    prepared_source = source_preparer(spec, cfg, root) if source_preparer else None
-    with planning_lock(root/'controllers/held_planning.lockdir'):
+    def observe_work():
         if adapter is None:
             counts = read_counts(root, template, read(cfg["standard_contracts"])["templates"], read(cfg["room_plan"]))
             reserved=reserve_pending_counts(counts,template,pending_held(root))
@@ -483,6 +480,25 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
             reserved = adapter.reserve_pending_counts(counts, template, adapter.pending(root))
             decision = adapter.next_work(template, reserved, max_groups=maximum_groups,
                 training_validated="train" in gates, mode=spec.get("mode", "eval_then_train"))
+        return counts, reserved, decision
+
+    # This unlocked observation can only defer work. The transaction below
+    # independently rechecks all counts and pending reservations before writing.
+    counts, reserved, decision = observe_work()
+    from scripts.campaign_20261110.controller_spool import candidate_budget_used
+    remaining_budget = spec["max_candidates"] - candidate_budget_used(records)
+    if decision is None or remaining_budget < 3 or allowance <= 0:
+        state.update(counts=counts, counts_after_pending_reservations=reserved)
+        if decision is None:
+            state['status'] = 'pending_work_reserves_remaining_capacity' if inflight else 'quota_or_room_capacity_complete'
+        elif remaining_budget < 3:
+            state['status'] = 'candidate_budget_exhausted'
+        return 0
+    # Large immutable demo/source hashes do not serialize unrelated classes.
+    source_preparer = getattr(adapter, 'prepare_source', None) if adapter else prepare_source
+    prepared_source = source_preparer(spec, cfg, root) if source_preparer else None
+    with planning_lock(root/'controllers/held_planning.lockdir'):
+        counts, reserved, decision = observe_work()
         state.update(counts=counts,counts_after_pending_reservations=reserved)
         from scripts.campaign_20261110.controller_spool import candidate_budget_used
         remaining_budget = spec["max_candidates"] - candidate_budget_used(records)
