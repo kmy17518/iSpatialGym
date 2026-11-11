@@ -91,6 +91,30 @@ def evaluation_exhausted(root, template):
     return count >= limit
 
 
+def canonical_training_ready(root):
+    """Require the real100-class chain, never a99-class or instance-count proxy."""
+    root=Path(root)
+    path=root/'infra/standard_recovery/canonical_validation.json'
+    try:
+        value=json.loads(path.read_text())
+        if value.get('schema')!='isg-canonical-template-validation-v1' or value.get('total')!=100 or value.get('validated')!=100:
+            return False
+        classes=value['classes']
+        if len(classes)!=100 or len({r['class_id']for r in classes})!=100 or not all(r.get('validated') is True and r.get('status')=='fresh_chain_verified' for r in classes):
+            return False
+        from scripts.campaign_20261110.dashboard_evidence import standard_catalog
+        from scripts.campaign_20261110.canonical_validation import audit
+        from scripts.campaign_20261110.export_release import ArtifactAudit
+        catalog=standard_catalog(root/'manifests/dashboard_standard_catalog.json')
+        if set(catalog)!={r['class_id']for r in classes}:return False
+        # A summary alone cannot release anything: repeat the actual native,
+        # demo, replay, hard-QA, sibling/camera and accepted-artifact audit.
+        fresh=audit(root,catalog,ArtifactAudit(root,1794321600),1794321600)
+        return fresh['total']==fresh['validated']==100
+    except (OSError,ValueError,KeyError,TypeError):
+        return False
+
+
 def check_environment(root, environment, *, kind='collection', start=None, count=None):
     result = {'allowed': False, 'reason': 'unknown collection scope', 'category': 'unverified',
               'gate_sha256': None}
@@ -125,6 +149,8 @@ def check_environment(root, environment, *, kind='collection', start=None, count
         if split != 'train': raise ValueError('unknown campaign split')
         result.update(category='standalone_training', reason='standalone training production blocked')
         if policy is None: return result
+        if not canonical_training_ready(root):
+            return {**result,'category':'eval_validation_hold','reason':'owner hold: all100 exact canonical eval classes must validate before standalone training or new instance-generation canaries'}
         # Reopening is intentionally unsupported until the required complete
         # pipeline has an implemented evidence verifier. A hand-edited flag
         # must never act as a production release.

@@ -86,7 +86,8 @@ def test_eval_label_cannot_bypass_exhausted_goal_quota(tmp_path):
     assert not check_environment(tmp_path,env)['allowed']
 
 
-def test_exact_canary_authorization_is_bounded_and_expires(tmp_path):
+def test_exact_canary_authorization_is_bounded_and_expires(tmp_path,monkeypatch):
+    monkeypatch.setattr('scripts.campaign_20261110.production_gate.canonical_training_ready',lambda root:True)
     from datetime import datetime,timezone,timedelta
     from scripts.campaign_20261110.contracts import file_digest
     env,cmd,job=setup(tmp_path,'train')
@@ -231,3 +232,20 @@ def test_native_coverage_separates_original_removal_and_actual_augmentation():
     import pytest
     with pytest.raises(ValueError,match='contract differs'):
         coverage_facts(row,raw,{'objects':[]})
+
+
+def test_eval100_hold_blocks_exact_old_canary_even_when_global_flag_is_open(tmp_path):
+    from datetime import datetime,timezone,timedelta
+    from scripts.campaign_20261110.contracts import file_digest
+    env,cmd,job=setup(tmp_path,'train');p=tmp_path/'controllers';p.mkdir()
+    auth=tmp_path/'authorization.json';value={'purpose':'training_pipeline_canary','config_sha256':file_digest(tmp_path/'config.json'),'start':50000,'count':3}
+    auth.write_text(json.dumps(value))
+    entry={**value,'max_instances':3,'expires_at':(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat(),'authorization_path':str(auth),'authorization_sha256':file_digest(auth)}
+    (p/'training_production_gate.json').write_text(json.dumps({'schema':'isg-training-production-gate-v1','campaign_id':'campaign_20261110','mode':'open','standalone_training_allowed':True,'allowed_canaries':[entry]}))
+    result=check_job(tmp_path,job)
+    assert not result['allowed'] and result['category']=='eval_validation_hold'
+    report=tmp_path/'infra/standard_recovery/canonical_validation.json';report.parent.mkdir(parents=True)
+    report.write_text(json.dumps({'schema':'isg-canonical-template-validation-v1','total':100,'validated':99,'classes':[]}))
+    assert not check_dispatch(tmp_path,cmd)['allowed']
+    report.write_text(json.dumps({'schema':'isg-canonical-template-validation-v1','total':100,'validated':100,'classes':[]}))
+    assert not check_dispatch(tmp_path,cmd)['allowed']
