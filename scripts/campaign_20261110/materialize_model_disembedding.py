@@ -73,6 +73,7 @@ def main():
     records = {row['key']: row for row in json.loads((a.inventory / 'cluster_templates_with_scales.json').read_text())['records']}
     from ispatialgym.grasping.schema import entry_id
     from ispatialgym.sampling.bddl_from_iddl import RoleGrounding, render
+    from ispatialgym.sampling.bddl_writer import Bindings
     from ispatialgym.sampling.iddl import parse_file
     from ispatialgym.sampling.knowledge import synset_of_category
     from ispatialgym.sampling.v2.problem import GroundedProblem, iter_template_choices
@@ -155,7 +156,8 @@ def main():
         check_reservations(pool.audit_template(), policy, hashes); pool_path = write_pool(directory / 'binding_pool.json', pool)
         proof = dict(defaults_sha256=file_digest(a.defaults), visual_review_sha256=file_digest(a.visual_review), tray_floor_probe_sha256=file_digest(a.tray_floor_proof),
                      native_scene_sha256=file_digest(scene_path), source_customs_sha256=file_digest(source), reservation_sha256=file_digest(a.reservations),
-                     support_adaptation='Existing globally reserved table at exact measured native scale and height', production_released=False)
+                     support_adaptation='Existing globally reserved table at exact measured native scale and height', production_released=False,
+                     runtime_role_order=list(entry['roles']))
         if a.support_scene_proof:
             proof['support_scene_proof'] = dict(path=str(a.support_scene_proof), sha256=file_digest(a.support_scene_proof))
             proof['support_adaptation'] = 'Globally reserved default-scale table inserted into a collision-checked private scene; original objects unchanged'
@@ -167,15 +169,36 @@ def main():
         candidate_id = 'held_model__' + cls + '__initial_count_' + str(len(distractors))
         if a.destination_side:
             candidate_id += '__destination_' + a.destination_side
+        candidate_id += '__native_roles_v1'
         template = Template(candidate_id, 'disembedding', cls, 'eval_model', scene, room, tuple(refs),
                             digest(dict(entry=entry, bddl_sha256=file_digest(bddl))), {**proof, 'task_rooms': [room], 'inst_to_name': names,
                             'runtime_bddl_sha256': file_digest(bddl), 'customs_alias': alias, 'fresh_geometry': 'pending', 'fresh_demo': 'pending',
                             'fresh_replay': 'pending', 'coverage': 'Native area profile required before count expansion', 'perturbations': False})
         template = bind_variant(template, pool_path, {choice.object.instance: choice.candidate_id for choice in choices})
-        check_reservations(template, policy, hashes); customs = directory / 'candidate_customs.json'; write_json_atomic(customs, {alias: entry})
+        check_reservations(template, policy, hashes); customs = directory / 'candidate_customs.json'
+        # GroundedProblem preserves JSON role order, and the native Bindings
+        # allocator numbers equal synsets in spawn order. Canonical key sorting
+        # would put destination before source and invert the tray BDDL names.
+        with customs.open('x') as stream:
+            json.dump({alias: entry}, stream, indent=2); stream.write('\n')
         gp = GroundedProblem.load(alias, str(customs), str(directory / 'bddl'))
         native = list(iter_template_choices(gp, scene, np.random.default_rng(20261110), max_templates=1))
         require(len(native) == 1 and [(row.category, row.model) for row in native[0].groups['distractors']] == [(row['category'], row['model']) for row in distractors], 'native distractor choice differs')
+        bindings = Bindings()
+        for role in dict.fromkeys(['floor', *gp.scene_roles()]):
+            row = role_rows[role]
+            actual = bindings.add(role, synset_of_category(row['category']))
+            require(actual.name == rendered.instances[role], 'native scene-role BDDL allocation differs: ' + role)
+        for role in gp.sampleable_roles():
+            actual = bindings.add(role, native[0].models[role].synset)
+            require(actual.name == rendered.instances[role], 'native sampleable-role BDDL allocation differs: ' + role)
+        for role in gp.group_roles():
+            actual = [bindings.add(role, member.synset).name for member in native[0].groups[role]]
+            require(actual == rendered.instances[role + '.members'], 'native group-role BDDL allocation differs: ' + role)
+        write_json_atomic(directory / 'native_binding_order_check.json', dict(
+            runtime_role_order=list(gp.roles), customs_sha256=file_digest(customs),
+            bddl_sha256=file_digest(bddl), bindings=[asdict(row) for row in bindings.all()],
+            native_allocation_matches_rendered_bddl=True))
         templates.append({**asdict(template), 'fingerprint': template.fingerprint})
         jobs.append(dict(candidate_id=template.template_id, class_id=cls, task='disembedding', alias=alias, scene=scene, room=room, split='eval_model',
                          template_fingerprint=template.fingerprint, source_manifest=str((a.out / 'validation_jobs.json').resolve()), required_new_grasp_key=gkey,
