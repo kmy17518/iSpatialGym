@@ -107,7 +107,10 @@ def test_pinned_trays_are_validated_directly_without_random_destination_search()
     camera = SimpleNamespace(width=640, height=480, project=lambda cam, pts: (th.tensor([[320., 240.]]), th.tensor([1.])))
     s.world = SimpleNamespace(footprint=lambda h, p: h[:, :2] + p[0][:2], camera_model=camera)
     s.top = SimpleNamespace(polygon_supported=lambda fp, margin: True)
-    s.src_floor = s.dst_floor = SimpleNamespace(at=lambda p: SimpleNamespace(centre=p[0][:2], z=.7))
+    # Different tray meshes have different floor-mask centres. Native placement
+    # aligns their object origins, so those offsets must not change eligibility.
+    s.src_floor = SimpleNamespace(at=lambda p: SimpleNamespace(centre=p[0][:2] + th.tensor([0., .02]), z=.7))
+    s.dst_floor = SimpleNamespace(at=lambda p: SimpleNamespace(centre=p[0][:2] + th.tensor([0., -.03]), z=.7))
     s._tray_yaw = lambda role, manip: 0.
     s.g = lambda key: {"destination_gap_min_m": .04, "destination_visible_width_m": .04}[key]
     manip = SimpleNamespace(local=lambda p: (float(p[1]), float(p[0])), base_xy=th.zeros(2), tangent=th.tensor([1., 0.]),
@@ -116,6 +119,10 @@ def test_pinned_trays_are_validated_directly_without_random_destination_search()
     destination = (th.tensor([1., 0., .7]), th.tensor([0., 0., 0., 1.]))
     actual, side, facts = s.campaign_tray_geometry(manip, None, source, destination)
     assert actual is destination and side == 1 and facts["source"] == "goal_plan"
+    assert facts["alignment_basis"] == "object_origins" and facts["edge_depth_residual_m"] == 0
+    displaced = (destination[0] + th.tensor([0., .006, 0.]), destination[1])
+    with pytest.raises(Reject, match="tray origins"):
+        s.campaign_tray_geometry(manip, None, source, displaced)
     camera.project = lambda cam, pts: (th.tensor([[700., 240.]]), th.tensor([1.]))
     with pytest.raises(Reject, match="required width"):
         s.campaign_tray_geometry(manip, None, source, destination)

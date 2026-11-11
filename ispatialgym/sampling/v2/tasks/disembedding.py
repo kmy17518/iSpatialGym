@@ -1272,11 +1272,13 @@ class Disembedding(SamplerV2):
             if error > .001:
                 raise Reject("campaign_tray_alignment", f"fixed {role} is not aligned to this table edge")
             footprints[role] = fp
-        source_floor, destination_floor = self.src_floor.at(source), self.dst_floor.at(destination)
-        depth_s, lat_s = manip.local(source_floor.centre)
-        depth_d, lat_d = manip.local(destination_floor.centre)
+        # _place_destination aligns the object origins at the same edge depth.
+        # Floor-mask centres can be offset differently within the two assets;
+        # comparing those centres would reject the native placement itself.
+        depth_s, lat_s = manip.local(source[0])
+        depth_d, lat_d = manip.local(destination[0])
         if abs(depth_s - depth_d) > .005:
-            raise Reject("campaign_tray_alignment", "tray floor centres have different distances from the table edge")
+            raise Reject("campaign_tray_alignment", "tray origins have different distances from the table edge")
         side = 1.0 if lat_d > lat_s else -1.0
         if side != self.dest_side:
             raise Reject("campaign_tray_side", "fixed destination is on the opposite template side")
@@ -1296,7 +1298,8 @@ class Disembedding(SamplerV2):
         uv, depth = cm.project(cam, th.tensor([[float(xy[0]), float(xy[1]), z]]))
         if float(depth[0]) <= .05 or not 0 <= float(uv[0, 0]) <= cm.width or not 0 <= float(uv[0, 1]) <= cm.height:
             raise Reject("campaign_destination_not_visible", "fixed destination does not expose the required width from this start")
-        return destination, side, {"source": "goal_plan", "gap_m": float(gap), "visible_width_min_m": width}
+        return destination, side, {"source": "goal_plan", "gap_m": float(gap), "visible_width_min_m": width,
+                                   "alignment_basis": "object_origins", "edge_depth_residual_m": abs(depth_s - depth_d)}
 
     def campaign_verify_goal(self, draft, *, settled=False):
         plan = getattr(self, "_campaign_tray_active", None)
