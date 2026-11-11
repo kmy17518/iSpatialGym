@@ -2676,6 +2676,17 @@ class IORSSmall(SamplerV2):
             partner = self.obj("partner")
             partner.set_position_orientation(*(G.t(v) for v in plan.partner))
             partner.keep_still()
+            if self.relation in ("ontop", "under"):
+                # The release ray must see the fixed partner at its new pose.
+                # sync_world below updates cuRobo meshes, not PhysX queries;
+                # without a physics step the ray can still hit only the table
+                # and the release silently falls back to the saucer's rim top.
+                self.world.step_physics(1, still=[self.robot, partner])
+                dp, dq = CPG.pose_error(partner.get_position_orientation(), plan.partner)
+                partner_tol = min(self.tol("position", .03), float(self.gen("partner_moved_max_m", .005)))
+                if dp > partner_tol or dq > self.tol("orientation", .20):
+                    raise Reject("campaign_partner_drift", f"fixed partner drifted during query sync by {dp:.6f} m / {dq:.6f} rad")
+                TT._count(self, "campaign_partner.surface_query_synced")
             self.kit.sync_world()
             self._campaign_latest_proposal = {"start_poses": {plan.partner_name: plan.partner},
                                               "goal_poses": {plan.target_name: plan.goal, plan.partner_name: plan.partner},
@@ -5771,7 +5782,9 @@ class IORSSmall(SamplerV2):
                                                    margin=self.margin_support):
                     raise Reject("campaign_goal_support", "fixed nextto goal leaves the support")
             if dp > self.ikc.WITNESS_POS_TOL or dq > self.ikc.WITNESS_ANG_TOL:
-                raise Reject("campaign_release_drift", f"release differs from native pair geometry by {dp:.6f} m / {dq:.6f} rad")
+                raise Reject("campaign_release_drift", f"release differs from native pair geometry by {dp:.6f} m / {dq:.6f} rad; "
+                             f"native_z={float(native[0][2]):.6f} planned_z={campaign_plan.release[0][2]:.6f} "
+                             f"surface_z={getattr(self, 'release_surface_z', None)} above={getattr(self, 'release_above_m', None)}")
             if campaign_plan.release_policy == "native_grasp_height":
                 return native
             return tuple(G.t(v) for v in campaign_plan.release)

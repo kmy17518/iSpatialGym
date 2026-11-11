@@ -89,3 +89,18 @@ def test_shared_goal_survives_native_residual_but_eval_bucket_stays_strict():
     draft.goal_poses["target"] = (th.tensor([.61, 0, .8]), th.tensor([0., 0, 0, 1]))
     with pytest.raises(Reject, match="native axial endpoint"):
         ax.AlignmentAxial.campaign_verify_goal(s, draft)
+
+
+def test_fixed_goal_ranks_checked_pool_and_deduplicates_stance_not_focus():
+    import numpy as np
+    def candidate(x, trunk, tag):
+        return SimpleNamespace(focus=th.tensor([x, 0., .8]), base_pose2d=[0., 0., 0.],
+                               translate=trunk, tilt=0., tag=tag)
+    far=candidate(4., .1, 'far_copy_of_near_stance')
+    near=candidate(.01, .1, 'near')
+    second=candidate(.2, .2, 'second')
+    third=candidate(.1, .3, 'third')
+    result=ax.campaign_goal_stances([far,second,near,third], [0.,0.,.8], np.random.default_rng(7))
+    assert [c.tag for c in result] == ['near','third','second']
+    assert all(any(c is original for original in [far,second,near,third]) for c in result)
+    assert far.focus[0] == 4  # source pool and physical stance geometry stay intact

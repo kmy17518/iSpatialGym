@@ -461,7 +461,17 @@ class AlignmentAxial(SamplerV2):
             self._campaign_surface_active = self.campaign_surface_plan()
         init = self.init_stance
         errors = []
+        campaign_plan = getattr(self, "_campaign_surface_active", None)
+        if campaign_plan is not None and getattr(self, "_split_cone_cands", None):
+            # The ordinary split-cone draw first chooses a random object
+            # position. A fixed goal cannot follow that position: keep the
+            # original checked Phase-2 survivors and try the stances whose
+            # focus is nearest the fixed target before the same native map,
+            # collision, visibility and complete-program checks.
+            self.manip_candidates = campaign_goal_stances(self._split_cone_cands, campaign_plan.position, rng)
         order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
+        if campaign_plan is not None:
+            order.sort(key=lambda k: float(th.linalg.norm(self.manip_candidates[k].focus[:2] - th.tensor(campaign_plan.position[:2]))))
         if self.left_bands is not None:
             # A1: the right band ends at λ ≈ +0.08 and the left contact band starts at λ ≈ 0 / −0.16 (B3 measurements on the
             # pilot support): a two-arm placement sits near the centre line — candidates whose focus lies nearest to the
@@ -480,12 +490,13 @@ class AlignmentAxial(SamplerV2):
             for o in self.world.spawned.values():
                 self.world.park(o, list(self.world.spawned).index(o.name))
             self.kit.sync_world()
-            scan = self._scan_candidates(rng, init, order[:6])
+            scan_order = order[:64] if campaign_plan is not None else order[:6]
+            scan = self._scan_candidates(rng, init, scan_order)
             plan = [(k, (d, f)) for k, d, f in scan]
-            self._a5_scan = {"candidates": len(order[:6]), "push_feasible": len(scan), "paired": sum(1 for _k, d, _f in scan if self._draw_paired(d))}
+            self._a5_scan = {"candidates": len(scan_order), "push_feasible": len(scan), "paired": sum(1 for _k, d, _f in scan if self._draw_paired(d))}
             if not plan:
                 detail = getattr(self, "_campaign_scan_rejections", None)
-                raise Reject("target_placement", f"no manipulation candidate of {len(order[:6])} has a push-feasible placement on the push_blade map"
+                raise Reject("target_placement", f"no manipulation candidate of {len(scan_order)} has a push-feasible placement on the push_blade map"
                              + (f"; fixed-goal scan rejections={detail}" if detail is not None else ""))
         for k, pre in plan:
             cand = self.manip_candidates[int(k)]
@@ -827,6 +838,11 @@ class AlignmentAxial(SamplerV2):
             # point in the right band; a brace is recorded only when the joint two-arm placement exists for that end
             if not any(jp["work_ok"] for _, jp, _, _, _ in pairs):
                 fails["work_off_band"] += 1
+                if campaign_plan is not None:
+                    for _, jp, _, _, _ in pairs:
+                        why = (jp.get("maps", {}).get("push_blade", {}).get("why") or "unspecified")
+                        key = "work_map:" + str(why)[:120]
+                        fails[key] = fails.get(key, 0) + 1
                 continue
             for _, jp, _, _, _ in pairs:
                 if jp["work_ok"] and not jp["ok"]:
@@ -872,6 +888,8 @@ class AlignmentAxial(SamplerV2):
             if d is None:
                 continue
             (paired if self._draw_paired(d) else push_only).append((int(k), d, fails))
+            if self._campaign_scan_rejections is not None and len(paired) + len(push_only) >= 6:
+                break
         return paired + push_only
 
     def axial_maps(self):
@@ -1273,6 +1291,20 @@ class AlignmentAxial(SamplerV2):
         return [{"scope": {"target": f"{mc.category}/{mc.model}", "support_height": round(float(self.top.z - self.world.floor_z), 2)}, "type": "contacts",
                  "trunk": [manip.translate, round(manip.tilt, 2)], "push": {"end": "long_axis", "distance_m": round(float(push.distance_m), 3)},
                  "brace": "stop_edge", "hard": False}]
+
+
+def campaign_goal_stances(candidates, position, rng):
+    """Keep checked unique stances, ranked by their nearest fixed-goal focus."""
+    goal = th.tensor(position[:2])
+    ordered = [candidates[int(i)] for i in rng.permutation(len(candidates))]
+    ordered.sort(key=lambda c: float(th.linalg.norm(c.focus[:2] - goal)))
+    seen, result = set(), []
+    for candidate in ordered:
+        key = tuple(float(v) for v in candidate.base_pose2d) + (float(candidate.translate), float(candidate.tilt))
+        if key not in seen:
+            seen.add(key)
+            result.append(candidate)
+    return result
 
 
 def initial_about_fixed_com(position, orientation, com_local, turn):
