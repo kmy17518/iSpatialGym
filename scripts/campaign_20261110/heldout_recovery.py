@@ -22,6 +22,8 @@ def recovery_state(remaining,jobs,latest):
     if states & {'queued','staging','PENDING','CONFIGURING'}:return 'queued'
     if jobs:return 'awaiting_observation'
     status=(latest or{}).get('status')
+    if status in ('native_preparation','engineering_blocked'):return 'engineering_blocked'
+    if status=='native_passed':return 'awaiting_validation'
     if status in ('admitted','complete','retired_after_claim'):return 'ready_for_scoped_refill'
     if status in ('external_submission','awaiting_replay','awaiting_gate'):return 'awaiting_acceptance'
     if status=='failed' or (latest or{}).get('reason'):return 'failed'
@@ -185,7 +187,7 @@ def publish(root):
                 observations[key].append({'controller':'owned_native_engineering','controller_state':str(engineering),
                     'controller_config':str(engineering),'configuration':entry.get('configuration'),
                     'runtime':entry.get('runtime'),'bucket':entry.get('bucket'),'job':job,'failures':[],
-                    'status':'native_preparation','reason':entry['blocker'],'next_action':entry['next_action'],
+                    'status':entry.get('status','native_preparation'),'reason':entry['blocker'],'next_action':entry['next_action'],
                     'last_progress_epoch':entry['observed_unix'],'observed_at':iso(now),'evidence':entry['evidence']})
     jobs=[o['job']for obs in observations.values()for o in obs if o['job']]
     sched,serrors=scheduler_states({j['job_id']for j in jobs if j['active']and j['worker_status']=='scheduler_state_not_observed'})

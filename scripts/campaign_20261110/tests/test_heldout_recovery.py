@@ -39,3 +39,9 @@ def test_unknown_scheduler_state_is_not_pending_and_new_admission_is_not_old_fai
     assert recovery_state(6,[],{'status':'admitted'})=='ready_for_scoped_refill'
     assert recovery_state(3,[],{'status':'external_submission'})=='awaiting_acceptance'
     assert recovery_state(0,[],{'status':'failed'})=='complete'
+
+
+def test_completed_native_geometry_remains_distinct_from_demo_failure():
+    assert recovery_state(9,[],{'status':'native_passed','reason':'Own demo and replay required'})=='awaiting_validation'
+    assert recovery_state(9,[],{'status':'native_preparation','reason':'Missing brace candidates'})=='engineering_blocked'
+    assert recovery_state(9,[{'worker_status':'RUNNING'}],{'status':'native_passed'})=='running'
