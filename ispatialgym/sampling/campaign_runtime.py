@@ -59,6 +59,24 @@ def training_soft_buckets() -> bool:
     return active() and configuration()[0]["split"] == "train"
 
 
+def inside_frame_recovery() -> bool:
+    """Hash-bound ranking/retry policy for the blocked saucepot configuration.
+
+    This changes candidate selection, never camera, IK or collision thresholds.
+    It travels with the template into later sibling groups and train instances.
+    """
+    if not active():
+        return False
+    _, template, _, _ = configuration()
+    value = template.scene_setup.get('recovery_options', {}).get('inside_frame_rank', False)
+    require(type(value) is bool, 'inside frame recovery option must be boolean')
+    if value:
+        require(template.class_id == 'inter_object_relation_satisfaction-inside_04'
+                and template.task == 'inter_object_relation_satisfaction-inside_small_scale',
+                'inside frame recovery belongs to the audited saucepot class')
+    return value
+
+
 def choose_soft_bucket(rng, buckets, counts):
     """Favor underfilled train buckets while keeping every bucket eligible.
 

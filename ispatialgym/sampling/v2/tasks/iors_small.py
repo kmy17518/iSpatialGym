@@ -2700,7 +2700,9 @@ class IORSSmall(SamplerV2):
         self._a1_screen_shadow = False
         cands, pdc = self.place_depth_cap_filter(cands)
         order = rng.permutation(len(cands))
-        if os.environ.get("ISPATIALGYM_STANCE_FRAME_AIM", "") == "1" and self.shelf_pose is None and self.relation != "touching" and cands:
+        from ispatialgym.sampling import campaign_runtime
+        frame_recovery = self.relation == "inside" and campaign_runtime.inside_frame_recovery()
+        if (os.environ.get("ISPATIALGYM_STANCE_FRAME_AIM", "") == "1" or frame_recovery) and self.shelf_pose is None and self.relation != "touching" and cands:
             # oracle-fix 2026-11-07 (owner prompt E 2, opt-in): the candidates whose expected place sits deepest in their manipulation image first
             # (stance_frame_aim: the head camera from base + trunk, no IK); the random order breaks ties
             aim = {int(i): self.stance_frame_aim(cands[int(i)]) for i in order}
@@ -2819,6 +2821,11 @@ class IORSSmall(SamplerV2):
                 # its grasp passed too (owner 2026-09-27: the fallback spans the segment)
                 tried: List[str] = []
                 retries = place_partner_retries(self.relation)  # i7-nextto (ISPATIALGYM_PLACE_PARTNER_RETRY, default 0 = off)
+                if frame_recovery and getattr(self, "_campaign_pair_active", None) is None:
+                    # A rejected random partner must not consume the already
+                    # validated grasp without trying another bounded placement.
+                    # Fixed sibling groups keep their exact partner pose.
+                    retries = max(retries, 2)
                 retried = 0
                 while True:
                     summary0 = {kk: (list(vv) if isinstance(vv, list) else vv) for kk, vv in d.summary.items()} if retries else None
@@ -2922,7 +2929,9 @@ class IORSSmall(SamplerV2):
         self._place_screen_reject = False  # i7-nextto: set when the place screening's exact IK rejects (PLACE_PARTNER_RETRY)
         # §4.6 step 2: partner on the attempt's side (A1) at a gap of the start region's interval
         frame_score = None
-        if os.environ.get("ISPATIALGYM_FRAME_RANK", "") == "1" and self.relation != "touching":
+        from ispatialgym.sampling import campaign_runtime
+        frame_recovery = self.relation == "inside" and campaign_runtime.inside_frame_recovery()
+        if (os.environ.get("ISPATIALGYM_FRAME_RANK", "") == "1" or frame_recovery) and self.relation != "touching":
             # oracle-fix 2026-11-07 (owner prompt E 3): the partner draw ranked by the place / pre-place eef box margin in this candidate's image
             cam_m = self.camera_pose_at(manip)
 
