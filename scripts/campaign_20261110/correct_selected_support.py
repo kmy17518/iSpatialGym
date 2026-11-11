@@ -5,7 +5,7 @@ existing physical proofs and materialized configurations cannot be reinterpreted
 """
 from copy import deepcopy
 
-from scripts.campaign_20261110.training_dependency_inventory import digest
+from scripts.campaign_20261110.contracts import digest
 
 
 def replace_support(manifest, *, old_profile, new_profile, binding, correction_ref):
