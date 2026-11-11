@@ -83,12 +83,23 @@ def observed_batch_verification(root, reference, kind):
     return result
 
 
-def observe(root, *, now=None):
+def observe(root, *, now=None, publish=None, previous_batches=()):
     root = Path(root).resolve(); base = root/'training_pipeline_canaries'
     result = {'schema': 'isg-training-pipeline-status-v1', 'campaign_id': 'campaign_20261110',
         'observed_at': now or datetime.now(timezone.utc).isoformat(), 'records': [], 'batch_stages': [],
         'sources': [], 'errors': [], 'benchmark_credit': 0, 'quota_consumed': 0,
         'production_released': False, 'status': 'observed'}
+    result['cycle_started_at'] = result['observed_at']
+    result['cycle_finished_at'] = None
+    def checkpoint(phase):
+        if publish is None: return
+        current = {b['request']['path'] for b in result['batch_stages']}
+        carried = [{**b, 'observation_current_cycle': False} for b in previous_batches
+                   if b.get('request', {}).get('path') not in current]
+        snapshot = {**result, 'batch_stages': result['batch_stages'] + carried,
+                    'cycle_phase': phase, 'status': 'refreshing'}
+        summarize(snapshot)
+        publish(snapshot)
     reviews = {}
     for path in sorted(base.glob('*/existing_native_reviews.json')):
         try:
@@ -195,9 +206,13 @@ def observe(root, *, now=None):
                             'native': True, 'demo': True, 'physics_replay': True, 'hard_qa': True,
                             'export_provenance': True, 'benchmark_acceptance': False,
                             'perturbations': proof['export_record'].get('perturbations', {})}
+                row['last_observed_at'] = datetime.now(timezone.utc).isoformat()
                 result['records'].append(row)
         except Exception as error:
             result['errors'].append({'path': str(path), 'error': f'{type(error).__name__}: {error}'})
+    # Publish freshly joined instance outcomes before any potentially slow full
+    # batch proof. Prior batch observations keep their own dated evidence.
+    checkpoint('batch_verification')
     for request in sorted(base.glob('*/batch_restoration*/request.json')):
         batch = {'request': ref(request), 'batch': str(request.parent.relative_to(base)),
                  'observed_at': timestamp(request), 'status': 'prepared_unvalidated', 'stages': [],
@@ -283,14 +298,23 @@ def observe(root, *, now=None):
         elif any(s['status'] in ('failed_execution','failed_validation')for s in batch['stages']):batch['status']='failed_validation'
         elif any(s['status']=='completed_without_complete_probe'for s in batch['stages']):batch['status']='incomplete_terminal_evidence'
         elif submissions:batch['status']='submitted'
+        batch['observation_current_cycle'] = True
+        batch['last_observed_at'] = datetime.now(timezone.utc).isoformat()
         result['batch_stages'].append(batch)
+        checkpoint('batch_verification')
+    result['cycle_finished_at'] = datetime.now(timezone.utc).isoformat()
+    result['cycle_phase'] = 'complete'
+    summarize(result)
+    return result
+
+
+def summarize(result):
     keys = [(r['candidate_id'], r['start']) for r in result['records']]
     require(len(keys) == len(set(keys)), 'duplicate exact canary attempt in projection')
     result['counts'] = dict(Counter(r['status'] for r in result['records']))
     result['attempts_observed'] = len(result['records'])
     result['family_paths'] = family_paths(result['records'], result['batch_stages'])
     if result['errors']: result['status'] = 'partial_observation'
-    return result
 
 
 
@@ -329,7 +353,9 @@ def main():
     parser.add_argument('--root', type=Path, required=True); parser.add_argument('--interval', type=float, default=0)
     args = parser.parse_args(); output = args.root/'training_pipeline_canaries/pipeline_status.json'
     while True:
-        value = observe(args.root)
+        previous = read(output).get('batch_stages', []) if output.exists() else []
+        value = observe(args.root, publish=lambda value: write_json_atomic(output, value),
+                        previous_batches=previous)
         write_json_atomic(output, value)
         print(json.dumps({'observed_at': value['observed_at'], 'attempts': value['attempts_observed'],
             'errors': len(value['errors']), 'benchmark_credit': 0}), flush=True)

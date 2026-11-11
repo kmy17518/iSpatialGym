@@ -1,5 +1,6 @@
 from scripts.campaign_20261110 import training_pipeline_status as status
 from scripts.campaign_20261110.contracts import write_json_atomic
+import copy
 
 
 def request(root, name, start):
@@ -18,6 +19,31 @@ def test_failed_and_pending_attempts_never_become_credit(tmp_path):
     assert value['attempts_observed'] == 2 and value['counts'] == {'native_failed': 1, 'native_not_observed': 1}
     assert value['benchmark_credit'] == value['quota_consumed'] == 0
     assert not (tmp_path/'dataset').exists()
+
+
+def test_instance_refresh_publishes_before_slow_batch_and_preserves_prior_dates(tmp_path, monkeypatch):
+    request(tmp_path, 'fresh', 12)
+    folder=tmp_path/'training_pipeline_canaries/batch/batch_restoration_r1'
+    write_json_atomic(folder/'request.json', {'canaries': []})
+    write_json_atomic(folder/'physics/probe.json', {'entries': [{}, {}, {}]})
+    prior={'request': status.ref(folder/'request.json'), 'status': 'failed_validation',
+           'tasks': [], 'observed_at': '2026-11-11T00:00:00Z',
+           'stages': [{'kind': 'physics_action_open_loop', 'status': 'failed_validation',
+                       'verification_observed_at': '2026-11-11T00:01:00Z'}]}
+    published=[]
+    def verify(*args):
+        assert published, 'fresh records must be visible before expensive verification'
+        first=published[0]
+        assert first['records'][0]['start']==12 and first['cycle_finished_at'] is None
+        assert first['batch_stages'][0]['observation_current_cycle'] is False
+        assert first['batch_stages'][0]['stages'][0]['verification_observed_at']=='2026-11-11T00:01:00Z'
+        return {'status': 'failed_validation', 'error': 'unchanged strict failure'}
+    monkeypatch.setattr(status,'observed_batch_verification',verify)
+    final=status.observe(tmp_path,publish=lambda value:published.append(copy.deepcopy(value)),previous_batches=[prior])
+    assert final['cycle_phase']=='complete' and final['cycle_finished_at'] is not None
+    assert final['batch_stages'][0]['observation_current_cycle'] is True
+    assert final['batch_stages'][0]['status']=='failed_validation'
+    assert final['benchmark_credit']==final['quota_consumed']==0
 
 
 def test_review_must_match_original_native_index(tmp_path):
