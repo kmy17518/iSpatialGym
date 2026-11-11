@@ -60,7 +60,8 @@ def read_counts(root, template, standards, room_plan):
             with sqlite3.connect(f"file:{local}?mode=ro", uri=True) as db:
                 counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                                                 (template.split, template.task, scope))))
-                records = [json.loads(row[0]) for row in db.execute("SELECT record FROM members WHERE split='train' AND task=?", (template.task,))]
+                from scripts.campaign_20261110.training_eligibility import eligible_training_records
+                records = eligible_training_records(db, template.task)
                 train_class = sum(row["class_id"] == template.class_id for row in records)
                 train_buckets = Counter(row.get("bucket") for row in records if row["class_id"] == template.class_id)
                 room_used = sum(accepted_room(row) == room for row in records)
@@ -94,21 +95,15 @@ def next_work(template, counts, *, max_groups=6, training_validated=False, mode=
         if split == "eval_standard":
             groups = min(groups, counts["class_remaining"], counts["room_remaining"])
         return {"phase": split, "bucket": bucket, "groups": groups, "needs_new_gate": False} if groups else None
-    if mode == "eval_only" or split not in ("train", "eval_standard"):
-        return None
-    spare = min(counts["class_remaining"], max(0, counts["room_remaining"]-counts["evaluation_sibling_reserve"]))
-    if spare <= 0:
-        return None
-    weights = (3, 4, 3)
-    bucket = min(range(3), key=lambda i: (counts["train_buckets"].get(i, 0)/weights[i], i))
-    groups = min(max_groups, (spare+2)//3) if training_validated else 1
-    return {"phase": "train", "bucket": bucket, "groups": groups, "needs_new_gate": not training_validated}
+    # Persistent gate: autonomous standalone refill is disabled until release.
+    return None
 
 
 def reserve_pending_counts(counts, template, pending):
     """Conservatively reserve unpublished slots, without treating them as accepted."""
     result={**counts,'evaluation':Counter(counts['evaluation']),'train_buckets':Counter(counts['train_buckets'])}
     for row in pending:
+        if row.get("phase") == "train": continue
         if row['task']!=template.task:continue
         groups=row['groups'];phase=row['phase'];same_class=row['class_id']==template.class_id
         if phase==template.split and (same_class or phase=='eval_category'):

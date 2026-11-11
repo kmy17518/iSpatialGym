@@ -66,11 +66,11 @@ def read_counts(root, template):
             result["evaluation"] = Counter(dict(db.execute(
                 "SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                 (template.split, template.task, scope))))
-            result["train_buckets"] = Counter(dict(db.execute(
-                "SELECT bucket,COUNT(*) FROM members WHERE split='train' AND task=? AND class_id=? GROUP BY bucket",
-                (template.task, template.class_id))))
+            from scripts.campaign_20261110.training_eligibility import eligible_training_records
+            eligible_training = eligible_training_records(db, template.task)
+            result["train_buckets"] = Counter(row.get("bucket") for row in eligible_training if row["class_id"] == template.class_id)
             result["class_remaining"] -= sum(result["train_buckets"].values())
-            result["task_remaining"] -= db.execute("SELECT COUNT(*) FROM members WHERE split='train' AND task=?", (template.task,)).fetchone()[0]
+            result["task_remaining"] -= len(eligible_training)
             standard = db.execute("SELECT COUNT(*) FROM members WHERE split='eval_standard' AND task=? AND class_id=?",
                                   (template.task, template.class_id)).fetchone()[0]
             result["evaluation_sibling_reserve"] = max(0, 10 - standard)
@@ -86,6 +86,8 @@ def pending(root):
         records = [record for state in raw.get("seeds", {}).values() for record in state.get("queues", [])]
         records += [record for record in raw.get("records", {}).values() if isinstance(record, dict) and "admission_id" in record]
         for record in records:
+            if record.get("phase") == "train":
+                continue
             if record.get("status") in ("complete", "admitted", "failed"):
                 continue
             ids = [gid for gid in record["prepared"]["group_ids"] if gid not in record.get("groups", {})]
@@ -103,6 +105,7 @@ def pending(root):
 def reserve_pending_counts(counts, template, records):
     result = {**counts, "evaluation": Counter(counts["evaluation"]), "train_buckets": Counter(counts["train_buckets"])}
     for row in records:
+        if row.get('phase') == 'train': continue
         if row["task"] != template.task:
             continue
         n, phase = 3 * row["groups"], row["phase"]
@@ -136,22 +139,8 @@ def next_work(template, counts, *, max_groups=6, training_validated=False, mode=
             if split == "eval_standard":
                 groups = min(groups, counts["class_remaining"], counts["task_remaining"])
             return {"phase": split, "bucket": bucket, "groups": groups, "needs_new_gate": False} if groups else None
-    if mode == "eval_only" or split not in ("train", "eval_standard"):
-        return None
-    reserve = counts.get("evaluation_sibling_reserve", 0)
-    spare = min(max(0, counts["class_remaining"] - reserve), counts["task_remaining"])
-    if spare <= 0:
-        return None
-    # Another controller can still be collecting standard evaluation. Every
-    # outstanding eval needs a fresh training sibling in this class. Pending
-    # groups already reserve their full three candidates, conservatively.
-    available_groups = spare // 3 if reserve else (spare + 2) // 3
-    if not available_groups:
-        return None
-    weights = quotas(template, "train")
-    bucket = min(range(len(weights)), key=lambda i: (counts["train_buckets"].get(i, 0) / weights[i], i))
-    return {"phase": "train", "bucket": bucket, "groups": min(max_groups, available_groups) if training_validated else 1,
-            "needs_new_gate": not training_validated}
+    # Persistent gate: autonomous standalone refill is disabled until release.
+    return None
 
 
 def prepare_queue(spec, state, decision, cfg, root, template, save):

@@ -19,7 +19,7 @@ class DispatchTests(unittest.TestCase):
         (self.code / '.snapshot_commit').write_text('immutable-code')
         (self.root / 'manifests').mkdir()
         (self.root / 'manifests/family_index_reservations.json').write_text(json.dumps({'reservations': {'fresh': {'start': 50000000, 'n': 3}}}))
-        self.config = self.root / 'config.json'; self.config.write_text('{}')
+        self.config = self.root / 'config.json'; self.config.write_text(json.dumps({'template':{'split':'eval_standard','task':'object_scaling','class_id':'apple'}}))
         self.command = ['python3', str(self.code / 'scripts/trainfast/submit_fast.py'), 'submit', 'object_scaling-apple', '3',
                         '--root', str(self.root), '--code', str(self.code), '--base-index', '50000000', '--tag', 'held_queue',
                         '--extra-env', 'ISPATIALGYM_CAMPAIGN_CONFIG=' + str(self.config), '--extra-env', 'ISGF_COLLECT_EXTRA=--no-goal-override']

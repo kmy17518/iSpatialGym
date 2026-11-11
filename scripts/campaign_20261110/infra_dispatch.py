@@ -151,6 +151,8 @@ def enqueue(root, token, command, priority=50, backends=BACKENDS):
     root = Path(root).resolve()
     require(token and token.replace('_', '').replace('-', '').isalnum(), 'unsafe dispatch token')
     require(backends and set(backends) <= set(BACKENDS), 'unknown dispatch backend')
+    from scripts.campaign_20261110.production_gate import require_dispatch
+    require_dispatch(root, command)
     identity = input_identity(root, command)
     prepare_intent_ledger(root, token)
     reservation_path = root / 'manifests/family_index_reservations.json'
@@ -191,6 +193,8 @@ def enqueue(root, token, command, priority=50, backends=BACKENDS):
 
 
 def routed_command(root, payload, backend):
+    from scripts.campaign_20261110.production_gate import require_dispatch
+    require_dispatch(root, payload['command'])
     require(backend in payload['backends'], 'backend not authorized for this intent')
     command = list(payload['command'])
     require(input_identity(root, command) == payload['identity'], 'immutable command inputs changed')
@@ -293,6 +297,8 @@ def activate_vast(root, payload, row, timeout=25):
 def execute(root, path, backend):
     root, path = Path(root).resolve(), Path(path)
     payload = json.loads(path.read_text())
+    from scripts.campaign_20261110.production_gate import require_dispatch
+    require_dispatch(root, payload['command'])
     receipt_path = root / 'dispatch/receipts' / (payload['token'] + '.json')
     with atomic_directory_lock(root / 'dispatch/locks' / (payload['token'] + '.lockdir')):
         prior = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}

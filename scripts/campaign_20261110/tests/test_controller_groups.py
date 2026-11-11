@@ -10,10 +10,9 @@ def counts(**kwargs):
 def test_unbucketed_pair_eval_continues_to_training_with_new_phase_gate():
     template = SimpleNamespace(task="inter_object_relation_satisfaction-ontop_small_scale", split="eval_standard")
     assert next_work(template, counts())["groups"] == 6
-    assert next_work(template, counts(evaluation={0: 10})) == {
-        "phase": "train", "bucket": 0, "groups": 1, "needs_new_gate": True}
-    assert next_work(template, counts(evaluation={0: 10}), training_validated=True)["groups"] == 6
-    assert next_work(template, counts(), mode="train_only")["phase"] == "train"
+    assert next_work(template, counts(evaluation={0: 10})) is None
+    assert next_work(template, counts(evaluation={0: 10}), training_validated=True) is None
+    assert next_work(template, counts(), mode="train_only") is None
 
 
 def test_holdouts_never_spill_into_training_and_count_three_members_per_group():
@@ -40,7 +39,7 @@ def test_strict_joint_buckets_and_soft_training_use_their_own_weights():
     template = SimpleNamespace(task="configuration_matching-articulation_close_small_scale", split="eval_standard")
     assert next_work(template, counts(evaluation={0: 5, 1: 2}))["bucket"] == 1
     result = next_work(template, counts(evaluation={0: 5, 1: 5}, train_buckets={0: 100, 1: 0}), training_validated=True)
-    assert result["bucket"] == 1 and result["phase"] == "train"
+    assert result is None
     assert next_work(template, counts(class_remaining=0), mode="train_only") is None
     assert ranges(template) == ((0, .5), (.5, 1))
 
@@ -51,7 +50,7 @@ def test_pending_generic_groups_reserve_global_task_and_class_capacity():
                {"task": "disembedding", "class_id": "another", "phase": "train", "bucket": 0, "groups": 6}]
     result = reserve_pending_counts(counts(), template, pending)
     assert result["evaluation"] == {1: 4}
-    assert result["class_remaining"] == 988 and result["task_remaining"] == 3970
+    assert result["class_remaining"] == 988 and result["task_remaining"] == 3988
     assert next_work(template, result)["bucket"] == 0
 
 
@@ -61,9 +60,9 @@ def test_training_cannot_consume_unfinished_standard_evaluation_siblings():
                      training_validated=True, mode="train_only") is None
     result = next_work(template, counts(class_remaining=5, evaluation_sibling_reserve=2),
                        training_validated=True, mode="train_only")
-    assert result["groups"] == 1  # Three candidates still leave two required siblings.
+    assert result is None  # Standalone production is blocked.
     assert next_work(template, counts(class_remaining=1, evaluation_sibling_reserve=0),
-                     training_validated=True, mode="train_only")["groups"] == 1
+                     training_validated=True, mode="train_only") is None
 
 
 def test_retired_runtime_reconciles_existing_work_but_never_authors_more(tmp_path, monkeypatch):

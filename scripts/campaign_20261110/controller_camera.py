@@ -39,13 +39,9 @@ def remaining_capacity(template, accepted, caps, quotas):
                 and (split == "eval_category" or r.get("class_id", class_id) == class_id)]
     counts = Counter(r["bucket"] for r in eligible)
     evaluation = sum(max(0, n - counts[b]) for b, n in quotas.get(split, {}).items())
-    if split not in ("train", "eval_standard"):
-        return evaluation
-    room = template.scene + "/" + template.room
-    training = [r for r in rows if r["split"] == "train"]
-    room_left = max(0, caps.get(room, 0) - sum(r["room"] == room for r in training))
-    class_left = max(0, 1000 - sum(r.get("class_id", class_id) == class_id for r in training))
-    return evaluation + min(room_left, class_left)
+    # No standalone camera training until the complete pipeline is released.
+    return evaluation
+
 
 
 def pending_camera(root,accepted):
@@ -72,6 +68,7 @@ def reserved_capacity(template, accepted, caps, quotas, pending):
     caps=dict(caps);same_scope=0
     room=template.scene+'/'+template.room
     for row in pending:
+        if row.get('split') == 'train': continue
         if row['task']!=template.task:continue
         share_train=template.split in ('train','eval_standard') and row['split'] in ('train','eval_standard')
         share_eval=template.split==row['split']

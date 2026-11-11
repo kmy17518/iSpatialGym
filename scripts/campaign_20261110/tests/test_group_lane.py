@@ -50,11 +50,12 @@ def test_strict_eval_bucket_caps_with_train_siblings_and_idempotent_export(tmp_p
         f, review = candidate(tmp_path, index)
         result = claim(tmp_path, f, review)
         assert list(result["accepted"].values()).count("eval_standard") == (1 if index < 3 else 0)
-        assert list(result["accepted"].values()).count("train") >= 1
+        assert list(result["accepted"].values()).count("train") == (1 if index < 3 else 0)
         assert claim(tmp_path, f, review) == result
         exported = tmp_path / "dataset/groups" / (review["group_id"]+".json")
-        assert read(exported) == result
-    assert read(tmp_path / "dataset/group_counts.json")["counts"] == {"eval_standard": 3, "train": 5}
+        if index < 3: assert read(exported) == result
+        else: assert not exported.exists()
+    assert read(tmp_path / "dataset/group_counts.json")["counts"] == {"eval_standard": 3, "train": 3}
 
 
 def test_repeated_canonical_goal_can_form_another_fresh_group_under_owner_policy(tmp_path):
@@ -80,7 +81,7 @@ def test_changed_artifacts_and_reserved_models_fail_before_claim(tmp_path):
 
 def test_train_buckets_soft_eval_strict_and_boundary_rules(tmp_path):
     f, review = candidate(tmp_path, 0, magnitude=.31, split="train")
-    assert set(claim(tmp_path, f, review)["accepted"].values()) == {"train"}
+    assert claim(tmp_path, f, review)["accepted"] == {}
     with pytest.raises(c.ContractError, match="outside task buckets"):
         lane.bucket_index(replace(f.template, split="eval_standard"), {"actual_magnitude": .31}, strict=True)
     assert lane.bucket_index(f.template, {"actual_magnitude": .10}, strict=True) == 0
@@ -122,7 +123,7 @@ def test_area_weighted_room_cap_counts_siblings_and_freezes_policy(tmp_path):
         claim(tmp_path,f2,review2,plan=room_plan())
 
 
-def test_per_class_training_cap_applies_before_task_total(tmp_path):
+def test_unverified_historical_rows_leave_replacement_capacity_open(tmp_path):
     f,review=candidate(tmp_path,0)
     path=tmp_path/"dataset/quotas.sqlite3";path.parent.mkdir()
     db=lane._db(path)
@@ -133,7 +134,7 @@ def test_per_class_training_cap_applies_before_task_total(tmp_path):
     db.close()
     assert sorted(claim(tmp_path,f,review)["accepted"].values())==["eval_standard","train"]
     f2,review2=candidate(tmp_path,1)
-    assert claim(tmp_path,f2,review2)["accepted"]=={}
+    assert sorted(claim(tmp_path,f2,review2)["accepted"].values())==["eval_standard","train"]
 
 
 def test_room_cap_migration_reads_verified_legacy_tro_without_changing_it(tmp_path):

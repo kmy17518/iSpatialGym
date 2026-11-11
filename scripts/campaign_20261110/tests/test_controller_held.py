@@ -36,8 +36,8 @@ def test_training_reserves_room_capacity_for_other_eval_siblings_and_needs_its_o
     t = SimpleNamespace(task="object_scaling", split="eval_standard")
     completed = counts(evaluation={0:3,1:4,2:3})
     proposal = next_work(t, completed)
-    assert proposal == {"phase":"train", "bucket":0, "groups":1, "needs_new_gate":True}
-    assert next_work(t, completed, training_validated=True)["groups"] == 6
+    assert proposal is None
+    assert next_work(t, completed, training_validated=True) is None
     assert next_work(t, counts(evaluation={0:3,1:4,2:3},room_remaining=10,evaluation_sibling_reserve=10)) is None
     assert next_work(t, counts(evaluation={0:3,1:4,2:3},class_remaining=0)) is None
 
@@ -56,7 +56,7 @@ def test_eval_only_held_refill_preserves_strict_deficits_and_stops_at_quota():
         "phase": "eval_standard", "bucket": 2, "groups": 1, "needs_new_gate": False}
     complete = counts(evaluation={0:3,1:4,2:3})
     assert next_work(template, complete, mode="eval_only", training_validated=True) is None
-    assert next_work(template, complete)["phase"] == "train"
+    assert next_work(template, complete) is None
     with pytest.raises(ContractError, match="unknown held collection mode"):
         next_work(template, complete, mode="typo")
 
@@ -79,7 +79,7 @@ def test_private_native_customs_and_definition_are_preserved_and_hash_checked(tm
 def test_training_bucket_selection_remains_a_preference():
     t = SimpleNamespace(task="mental_rotation", split="train")
     proposal = next_work(t, counts(train_buckets={0:30,1:0,2:30}), training_validated=True)
-    assert proposal["phase"] == "train" and proposal["bucket"] == 1
+    assert proposal is None
 
 
 @pytest.mark.parametrize("family", ["held", "generic"])
@@ -99,8 +99,8 @@ def test_unbucketed_soft_training_counts_remain_serializable_and_consume_capacit
     monkeypatch.setattr(group_lane, "training_room_policy", lambda *args: {"caps": {"scene/room": 100}})
     counts = (controller_held.read_counts(tmp_path, template, [], {}) if family == "held"
               else controller_groups.read_counts(tmp_path, template))
-    assert counts["train_buckets"] == {0: 1} and counts["train_unbucketed"] == 1
-    assert counts["class_remaining"] == 998 and counts["evaluation_unbucketed"] == 1
+    assert counts["train_buckets"] == {} and counts["train_unbucketed"] == 0
+    assert counts["class_remaining"] == 1000 and counts["evaluation_unbucketed"] == 1
     canonical_json({"counts": counts})  # Controller state publication must not crash on soft-bucket nulls.
 
 
@@ -150,7 +150,7 @@ def test_pending_queues_reserve_distinct_strict_buckets_and_shared_room_capacity
     reserved=reserve_pending_counts(original,template,pending)
     assert original['evaluation']=={}
     assert reserved['evaluation']=={1:4}
-    assert reserved['class_remaining']==988 and reserved['room_remaining']==161
+    assert reserved['class_remaining']==988 and reserved['room_remaining']==179
     assert next_work(template,reserved)['bucket']==0
     assert next_work(template,reserve_pending_counts(counts(room_remaining=3),template,pending)) is None
 

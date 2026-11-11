@@ -296,20 +296,29 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                     require(previous[0] == digest(review), "accepted group changed")
                     return json.loads(previous[1])
                 split, task = template.split, template.task
+                if split == "train":
+                    return {"accepted": {}, "deferred": [row["instance_id"] for row in rows],
+                            "reason": "training production gate: standalone eligibility not validated"}
                 scope = task if split == "eval_category" else template.class_id
                 counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                                                   (split, task, scope))))
-                train_count = db.execute("SELECT COUNT(*) FROM members WHERE split='train' AND task=?", (task,)).fetchone()[0]
-                class_count = db.execute("SELECT COUNT(*) FROM members WHERE split='train' AND task=? AND class_id=?",
-                                         (task,template.class_id)).fetchone()[0]
+                from scripts.campaign_20261110.training_eligibility import eligible_training_records
+                eligible_training = eligible_training_records(db, task)
+                train_count = len(eligible_training)
+                class_count = sum(row["class_id"] == template.class_id for row in eligible_training)
                 class_cap = QUOTAS[task].train_instances//QUOTAS[task].standard_classes
                 capacity = class_cap-class_count
                 if room_policy is not None:
-                    records = [json.loads(row[0]) for row in db.execute("SELECT record FROM members WHERE split='train' AND task=?",(task,))]
+                    records = eligible_training
                     room_counts = Counter(accepted_room(row) for row in records)
                     require(set(room_counts) <= set(room_policy["caps"]), "accepted training data includes a room outside frozen plan")
                     require(all(room_counts[key] <= cap for key,cap in room_policy["caps"].items()), "accepted training data already exceeds room cap")
                     capacity = min(capacity,room_policy["caps"][room]-room_counts[room])
+                if split == "eval_standard":
+                    total, buckets = _quota(QUOTAS[task], split)
+                    if sum(counts.values()) >= total or not any(not buckets or counts[row["bucket"]] < buckets[row["bucket"]] for row in rows):
+                        return {"accepted": {}, "deferred": [row["instance_id"] for row in rows],
+                                "reason": "training production gate: evaluation purpose exhausted"}
                 allocation = _allocate(rows, split=split, q=QUOTAS[task], eval_counts=counts, train_count=train_count,train_capacity=capacity)
                 if not allocation:
                     return {"accepted": {}, "deferred": [row["instance_id"] for row in rows], "reason": "quota full"}

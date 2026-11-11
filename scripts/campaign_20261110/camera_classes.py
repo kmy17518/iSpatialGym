@@ -21,8 +21,8 @@ def allocate_members(accepted, members, *, class_id, training_room_caps, eval_qu
     """Pure quota decision: held-out overflow can never become training."""
     eval_counts = Counter((row["split"], "*" if row["split"] == "eval_category" else row["class_id"], row["bucket"])
                           for row in accepted.values() if row["split"] != "train")
-    room_counts = Counter(row["room"] for row in accepted.values() if row["split"] == "train")
-    class_counts = Counter(row["class_id"] for row in accepted.values() if row["split"] == "train")
+    room_counts = Counter()
+    class_counts = Counter()
     added, deferred = {}, []
     for member in members:
         iid, bucket, room = member["instance_id"], member["bucket"], member["room"]
@@ -36,11 +36,6 @@ def allocate_members(accepted, members, *, class_id, training_room_caps, eval_qu
         if source in eval_quotas and not member["perturbed"] and eval_counts[slot] < eval_quotas[source][bucket]:
             split = source
             eval_counts[slot] += 1
-        elif (source in ("eval_standard", "train") and room in training_room_caps
-              and room_counts[room] < training_room_caps[room] and class_counts[class_id] < 1000):
-            split = "train"
-            room_counts[room] += 1
-            class_counts[class_id] += 1
         else:
             deferred.append(iid)
             continue

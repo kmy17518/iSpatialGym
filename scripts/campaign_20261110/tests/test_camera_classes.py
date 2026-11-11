@@ -17,8 +17,8 @@ def test_class_specific_eval_and_soft_training_buckets():
         rows = members(cls, "eval_standard", (5, 5, 5))
         added, deferred = allocate_members(accepted, rows, class_id=cls, training_room_caps={"scene/room": 100})
         assert list(added.values()).count("eval_standard") == 10
-        assert list(added.values()).count("train") == 5 and not deferred
-        assert allocate_members(accepted, rows, class_id=cls, training_room_caps={"scene/room": 100}) == ({}, [])
+        assert list(added.values()).count("train") == 0 and len(deferred) == 5
+        assert allocate_members(accepted, rows, class_id=cls, training_room_caps={"scene/room": 100}) == ({}, deferred)
 
 
 def test_model_overflow_never_becomes_training_and_category_quota_is_task_wide():
@@ -44,13 +44,13 @@ def test_standard_camera_category_keeps_its_distinct_three_four_three_quota():
 def test_training_honors_room_and_class_caps_and_accepts_only_held_in():
     accepted = {}
     added, deferred = allocate_members(accepted, members("train", "train", (1002, 0, 0)), class_id="hamper", training_room_caps={"scene/room": 2000})
-    assert len(added) == 1000 and len(deferred) == 2
+    assert len(added) == 0 and len(deferred) == 1002
     added, deferred = allocate_members(accepted, members("chair", "train", (4, 0, 0)), class_id="chair", training_room_caps={"scene/room": 1002})
-    assert len(added) == 2 and len(deferred) == 2
+    assert len(added) == 0 and len(deferred) == 4
     rows = members("perturbed", "eval_standard", (1, 0, 0))
     rows[0]["perturbed"] = True
     added, _ = allocate_members(accepted, rows, class_id="new", training_room_caps={"scene/room": 2000})
-    assert list(added.values()) == ["train"]
+    assert list(added.values()) == []
 
 
 def test_obstructed_audit_and_atomic_claim_bind_poses_and_global_reservations(tmp_path):
@@ -66,7 +66,7 @@ def test_obstructed_audit_and_atomic_claim_bind_poses_and_global_reservations(tm
                   reservations=reservations, reservation_hashes=hashes)
     path = tmp_path/"dataset/camera_obstructed.json"
     result = camera_classes.claim_obstructed(review, path, **kwargs)
-    assert result["counts"]["splits"] == {"eval_standard": 10, "train": 2}
+    assert result["counts"]["splits"] == {"eval_standard": 10}
     assert camera_classes.claim_obstructed(review, path, **kwargs)["accepted"] == {}
     target = f.inst/"camera_01-tro_state.json"
     tro = camera_classes.read(target)

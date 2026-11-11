@@ -74,10 +74,10 @@ def test_strict_eval_quotas_training_soft_buckets_and_idempotency(tmp_path):
     review = audit(f)
     result = claim(f, review)
     assert result["counts"]["eval_standard"] == {"3": 3, "5": 4, "10": 3}
-    assert result["counts"]["train_total"] == 2
+    assert result["counts"]["train_total"] == 0
     assert claim(f, review)["accepted"] == {}
     accepted=lane.read(f.root / "accepted/camera.json")["accepted"]
-    assert len(accepted) == 12
+    assert len(accepted) == 10
     assert all(row["contract"]["class_id"]==f.template.class_id and row["source_job"]==str(f.job) for row in accepted.values())
     state=lane.read(f.root / "accepted/camera.json")
     state["accepted"]["camera_00"].pop("contract")
@@ -101,7 +101,7 @@ def test_mutated_report_after_audit_and_train_room_cap_are_enforced(tmp_path):
     f = fixture(tmp_path, distances=(1, 1, 1, 1, 1, 1, 1))
     review = audit(f)
     result = claim(f, review)
-    assert len(result["accepted"]) == 5 and len(result["deferred"]) == 2
+    assert len(result["accepted"]) == 3 and len(result["deferred"]) == 4
     report = Path(review["members"][1]["artifacts"]["report"]["path"])
     report.write_text("{}")
     with pytest.raises(c.ContractError, match="changed after review"):

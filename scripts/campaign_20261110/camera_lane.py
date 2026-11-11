@@ -193,7 +193,9 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
         require(state["eval_quotas"] == EVAL_QUOTAS and state["training_room_caps"] == training_room_caps, "quota policy changed")
         accepted = state["accepted"]
         eval_counts = Counter(row["bucket"] for row in accepted.values() if row["split"] == "eval_standard")
-        train_counts = Counter(row["room"] for row in accepted.values() if row["split"] == "train")
+        # Cameras have no goal-group sibling exception. Historical rows remain
+        # stored, but cannot consume compliant replacement capacity.
+        train_counts = Counter()
         added, deferred = {}, []
         for member in review["members"]:
             iid, bucket, room = member["instance_id"], member["bucket"], member["room"]
@@ -209,9 +211,6 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
             if member["sampling_split"] == "eval_standard" and not member["perturbed"] and eval_counts[bucket] < EVAL_QUOTAS[bucket]:
                 split = "eval_standard"
                 eval_counts[bucket] += 1
-            elif room in training_room_caps and train_counts[room] < training_room_caps[room]:
-                split = "train"
-                train_counts[room] += 1
             else:
                 deferred.append(iid)
                 continue

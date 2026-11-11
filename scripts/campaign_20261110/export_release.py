@@ -288,6 +288,13 @@ def main():
     p.add_argument("--shard-size", type=int, default=32)
     a = p.parse_args()
     source, groups, inputs = snapshot_allocations(a.root)
+    from scripts.campaign_20261110.training_eligibility import classify_record
+    excluded = [row for row in source if row['split'] == 'train' and classify_record(row, groups.get(row.get('group_id')))['status'] != 'eligible']
+    source = [row for row in source if row not in excluded]
+    included = {row['instance_id'] for row in source}
+    groups = {gid: group for gid,group in groups.items() if any(iid in included for iid in group['accepted'])}
+    inputs.append({'kind': 'training_eligibility_filter', 'excluded_historical_training': len(excluded),
+                   'excluded_record_sha256': digest(excluded), 'historical_records_preserved': True})
     contracts = contract_index(a.root)
     active = next((item["pointer"] for item in inputs if item.get("kind") == "active_reservation_policy"), None)
     paths = (active["reservations"]["path"], active["asset_hashes"]["path"]) if active else (a.reservations, a.reservation_hashes)
