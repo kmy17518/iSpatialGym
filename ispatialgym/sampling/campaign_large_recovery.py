@@ -1,10 +1,61 @@
 """Strict candidate-selection policies for measured large-object failures."""
 import os
+import copy
 
 from scripts.campaign_20261110.contracts import require
 
 
 SOAP_LIFT_FRAME_ENV = 'ISPATIALGYM_CAMPAIGN_SOAP_LIFT_FRAME_SCREEN'
+
+
+def candidate_program_screen(plan=None):
+    """Run the unchanged final check while audited alternatives remain available."""
+    from ispatialgym.sampling import campaign_runtime as runtime
+    if not runtime.active():
+        return False
+    _, template, _, _ = runtime.configuration()
+    enabled = template.scene_setup.get('recovery_options', {}).get('heel_candidate_program_screen', False)
+    require(type(enabled) is bool, 'heel candidate program screen must be boolean')
+    if enabled:
+        require(template.class_id == 'inter_object_relation_satisfaction-under_large_scale_01'
+                and template.task == 'inter_object_relation_satisfaction-under_large_scale',
+                'heel candidate program screen belongs to the audited sandal class')
+        return True
+    proposal = getattr(plan, 'floor_push_source_proposal', None)
+    if proposal is not None:
+        require(template.class_id == 'inter_object_relation_satisfaction-under_large_scale_02'
+                and template.task == 'inter_object_relation_satisfaction-under_large_scale'
+                and isinstance(proposal, dict),
+                'floor push candidate screen belongs to the audited briefcase plan')
+        return True
+    return False
+
+
+def candidate_program_rejection(sampler, plan=None):
+    """Screen a complete candidate without retaining provisional witness edits.
+
+    Both audited classes repeatedly reached the late checker only after the
+    stance/grasp loop had ended. Reuse that checker on an isolated sidecar so a
+    failed retreat leaves the remaining native candidates searchable. Its
+    world-state restoration and every original rejection remain in force.
+    """
+    if not candidate_program_screen(plan):
+        return None
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2 import program_check
+
+    original = sampler.sidecar
+    sampler.sidecar = copy.deepcopy(original)
+    try:
+        with sampler._floor_relaxed():
+            program_check.run(sampler.gp.variant, sampler.sidecar, sampler,
+                              subtask=sampler.subtask)
+        sampler.heel_tight_left_j4_check()
+    except Reject as exc:
+        return f'{exc.reason}: {exc}'
+    finally:
+        sampler.sidecar = original
+    return None
 
 
 def heel_carry_path_screen():

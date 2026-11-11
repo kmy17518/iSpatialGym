@@ -8181,6 +8181,24 @@ class IORSLarge(SamplerV2):
                         TT._count(self, "stance_c.extended_used")
                         log.info("%s: stance C trunk-first order: trunk (%.2f, %.2f) d %.2f coupled at rank %d, after the less extended candidates (least "
                                  "translate %.2f) failed", self.gp.variant, place.translate, place.tilt, place.stand_off or 0.0, i_c, least_translate)
+                from ispatialgym.sampling.campaign_large_recovery import candidate_program_screen, candidate_program_rejection
+                if candidate_program_screen(campaign_plan):
+                    early_failure = candidate_program_rejection(self, campaign_plan)
+                    if early_failure is not None:
+                        TT._count(self, "candidate_program.rejected")
+                        errors.append(f"C: complete candidate program: {early_failure}")
+                        fails["complete candidate program"] = fails.get("complete candidate program", 0) + 1
+                        log.info("%s: candidate program rejected before ending the native search: %s", self.gp.variant, early_failure)
+                        self._drop_leg_records("placement")
+                        self._drop_leg_records("push")
+                        self.record_carry_arm_q(tname, arm, None)
+                        self.sidecar.stances.pop("placement", None)
+                        self.sidecar.stances.pop("push", None)
+                        self.sidecar.grasps.clear()
+                        self.sidecar.contacts.clear()
+                        continue
+                    TT._count(self, "candidate_program.passed")
+                    d.summary["campaign_early_program_screen"] = {"passed": True, "final_check_required": True}
                 if sm is not None and sm_cur is not None and sm_cur[1]:
                     sm.c_passed(sm_cur[0], sm_a)  # a re-checked C of the memo coupled (must stay ~0)
                 return d
