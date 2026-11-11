@@ -4691,12 +4691,17 @@ def push_speed_of(contact) -> Optional[float]:
     2026-10-14 ~02:04: "slow push should be parameter of pushes"): every pad leg of that push runs at it - the approach from the lowered
     pre-contact and the push, the re-push, the strokes, the closed-loop arc, the back-offs, the rock-back round's return onto the face -
     and a base nudge at most at it; None (absent / not positive) = ``push_speed_line`` / ``push_speed_arc`` / the arm's speed."""
+    from ispatialgym.sampling import campaign_runtime
+    # The audited spoon overshot after contact approach. Slow every pad leg,
+    # preserving its hinge, contact geometry, residual checks and final gates.
+    slow_spoon = campaign_runtime.contact_recovery('axial_spoon_slow_pad')
     v = (getattr(contact, "extra", None) or {}).get("push_speed_m_s")
     try:
         v = None if v is None else float(v)
     except (TypeError, ValueError):
-        return None
-    return v if v is not None and v > 0.0 else None
+        v = None
+    speed = v if v is not None and v > 0.0 else None
+    return min(speed, .01) if slow_spoon and speed is not None else .01 if slow_spoon else speed
 
 
 def _speed_kw(ctx: Dict[str, Any]) -> Dict[str, float]:

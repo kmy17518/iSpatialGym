@@ -47,3 +47,16 @@ def test_mass_center_option_uses_existing_physical_constructor(monkeypatch):
     template.scene_setup['recovery_options']['touching_push_mass_center'] = 'true'
     with pytest.raises(ContractError, match='boolean'):
         IS.push_line_com_on()
+
+
+def test_spoon_pad_policy_only_caps_audited_campaign_speed(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    assert EX.push_speed_of(NS(extra={})) is None
+    assert EX.push_speed_of(NS(extra={'push_speed_m_s': .025})) == .025
+    template = bind(monkeypatch, 'alignment-axial_05', 'alignment-axial', {'axial_spoon_slow_pad': True})
+    assert EX.push_speed_of(NS(extra={})) == .01
+    assert EX.push_speed_of(NS(extra={'push_speed_m_s': .025})) == .01
+    assert EX.push_speed_of(NS(extra={'push_speed_m_s': .005})) == .005
+    template.class_id = 'alignment-axial_04'
+    with pytest.raises(ContractError, match='another audited class'):
+        EX.push_speed_of(NS(extra={}))
