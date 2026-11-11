@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import vm from 'node:vm';
+const code=await readFile(new URL('./static/app.js',import.meta.url),'utf8');
+const context=vm.createContext({});
+vm.runInContext(code.slice(code.indexOf('function heldoutJobState'),code.indexOf('function renderHeldout')),context);
+context.jobs=[{state:'RUNNING'},{worker_status:'assigned'},{backend_state:'staging'},{status:'launching'},{state:'PENDING'},{state:'scheduler_state_not_observed'},{state:'COMPLETED'}];
+const counts=JSON.parse(JSON.stringify(vm.runInContext('heldoutJobCounts(jobs)',context)));
+assert.deepEqual(counts,{running:1,pending:1,assigned:3,unknown:1});
+context.jobs=[{state:'assigned',execution_state:'running'},{state:'running',execution_state:'stale'}];
+assert.deepEqual(JSON.parse(JSON.stringify(vm.runInContext('heldoutJobCounts(jobs)',context))),{running:1,pending:0,assigned:0,unknown:1});
+console.log('Held-out activity: assignment/startup, stale evidence and verified execution remain distinct.');
