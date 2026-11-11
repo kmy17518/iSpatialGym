@@ -349,3 +349,23 @@ def test_native_handle_closure_refuses_external_absolute_files(tmp_path):
     (template/'template_meta.json').write_text(json.dumps({'customs':str(customs),'variant':'wardrobe'}))
     with pytest.raises(ValueError,match='outside owned campaign'):
         template_customs_inputs({'TEMPLATE':str(template)},root)
+
+
+def test_standard_recovery_precedes_training_without_enabling_parked_jobs(monkeypatch):
+    from scripts.campaign_20261110.infra_vast import cost_provenance
+    evidence={
+        '1':{'split':'train','class_id':'zero_class'},
+        '2':{'split':'eval_standard','class_id':'working_class'},
+        '3':{'split':'eval_standard','class_id':'zero_class'},
+        '4':{'split':'eval_model','class_id':'zero_class'},
+        '5':{'split':'eval_standard','class_id':'zero_class'},
+        '6':{'split':None,'class_id':'zero_class'},
+    }
+    monkeypatch.setattr(cost_provenance,'scope',lambda row:{'status':'observed',**evidence[row['id']]})
+    rows=[{'id':str(i),'status':'queued'} for i in range(1,7)]
+    config={'dispatch_job_ids':['1','2','3','4','6'], 'dispatch_priority_job_ids':['1','4','2'],
+            'prioritize_standard_eval':True,'standard_recovery_class_ids':['zero_class']}
+    assert [r['id'] for r in dispatch_order(rows,config)]==['3','2','4','6','1']
+    # An explicitly reviewed prerequisite can advance without guessing its split.
+    config['standard_recovery_priority_job_ids']=['6']
+    assert [r['id'] for r in dispatch_order(rows,config)]==['3','6','2','4','1']

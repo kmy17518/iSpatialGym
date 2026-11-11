@@ -95,9 +95,32 @@ def dispatch_order(states, config):
     allowed = config.get("dispatch_job_ids")
     allowed = None if allowed is None else {str(jid) for jid in allowed}
     priority = {str(jid): index for index, jid in enumerate(config.get("dispatch_priority_job_ids", []))}
-    return sorted((row for row in states if row["status"] == "queued" and
-                   (allowed is None or str(row["id"]) in allowed)),
-                  key=lambda row: (priority.get(str(row["id"]), len(priority)), int(row["id"])))
+    rows = [row for row in states if row["status"] == "queued" and
+            (allowed is None or str(row["id"]) in allowed)]
+    standard = bool(config.get("prioritize_standard_eval", False))
+    recovery_classes = set(config.get("standard_recovery_class_ids", []))
+    explicit = set(map(str, config.get("standard_recovery_priority_job_ids", [])))
+    if standard:
+        try:
+            from .cost_provenance import scope
+        except ImportError:
+            from cost_provenance import scope
+
+    def rank(row):
+        tier = 0
+        if standard:
+            evidence = scope(row)
+            split = evidence.get('split')
+            if str(row['id']) in explicit:
+                tier = 0
+            elif evidence.get('status') == 'observed' and split == 'eval_standard':
+                tier = 0 if evidence.get('class_id') in recovery_classes else 1
+            elif split == 'train':
+                tier = 3
+            else:
+                tier = 2  # unknown/held-out scope is never relabeled standard
+        return tier, priority.get(str(row["id"]), len(priority)), int(row["id"])
+    return sorted(rows, key=rank)
 
 
 def prepare_environment(job_dir, root):
