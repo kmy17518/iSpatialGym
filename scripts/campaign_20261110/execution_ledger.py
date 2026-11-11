@@ -125,7 +125,7 @@ def build(root, now=None):
     for i,r in enumerate(records(values['pipeline'].get('records'))):
         result.append(row(f"pipeline:{r.get('candidate_id')}:{r.get('start',i)}", 'pipeline_canary', '/root/dataset_contract', refs['pipeline'],
             configuration_id=r.get('candidate_id'), class_id=r.get('class_id'), status=r.get('status'), runtime=r.get('native_runtime'),
-            configuration_sha256=r.get('configuration_sha256'), dependencies=r.get('dependencies',[]), active_work=[r.get('allocation',{})],
+            configuration_sha256=r.get('configuration_sha256'), start=r.get('start'), count=r.get('count'), dependencies=r.get('dependencies',[]), active_work=[r.get('allocation',{})],
             artifacts=[v for v in (r.get('request'),r.get('native'),r.get('review')) if v],
             stages={**{s:stage() for s in STAGES}, 'native':stage(r.get('native')), 'accepted':{'status':'excluded_zero_credit'}},
             next_action=r.get('next_action') or 'Owner reconciles completed stages into own physics replay, hard QA and batched restoration; no benchmark credit.'))
@@ -151,7 +151,7 @@ def publish(root):
     value=build(root);target=Path(root)/'infra/execution_ledger.json';target.parent.mkdir(parents=True,exist_ok=True)
     temporary=target.with_suffix('.tmp');temporary.write_text(json.dumps(value,indent=2)+'\n');temporary.replace(target)
     print(json.dumps({'observed_at':value['observed_at'],'rows':len(value['rows']),'accepted':value['accepted']['counts'],
-        'preparation':{k:v for k,v in value['preparation'].items() if k!='dispatch'}}),flush=True)
+        'preparation':{k:value['preparation'][k] for k in ('required_configurations','verified_configurations','denominator_complete','dependency_status_counts')}}),flush=True)
 
 
 if __name__=='__main__':

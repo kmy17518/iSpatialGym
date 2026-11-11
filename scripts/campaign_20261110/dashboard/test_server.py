@@ -86,6 +86,20 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.request('GET', '/reports/live')
         self.assertEqual(before, self.hashes())
 
+    def test_execution_and_configuration_pages_preserve_denominator_and_isolation(self):
+        self.write('dashboard/execution_ledger.json',{'campaign_id':'campaign_20261110','rows':[],
+                   'preparation':{'required_configurations':101,'verified_configurations':0}})
+        self.write('dashboard/configuration_index.json',{'campaign_id':'campaign_20261110','rows':[
+            {'id':str(i),'class_id':'C','model_keys':['bottle/A'],'state':'blocked','api_key':'HIDDEN'} for i in range(101)]})
+        before=self.hashes();code,raw=self.request('GET','/api/configurations?q=bottle&offset=100')
+        self.assertEqual(code,200);value=json.loads(raw)
+        self.assertEqual(value['required_configurations_in_index'],101);self.assertEqual(len(value['rows']),1)
+        self.assertNotIn(b'HIDDEN',raw)
+        self.assertEqual(self.request('GET','/reports/execution-ledger')[0],200)
+        self.assertEqual(before,self.hashes())
+        self.write('dashboard/configuration_index.json',{'campaign_id':'old','rows':[]})
+        self.assertEqual(self.request('GET','/api/configurations')[0],404)
+
     def test_mutating_http_methods_are_rejected_without_writes(self):
         before = self.hashes()
         for method in ('POST', 'PUT', 'PATCH', 'DELETE'):

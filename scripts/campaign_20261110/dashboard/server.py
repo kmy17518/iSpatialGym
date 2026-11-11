@@ -7,7 +7,7 @@ import json
 import math
 from pathlib import Path
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 STATIC = Path(__file__).parent / 'static'
 TARGETS = {'eval_standard': 1000, 'eval_model': 891, 'eval_category': 109, 'train': 100000}
@@ -55,6 +55,12 @@ def snapshot(root, inventory):
     requirements, reqs = read_source(root / 'dashboard/training_requirements.json')
     training_stream, tss = read_source(root / 'dashboard/training_stream.json')
     pipeline_status, pss = read_source(root / 'dashboard/pipeline_status.json')
+    execution, exs = read_source(root / 'dashboard/execution_ledger.json')
+    preparation, prs = read_source(root / 'dashboard/preparation_status.json')
+    if execution and execution.get('campaign_id') != 'campaign_20261110':
+        execution = {}; exs = {'available':False,'error':'Campaign identity mismatch'}
+    if preparation and preparation.get('campaign_id') != 'campaign_20261110':
+        preparation = {}; prs = {'available':False,'error':'Campaign identity mismatch'}
     ik_observation, iks = read_source(root / 'dashboard/ik_observation.json')
     existing_reviews, ers = read_source(root / 'dashboard/existing_native_reviews.json')
     change_impact, cis = read_source(root / 'dashboard/change_impact.json')
@@ -138,6 +144,8 @@ def snapshot(root, inventory):
         'training_requirements': requirements,
         'training_stream': training_stream,
         'pipeline_status': pipeline_status,
+        'execution_ledger': execution, 'execution_source': exs,
+        'preparation_status': preparation, 'preparation_source': prs,
         'pipeline_status_source': pss,
         'ik_observation': ik_observation,
         'ik_observation_source': iks,
@@ -174,7 +182,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_body(200, (self.server.data_root / name).read_bytes(), 'text/plain; charset=utf-8')
             except OSError:
                 return self.send_body(404, b'Report unavailable', 'text/plain')
-        audits = {'/reports/capacity-recovery': 'capacity_recovery.json', '/reports/heldout-recovery': 'heldout_recovery.json', '/reports/reconciliation': 'reconciliation.json',
+        if path == '/api/configurations':
+            value, status = read_source(self.server.data_root / 'dashboard/configuration_index.json')
+            if not status['available'] or value.get('campaign_id') != 'campaign_20261110':
+                return self.send_body(404, b'{"error":"Current configuration index unavailable"}', 'application/json')
+            query=parse_qs(urlparse(self.path).query)
+            term=query.get('q',[''])[0].lower(); wanted=query.get('state',['all'])[0]
+            rows=value.get('rows',value.get('configurations',[]))
+            if isinstance(rows,dict):rows=list(rows.values())
+            matching=[r for r in rows if (wanted=='all' or r.get('state',r.get('status'))==wanted)
+                      and (not term or term in json.dumps(r,sort_keys=True).lower())]
+            try: offset=max(0,int(query.get('offset',['0'])[0]))
+            except ValueError:offset=0
+            payload={'campaign_id':'campaign_20261110','observed_at':value.get('observed_at'),
+                     'required_configurations_in_index':len(rows),'matching':len(matching),
+                     'offset':offset,'limit':100,'rows':matching[offset:offset+100]}
+            return self.send_body(200,json.dumps(sanitize(payload)).encode(),'application/json')
+        audits = {'/reports/execution-ledger':'execution_ledger.json', '/reports/preparation':'preparation_status.json', '/reports/capacity-recovery': 'capacity_recovery.json', '/reports/heldout-recovery': 'heldout_recovery.json', '/reports/reconciliation': 'reconciliation.json',
             '/reports/canonical-validation': 'canonical_validation.json',
             '/reports/training-eligibility': 'training_eligibility.json',
             '/reports/training-production-gate': 'training_production_gate.json',
@@ -196,7 +220,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/pipeline-status', '/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
+            if path in ('/reports/execution-ledger', '/reports/preparation', '/reports/pipeline-status', '/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,

@@ -13,7 +13,7 @@ REMOTE = '/vision/u/minyeong/projects/isg_home/campaign_20261110/infra'
 FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group_yield.json', 'goal_group_yield_error.json')
 FLEET_FILE = 'vast_fleet_gpu_time.json'
 CLUSTER_FLEET_FILE = 'cluster_fleet_gpu_time.json'
-AUDIT_FILES = {'pipeline_status.json': 'training_pipeline_canaries/pipeline_status.json', 'ik_observation.json': 'ik_exchange/observation.json', 'capacity_recovery.json': 'infra/capacity_recovery/ledger.json', 'heldout_recovery.json': 'infra/heldout_recovery/ledger.json','canonical_validation.json': 'infra/standard_recovery/canonical_validation.json','gate_quality_audit.json': 'validation/gate_quality_audit.json',
+AUDIT_FILES = {'execution_ledger.json':'infra/execution_ledger.json','preparation_status.json':'training_preparation/status.json','pipeline_status.json': 'training_pipeline_canaries/pipeline_status.json', 'ik_observation.json': 'ik_exchange/observation.json', 'capacity_recovery.json': 'infra/capacity_recovery/ledger.json', 'heldout_recovery.json': 'infra/heldout_recovery/ledger.json','canonical_validation.json': 'infra/standard_recovery/canonical_validation.json','gate_quality_audit.json': 'validation/gate_quality_audit.json',
                'training_eligibility.json': 'accounting/training_eligibility.json',
                'training_production_gate.json': 'controllers/training_production_gate.json',
                'training_containment.json': 'infra/training_production_gate/containment_status.json',
@@ -36,11 +36,18 @@ def sync(output, ssh_options=()):
     remote = "import json,pathlib; p=pathlib.Path(%r); names=%r; data={n:json.loads((p/n).read_text()) for n in names if (p/n).exists()}; report=p/'GOAL_GROUP_YIELD.md'; data['goal_yield_report']=report.read_text() if report.exists() else None; data.update({n:json.loads((p.parent/'accounting'/n).read_text()) for n in %r if (p.parent/'accounting'/n).exists()}); print(json.dumps(data))" % (REMOTE, FILES, (FLEET_FILE, CLUSTER_FLEET_FILE))
     remote = remote.replace('print(json.dumps(data))',
         "data.update({n:json.loads((p.parent/relative).read_text()) for n,relative in %r.items() if (p.parent/relative).exists()}); print(json.dumps(data))" % AUDIT_FILES)
+    index = output/'configuration_index.json'
+    previous = json.loads((output/'configuration_index_sync.json').read_text()) if (output/'configuration_index_sync.json').exists() else {}
+    remote = remote.replace('print(json.dumps(data))',
+        "idx=p.parent/'training_preparation/configuration_index.json'; stat=idx.stat() if idx.exists() else None; version=[stat.st_size,stat.st_mtime_ns] if stat else None; data['configuration_index_version']=version; data.update({'configuration_index.json':json.loads(idx.read_text())} if version and version!=%r else {}); print(json.dumps(data))" % previous.get('version'))
     # The fixed remote program reads only the allowlisted campaign audit files.
     command = "python3 - <<'PY'\n" + remote + "\nPY"
     result = subprocess.run(['ssh', '-oBatchMode=yes', '-oConnectTimeout=15',
         *ssh_options, 'minyeong@svl11', command], text=True, capture_output=True, timeout=45, check=True)
     bundle = json.loads(result.stdout)
+    index_data=bundle.get('configuration_index.json')
+    if index_data and index_data.get('campaign_id')=='campaign_20261110':
+        atomic(index,index_data);atomic(output/'configuration_index_sync.json',{'version':bundle['configuration_index_version']})
     evidence = bundle.get('dashboard_evidence.json')
     if not evidence or evidence.get('campaign_id') != 'campaign_20261110':
         raise ValueError('Current campaign allocation evidence is unavailable or mismatched')
