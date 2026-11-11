@@ -16,13 +16,14 @@ class Sampler(at.Attachment):
     pname = "bottle"
 
 
-def plan():
+def plan(**extra):
     raw = {"schema": goals.SCHEMA, "task": "configuration_matching-attachment", "campaign_id": "new",
            "group_id": "group", "split": "eval_standard", "template_id": "template", "scene": "scene", "room": "room",
            "contract_template_sha256": "a"*64, "target_name": "cap", "partner_name": "bottle",
            "goal_pose": {"position": [.6, .1, .95], "orientation": [0, 0, 0, 1]},
            "partner_pose": {"position": [.6, .1, .8], "orientation": [0, 0, 0, 1]},
            "created_at": 100, "budget_seconds": 900, "max_members": 3}
+    raw.update(extra)
     return goals.validate_attachment_plan(raw, template_id="template", scene="scene", rooms=["room"], activated_at=200, now=201)
 
 
@@ -91,3 +92,29 @@ def test_only_target_start_and_grasp_change_within_fixed_attachment_goal():
         p.verify(target, (partner[0], [0, 0, 1, 0]), position_tol=.01, orientation_tol=.15)
     assert p.summary()["phase"] == "planned_before_start"
     assert p.deadline_at == 1100  # Activated time, not the earlier authoring time.
+
+
+def test_attachment_source_stance_requires_provenance_and_changes_plan_hash():
+    hint = {'base_pose2d': [15.9763, -9.18787, 1.5708], 'focus': [15.9763, -8.35787, .80252],
+            'translate': .25, 'tilt': -.532533, 'source_summary_sha256': 'b'*64}
+    p = plan(anchor_sources={'summary': {'sha256': 'b'*64}}, anchor_manipulation_stance=hint)
+    assert p.anchor_manipulation_stance['tilt'] == -.532533
+    assert p.sha256 != plan().sha256
+    with pytest.raises(goals.GoalPlanError, match='summary provenance'):
+        plan(anchor_sources={'summary': {'sha256': 'c'*64}}, anchor_manipulation_stance=hint)
+    assert plan().anchor_manipulation_stance is None
+
+
+def test_cork_hint_only_reorders_existing_candidates_with_four_exploratory_slots():
+    hint = {'base_pose2d': [15.9763, -9.18787, 1.5708], 'focus': [15.9763, -8.35787, .80252],
+            'translate': .25, 'tilt': -.532533}
+    p = replace(plan(), anchor_manipulation_stance=hint)
+    candidates = [NS(**{**hint, 'translate': .5, 'tilt': -.68}) for _ in range(8)] + [NS(**hint)]
+    original = list(range(len(candidates)))
+    ranked = goals.order_source_stances(p, 'configuration_matching-attachment_03', original, candidates)
+    assert ranked[:4] == original[:4] and ranked[4] == 8
+    assert sorted(ranked) == original and len(set(ranked)) == len(original)
+    for cls in ('configuration_matching-attachment_01', 'configuration_matching-attachment_02',
+                'configuration_matching-attachment_04'):
+        assert goals.order_source_stances(p, cls, original, candidates) is original
+    assert goals.order_source_stances(plan(), 'configuration_matching-attachment_03', original, candidates) is original

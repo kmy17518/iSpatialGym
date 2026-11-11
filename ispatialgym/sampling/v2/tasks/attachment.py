@@ -1163,6 +1163,11 @@ class Attachment(SamplerV2):
         # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the manipulation stance candidates (alias_memory.reorder_pick: a
         # flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
         order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: "right", rng)
+        plan = getattr(self, '_campaign_attachment_active', None)
+        if plan is not None and plan.anchor_manipulation_stance is not None:
+            from ispatialgym.sampling import campaign_runtime
+            order = CAG.order_source_stances(plan, campaign_runtime.configuration()[1].class_id,
+                                            order, self.manip_candidates)
         self._early_rest_last = None
         for k in order[:6]:
             if time.time() > self._deadline:

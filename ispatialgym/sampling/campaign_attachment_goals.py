@@ -29,6 +29,7 @@ class AttachmentGoalPlan:
     max_members: int
     sha256: str
     anchor_base_pose2d: tuple | None = None
+    anchor_manipulation_stance: dict | None = None
 
     def summary(self):
         def as_pose(value):
@@ -70,9 +71,22 @@ def validate_attachment_plan(raw, *, template_id, scene, rooms, activated_at, no
     count = raw.get("max_members", 3)
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 3, "invalid attachment group size")
     fingerprint = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
-    from ispatialgym.sampling.campaign_tabletop_starts import anchor_base
+    from ispatialgym.sampling.campaign_tabletop_starts import anchor_base, anchor_manipulation
     return AttachmentGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha,
-                              raw["target_name"], raw["partner_name"], goal, partner, activated_at + budget, count, fingerprint, anchor_base(raw))
+                              raw["target_name"], raw["partner_name"], goal, partner, activated_at + budget, count, fingerprint,
+                              anchor_base(raw), anchor_manipulation(raw))
+
+
+def order_source_stances(plan, class_id, order, candidates):
+    """Try the proven cork torso among the existing, fully checked pool.
+
+    Four ordinary proposals remain ahead of two source-near proposals. No
+    stance is synthesized, discarded, or exempted from native checks.
+    """
+    if class_id != 'configuration_matching-attachment_03' or plan.anchor_manipulation_stance is None:
+        return order
+    from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
+    return prioritize_written_stances(order, candidates, [plan.anchor_manipulation_stance])
 
 
 def load_attachment_plan(*, template_id, scene, rooms, activated_at, expected_sha256=None):
