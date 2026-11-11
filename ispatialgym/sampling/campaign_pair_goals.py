@@ -47,6 +47,18 @@ class PairGoalPlan:
     def orientation_required(self):
         return self.scale == "large" or self.relation != "inside"
 
+    @property
+    def native_geometry_reference(self):
+        """Keep the release attitude separate from the later settled outcome.
+
+        A small inside target may roll after a drop. Its settled orientation is
+        not a new release command, even though orientation is unscored there.
+        Native jaw/rim clearance is still recomputed for each selected grasp.
+        """
+        if self.relation in ("ontop", "under") or (self.relation == "inside" and self.scale == "small"):
+            return self.release
+        return self.goal
+
     def summary(self):
         as_pose = lambda x: {"position": list(x[0]), "orientation": list(x[1])}
         result = {"campaign_id": self.campaign_id, "group_id": self.group_id, "split": self.split,

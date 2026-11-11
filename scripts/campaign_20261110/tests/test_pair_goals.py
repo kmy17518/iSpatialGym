@@ -62,6 +62,19 @@ class PairPlanTests(unittest.TestCase):
         with self.assertRaises(g.GoalPlanError):
             g.validate_pair_plan(raw, **{**kw, 'relation': 'ontop'})
 
+    def test_inside_release_does_not_inherit_a_rolled_settled_goal(self):
+        raw = self.fixture('inside')
+        raw['release_policy'] = 'native_grasp_height'
+        raw['release_pose']['position'][2] = .98
+        raw['goal_pose']['orientation'] = [1, 0, 0, 0]
+        plan = g.validate_pair_plan(raw, template_id='t', scene='s', rooms=['r'],
+                                   relation='inside', activated_at=999, now=1000)
+        self.assertEqual(plan.native_geometry_reference, ((0., 0., .98), (0., 0., 0., 1.)))
+        self.assertEqual(plan.goal[1], (1., 0., 0., 0.))
+        plan.verify_settled((plan.goal[0], [0, 1, 0, 0]), plan.partner)
+        with self.assertRaises(g.GoalPlanError):
+            plan.verify_settled(([.031, 0, .8], [0, 1, 0, 0]), plan.partner)
+
     def test_nextto_gap_varies_in_middle_eighty_percent_before_start_draw(self):
         goal = ([0, .2, .7], [0, 0, 0, 1])
         partner = ([0, 0, .7], [0, 0, 0, 1])
