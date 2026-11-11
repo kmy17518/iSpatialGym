@@ -125,6 +125,9 @@ def next_work(template, counts, *, max_groups=6, training_validated=False, mode=
         if any(deficits):
             from scripts.campaign_20261110.disembedding_coverage import eligible_buckets
             eligible = eligible_buckets(template)
+            if eligible is None:
+                from scripts.campaign_20261110.joint_goal_eligibility import eligible_buckets as joint_buckets
+                eligible = joint_buckets(template)
             available = [i for i in (eligible if eligible is not None else range(len(deficits))) if deficits[i]]
             if not available:
                 return None  # Remaining strict buckets need a different physical count variant.
