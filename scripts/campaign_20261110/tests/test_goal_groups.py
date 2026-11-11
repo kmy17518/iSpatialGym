@@ -293,6 +293,44 @@ def test_large_pair_author_binds_scene_partner_and_goal_cell(tmp_path):
     assert plan["goal_pose"]["position"] == [1, 2, 2.99]
 
 
+def test_large_under_author_requires_hashed_native_drop_contact_and_fixed_endpoint(tmp_path):
+    import pytest
+    job, ledger, _, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    partner = c.ObjectRef('desk.n.01_1', 'partner', 'desk', 'p', c.digest('partner'), ready=True, readiness_source='test')
+    template = replace(template, task='inter_object_relation_satisfaction-under_large_scale', objects=template.objects+(partner,))
+    target = template.objects[0].instance
+    anchor['template_meta']['bindings'] = [{'name': target, 'role': 'target'}, {'name': partner.instance, 'role': 'partner'}]
+    anchor['tro']['ispatialgym']['object_bindings'][target]['scene_object_name'] = 'target_scene'
+    anchor['tro']['ispatialgym']['object_bindings'][partner.instance] = {'category': 'desk', 'model': 'p'}
+    anchor['bound_object_poses'] = {partner.instance: [[0, 0, .7], [0, 0, 0, 1]]}
+    anchor['planned_goal_poses'] = {target: [[1., 2., .003], [0., 0., 0., 1.]]}
+    anchor['summary']['goal_check'] = {'settled_poses': {'target_scene': [[1.001, 2., .002], [0., 0., 0., 1.]]}}
+    sidepath = Path(anchor['sources']['sidecar']['path'])
+    side = g.read_json(sidepath)
+    side.update(stances={'placement': {'edge': '-x'}},
+        grasps=[{'object': target, 'place': {'position': [.7, 2., .15], 'orientation': [0., 0., 0., 1.]},
+                 'eef_in_object': {'position': [0., 0., 0.], 'orientation': [0., 0., 0., 1.]}}],
+        contacts={'push': {'kind': 'push_under', 'object': target, 'direction': [1., 0., 0.], 'drop_cell': [.7, 2.], 'goal_cell': [1., 2.]}})
+    c.write_json_atomic(sidepath, side)
+    anchor['sources']['sidecar']['sha256'] = c.file_digest(sidepath)
+    kwargs = dict(anchor=anchor, template=template, campaign_id='new', code_sha256=c.file_digest(code/'.snapshot_commit'),
+                  physics_sha256=c.digest('physics'), data_sha256=c.digest('maps'), magnitude_range=[0, 1])
+    g.prepare_group(**kwargs, group_id='under', output=tmp_path/'groups/under')
+    plan = g.read_json(tmp_path/'groups/under/goal_plan.json')
+    assert plan['floor_push'] == {'edge': '-x', 'direction': [1., 0.]}
+    assert plan['place_pose']['position'] == [.7, 2., .15]
+    assert plan['release_pose']['position'] == [1., 2., .003]
+    assert plan['goal_pose']['position'] == [1.001, 2., .002]
+    side['contacts']['push']['drop_cell'][1] += .02
+    c.write_json_atomic(sidepath, side)
+    with pytest.raises(c.ContractError, match='sidecar changed'):
+        g.prepare_group(**kwargs, group_id='changed', output=tmp_path/'groups/changed')
+    anchor['sources']['sidecar']['sha256'] = c.file_digest(sidepath)
+    with pytest.raises(c.ContractError, match='disagree on drop cell'):
+        g.prepare_group(**kwargs, group_id='bad_drop', output=tmp_path/'groups/bad_drop')
+
+
 def test_alignment_buckets_use_applied_native_range_without_widening(tmp_path):
     import pytest
     _, _, _, template, _ = GoalGroupControllerTests().fixture(tmp_path)

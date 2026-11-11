@@ -2500,6 +2500,16 @@ class IORSLarge(SamplerV2):
         too). ``sample`` clears the memo per attempt. DEFAULT OFF (lead #70b: 1 hit in 2,052 solves on under_large_03 - identical but no speed);
         ``ISPATIALGYM_PUSH_CHAIN_MEMO=1`` turns it on.
         Kit ``push_chain.solved`` / ``push_chain.memo_hit``."""
+        plan = getattr(self, "_campaign_pair_active", None)
+        if plan is not None and plan.floor_push is not None:
+            if not self.campaign_floor_push_lane(place.extras, drop_xy=drop_xy, goal_xy=goal_xy, direction=d2):
+                return None
+            # F_goal and the final release use this exact audited attitude. The
+            # native contact/IK chain must be solved at that same attitude, not
+            # at the incidental initial yaw used to order grasp candidates.
+            quat = G.t(plan.place[1])
+            if not self.push_yaw_kept(quat, d2):
+                return None
         memo = self.__dict__.get("_push_chain_memo")  # set by ``sample`` (an attempt): outside one, every call solves
         qmode = chain_memo_mode()
         if memo is not None and qmode != "off":
@@ -3692,6 +3702,13 @@ class IORSLarge(SamplerV2):
         tried, out_all = [], []
         for rank, edge in enumerate(edges):
             out = self._placement_candidates_at(edge, init_xy, arm)
+            plan = getattr(self, "_campaign_pair_active", None)
+            if plan is not None and plan.floor_push is not None:
+                # Retain only members of the original, fully checked native
+                # candidate set. Do not move a stance or manufacture a lane.
+                kept = [st for st in out if self.campaign_floor_push_lane(st.extras)]
+                TT._countn(self, "campaign_floor_push.filtered_lanes", len(out) - len(kept))
+                out = kept
             if out:
                 for st in out:
                     st.extras["edge_rank"] = rank
@@ -4992,8 +5009,9 @@ class IORSLarge(SamplerV2):
                     raise Reject("campaign_goal_plan", "surface plan requires the native surface-touching mode")
             if plan.placement_mode == "drop_push":
                 from ispatialgym.sampling.v2.tasks.iors_large_touching import TouchingMode
-                if self.relation_mode is not TouchingMode:
-                    raise Reject("campaign_goal_plan", "drop-push plan requires the native floor-touching mode")
+                native_under = self.relation == "under" and self.push_under and plan.floor_push is not None
+                if not native_under and self.relation_mode is not TouchingMode:
+                    raise Reject("campaign_goal_plan", "drop-push plan requires the native floor-push mode")
             if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
                 raise Reject("campaign_group_complete", "large pair goal-group member limit reached")
             self._campaign_pair_plan_sha = plan.sha256
@@ -5006,6 +5024,21 @@ class IORSLarge(SamplerV2):
     def campaign_group_remaining_s(self):
         plan = self.campaign_pair_plan()
         return None if plan is None else max(0.0, plan.deadline_at - time.time())
+
+    def campaign_floor_push_lane(self, extras, *, drop_xy=None, goal_xy=None, direction=None):
+        """A native candidate must reproduce the recorded drop, endpoint and edge."""
+        plan = getattr(self, "_campaign_pair_active", None)
+        if plan is None or plan.floor_push is None:
+            return True
+        drop = extras.get("drop_cell") if drop_xy is None else drop_xy
+        goal = extras.get("goal_cell") if goal_xy is None else goal_xy
+        push = extras.get("push_dir") if direction is None else direction
+        if drop is None or goal is None or push is None:
+            return False
+        return (extras.get("edge") == plan.floor_push["edge"]
+                and math.dist([float(v) for v in drop], plan.place[0][:2]) <= .005
+                and math.dist([float(v) for v in goal], plan.goal_cell) <= .001
+                and math.dist([float(v) for v in push], plan.floor_push["direction"]) <= 1e-6)
 
     def campaign_pin_goal(self):
         self._campaign_latest_proposal = None

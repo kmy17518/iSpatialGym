@@ -351,7 +351,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                   reuse_anchor_goal: bool = False):
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", group_id), "group id must be a safe path component")
     pair_tasks = {f"inter_object_relation_satisfaction-{relation}_{scale}_scale": (relation, scale)
-                  for scale, relations in (("small", PAIR_RELATIONS), ("large", ("ontop", "inside", "nextto", "touching"))) for relation in relations}
+                  for scale in ("small", "large") for relation in PAIR_RELATIONS}
     joint_task = template.task.startswith("configuration_matching-articulation_")
     block_task = template.task == "configuration_matching-block_design"
     require(block_task or joint_task or template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "alignment-axial", "disembedding", "configuration_matching-attachment") or template.task in pair_tasks,
@@ -509,7 +509,33 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             plan["goal_pose"] = {"position": changed_goal[0], "orientation": changed_goal[1]}
             plan["release_pose"] = {"position": changed_release[0], "orientation": changed_release[1]}
             plan["nextto_gap_proposal_m"] = gap
-        if scale == "large" and relation == "touching" and (anchor["summary"].get("surface_touching") or anchor["summary"].get("push_touching")):
+        if scale == "large" and relation == "under":
+            from ispatialgym.sampling.campaign_pair_goals import object_pose_from_grasp
+
+            require(file_digest(anchor["sources"]["sidecar"]["path"]) == anchor["sources"]["sidecar"]["sha256"],
+                    "push-under anchor sidecar changed after audit")
+            sidecar = read_json(anchor["sources"]["sidecar"]["path"])
+            grasps = [row for row in sidecar.get("grasps", []) if row.get("object") == plan["target_name"]]
+            push = sidecar.get("contacts", {}).get("push", {})
+            require(len(grasps) == 1 and grasps[0].get("place") and grasps[0].get("eef_in_object")
+                    and push.get("kind") == "push_under" and push.get("object") == plan["target_name"],
+                    "push-under anchor lacks its native drop and push")
+            released = object_pose_from_grasp(grasps[0]["place"], grasps[0]["eef_in_object"])
+            native_goal = anchor["planned_goal_poses"].get(plan["target_name"])
+            require(native_goal is not None and len(native_goal) == 2, "push-under anchor lacks its native endpoint")
+            direction = push.get("direction")
+            require(isinstance(direction, list) and len(direction) == 3 and abs(direction[2]) < 1e-6,
+                    "push-under anchor has no horizontal push direction")
+            placement = sidecar.get("stances", {}).get("placement", {})
+            edge = placement.get("edge") or placement.get("extras", {}).get("edge")
+            require(edge, "push-under anchor has no native placement edge")
+            plan.update(placement_mode="drop_push", floor_push={"edge":edge,"direction":direction[:2]},
+                        goal_cell=push.get("goal_cell"),
+                        release_pose={"position":native_goal[0],"orientation":native_goal[1]},
+                        place_pose={"position":released[0],"orientation":released[1]})
+            require(push.get("drop_cell") is not None and math.dist(push["drop_cell"], released[0][:2]) <= .005,
+                    "push-under native contact and release disagree on drop cell")
+        elif scale == "large" and relation == "touching" and (anchor["summary"].get("surface_touching") or anchor["summary"].get("push_touching")):
             from ispatialgym.sampling.campaign_pair_goals import object_pose_from_grasp
 
             require(file_digest(anchor["sources"]["sidecar"]["path"]) == anchor["sources"]["sidecar"]["sha256"],

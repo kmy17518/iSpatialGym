@@ -244,3 +244,45 @@ def test_floor_touching_fixed_chain_still_runs_native_solver_and_rejects_other_e
     assert s._push_under_chain(stance, th.tensor(p.release[1]), th.tensor([.7, 2.]), th.tensor([1., 2.]), th.tensor([1., 0.])) is None
     assert s._push_under_chain(stance, th.tensor([0., 0., 1., 0.]), th.tensor([.8, 2.]), th.tensor([1., 2.]), th.tensor([1., 0.])) is None
     assert len(calls) == 1
+
+
+def test_large_under_keeps_only_native_lane_and_solves_at_fixed_drop_attitude():
+    from ispatialgym.sampling.v2.tasks.iors_large import IORSLarge
+    p = replace(plan('under'), scale='large', placement_mode='drop_push',
+        release=((1., 2., .003), (0., 0., 0., 1.)), goal_cell=(1., 2.),
+        place=((.7, 2., .15), (0., 0., 0., 1.)), floor_push={'edge': '-x', 'direction': [1., 0.]})
+    s = IORSLarge.__new__(IORSLarge)
+    s._campaign_pair_active = p
+    calls = []
+    s.push_yaw_kept = lambda q, d: True
+    s._push_under_chain_solve = lambda *args: calls.append(args) or {'native_checked': True}
+    extra = {'edge': '-x', 'drop_cell': [.7, 2.], 'goal_cell': [1., 2.], 'push_dir': [1., 0.]}
+    stance = SimpleNamespace(extras=extra)
+    assert s.campaign_floor_push_lane(extra)
+    for key, value in [('edge', '+x'), ('drop_cell', [.72, 2.]), ('goal_cell', [1., 2.002]), ('push_dir', [-1., 0.])]:
+        assert not s.campaign_floor_push_lane({**extra, key: value})
+    # The candidate's initial carried yaw is not the final drop attitude; F_goal
+    # independently checks the fixed release, and the contact solver must agree.
+    assert s._push_under_chain(stance, th.tensor([0., 0., 1., 0.]), [.7, 2.], [1., 2.], [1., 0.])['native_checked']
+    assert th.allclose(calls[0][1], th.tensor(p.place[1]))
+    assert s._push_under_chain(stance, th.tensor(p.place[1]), [.7, 2.], [1.02, 2.], [1., 0.]) is None
+    s.push_yaw_kept = lambda q, d: False
+    assert s._push_under_chain(stance, th.tensor(p.place[1]), [.7, 2.], [1., 2.], [1., 0.]) is None
+    assert len(calls) == 1
+
+
+def test_large_under_filters_checked_candidates_without_mutating_native_stances():
+    from ispatialgym.sampling.v2.tasks.iors_large import IORSLarge
+    p = replace(plan('under'), scale='large', placement_mode='drop_push', goal_cell=(1., 2.),
+        place=((.7, 2., .15), (0., 0., 0., 1.)), floor_push={'edge': '-x', 'direction': [1., 0.]})
+    s = IORSLarge.__new__(IORSLarge)
+    s._campaign_pair_active = p
+    edge = SimpleNamespace(name='-x', mid=th.tensor([.8, 2.]))
+    s.place = {'edges': [edge]}; s.seg_arm = 'right'
+    s.gp = SimpleNamespace(gen=lambda name, default=None: False if name == 'placement_pool_edges' else default, variant='fixture')
+    kept = SimpleNamespace(extras={'edge': '-x', 'drop_cell': [.7, 2.], 'goal_cell': [1., 2.], 'push_dir': [1., 0.]})
+    other = SimpleNamespace(extras={**kept.extras, 'goal_cell': [1., 3.]})
+    s._placement_candidates_at = lambda *a: [other, kept]
+    result = s.placement_candidates([.2, .3])
+    assert result == [kept] and result[0] is kept
+    assert other.extras['goal_cell'] == [1., 3.]

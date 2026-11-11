@@ -90,6 +90,27 @@ def test_large_pair_schema_rejects_missing_cell_and_preserves_inside_orientation
         p.verify_settled((p.goal[0], [1, 0, 0, 0]), p.partner)
 
 
+def test_large_under_requires_forward_native_lane_and_rejects_altered_geometry():
+    import copy
+    import pytest
+    raw = PairPlanTests().fixture('under')
+    raw.update(task='inter_object_relation_satisfaction-under_large_scale',
+               placement_mode='drop_push', goal_cell=[0., 0.],
+               place_pose={'position': [-.3, 0., 1.], 'orientation': [0., 0., 0., 1.]},
+               floor_push={'edge': '-x', 'direction': [1., 0.]})
+    kw = dict(template_id='t', scene='s', rooms=['r'], relation='under', scale='large', activated_at=999, now=1000)
+    plan = g.validate_pair_plan(raw, **kw)
+    assert plan.summary()['floor_push'] == raw['floor_push']
+    for field, value in [('floor_push', None), ('placement_mode', 'surface'),
+                         ('floor_push', {'edge': '-x', 'direction': [-1., 0.]}),
+                         ('floor_push', {'edge': '-x', 'direction': [1., .1]}),
+                         ('place_pose', {'position': [-.3, .01, 1.], 'orientation': [0., 0., 0., 1.]})]:
+        broken = copy.deepcopy(raw)
+        broken[field] = value
+        with pytest.raises(g.GoalPlanError):
+            g.validate_pair_plan(broken, **kw)
+
+
 def test_large_base_push_requires_geometry_and_middle_eighty_percent():
     import pytest
     raw = PairPlanTests().fixture('nextto')
