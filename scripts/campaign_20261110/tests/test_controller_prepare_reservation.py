@@ -48,6 +48,7 @@ def test_busy_index_lock_leaves_no_authored_queue(tmp_path, monkeypatch, kind):
         monkeypatch.setattr(admission, "source_release", lambda *a: str(tmp_path))
         monkeypatch.setattr(admission, "admission_id", lambda *a: "identity")
         monkeypatch.setattr(admission, "successful_anchor", lambda *a, **k: {})
+        monkeypatch.setattr(admission, "bind_missing_runtime_identity", lambda template, anchor: template)
         monkeypatch.setattr(admission, "read_env", lambda *a: {})
         monkeypatch.setattr(groups, "read_counts", lambda *a: {})
         monkeypatch.setattr(groups, "reserve_pending_counts", lambda *a: {})

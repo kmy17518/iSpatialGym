@@ -200,6 +200,23 @@ def append_seed(catalog, spec, campaign_id):
         write_json_atomic(catalog, updated)
 
 
+def bind_missing_runtime_identity(template, anchor):
+    """Bind a legacy single-group source to its actual native choice for a new queue."""
+    if template.scene_setup.get("runtime_template_id"):
+        return template
+    from ispatialgym.sampling.v2.problem import TemplateChoice
+    metadata = anchor["template_meta"]
+    native = TemplateChoice.from_json(metadata["choice"])
+    require(native.template_id == metadata["template_id"], "native choices do not reproduce source runtime identity")
+    require(native.scene == template.scene and template.room in native.rooms,
+            "native runtime identity belongs to another scene/room")
+    path = Path(anchor["template_dir"]) / "template_meta.json"
+    require(read(path) == metadata, "native identity metadata changed after source audit")
+    return replace(template, scene_setup={**template.scene_setup, "runtime_template_id": native.template_id,
+        "runtime_identity_binding": {"metadata": str(path), "metadata_sha256": file_digest(path),
+            "choice_sha256": digest(metadata["choice"]), "method": "native_TemplateChoice_from_audited_anchor"}})
+
+
 def prepare(proof, allocation, cfg, root):
     from scripts.campaign_20261110.goal_batches import prepare_batch, submission_command
     from ispatialgym.sampling.campaign_goal_queue import schema_for_task
@@ -215,6 +232,7 @@ def prepare(proof, allocation, cfg, root):
     identity = admission_id(source_template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"))
     name = "group_admit_" + identity[:20]
     anchor = successful_anchor(allocation["job_dir"], campaign_root=root, ledger=allocation["ledger"], campaign_started_at=cfg["started_at"])
+    template = bind_missing_runtime_identity(template, anchor)
     if template.task.startswith("alignment-") and not template.scene_setup.get("bucket_policy"):
         from scripts.campaign_20261110.goal_groups import with_alignment_buckets
         template = with_alignment_buckets(template, anchor["template_meta"].get("template_facts", {}).get("deviation_range_applied_deg"),

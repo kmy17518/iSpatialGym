@@ -73,6 +73,29 @@ def test_admission_identity_keeps_applied_scale_and_light_separate(tmp_path, mon
     assert base == c.digest(legacy)
 
 
+def test_legacy_single_group_binds_actual_native_identity_for_new_queue(tmp_path, monkeypatch):
+    from ispatialgym.sampling.v2.problem import TemplateChoice
+    _, template, _ = anchor_fixture(tmp_path, monkeypatch)
+    choice = {"scene": template.scene, "rooms": [template.room], "models": {}}
+    native = TemplateChoice.from_json(choice)
+    metadata = {"template_id": native.template_id, "choice": choice}
+    source = tmp_path / "native"; source.mkdir()
+    c.write_json_atomic(source / "template_meta.json", metadata)
+    anchor = {"template_meta": metadata, "template_dir": str(source)}
+    bound = admission.bind_missing_runtime_identity(template, anchor)
+    assert "runtime_template_id" not in template.scene_setup
+    assert bound.scene_setup["runtime_template_id"] == native.template_id
+    assert bound.objects == template.objects and bound.split == template.split
+    assert bound.fingerprint != template.fingerprint  # New contract must obtain its own gate.
+    assert admission.bind_missing_runtime_identity(bound, {}) is bound
+    wrong = {**metadata, "template_id": "invented"}
+    with pytest.raises(c.ContractError, match="do not reproduce"):
+        admission.bind_missing_runtime_identity(template, {**anchor, "template_meta": wrong})
+    c.write_json_atomic(source / "template_meta.json", wrong)
+    with pytest.raises(c.ContractError, match="metadata changed"):
+        admission.bind_missing_runtime_identity(template, anchor)
+
+
 def test_standard_admission_preserves_default_contract_ownership_and_sibling_capacity(tmp_path, monkeypatch):
     _, template, _ = anchor_fixture(tmp_path, monkeypatch)
     cfg = {"admission_split": "eval_standard", "admitted_classes": [template.class_id]}
