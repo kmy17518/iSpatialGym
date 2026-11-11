@@ -303,6 +303,7 @@ class WorldPool:
         self.n_loads = 0
         self.load_time_s = 0.0
         self.model_pool_key = None
+        self.require_compatible_reuse = False
 
     def get(self, problem: GroundedProblem, scene: str):
         from ispatialgym.sampling.robot_utils import RobotKit
@@ -332,6 +333,8 @@ class WorldPool:
             log.info("world reused for %s: %s%s (SCENE_CROP of the live world: %s)", problem.variant, world_key_str(key),
                      "" if getattr(self.world, "cameras", True) else " (camera-free)", (self.crop_key or ("full",))[0])
             return self.world, self.kit
+        if self.require_compatible_reuse:
+            raise ValueError('Existing sampler world is incompatible with the requested scene, crop, cameras or model-pool manifest')
         if self.world is not None:
             if self.key == key and not SCROP.covers(self.crop_key, wanted_crop):
                 log.info("world re-created for %s: SCENE_CROP %s requested, the live world is cropped %s", problem.variant, wanted_crop, self.crop_key)
@@ -497,7 +500,20 @@ def load_problem_from_args(args) -> GroundedProblem:
     return GroundedProblem.load(args.variant, args.customs, args.bddl_root)
 
 
-def main(argv=None, shutdown: bool = True):
+def main(argv=None, shutdown: bool = True, *, existing_pool: Optional[WorldPool] = None):
+    """Run native sampling, optionally borrowing an already-clean compatible world.
+
+    A borrowed pool never rebuilds or shuts down the caller's simulator. Its
+    normal world key, crop, camera and model-pool manifest checks still apply.
+    Each variant retains its ordinary sampling, export and cleanup paths.
+    """
+    if existing_pool is not None:
+        if shutdown or not isinstance(existing_pool, WorldPool):
+            raise ValueError('Borrowing a WorldPool requires shutdown=False')
+        if existing_pool.world is None or existing_pool.kit is None:
+            raise ValueError('Borrowed sampler world is not loaded')
+        if existing_pool.world.spawned or getattr(existing_pool.world.model_pool, 'active', {}):
+            raise ValueError('Borrowed sampler world still has active template objects; cleanup is required')
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--variant", action="append", required=True, help="customs variant; repeatable")
     parser.add_argument("--customs", default=os.environ.get("ISG_CUSTOMS") or DEFAULT_CUSTOMS,
@@ -565,7 +581,9 @@ def main(argv=None, shutdown: bool = True):
     customs_sha = hashlib.sha256(open(args.customs, "rb").read()).hexdigest() if (not args.v1_spec and os.path.exists(args.customs)) else None
     report = new_run_summary(SAMPLER_VERSION, None if args.v1_spec else args.customs, args.out, vars(args))
     report["variants"] = {}  # per variant: wall time, world action, n_written, error
-    pool = WorldPool(args.out)
+    pool = existing_pool if existing_pool is not None else WorldPool(args.out)
+    previous_reuse_policy = pool.require_compatible_reuse
+    pool.require_compatible_reuse = existing_pool is not None
     t_start = time.time()
     import omnigibson as og
 
@@ -587,10 +605,12 @@ def main(argv=None, shutdown: bool = True):
         log.error("traceback", exc_info=True)
         raise
     finally:
+        pool.require_compatible_reuse = previous_reuse_policy
         report["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         report["wall_time_s"] = round(time.time() - t_start, 2)
         report["world"] = {"n_loads": pool.n_loads, "load_time_s": round(pool.load_time_s, 2), "key": world_key_str(pool.key) if pool.key else None,
-                           "base_link_mass_kg": getattr(pool.world, "base_link_mass_kg", None)}
+                           "base_link_mass_kg": getattr(pool.world, "base_link_mass_kg", None),
+                           "borrowed_pool": existing_pool is not None, "model_pool_manifest_sha256": pool.model_pool_key}
         report["n_written"] = sum(int(e.get("n_written", 0)) for temps in report["problems"].values() for e in temps.values())
         with open(os.path.join(args.out, "summary.json"), "w") as f:
             json.dump(report, f, indent=2, default=str)
@@ -647,6 +667,8 @@ def run_variant(args, variant: str, pool: WorldPool, report: Dict[str, Any], cus
         except Exception as e:
             log.error("traceback", exc_info=True)
             report["errors"].append({"variant": variant, "scene": scene, "error": f"scene load failed: {e!r}"})
+            if pool.require_compatible_reuse:
+                raise  # Preserve the caller's world when compatibility fails.
             pool.world, pool.kit, pool.key = None, None, None
             continue
         exclude = _existing_templates(args.out, gp, scene)
