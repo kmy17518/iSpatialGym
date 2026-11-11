@@ -29,6 +29,33 @@ def union_seconds(intervals):
     return total + (previous[1] - previous[0] if previous else 0)
 
 
+def historical_counts(root, created):
+    """Recover counts only from pinned exact offers preceding their rental."""
+    root=Path(root).resolve();path=root/'accounting/vast_rental_gpu_count_sources.json'
+    if not path.exists():return {},None
+    body=path.read_bytes();manifest=json.loads(body)
+    if manifest.get('schema')!='isg-vast-exact-historical-gpu-count-v1' or manifest.get('campaign_id')!='campaign_20261110':
+        raise ValueError('historical rental count source identity differs')
+    counts={};cached={}
+    for row in manifest['records']:
+        iid=str(row['instance']);event=created.get(iid)
+        if not event or event.get('offer')!=row['offer'] or event.get('machine_id')!=row['machine_id']:
+            raise ValueError('historical rental allocation identity differs: '+iid)
+        source=Path(row['source_path']).resolve()
+        if not source.is_relative_to(root/'vast/market'):raise ValueError('historical count source outside campaign market')
+        if source not in cached:
+            source_body=source.read_bytes();cached[source]=(hashlib.sha256(source_body).hexdigest(),json.loads(source_body))
+        digest,market=cached[source]
+        if digest!=row['source_sha256'] or market['time']>event['time']:
+            raise ValueError('historical count source changed or postdates rental: '+iid)
+        matches=[offer for offer in market['offers'] if offer.get('id')==row['offer'] and offer.get('machine_id')==row['machine_id']]
+        actual={int(offer['num_gpus']) for offer in matches if offer.get('num_gpus')}
+        if actual!={int(row['num_gpus'])} or int(row['num_gpus'])<=0:
+            raise ValueError('historical offer GPU count is ambiguous: '+iid)
+        counts[iid]=int(row['num_gpus'])
+    return counts,{'path':str(path),'sha256':hashlib.sha256(body).hexdigest(),'recovered_rentals':len(counts)}
+
+
 def snapshot(root, timestamp=None):
     root = Path(root); timestamp = time.time() if timestamp is None else timestamp
     events_path = root / 'vast/ledger/events.jsonl'; presence_path = root / 'vast/ledger/rental_presence.jsonl'
@@ -47,6 +74,10 @@ def snapshot(root, timestamp=None):
             if row.get('offer') == created[iid].get('offer') and row.get('machine_id') == created[iid].get('machine_id'):
                 counts[iid] = len(row['gpu_ids'])
         elif row['ev'] == 'destroy' and row.get('ok'): ended.setdefault(iid, row)
+    recovered,count_source=historical_counts(root,created)
+    for iid,count in recovered.items():
+        if iid in counts and counts[iid]!=count:raise ValueError('historical/current rental GPU count differs: '+iid)
+        counts[iid]=count
     for row in observations:
         for item in row['instances']:
             iid, count = item['instance'], item['gpu_count']
@@ -62,14 +93,20 @@ def snapshot(root, timestamp=None):
         if end < start or int(count) <= 0: raise ValueError('invalid worker accounting interval')
         if iid in counts and counts[iid] != int(count): raise ValueError('worker/rental GPU count differs')
         attempts.setdefault(iid, []).append((start, end))
-    records=[]; window_unknown=[]; window_total=0.; window_attributed=0.
+    records=[]; window_unknown=[]; window_total=0.; window_attributed=0.;recorded_total=0.;recorded_attributed=0.
     for iid, event in created.items():
-        end = min(timestamp, ended.get(iid, {}).get('time', timestamp)); start = event['time']; count = counts.get(iid)
+        end = min(timestamp, observed if observed is not None else timestamp,
+                  ended.get(iid, {}).get('time', timestamp)); start = event['time']; count = counts.get(iid)
         record = {'instance': iid, 'gpu_count': count, 'created_observation_unix': start,
                   'destroyed_observation_unix': ended.get(iid, {}).get('time'),
                   'rental_observation_gpu_seconds': max(0, end-start)*count if count else None,
                   'creation_request_started_unix': event.get('request_started_unix'),
                   'creation_response_completed_unix': event.get('response_completed_unix')}
+        if count is not None:
+            total=max(0,end-start)*count
+            attributed=union_seconds([(max(a,start),min(b,end)) for a,b in attempts.get(iid,[]) if min(b,end)>max(a,start)])*count
+            recorded_total+=total;recorded_attributed+=attributed
+            record.update(recorded_attributed_gpu_seconds=attributed,recorded_unattributed_gpu_seconds=total-attributed)
         if epoch is not None and end > epoch:
             first, last = max(start, epoch), min(end, observed)
             if last > first:
@@ -84,15 +121,22 @@ def snapshot(root, timestamp=None):
         records.append(record)
     orphan_presence=sorted({item['instance'] for row in observations for item in row['instances']} - set(created))
     unavailable = not complete or bool(window_unknown or orphan_presence)
+    historical_unknown=[row['instance'] for row in records if row['gpu_count'] is None]
+    recorded_unavailable=not complete or bool(historical_unknown or orphan_presence)
     return {'schema':'isg-vast-rental-gpu-accounting-v1','campaign_id':'campaign_20261110','observed_at_unix':timestamp,
             'provider_observed_at_unix':observed,'instrumentation_epoch_unix':epoch,
             'fleet_window_estimated_gpu_seconds':None if unavailable else window_total,
             'fleet_window_measured_attributed_worker_gpu_seconds':window_attributed,
             'fleet_window_unattributed_gpu_seconds':None if unavailable else window_total-window_attributed,
+            'recorded_fleet_started_at_unix':min((event['time'] for event in created.values()),default=None),
+            'recorded_fleet_estimated_gpu_seconds':None if recorded_unavailable else recorded_total,
+            'recorded_fleet_measured_attributed_worker_gpu_seconds':recorded_attributed,
+            'recorded_fleet_unattributed_gpu_seconds':None if recorded_unavailable else recorded_total-recorded_attributed,
+            'historical_count_recovery':count_source,
             'window_unknown_gpu_count_instances':window_unknown,'provider_instances_without_creation':orphan_presence,
-            'historical_unknown_gpu_count_instances':[row['instance'] for row in records if row['gpu_count'] is None],
+            'historical_unknown_gpu_count_instances':historical_unknown,
             'attempts_missing_complete_intervals':missing,'rentals':records,
             'sources':[{'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
                        for path in (events_path,presence_path) if path.exists()],
             'boundary_precision':'Provider observations, not exact billing boundaries. Creation request/response times are retained prospectively; disappearance is bounded by polling. Legacy absent timing is not reconstructed.',
-            'scope':'All campaign Vast rentals after the instrumentation epoch, including boot, startup, failed attempts, retries, transfers, replay and idle. Attributed time is the union of retained worker fetch-to-upload intervals; remaining time is deliberately unattributed.'}
+            'scope':'All recorded campaign Vast rentals, including boot, startup, failed attempts, retries, transfers, replay and idle. The fleet_window fields retain the prospective observation epoch; recorded_fleet fields additionally cover historical rentals only when their exact GPU counts are proven. Attributed time is the union of retained worker fetch-to-upload intervals; remaining time is deliberately unattributed.'}

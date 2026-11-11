@@ -60,9 +60,11 @@ if [ -f "$REPLAY_META" ]; then
     set -e
 fi
 if [ "$SCENE_RC" -ne 0 ]; then REPLAY_RC=5; fi
-python3 - "$GATE_OUT" "$JOBDIR" "$SNAPSHOT" "${INPUTS[0]}" "${INPUTS[1]}" "$REPLAY_RC" <<'PY'
+GATE_HELPER="${ISGF_REPLAY_GATE_HELPER:-$ISGF_ROOT/tools/replay_gate_quality.py}"
+python3 - "$GATE_OUT" "$JOBDIR" "$SNAPSHOT" "${INPUTS[0]}" "${INPUTS[1]}" "$REPLAY_RC" "$GATE_HELPER" <<'PY'
 import datetime,hashlib,json,pathlib,sys
-out,job,snapshot,tro,demo,rc=sys.argv[1:]
+import importlib.util
+out,job,snapshot,tro,demo,rc,helper=sys.argv[1:]
 def sha256(path):
     h=hashlib.sha256()
     with open(path,'rb') as f:
@@ -77,6 +79,10 @@ result=results[-1] if results else {}
 passed=int(rc)==0 and result.get('success') is True and result.get('status')=='success'
 gate={'schema':1,'validated_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'validation_only':True,'source_job':job,'snapshot':snapshot,'instance':tro,'demo':demo,'demo_sha256':sha256(demo),'tro_sha256':sha256(tro),'replay_meta_paths':[str(p) for p in pathlib.Path(out,'replay').rglob('meta.json')],'replay_rc':int(rc),'replay_mode':'physics_action_open_loop','success':passed,'result':result}
 gate['scene_identity']=json.loads((pathlib.Path(out)/'scene_identity.json').read_text())
+spec=importlib.util.spec_from_file_location('campaign_replay_quality',helper)
+quality=importlib.util.module_from_spec(spec);spec.loader.exec_module(quality)
+gate['native_quality']=quality.assess(gate,pathlib.Path(out)/'gate.json')
+passed=gate['success']=bool(passed and gate['native_quality']['passed'])
 (pathlib.Path(out)/'gate.json').write_text(json.dumps(gate,indent=2)+'\n')
 print(json.dumps(gate))
 sys.exit(0 if passed else 2)

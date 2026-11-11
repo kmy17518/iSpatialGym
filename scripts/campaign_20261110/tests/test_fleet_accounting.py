@@ -1,4 +1,6 @@
 import json
+import hashlib
+import pytest
 
 from scripts.campaign_20261110.infra_vast import fleet_accounting as fa
 
@@ -27,6 +29,8 @@ def test_all_rental_time_keeps_startup_failed_work_and_idle_unattributed(tmp_pat
     assert value['fleet_window_estimated_gpu_seconds']==125  # 60 + 65 rental seconds.
     assert value['fleet_window_measured_attributed_worker_gpu_seconds']==50
     assert value['fleet_window_unattributed_gpu_seconds']==75
+    assert value['recorded_fleet_estimated_gpu_seconds']==135
+    assert value['recorded_fleet_unattributed_gpu_seconds']==85
     assert 'api_key' not in (tmp_path/'vast/ledger/rental_presence.jsonl').read_text()
 
 
@@ -35,6 +39,7 @@ def test_legacy_missing_gpu_count_remains_unavailable_without_guessing(tmp_path)
     value=fa.snapshot(tmp_path,100)
     assert value['fleet_window_estimated_gpu_seconds'] is None
     assert value['historical_unknown_gpu_count_instances']==['old']
+    assert value['recorded_fleet_estimated_gpu_seconds'] is None
     fa.observe(tmp_path/'vast',[{'id':'old','num_gpus':1}],True,19,20)
     fa.observe(tmp_path/'vast',[{'id':'old','num_gpus':1}],True,99,100)
     value=fa.snapshot(tmp_path,100)
@@ -50,3 +55,24 @@ def test_overlapping_retained_intervals_do_not_double_count_rental_gpu_time(tmp_
     value=fa.snapshot(tmp_path,100)
     assert value['fleet_window_measured_attributed_worker_gpu_seconds']==60
     assert value['fleet_window_unattributed_gpu_seconds']==30
+
+
+def test_exact_historical_offer_recovers_count_but_not_unknown_timing_or_attribution(tmp_path):
+    write_rows(tmp_path/'vast/ledger/events.jsonl',[
+        {'ev':'create','instance':'old','time':10,'offer':7,'machine_id':8},
+        {'ev':'destroy','instance':'old','time':80,'ok':True}])
+    fa.observe(tmp_path/'vast',[],True,99,100)
+    market=tmp_path/'vast/market/old.json';market.parent.mkdir()
+    market.write_text(json.dumps({'time':9,'offers':[{'id':7,'machine_id':8,'num_gpus':2}]}))
+    receipt=tmp_path/'accounting/vast_rental_gpu_count_sources.json';receipt.parent.mkdir()
+    receipt.write_text(json.dumps({'schema':'isg-vast-exact-historical-gpu-count-v1','campaign_id':'campaign_20261110',
+        'records':[{'instance':'old','offer':7,'machine_id':8,'num_gpus':2,'source_path':str(market),
+                    'source_sha256':hashlib.sha256(market.read_bytes()).hexdigest()}]}))
+    value=fa.snapshot(tmp_path,200)
+    assert value['historical_unknown_gpu_count_instances']==[]
+    assert value['recorded_fleet_estimated_gpu_seconds']==140
+    assert value['recorded_fleet_measured_attributed_worker_gpu_seconds']==0
+    assert value['recorded_fleet_unattributed_gpu_seconds']==140
+    assert value['rentals'][0]['creation_request_started_unix'] is None
+    market.write_text(market.read_text()+' ')
+    with pytest.raises(ValueError,match='source changed'):fa.snapshot(tmp_path,200)

@@ -76,6 +76,8 @@ def prepare(root, source_job, snapshot, helper_snapshot, canonical_output, token
              snapshot/'.snapshot_commit', helper/'scripts/campaign_20261110/job_replay.sh',
              helper/'scripts/campaign_20261110/infra_open_loop.sh', helper/'scripts/campaign_20261110/infra_replay_scene.py',
              helper/'scripts/campaign_20261110/vast_replay.py']
+    quality=helper/'scripts/campaign_20261110/replay_gate_quality.py'
+    if quality.is_file():paths.append(quality)
     paths += [p for p in template.iterdir() if p.is_file()]
     files = {str(p.resolve()): sha(p) for p in paths}
     job = root / 'out/vast_replay' / token

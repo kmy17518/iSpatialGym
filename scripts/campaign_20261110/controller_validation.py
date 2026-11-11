@@ -246,8 +246,10 @@ def main():
                         entry['vast_migration_error']={'at':time.time(),'reason':str(error)}
                 gate=read(pathlib.Path(entry['output'])/'gate.json',None)
                 if gate:
-                    entry.update(status='validated' if gate.get('success') else 'replay_failed',gate=gate)
-                    publish_recovered_gate(entry,a.root)
+                    from scripts.campaign_20261110.replay_gate_quality import assess
+                    quality=assess(gate,pathlib.Path(entry['output'])/'gate.json')
+                    entry.update(status='validated' if quality['passed'] else 'replay_failed',gate=gate,gate_quality=quality)
+                    if quality['passed']:publish_recovered_gate(entry,a.root)
                 elif entry['replay_job_id'] not in replay_active and entry['status']=='replay_queued':
                     # sbatch can complete between queue snapshot and this point; wait one full tick before concluding absent.
                     if entry.get('seen_queue_absent'):entry['status']='replay_missing'
