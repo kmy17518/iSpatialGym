@@ -5,3 +5,6 @@
 .grid>*{min-width:0}.observation,.alert{max-width:100%;overflow-wrap:anywhere}.section-head>div{min-width:0}@media(max-width:650px){.section-head{flex-wrap:wrap}.section-head>a{font-size:12px}.filters>label{max-width:100%}select{max-width:100%}}
 
 .recovery-evidence{max-width:38rem;max-height:30rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.75rem}#recovery-rows td{min-width:10rem;vertical-align:top}#recovery-rows .reason{min-width:16rem;max-width:25rem}
+
+/* Long proof identifiers must wrap inside cards, including narrow mobile grids. */
+.grid>*{min-width:0}.panel,.metric{overflow-wrap:anywhere}#training-gate p{overflow-wrap:anywhere}#training-production .table-wrap{max-height:520px}
