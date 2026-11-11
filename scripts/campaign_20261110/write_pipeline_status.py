@@ -84,7 +84,9 @@ def main():
                         [default_path, review_path, reservation], 1)
     folders = ('heldout_room_materialized_v2', 'heldout_small_pairs_v1', 'heldout_articulation_v1', 'heldout_carton_hhlmbi_v1',
                'heldout_block_materialized_v2', 'heldout_mental_isgm10_v1', 'heldout_lef_ief09_v1', 'heldout_pot_tbsjnw_v1', 'heldout_model_table_tasks_v1',
-               'heldout_model_disembedding_v1', 'heldout_model_wall_v3', 'heldout_small_pairs_replacements_v1')
+               'heldout_model_disembedding_v1', 'heldout_model_wall_v3', 'heldout_small_pairs_replacements_v1',
+               'held_touching02_replacement_fronts_v1', 'heldout_category_disembedding_reception_v1',
+               'heldout_model_disembedding_garage_v1')
     manifests = [root / folder / 'contract_candidates.json' for folder in folders]
     index_path = root / 'manifests/category_materialization_index_v4.json'
     index = json.loads(index_path.read_text())
@@ -141,7 +143,9 @@ def main():
                       (root, root / 'validation_inputs/held_ontop04_replacement_geometry_v1/validation_jobs.json', 'held_ontop04_replacement_geometry_v1'),
                       (root, root / 'validation_inputs/held_under_replacements_geometry_v1/validation_jobs.json', 'held_under_replacements_geometry_v1'),
                       (root, root / 'validation_inputs/held_axial05_consumer_v2/validation_jobs.json', 'held_axial05_consumer_v2'),
-                      (root, root / 'validation_inputs/held_axial05_consumer_v3/validation_jobs.json', 'held_axial05_consumer_v3')]
+                      (root, root / 'validation_inputs/held_axial05_consumer_v3/validation_jobs.json', 'held_axial05_consumer_v3'),
+                      (root, root / 'validation_inputs/held_touching02_replacement_geometry_v1/validation_jobs.json', 'held_touching02_replacement_geometry_v1'),
+                      (root, root / 'validation_inputs/held_touching02_replacement_geometry_v2/validation_jobs.json', 'held_touching02_replacement_geometry_v2')]
     if a.secondary_root:
         secondary = a.secondary_root.resolve()
         assert secondary.name == 'campaign_20261110', 'unexpected secondary campaign source'
@@ -177,7 +181,7 @@ def main():
     bound_paths = [root / 'manifests/floating_consumer_contracts_r5.json']
     for pattern in ('held_model_wall_fresh_contracts_r*.json', 'held_pairs_fresh_contracts_r*.json',
                     'category_ontop_fresh_contract_r*.json', 'held_nextto03_fresh_contract_r*.json',
-                    'held_attachment_fresh_contract_r*.json'):
+                    'held_attachment_fresh_contract_r*.json', 'held_axial05_fresh_contract_r*.json'):
         bound_paths.extend(sorted((root / 'manifests').glob(pattern)))
     for bound_path in bound_paths:
         bound = json.loads(bound_path.read_text())

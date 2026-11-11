@@ -10,8 +10,8 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 from pathlib import Path
-import statistics
 import sys
 import traceback
 
@@ -20,6 +20,22 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def require(test,msg):
     if not test:raise ValueError(msg)
 def depth(a,b):return min(min(float(a[1][i]),float(b[1][i]))-max(float(a[0][i]),float(b[0][i])) for i in range(3))
+
+
+def largest_true_rectangle(mask):
+    """Return the largest all-true raster rectangle as inclusive row/col bounds."""
+    heights=[0]*len(mask[0]);best=(0,None)
+    for i,row in enumerate(mask):
+        heights=[height+1 if value else 0 for height,value in zip(heights,row)]
+        stack=[]
+        for j,height in enumerate(heights+[0]):
+            start=j
+            while stack and stack[-1][1]>height:
+                column,prior_height=stack.pop();area=prior_height*(j-column)
+                if area>best[0]:best=(area,(i-prior_height+1,i,column,j-1))
+                start=column
+            if not stack or stack[-1][1]<height:stack.append((start,height))
+    return best
 
 
 def main():
@@ -37,8 +53,10 @@ def main():
     prior=json.loads(measurement_policy.read_text())
     for field in ('model_holdout_models','category_holdout_models','train_exclude_models'):
         require(set(prior[field])<=set(policy[field]),'measurement reservation is not an ancestor')
-    for field in ('category_holdout_categories','category_holdout_rooms','train_exclude_categories'):
-        require(prior[field]==policy[field],'category or room policy changed since measurement')
+    for field in ('category_holdout_categories','train_exclude_categories'):
+        require(set(prior[field])<=set(policy[field]),'category reservation removed since measurement')
+    require({(x['scene'],x['room']) for x in prior['category_holdout_rooms']}<=
+            {(x['scene'],x['room']) for x in policy['category_holdout_rooms']},'room reservation removed since measurement')
     row=next(r for r in defaults['objects'] if r['category']+'/'+r['model']==key)
     require(row['ready'] and key in policy['train_exclude_models'],'support not a ready reserved model')
     if a.split=='eval_category':
@@ -68,11 +86,14 @@ def main():
         pos,_=obj.get_position_orientation();lo,hi=obj.aabb;local_bottom=float(lo[2]-pos[2]);extent=hi-lo
         seg=world.scene.seg_map;mask=(seg.room_ins_map==seg.room_ins_name_to_ins_id[room]).cpu().numpy().astype('uint8')
         distance=cv2.distanceTransform(mask,cv2.DIST_L2,5)*seg.map_resolution
-        clearance=float(th.linalg.norm(extent[:2]))*.5+.55
+        # A long rectangular support can fit a room narrower than its diagonal.
+        # Propose using the short radius, then require its entire inflated
+        # rectangle to stay in the room at each candidate orientation.
+        clearance=float(th.min(extent[:2]))*.5+.55
         indices=np.argwhere(distance>=clearance)
         require(len(indices)>0,'heldout room has no conservative support footprint plus walking clearance')
         indices=sorted(indices,key=lambda x:(-float(distance[tuple(x)]),int(x[0]),int(x[1])))
-        selected=None;tested=[]
+        selected=None;tested=[];placement_diagnostics=[];footprint_rejected=0
         # No simulation step occurs while proposing placements; only the new
         # support moves. Reuse the unchanged context pieces across proposals.
         context_pieces={other.name:_collision_piece_aabbs(other) for other in world.scene.objects
@@ -81,13 +102,30 @@ def main():
             xy=seg.map_to_world(th.tensor(ij)).tolist()
             if any(sum((xy[k]-v[k])**2 for k in range(2))<.25**2 for v in tested):continue
             tested.append(xy)
-            obj.set_position_orientation(th.tensor([*xy,float(world.floor_z)-local_bottom+.001]),th.tensor([0.,0.,0.,1.]))
-            pieces=_collision_piece_aabbs(obj);bad=[]
-            for other_name,other_pieces in context_pieces.items():
-                amount=max((depth(x,y) for x in pieces for y in other_pieces),default=-1.)
-                if amount>.002:bad.append({'name':other_name,'overlap_m':amount})
-            if not bad:selected=xy;break
+            for yaw in (0.,math.pi/2):
+                half=extent[:2].cpu().numpy()*.5+.55
+                grid=np.array(np.meshgrid(np.arange(-half[0],half[0]+.05,.05),
+                                           np.arange(-half[1],half[1]+.05,.05),indexing='ij')).reshape(2,-1).T
+                rotation=np.array([[math.cos(yaw),-math.sin(yaw)],[math.sin(yaw),math.cos(yaw)]])
+                points=grid@rotation.T+np.array(xy)
+                pixels=seg.world_to_map(th.tensor(points,dtype=th.float32)).long().cpu().numpy()
+                in_bounds=((pixels[:,0]>=0)&(pixels[:,0]<mask.shape[0])&(pixels[:,1]>=0)&(pixels[:,1]<mask.shape[1]))
+                if not in_bounds.all() or not mask[pixels[:,0],pixels[:,1]].all():
+                    footprint_rejected+=1
+                    continue
+                obj.set_position_orientation(th.tensor([*xy,float(world.floor_z)-local_bottom+.001]),
+                                             th.tensor([0.,0.,math.sin(yaw/2),math.cos(yaw/2)]))
+                pieces=_collision_piece_aabbs(obj);bad=[]
+                for other_name,other_pieces in context_pieces.items():
+                    amount=max((depth(x,y) for x in pieces for y in other_pieces),default=-1.)
+                    if amount>.002:bad.append({'name':other_name,'overlap_m':amount})
+                placement_diagnostics.append(dict(xy=xy,yaw_rad=yaw,overlaps=bad[:10]))
+                if not bad:selected=xy;break
+            if selected is not None:break
             if len(tested)>=200:break
+        report['placement_diagnostics']=placement_diagnostics
+        report['footprint_rejected']=footprint_rejected
+        report['tested_centres']=len(tested)
         require(selected is not None,'all conservative room placements overlap existing collision pieces')
         world.activate(obj);start=obj.get_position_orientation()[0].clone()
         error=world.settle([obj],steps=90,still=[o for o in world.scene.objects if o.name!=name])
@@ -106,14 +144,35 @@ def main():
         og.clear();world=SimWorld(scene,[room],scene_variant={'path':str(stable)},cameras=False);obj=world.obj(name)
         require(all(abs(float(v)-w)<1e-6 for v,w in zip(obj.scale,row['default_scale'])),'reloaded support scale mismatch')
         lo,hi=obj.aabb;require(abs(float(lo[2])-float(world.floor_z))<.004,'reloaded support lost floor contact')
-        hits=[]
-        for i in range(1,8):
-            for j in range(1,8):
-                xy=[float(lo[0])+(float(hi[0])-float(lo[0]))*i/8,float(lo[1])+(float(hi[1])-float(lo[1]))*j/8]
-                hit=world.surface_z_under(xy,float(hi[2])+.02,depth=.08)
-                if hit and hit['body'].startswith(obj.prim_path+'/') and hit['normal'][2]>=.95:hits.append(hit)
-        require(len(hits)>=9,'support lacks a broad measured top plane')
-        top=statistics.median(x['z'] for x in hits);require(max(abs(h['z']-top) for h in hits)<.005,'support top is not planar')
+        # Use the production support reader's dominant horizontal face. A raised
+        # perimeter or headboard is not the support plane used by the sampler.
+        support_top=world.support_top(obj)
+        top=float(support_top.z)
+        selected_cells=th.nonzero(support_top.mask)
+        require(len(selected_cells)*support_top.resolution**2>=.10,'support lacks a broad measured top plane')
+        hits=[dict(x=float(support_top.xs[i]),y=float(support_top.ys[j]),z=float(support_top.zs[i,j]))
+              for i,j in selected_cells.tolist()]
+        report['top_hits']=hits
+        report['measured_height_world']=top
+        # The production mask deliberately includes +/-30 mm around the
+        # dominant face, including beveled edges. Prove an interior rectangular
+        # patch at the same 5 mm flatness tolerance; report boundary deviations
+        # separately instead of requiring the whole rounded perimeter be flat.
+        flat=support_top.mask & th.isfinite(support_top.zs) & (th.abs(support_top.zs-top)<.005)
+        area_cells,bounds=largest_true_rectangle(flat.cpu().numpy().tolist())
+        require(bounds is not None and area_cells*support_top.resolution**2>=.10,
+                'support lacks a continuous planar interior patch of at least 0.10 m2')
+        i0,i1,j0,j1=bounds
+        report['planar_interior_patch']={'row_bounds':[i0,i1],'column_bounds':[j0,j1],
+            'x_world':[float(support_top.xs[i0]),float(support_top.xs[i1])],
+            'y_world':[float(support_top.ys[j0]),float(support_top.ys[j1])],
+            'area_m2':area_cells*support_top.resolution**2,'flatness_tolerance_m':.005,
+            'widths_m':[(i1-i0+1)*support_top.resolution,(j1-j0+1)*support_top.resolution],
+            'all_cells_within_tolerance':True}
+        report['support_surface_diagnostics']={'native_mask_cells':len(hits),'flat_cells':int(flat.sum()),
+            'excluded_boundary_cells':len(hits)-int(flat.sum()),'native_mask_z_margin_m':.03,
+            'min_native_hit_z':min(h['z'] for h in hits),'max_native_hit_z':max(h['z'] for h in hits),
+            'task_tray_fit_and_physics_still_required':True}
         centre=((lo+hi)*.5).cpu().numpy();direction=np.array([1.,-1.,.7]);direction/=np.linalg.norm(direction)
         eye=centre+(float(th.max(hi-lo))*2.+.8)*direction;right=np.cross([0.,1.,0.],direction);right/=np.linalg.norm(right);up=np.cross(direction,right)
         og.sim.viewer_camera.set_position_orientation(th.tensor(eye,dtype=th.float32),mat2quat(th.tensor(np.column_stack([right,up,direction]),dtype=th.float32)))
@@ -122,7 +181,7 @@ def main():
         require(sha(a.source_scene)==source_hash,'original source scene changed')
         for n,v in source['objects_info']['init_info'].items():require(changed['objects_info']['init_info'][n]==v,'original definition altered')
         for n,v in source['state']['registry']['object_registry'].items():require(changed['state']['registry']['object_registry'][n]==v,'original state altered')
-        report.update(status='private_support_geometry_and_reload_passed',native_scene_path=str(stable),native_scene_sha256=sha(stable),position=obj.get_position_orientation()[0].tolist(),orientation=obj.get_position_orientation()[1].tolist(),actual_height_key=f'{top-float(world.floor_z):.4f}',measured_height_world=top,floor_z_world=float(world.floor_z),aabb_lower=lo.tolist(),aabb_upper=hi.tolist(),tested_placements=len(tested),blocked_footprints=fps,top_hits=hits,image={'path':str(png),'sha256':sha(png)},original_object_values_unchanged=True)
+        report.update(status='private_support_geometry_and_reload_passed',native_scene_path=str(stable),native_scene_sha256=sha(stable),position=obj.get_position_orientation()[0].tolist(),orientation=obj.get_position_orientation()[1].tolist(),actual_height_key=f'{top-float(world.floor_z):.4f}',measured_height_world=top,floor_z_world=float(world.floor_z),aabb_lower=lo.tolist(),aabb_upper=hi.tolist(),tested_placements=len(tested),blocked_footprints=fps,top_hits=hits,top_measurement_method='SimWorld.support_top dominant horizontal face',image={'path':str(png),'sha256':sha(png)},original_object_values_unchanged=True)
     except BaseException as exc:
         report.update(status='failed',error=str(exc),traceback=traceback.format_exc());traceback.print_exc();raise
     finally:
