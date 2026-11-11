@@ -30,6 +30,12 @@ assert.equal(training.onlyEligible,7,'Only eligible training reaches goal progre
 assert.equal(training.historyRates,null,'Raw historical training growth never becomes eligible throughput');
 const eligibleRates=await evaluate(`rateRows({...current,current_eligibility:{},change_impact:{},training_eligibility:{observed_at:'2026-11-11T01:00:00Z',eligible_accepted:120,history:[{observed_at:'2026-11-11T00:00:00Z',eligible_counts:{train:100}}]}}).rates.train`);
 assert.equal(eligibleRates,20,'Eligible throughput uses only audited eligibility history');
+const taskRates=await evaluate(`({rates:eligibleTaskRates(current),tasks:current.evidence.tasks.length,rows:document.querySelectorAll('#throughput details tbody tr').length,windowMinutes:rateRows(current).minutes,text:document.querySelector('#throughput').innerText})`);
+assert.equal(taskRates.rates.length,taskRates.tasks,'Every task has its own eligibility-rate observation');
+assert.equal(taskRates.rows,taskRates.tasks,'Measured task rates are rendered');
+assert.ok(taskRates.rates.some(x=>x.accepted_per_hour.eval_standard>0),'Recent standard-eval acceptance appears in its own task rate');
+assert.ok(taskRates.windowMinutes>=1&&taskRates.windowMinutes<=60.001,'Displayed measurement window matches the last hour');
+assert.ok(taskRates.text.includes('CST'),'Throughput observation is dated in Chicago time');
 const changeCounts=await evaluate(`({projected:counts({...current,current_eligibility:{counts:{current_eligible:{eval_standard:7,eval_model:6,eval_category:5,train:4}}}}),blocked:counts({...current,current_eligibility:{},change_impact:{summary:{under_review:1}}})})`);
 assert.deepEqual(changeCounts.projected,{eval_standard:7,eval_model:6,eval_category:5,train:4});
 assert.ok(Object.values(changeCounts.blocked).every(x=>x===null),'Missing affected-cohort projection cannot fall back to historical counts');
@@ -109,5 +115,5 @@ const mobile=await evaluate('({viewport:innerWidth,width:document.documentElemen
 const mobileShot=await call('Page.captureScreenshot',{format:'png'});await writeFile(output+'/mobile.png',Buffer.from(mobileShot.data,'base64'));
 await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});await evaluate(`document.querySelector('#compute').scrollIntoView({behavior:'instant'})`);await delay(200);const computeShot=await call('Page.captureScreenshot',{format:'png'});await writeFile(output+'/compute.png',Buffer.from(computeShot.data,'base64'));await evaluate(`document.querySelector('#activity').scrollIntoView({behavior:'instant'})`);await delay(200);const activityShot=await call('Page.captureScreenshot',{format:'png'});await writeFile(output+'/activity.png',Buffer.from(activityShot.data,'base64'));await evaluate('scrollTo(0,0)');
 assert.equal(errors.length,0,'No JavaScript runtime exceptions');assert.ok(requests.filter(r=>r.url.startsWith('http://127.0.0.1:8765')).every(r=>r.method==='GET'),'Browser sent GET only');
-const result={passed:true,observed_at:new Date().toISOString(),first,recovery,heldout,heldoutActual,canonical,stream,existingReviews,ikObservation,changeCounts,eligibleRates,goalYield,training,capacity,fleetTime,clusterTime,refreshed,filtered,states,mobile,request_count:requests.length,errors};
+const result={passed:true,observed_at:new Date().toISOString(),first,recovery,heldout,heldoutActual,canonical,stream,existingReviews,ikObservation,changeCounts,eligibleRates,taskRates,goalYield,training,capacity,fleetTime,clusterTime,refreshed,filtered,states,mobile,request_count:requests.length,errors};
 await writeFile(output+'/browser_check.json',JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify({passed:result.passed,observed_at:result.observed_at,counts:result.first.counts,canonical:result.canonical?.validated,heldout_rows:result.heldout.rows,mobile:result.mobile,request_count:result.request_count,errors:result.errors.length}));ws.close();
