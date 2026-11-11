@@ -3,7 +3,7 @@ import json
 import pytest
 from scripts.campaign_20261110.contracts import ContractError,file_digest
 from scripts.campaign_20261110.training_restoration import same_loaded_state
-from scripts.campaign_20261110.training_batch_probe import inputs,verify_runtime_compatibility
+from scripts.campaign_20261110.training_batch_probe import inputs,verify_runtime_compatibility,shared_world_proof
 
 
 def state():
@@ -69,3 +69,22 @@ def test_observational_runtime_requires_actual_unchanged_native_code(tmp_path):
         verify_runtime_compatibility(tmp_path,request,records,observed)
     with pytest.raises(ContractError,match='missing exact'):
         verify_runtime_compatibility(tmp_path,{},records,observed)
+
+
+def test_shared_world_requires_both_native_signature_and_saved_scene_checks():
+    from types import SimpleNamespace
+    records=[{'artifacts':{'tro':{'path':path}}} for path in ('/copyA/instances/a','/copyB/instances/b')]
+    calls=[]
+    def scene_check(*args):
+        calls.append(args)
+        return True,'exact native scene match'
+    runner=SimpleNamespace(instance_signature=lambda p:'same',
+        resolve_instance=lambda p:(None,str(__import__('pathlib').Path(p).parent.parent)),
+        template_compatible=scene_check)
+    proof=shared_world_proof(runner,records)
+    assert proof['compatible_template_dirs']==['/copyA','/copyB']
+    assert calls==[('/copyA','/copyA/instances/a','/copyB','/copyB/instances/b')]
+    runner.template_compatible=lambda *args:(False,'changed object pose')
+    with pytest.raises(ContractError,match='saved scenes differ'):shared_world_proof(runner,records)
+    runner.instance_signature=lambda path:path
+    with pytest.raises(ContractError,match='signatures differ'):shared_world_proof(runner,records)

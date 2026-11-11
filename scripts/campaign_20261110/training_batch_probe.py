@@ -71,6 +71,18 @@ def inputs(root,request):
     return value,records
 
 
+def shared_world_proof(runner, records):
+    """Use the production signature and saved-scene checks for template copies."""
+    paths=[r['artifacts']['tro']['path'] for r in records]
+    signatures=[runner.instance_signature(path) for path in paths]
+    require(signatures[0]==signatures[1],'production world signatures differ')
+    directories=[runner.resolve_instance(path)[1] for path in paths]
+    compatible,reason=runner.template_compatible(directories[0],paths[0],directories[1],paths[1])
+    require(compatible,'production saved scenes differ: '+reason)
+    return {'signature':signatures[0],'compatible_template_dirs':directories,
+            'scene_check':reason,'method':'native instance_signature + template_compatible'}
+
+
 def run(root,request,output,kind):
     root=Path(root).resolve();output=Path(output).resolve()
     require(output.is_relative_to(root) and not output.exists(),'probe output must be new and private')
@@ -86,10 +98,16 @@ def run(root,request,output,kind):
             'runtime_compatibility':compatibility,
             'accepted':False,'eligible_for_goal':False,'quota_consumed':0}
     if kind=='physics_action_open_loop':
+        # A and B are immutable copies of one exact configuration. Production
+        # prebuild checks compare their content and recorded scene, not paths.
+        os.environ['ISPATIALGYM_FAST_COLLECTOR_PREBUILD']='1'
         from ispatialgym.oracle import run_isg
-        signatures=[run_isg.instance_signature(r['artifacts']['tro']['path'])for r in records]
-        require(signatures[0]==signatures[1],'production world signatures differ')
-        shared={}
+        from ispatialgym.fastflags import fast_on
+        require(fast_on('COLLECTOR_PREBUILD'),'production template compatibility is disabled')
+        world=shared_world_proof(run_isg,records)
+        common['world_compatibility']=world
+        shared={'signature':world['signature'],
+                'compatible_template_dirs':set(map(os.path.abspath,world['compatible_template_dirs']))}
         for ordinal,index in enumerate(order):
             row=records[index];destination=output/('episode_'+str(ordinal))
             argv=['--instance',row['artifacts']['tro']['path'],'--mode','replay',
