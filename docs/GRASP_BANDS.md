@@ -6743,3 +6743,9 @@ The switch acts only on the under_large_02 variant's pitched floor push of an el
   - Lane 17.01 seen from the front: 22 of its C stances fail the B -> C carry because the C base is "disconnected on the eroded map". This is the generic carry check.
   - The A -> B transit failures near (18.1, -11.57) come from the drawn robot start, not from the lanes.
 - **New kit counters:** `push_guide_wall.c_out_of_reach`, `.c_no_endwise_pair`, `.c_endwise_pair`. One INFO line per C: 'guide-wall endwise pairs at C'.
+- **A/B result (r2).**
+  - ug2_ul02_on (trunk_0f1315a1): 22 attempts, 8 written, 6 ok out of 8 demos. 5.32 GPU-h, i.e. 0.89 GPU-h per ok.
+    - Every pushed demo was guided. The end-of-push yaw stayed within 3.9 deg, with tilt 0 and no topples.
+    - The 2 failures are not the push: arm_stutter in the final retreat, and the wheel touching the briefcase in the first navigate.
+  - Baseline ug_ul02_off (partial, one job still running): 6 demos, 0 ok. End yaw 0.4-20.9 deg, 2 topples.
+  - Flip recommended by the standard rule; not flipped on this branch.
