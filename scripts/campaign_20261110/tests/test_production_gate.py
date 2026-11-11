@@ -27,8 +27,8 @@ def test_missing_policy_blocks_standalone_and_unknown_but_keeps_eval(tmp_path):
 
 
 def test_replay_and_prerequisites_allowed_without_relabeling_collection(tmp_path):
-    assert check_job(tmp_path,tmp_path/'missing',kind='physics_replay')['allowed']
-    assert check_job(tmp_path,tmp_path/'missing',kind='native_dependency')['allowed']
+    assert not check_job(tmp_path,tmp_path/'missing',kind='physics_replay')['allowed']
+    assert not check_job(tmp_path,tmp_path/'missing',kind='native_dependency')['allowed']
     assert not check_job(tmp_path,tmp_path/'missing',kind='validation')['allowed']
 
 
@@ -116,3 +116,46 @@ def test_projection_unverified_overrides_mechanically_proven_sibling_quota(tmp_p
     (p/'training_eligibility.json').write_text(json.dumps({'campaign_id':'campaign_20261110','status':'complete',
         'records':{'g':{'status':'unverified','accepted_record_sha256':digest(row)}}}))
     assert eligible_training_records(db,root=tmp_path)==[]
+
+
+def test_projection_reaudits_native_demo_and_replay_without_rewriting_acceptance(tmp_path):
+    import shutil
+    from scripts.campaign_20261110.tests.test_group_lane import candidate, claim
+    from scripts.campaign_20261110.training_eligibility import build_projection
+    f,review=candidate(tmp_path,0)
+    result=claim(tmp_path,f,review)
+    source=tmp_path/'dataset/quotas.sqlite3';target=tmp_path/'dataset/allocations.sqlite'
+    shutil.copyfile(source,target)
+    before=target.read_bytes()
+    projection=build_projection(tmp_path)
+    assert projection['historically_accepted']==projection['eligible_accepted']==1
+    assert projection['unverified']==projection['excluded']==0
+    Path(review['members'][1]['report']).write_text('{}')
+    after=build_projection(tmp_path)
+    assert after['eligible_accepted']==0 and after['unverified']==1
+    assert target.read_bytes()==before
+
+
+def test_replay_checks_true_source_scope_but_not_exhausted_eval_quota(tmp_path):
+    env,cmd,job=setup(tmp_path,'train')
+    replay=tmp_path/'replay';replay.mkdir()
+    (replay/'replay_inputs.json').write_text(json.dumps({'source_job':str(job)}))
+    assert not check_job(tmp_path,replay,kind='physics_replay')['allowed']
+    config=tmp_path/'config.json';value=json.loads(config.read_text());value['template']['split']='eval_standard';config.write_text(json.dumps(value))
+    assert check_job(tmp_path,replay,kind='physics_replay')['allowed']
+    value['template']['class_id']='inter_object_relation_satisfaction-under_large_scale_02';config.write_text(json.dumps(value))
+    assert not check_job(tmp_path,replay,kind='physics_replay')['allowed']
+
+
+def test_native_dependency_cannot_resume_owner_parked_class(tmp_path):
+    job=tmp_path/'native';job.mkdir();p=job/'native_inputs.json'
+    value={'campaign_root':str(tmp_path),'original_entry':{'class_id':'inter_object_relation_satisfaction-under_large_scale_02'}}
+    p.write_text(json.dumps(value));assert not check_job(tmp_path,job,kind='native_dependency')['allowed']
+    value['original_entry']['class_id']='inter_object_relation_satisfaction-inside_large_scale_01'
+    p.write_text(json.dumps(value));assert check_job(tmp_path,job,kind='native_dependency')['allowed']
+
+
+def test_deferred_successful_members_cannot_be_reclassified_as_singleton():
+    row=member('t')
+    group={'accepted':{'t':'train'},'members':[row],'deferred':['successful_but_over_quota']}
+    assert classify_record(row,group)['status']=='excluded'

@@ -454,3 +454,13 @@ def test_exact_customs_preflight_supports_direct_stage_entrypoint_from_other_cwd
     result=subprocess.run([sys.executable,'-I','-c',command],cwd=tmp_path,capture_output=True,text=True)
     assert result.returncode==0,result.stderr
     assert json.loads(receipt.read_text())['automatic_exact_source_joins']
+
+def test_stopped_training_disk_stays_protected_until_verified_harvest(tmp_path):
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import preserved_instances
+    assert preserved_instances(tmp_path)==set()
+    p=tmp_path/'infra/training_production_gate/preserved_instances.json';p.parent.mkdir(parents=True)
+    p.write_text(json.dumps({'campaign_id':'campaign_20261110','instances':{'1':{},'2':{'harvest_verified':True}}}))
+    assert preserved_instances(tmp_path)=={'1'}
+    p.write_text(json.dumps({'campaign_id':'another_campaign','instances':{'1':{}}}))
+    import pytest
+    with pytest.raises(ValueError):preserved_instances(tmp_path)

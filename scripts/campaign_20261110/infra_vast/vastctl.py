@@ -39,7 +39,7 @@ from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
-    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision
+    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision, preserved_instances
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
@@ -49,7 +49,7 @@ try:
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
     from .fleet_accounting import observe as observe_rentals
 except ImportError:
-    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision
+    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision, preserved_instances
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
@@ -552,6 +552,9 @@ def owner_of(iid):
 
 
 def destroy(c, iid, reason, key_name=None):
+    if str(iid) in preserved_instances(F):
+        log(f"PRESERVE {iid}: stopped training disk awaits verified artifact harvest")
+        return False
     owner = key_name or owner_of(iid)
     order = ([owner] if owner in c else []) + [k for k in c if k != owner]
     ok, used = False, None
@@ -842,11 +845,12 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
                "instances": instance_metrics,
                "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='boot') if list_ok else None,
                "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] in ('ready','run')) if list_ok else None,
-               "worker_running_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['assigned_jobs']) if list_ok else None,
+               "worker_running_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['assigned_jobs'] and i['actual_status']=='running') if list_ok else None,
                "worker_idle_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='ready' and not i['assigned_jobs'] and not i['staging_jobs']) if list_ok else None,
                'worker_staging_gpus':sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['staging_jobs']) if list_ok else None,
                "worker_unknown_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] is None) if list_ok else None,
-               "rental_pending_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status']!='running') if list_ok else None,
+               "rental_pending_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status'] not in ('running','stopped','exited')) if list_ok else None,
+               "preserved_stopped_instances": sorted(preserved_instances(F)),
                "max_instances":C['max_instances'],
                "dispatch_eligible_queued":len(dispatch_order(states.values(), C)),
                "dispatch_excluded_queued":n['queued']-len(dispatch_order(states.values(), C)),
@@ -860,6 +864,7 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
 def tick(c, s3, state):
     global STAGER
     C = cfg()
+    protected = preserved_instances(F)
     states = load_states()
     ingest(states, C)
     presence_started = now()
@@ -976,6 +981,8 @@ def tick(c, s3, state):
         if s["status"] != "assigned" or s["id"] in dones:
             continue
         iid = s.get("instance")
+        if iid in protected:
+            continue  # deliberately stopped, with on-disk evidence retained
         hb = hbs.get(iid) or {}
         gone = list_ok and iid not in live
         stale = hb.get("time") and t - hb["time"] > 1500
@@ -1015,7 +1022,7 @@ def tick(c, s3, state):
     if resource_blocked:
         log('RESOURCE_GUARD blocked GPU identities: ' + ','.join(sorted(resource_blocked)))
     draining = drained_workers(live, C)
-    routing_live = {iid:worker for iid,worker in live.items() if iid not in resource_blocked | draining}
+    routing_live = {iid:worker for iid,worker in live.items() if iid not in resource_blocked | draining | protected}
     allowed = {job['id'] for job in queued}
     for reservation in STAGER.ready():
         jid,iid=reservation['id'],reservation['instance'];s=states[jid]
@@ -1044,6 +1051,8 @@ def tick(c, s3, state):
     # 4. destroy: failed / stuck / idle instances, any instance over the price limit
     pending = len(queued)
     for iid, i in live.items():
+        if iid in protected:
+            continue
         hb = hbs.get(iid) or {}
         up = t - float(i.get("start_date") or t)
         st = i.get("actual_status")

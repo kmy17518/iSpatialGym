@@ -186,6 +186,14 @@ def main():
         retry_requests=read(a.root/'validation/replay_retry_requests.json',{}).get('requests',{})
         for row in rows:
             jid=row['jobid'];job=pathlib.Path(row['job_dir']);entry=state['gates'].setdefault(jid,{'source_job_id':jid,'key':row['key'],'source_job_dir':str(job),'status':'waiting_for_demo'})
+            from scripts.campaign_20261110.production_gate import check_job
+            production = check_job(a.root, job, kind='source_validation')
+            if not production['allowed']:
+                entry['production_gate_block'] = production
+                # Existing reports and history remain immutable. No new replay,
+                # retry, or pending-to-Vast migration can bypass the source gate.
+                continue
+            entry.pop('production_gate_block', None)
             try:
                 if apply_retry_request(entry,retry_requests.get(jid),a.root,replay_active):atomic(statepath,state)
             except ValueError as error:

@@ -135,6 +135,17 @@ def production_decision(job, config):
     return check_job(root, job.get('job_dir', ''), kind=job.get('job_kind', 'collection'))
 
 
+def preserved_instances(root):
+    """Stopped disks awaiting harvest must never be treated as lost workers."""
+    path = Path(root) / 'infra/training_production_gate/preserved_instances.json'
+    if not path.exists():
+        return set()
+    value = json.loads(path.read_text())
+    if value.get('campaign_id') != 'campaign_20261110':
+        raise ValueError('preserved-instance campaign identity differs')
+    return {str(key) for key, row in value['instances'].items() if not row.get('harvest_verified')}
+
+
 def prepare_environment(job_dir, root):
     """Let the image's Isaac import select its existing apps directory.
 

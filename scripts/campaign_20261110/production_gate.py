@@ -102,9 +102,9 @@ def check_environment(root, environment, *, kind='collection', start=None, count
         policy = None
         result['policy_error'] = str(exc)
     # These paths create validation evidence, not dataset training instances.
-    if kind in ('physics_replay', 'native_dependency'):
+    if kind == 'native_dependency':
         return {**result, 'allowed': True, 'category': kind, 'reason': 'independent validation'}
-    if kind != 'collection': return result
+    if kind not in ('collection', 'source_validation'): return result
     try:
         path, config, queue = _inputs(root, environment)
         template = config['template']
@@ -114,7 +114,7 @@ def check_environment(root, environment, *, kind='collection', start=None, count
         if template['class_id'] in PARKED_CLASSES:
             return {**result, 'reason': 'owner artifact dependency remains parked', 'category': 'owner_blocked'}
         if split in ('eval_standard', 'eval_model', 'eval_category'):
-            if queue is not None or environment.get('ISPATIALGYM_CAMPAIGN_GOAL_PLAN') or template['task'].startswith('camera_relocalization'):
+            if kind == 'collection' and (queue is not None or environment.get('ISPATIALGYM_CAMPAIGN_GOAL_PLAN') or template['task'].startswith('camera_relocalization')):
                 if evaluation_exhausted(root, template):
                     return {**result, 'reason': 'evaluation quota exhausted; cannot produce training by relabeling'}
             return {**result, 'allowed': True, 'category': split, 'reason': 'evaluation purpose; acceptance quota remains mandatory'}
@@ -162,14 +162,25 @@ def check_dispatch(root, command, *, kind='collection'):
 
 
 def check_job(root, job_dir, *, kind='collection'):
-    if kind in ('physics_replay', 'native_dependency'):
-        return check_environment(root, {}, kind=kind)
     try:
+        if kind == 'native_dependency':
+            value = json.loads((Path(job_dir) / 'native_inputs.json').read_text())
+            cls = value['original_entry']['class_id']
+            if value['campaign_root'] != str(Path(root).resolve()):
+                raise ValueError('native validation campaign differs')
+            if cls in PARKED_CLASSES:
+                return {'allowed': False, 'category': 'owner_blocked', 'reason': 'owner artifact dependency remains parked'}
+            return check_environment(root, {}, kind=kind)
+        if kind == 'physics_replay':
+            value = json.loads((Path(job_dir) / 'replay_inputs.json').read_text())
+            source = _owned(root, value['source_job'])
+            result = check_job(root, source, kind='source_validation')
+            return {**result, 'source_job': str(source), 'replay_source_checked': True}
         environment = read_environment(Path(job_dir) / 'job.env')
         return check_environment(root, environment, kind=kind,
             start=int(environment['START']) if environment.get('START') else None,
             count=int(environment['N']) if environment.get('N') else None)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, KeyError, TypeError) as exc:
         return {'allowed': False, 'category': 'unverified', 'reason': 'unreadable job identity: ' + str(exc)}
 
 
