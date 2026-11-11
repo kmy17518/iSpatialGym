@@ -61,7 +61,7 @@ def read_counts(root, template, standards, room_plan):
                 counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                                                 (template.split, template.task, scope))))
                 from scripts.campaign_20261110.training_eligibility import eligible_training_records
-                records = eligible_training_records(db, template.task)
+                records = eligible_training_records(db, template.task, root=root)
                 train_class = sum(row["class_id"] == template.class_id for row in records)
                 train_buckets = Counter(row.get("bucket") for row in records if row["class_id"] == template.class_id)
                 room_used = sum(accepted_room(row) == room for row in records)

@@ -36,18 +36,28 @@ def classify_record(row, group=None):
             'reasons': ['training_only_multi_member_group_has_no_standard_eval_purpose_remaining']}
 
 
-def eligible_training_records(db, task=None):
+def eligible_training_records(db, task=None, *, root=None):
     """Quota basis: only proved eval siblings/singletons, never flagged capacity.
 
     Committed allocator records already carry their independently audited native,
     demo and replay provenance. The projection separately rechecks their bytes.
     """
+    projection = {}
+    if root is not None:
+        path = Path(root)/'accounting/training_eligibility.json'
+        if path.exists():
+            value = json.loads(path.read_text())
+            if value.get('campaign_id') != 'campaign_20261110' or value.get('status') != 'complete':
+                raise ValueError('training eligibility projection unavailable')
+            projection = value.get('records', {})
     groups = {}
     query = "SELECT record FROM members WHERE split='train'" + (' AND task=?' if task else '')
     result = []
     for value, in db.execute(query, (task,) if task else ()):
         row = json.loads(value)
         if row.get('sampling_split') != 'eval_standard' or row.get('split') != 'train': continue
+        projected = projection.get(row.get('instance_id'))
+        if projected and (projected.get('status') != 'eligible' or projected.get('accepted_record_sha256') != digest(row)): continue
         gid = row.get('group_id')
         if gid not in groups:
             found = db.execute('SELECT record FROM groups WHERE id=?', (gid,)).fetchone()
@@ -73,8 +83,18 @@ def audit_eligible(row, checked):
     gate = verify(row['gate']['path'], row['gate']['sha256'])
     if gate.get('success') is not True or gate.get('replay_mode') != 'physics_action_open_loop':
         raise ValueError('accepted native replay gate failed')
-    for evidence in row.get('evidence', []):
-        verify(evidence['report_path'], evidence['report_sha256'])
+    evidence_rows = row.get('evidence', [])
+    if {item.get('kind') for item in evidence_rows} != {'demo', 'open_loop_replay'}:
+        raise ValueError('missing exact demo/open-loop-replay evidence')
+    for evidence in evidence_rows:
+        if evidence.get('key') != row['validation_key'] or evidence.get('success') is not True or evidence.get('qa_passed') is not True:
+            raise ValueError('validation evidence key/result mismatch')
+        if evidence.get('restoration_verified') is not True or evidence.get('demo_sha256') != gate.get('demo_sha256'):
+            raise ValueError('validation restoration/demo binding mismatch')
+        physical = verify(evidence['report_path'], evidence['report_sha256'])
+        report_passed(physical, 'oracle' if evidence['kind'] == 'demo' else 'replay')
+        if physical.get('instance_id') != evidence.get('instance_id'):
+            raise ValueError('validation report instance mismatch')
     return {'native_tro_sha256': row['tro_sha256'], 'demo_report_sha256': row['report_sha256'],
             'gate': row['gate'], 'validation_key': row['validation_key'],
             'room': row.get('room'), 'perturbations': block.get('perturbations')}
@@ -108,8 +128,11 @@ def build_projection(root):
         cohort['count'] += 1
         cohort['instance_ids'].append(row['instance_id'])
         if proof and len(cohort['coverage_evidence']) < 3: cohort['coverage_evidence'].append(proof)
-        records[row['instance_id']] = {**decision, 'cohort_id': cohort_id, 'accepted_record_sha256': digest(row),
+        records[row['instance_id']] = {**decision, 'cohort_id': cohort_id, 'accepted_record_sha256': digest({k:v for k,v in row.items() if k != 'allocation_source'}),
             'allocation_source': row['allocation_source'], 'group_id': row.get('group_id'), 'evidence': proof}
+    from scripts.campaign_20261110.contracts import task_quotas
+    for q in task_quotas(): tasks.setdefault(q.task, 0)
+    for row in rows: classes.setdefault(row.get('class_id', row['task']), 0)
     return {'schema': 'isg-training-eligibility-v1', 'campaign_id': 'campaign_20261110', 'observed_at': now,
         'status': 'complete', 'historically_accepted': sum(totals.values()), 'eligible_accepted': totals['eligible'],
         'excluded': totals['excluded'], 'unverified': totals['unverified'], 'replacement_count': 0,

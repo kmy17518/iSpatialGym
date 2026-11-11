@@ -104,3 +104,15 @@ def test_exact_canary_authorization_is_bounded_and_expires(tmp_path):
     changed=list(cmd);changed[4]='4';assert not check_dispatch(tmp_path,changed)['allowed']
     auth['expires_at']='2000-01-01T00:00:00+00:00';gate.write_text(json.dumps(policy))
     assert not check_dispatch(tmp_path,cmd)['allowed']
+
+
+def test_projection_unverified_overrides_mechanically_proven_sibling_quota(tmp_path):
+    import sqlite3
+    db=sqlite3.connect(':memory:');db.executescript('CREATE TABLE members(split,task,record);CREATE TABLE groups(id,record);')
+    row=member('g');group={'accepted':{'g':'train'},'members':[row]}
+    db.execute('INSERT INTO groups VALUES (?,?)',('g',json.dumps(group)))
+    db.execute('INSERT INTO members VALUES (?,?,?)',('train','object_scaling',json.dumps(row)))
+    p=tmp_path/'accounting';p.mkdir()
+    (p/'training_eligibility.json').write_text(json.dumps({'campaign_id':'campaign_20261110','status':'complete',
+        'records':{'g':{'status':'unverified','accepted_record_sha256':digest(row)}}}))
+    assert eligible_training_records(db,root=tmp_path)==[]

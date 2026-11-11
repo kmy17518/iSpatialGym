@@ -303,7 +303,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                 counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                                                   (split, task, scope))))
                 from scripts.campaign_20261110.training_eligibility import eligible_training_records
-                eligible_training = eligible_training_records(db, task)
+                eligible_training = eligible_training_records(db, task, root=root)
                 train_count = len(eligible_training)
                 class_count = sum(row["class_id"] == template.class_id for row in eligible_training)
                 class_cap = QUOTAS[task].train_instances//QUOTAS[task].standard_classes

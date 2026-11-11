@@ -67,7 +67,7 @@ def read_counts(root, template):
                 "SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                 (template.split, template.task, scope))))
             from scripts.campaign_20261110.training_eligibility import eligible_training_records
-            eligible_training = eligible_training_records(db, template.task)
+            eligible_training = eligible_training_records(db, template.task, root=root)
             result["train_buckets"] = Counter(row.get("bucket") for row in eligible_training if row["class_id"] == template.class_id)
             result["class_remaining"] -= sum(result["train_buckets"].values())
             result["task_remaining"] -= len(eligible_training)
