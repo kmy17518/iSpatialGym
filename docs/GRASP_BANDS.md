@@ -6813,3 +6813,42 @@ The switch acts only on the under_large_02 variant's pitched floor push of an el
     - The 2 failures are not the push: arm_stutter in the final retreat, and the wheel touching the briefcase in the first navigate.
   - Baseline ug_ul02_off (partial, one job still running): 6 demos, 0 ok. End yaw 0.4-20.9 deg, 2 topples.
   - Flip recommended by the standard rule; not flipped on this branch.
+
+## under_large_01: not_reached is the heel-first lock's -22.5 deg yaw (branch `i7-ul01reach`, round 4, 2026-11-10)
+
+Task: under_large_01 (the sandal chgcrm pushed under bed_rrcvaq_0, the flat floor blade in 3 strokes of ~0.10 m) failed as
+oracle_failed:not_reached in about half its written demos (int2_31: 4 written, 2 ok, 2 not_reached).
+
+### Evidence (every under_large_01 demo under $OFH/out, 2026-11-06..10: 138 written demos, 38 tags)
+
+- **28 not_reached, all the same failure.** The 3 strokes run to the end (`push_stop` leg_end); the sandal ends 0.18-0.19 m short
+  of the goal line (`push_residual`), position error 0.20-0.21 m, orientation error 0.22-0.30 rad (tolerances 0.05 / 0.15).
+  - Stroke 1: the hand travels 0.112 m, the sandal advances 0.035-0.042 m (a good stroke: 0.094) and slides ~26 mm sideways; yaw
+    unchanged (+-3 deg).
+  - Stroke 2: the root is 25-37 mm off the line, the re-aim follows (cap 30 mm); the sandal advances 0.052-0.060 m and turns +5..+9 deg.
+  - Stroke 3: the root is ~75 mm off the line, past the 30 mm re-aim cap: the blade meets only the sandal's edge (contact +37 mm), the
+    sandal advances 4-10 mm and turns to +13..+17 deg.
+  - No base nudge or place phase is involved: the place ends normally and the push stops at leg_end, not on a stall.
+- **The cause is the carried yaw** (the instance summary's `grasp.yaw`, which the place keeps as the goal orientation):
+
+  | carried yaw | written demos | outcome |
+  |---|---|---|
+  | 0 / -0.03 / -0.04 rad | 96 | 78 ok; the rest unrelated (pause 5, wobble 4, touching 5, stutter 2, plan 1, collision 1) |
+  | -0.12 .. -0.24 rad (jittered) | 7 | 7 symbolic_only (orientation error 0.19-0.31 rad) |
+  | -0.35 .. -0.39 rad (jittered), 5.89 rad (= -22.5 deg grid) | 34 | 28 not_reached, 6 plan_failed, 0 ok |
+  | -0.48 rad | 1 | execution |
+
+  Every not_reached instance has the sandal placed at -20..-22.4 deg to the push. It is deterministic per instance (360002 failed in
+  all 14 tags that wrote it).
+- **Why that yaw is sampled.** `generation.push_under_yaw` = `heel_first` keeps the yaws at which the heel points back within one step of
+  the 16-yaw grid (22.5 deg): the grid yaws 0 and 5.89 rad ('push-under yaw lock heel_first: kept 2 of N yaws ... [0.0, 5.89]'), and the
+  B IK's retries jitter the drawn yaw by up to 22.5 deg (`TARGET_JITTER`). Of 185 written instances 43 carry 5.89 rad and 18 another
+  jittered yaw beyond 0.04 rad.
+
+### The switch: `ISPATIALGYM_PUSH_HEEL_TIGHT` (default off; commit b413aab9)
+
+- "1" = heel_first's tolerance 5 deg (`PUSH_HEEL_TIGHT_TOL_DEG`), a number = that many degrees; never wider than the spec's
+  `push_under_yaw_tol_deg`. The init-yaw jitter is capped at 0.8 of it (4 deg), so the B IK's retries stay inside the lock.
+- Acts only where the heel_first lock is set (the two sandal-under-bed variants); the oracle is unchanged.
+- Kit counters `push_heel_tight.dropped` (a yaw today's tolerance keeps and the tight one does not) and `push_heel_tight.jitter_capped`;
+  `template_facts.push_under_yaw.heel_angle_rest_deg` and one INFO line 'push-under yaw lock heel_first: tolerance ...'.
