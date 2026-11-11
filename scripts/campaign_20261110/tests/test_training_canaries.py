@@ -10,8 +10,8 @@ from scripts.campaign_20261110.tests.test_controller_admission import anchor_fix
 from scripts.campaign_20261110.tests.test_group_lane import reservations
 
 
-def setup(root,monkeypatch):
-    f,template,config_path=anchor_fixture(root,monkeypatch,split='train')
+def setup(root,monkeypatch,task='inter_object_relation_satisfaction-ontop_small_scale'):
+    f,template,config_path=anchor_fixture(root,monkeypatch,split='train',task=task)
     config=json.loads(config_path.read_text());config['campaign_id']='campaign_20261110'
     config['perturbations']['scales']['apple.n.01_1'].update(applied=[1.1]*3,mode='uniform')
     perturb=c.Perturbations({k:c.ScaleState(**v) for k,v in config['perturbations']['scales'].items()})
@@ -66,6 +66,21 @@ def test_actual_artifact_export_preserves_scales_without_acceptance_or_quota(tmp
     assert projection['validated_instances']==1 and projection['eligible_accepted']==projection['quota_consumed']==0
     assert projection['coverage']['measures']['instances_with_nondefault_scale']==1
     assert 'excluded from benchmark' in projection['coverage']['basis']
+
+
+@pytest.mark.parametrize('task',['object_scaling','mental_rotation'])
+def test_authorized_native_held_canary_does_not_require_generic_queue_adapter(tmp_path,monkeypatch,task):
+    f,_=setup(tmp_path,monkeypatch,task=task)
+    with pytest.raises(c.ContractError,match='no generic queue adapter'):
+        admission.source_proof(f.gate,root=tmp_path,started_at=f.since,campaign_id='campaign_20261110')
+    review=canary.audit_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
+    assert review['task']==task and review['validation_passed']
+    assert not review['accepted'] and review['quota_consumed']==0
+    replay=next(f.gate.parent.glob('replay/*/meta.json'))
+    value=json.loads(replay.read_text());value['qa']['hard_triggered']=['unsafe']
+    c.write_json_atomic(replay,value)
+    with pytest.raises(c.ContractError,match='QA'):
+        canary.audit_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
 
 
 def test_canary_rejects_changed_authorization_and_missing_restored_scale(tmp_path,monkeypatch):

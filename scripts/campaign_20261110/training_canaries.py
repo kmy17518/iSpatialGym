@@ -82,7 +82,11 @@ def audit_canary(job, gate_path, *, root, started_at):
     declared=read(authorization_path)
     require(all(declared.get(k)==authorization[k] for k in ('purpose','config_sha256','start','count')),
             'canary authorization identity differs')
-    proof=source_proof(gate_path,root=root,started_at=started_at,campaign_id=policy['campaign_id'])
+    # This is an explicitly authorized canary audit, not generic queue
+    # admission. Native held-object tasks use their own region author, while
+    # retaining the same exact demo/replay, split and artifact checks here.
+    proof=source_proof(gate_path,root=root,started_at=started_at,campaign_id=policy['campaign_id'],
+                       permitted_split='train')
     require(proof['source_job']==str(job) and proof['config']['sha256']==config_sha,
             'canary needs its own exact-job physics replay')
     gate=read(gate_path);tro_path=Path(gate['instance']);raw=read(tro_path)['ispatialgym']

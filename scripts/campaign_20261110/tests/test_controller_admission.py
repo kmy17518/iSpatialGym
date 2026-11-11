@@ -47,6 +47,8 @@ def test_heldout_or_goal_overridden_anchor_cannot_enter_training(tmp_path, monke
         admission.source_proof(f.gate, root=tmp_path, started_at=f.since, campaign_id="campaign")
     proof = admission.source_proof(f.gate, root=tmp_path, started_at=f.since, campaign_id="campaign", permitted_split="eval_model")
     assert proof["template"]["split"] == "eval_model" and proof["schema"] == "isg-heldout-anchor-admission-v1"
+    with pytest.raises(c.ContractError, match="cannot train"):
+        admission.source_proof(f.gate, root=tmp_path, started_at=f.since, campaign_id="campaign", permitted_split="train")
     with pytest.raises(c.ContractError, match="heldout source cannot train"):
         admission.scoped_template(template, {})
     second = tmp_path / "another"; f, _, _ = anchor_fixture(second, monkeypatch)
