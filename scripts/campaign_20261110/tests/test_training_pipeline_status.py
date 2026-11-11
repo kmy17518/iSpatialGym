@@ -74,3 +74,21 @@ def test_family_evidence_does_not_validate_unrelated_paths():
     assert families['configuration_matching-attachment']['exact_validation']['status']=='untested'
     assert all(r['model_pool_switch_active_only_export']['status']=='untested' for r in families.values())
     assert sum(r['standard_classes'] for r in families.values())==100
+
+
+def test_terminal_allocation_does_not_stay_submitted_or_imply_probe_success(tmp_path):
+    path=tmp_path/'training_pipeline_canaries/batch/batch_restoration_r2'
+    write_json_atomic(path/'request.json',{'canaries':[]})
+    write_json_atomic(path/'submission.json',{'request':status.ref(path/'request.json'),
+        'jobs':[{'kind':'physics_action_open_loop','job_id':'123'},
+                {'kind':'kinematic_observation_rendering','job_id':'124'}]})
+    write_json_atomic(path/'execution_observation.json',{
+        'schema':'isg-batch-execution-observation-v1','request':status.ref(path/'request.json'),
+        'observed_at':'2026-11-11T16:00:00Z','jobs':[
+            {'job_id':'123','state':'FAILED','exit_code':'1:0'},
+            {'job_id':'124','state':'COMPLETED','exit_code':'0:0'}]})
+    value=status.observe(tmp_path)['batch_stages'][0]
+    assert value['stages'][0]['status']=='failed_execution'
+    assert value['stages'][1]['status']=='completed_without_complete_probe'
+    assert value['status']!='batch_restoration_verified'
+    assert value['benchmark_credit']==0

@@ -155,6 +155,17 @@ def observe(root, *, now=None):
                 batch['submission'] = ref(submission_path)
             except Exception as error:
                 batch.update(status='submission_observation_failed', error=f'{type(error).__name__}: {error}')
+        scheduler_path=request.parent/'execution_observation.json'
+        scheduler={}
+        if scheduler_path.exists():
+            try:
+                observation=read(scheduler_path)
+                require(observation['schema']=='isg-batch-execution-observation-v1' and
+                        observation['request']==ref(request),'batch execution observation identity differs')
+                scheduler={str(job['job_id']):job for job in observation['jobs']}
+                batch['execution_observation']=ref(scheduler_path)
+            except Exception as error:
+                batch.setdefault('observation_errors',[]).append(str(error))
         for name, kind in [('physics', 'physics_action_open_loop'), ('render', 'kinematic_observation_rendering')]:
             probe = request.parent/name/'probe.json'
             stage = {'kind': kind, 'status': 'not_observed'}
@@ -177,6 +188,16 @@ def observe(root, *, now=None):
                         stage['status'] = 'verified'
                 except Exception as error:
                     stage.update(status='failed_validation', error=f'{type(error).__name__}: {error}')
+            job_id=str(submissions.get(kind,{}).get('job_id',''))
+            if job_id in scheduler:
+                execution=scheduler[job_id]
+                stage.update(scheduler_state=execution['state'],scheduler_observed_at=observation['observed_at'],
+                             execution_observation=ref(scheduler_path),exit_code=execution.get('exit_code'))
+                if execution['state'] in ('FAILED','CANCELLED','TIMEOUT','OUT_OF_MEMORY','NODE_FAIL','PREEMPTED'):
+                    stage['evidence_verified']=stage['status']=='verified'
+                    stage['status']='failed_execution'
+                elif execution['state']=='COMPLETED' and stage['status'] in ('submitted','incomplete'):
+                    stage['status']='completed_without_complete_probe'
             batch['stages'].append(stage)
         if all(s['status'] == 'verified' for s in batch['stages']): batch['status'] = 'batch_restoration_verified'
         result['batch_stages'].append(batch)
