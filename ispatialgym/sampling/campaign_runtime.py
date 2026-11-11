@@ -144,6 +144,23 @@ def touching_push_stroke_m():
     return float(value)
 
 
+def touching_push_yaw_gain():
+    """Audited spray-bottle feedback gain, recorded in each native stroke plan."""
+    if not active():
+        return None
+    _, template, _, _ = configuration()
+    value = template.scene_setup.get('recovery_options', {}).get('touching_push_yaw_gain_m_per_rad')
+    if value is None:
+        return None
+    require(type(value) in (int, float) and math.isfinite(value) and 0 < value <= .15,
+            'campaign yaw gain must be finite and within (0, 0.15] meters per radian')
+    require((template.class_id, template.task) == ('inter_object_relation_satisfaction-touching_04',
+            'inter_object_relation_satisfaction-touching_small_scale'),
+            'yaw gain recovery belongs to the audited spray-bottle class')
+    require(touching_push_stroke_m() is not None, 'yaw gain requires a configured stroke plan')
+    return float(value)
+
+
 def choose_soft_bucket(rng, buckets, counts):
     """Favor underfilled train buckets while keeping every bucket eligible.
 

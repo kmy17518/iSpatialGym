@@ -7951,9 +7951,12 @@ class IORSSmall(SamplerV2):
             TT._count(self, "touch_push_strokes.skipped_class")
             return {}
         from ispatialgym.sampling.v2.tasks.iors_large import push_contact_strips, push_stroke_plan
+        from ispatialgym.sampling import campaign_runtime
+        yaw_gain = campaign_runtime.touching_push_yaw_gain()
 
         plan = push_stroke_plan(float(dist), stroke, TOUCH_PUSH_STROKES_MAX, backoff_m=TOUCH_PUSH_STROKE_BACKOFF_M, reaim_max_m=TOUCH_PUSH_STROKE_REAIM_MAX_M,
-                                yaw_gain_m_per_rad=TOUCH_PUSH_STROKE_YAW_GAIN_M_PER_RAD, yaw_deadband_rad=math.radians(2.0))
+                                yaw_gain_m_per_rad=TOUCH_PUSH_STROKE_YAW_GAIN_M_PER_RAD if yaw_gain is None else yaw_gain,
+                                yaw_deadband_rad=math.radians(2.0))
         strips, _face = push_contact_strips("closed_turned" if str(kind).startswith("push_tip_h") else "blade")
         clearance = float(extras.get("stop_clearance_m") or CPZ.STOP_CLEARANCE)
         TT._count(self, "touch_push_strokes.recorded")

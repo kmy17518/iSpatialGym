@@ -129,6 +129,28 @@ def test_invalid_stroke_policy_never_enters_native_program(monkeypatch,value):
     with pytest.raises(ContractError,match='finite'):CR.touching_push_stroke_m()
 
 
+def test_yaw_gain_requires_exact_class_and_stroke_configuration(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    assert CR.touching_push_yaw_gain() is None
+    template=bind(monkeypatch,'inter_object_relation_satisfaction-touching_04',
+        'inter_object_relation_satisfaction-touching_small_scale',
+        {'touching_push_stroke_m':.03,'touching_push_yaw_gain_m_per_rad':.06})
+    assert CR.touching_push_yaw_gain()==.06
+    template.class_id='inter_object_relation_satisfaction-touching_01'
+    with pytest.raises(ContractError,match='audited spray-bottle'):CR.touching_push_yaw_gain()
+    template.class_id='inter_object_relation_satisfaction-touching_04'
+    template.scene_setup['recovery_options'].pop('touching_push_stroke_m')
+    with pytest.raises(ContractError,match='configured stroke'):CR.touching_push_yaw_gain()
+
+
+@pytest.mark.parametrize('value',[True,'0.06',0,-.06,.16,float('nan'),float('inf')])
+def test_invalid_yaw_gain_is_rejected(monkeypatch,value):
+    bind(monkeypatch,'inter_object_relation_satisfaction-touching_04',
+        'inter_object_relation_satisfaction-touching_small_scale',
+        {'touching_push_stroke_m':.03,'touching_push_yaw_gain_m_per_rad':value})
+    with pytest.raises(ContractError,match='finite'):CR.touching_push_yaw_gain()
+
+
 @pytest.mark.parametrize('option', ['shelf_board_draw','shelf_other_arm'])
 def test_shelf_options_are_bound_to_exact_released_class(monkeypatch, option):
     from types import SimpleNamespace
