@@ -1178,7 +1178,7 @@ class Disembedding(SamplerV2):
             return
         if group["group_id"] != plan.group_id:
             raise ValueError("published puzzle belongs to another goal group")
-        grasp = C.split_twin(group["requested_start"]["grasp"])[0]
+        grasp = str(group["requested_start"]["grasp"])
         used = getattr(self, "_campaign_layout_published_grasps", {})
         used.setdefault(plan.group_id, set()).add(grasp)
         self._campaign_layout_published_grasps = used
@@ -1186,7 +1186,12 @@ class Disembedding(SamplerV2):
     def _campaign_layout_grasps(self):
         plan = getattr(self, "_campaign_tray_active", None)
         used = getattr(self, "_campaign_layout_published_grasps", {}).get(getattr(plan, "group_id", None), set())
-        return [g for g in self.pick_grasps if C.split_twin(g.name)[0] not in used]
+        return [g for g in self.pick_grasps if g.name not in used or C.twin_name(g.name) not in used]
+
+    def _campaign_layout_grasp_allowed(self, name):
+        plan = getattr(self, "_campaign_tray_active", None)
+        used = getattr(self, "_campaign_layout_published_grasps", {}).get(getattr(plan, "group_id", None), set())
+        return name not in used
 
     def _layout_pick(self, rng, manip: Stance, arms_here: List[str]):
         """Owner 2026-10-12 (disembedding#01, the puzzle): the fixed layout turned as a whole about the vertical - the target with its
@@ -1244,7 +1249,8 @@ class Disembedding(SamplerV2):
                     t_pose, grasp = TT.phase3_target(self, manip, rng, grasps, self.hull["target"], self.rest["target"], self.grasp_ignore_list(), top=src_w,
                                                      support_z=src_w.z, margin=float(self.g("tray_footprint_margin_m")),
                                                      scale_key=self.choice.models["target"].scale, bands=self.bands, arms=arms_here,
-                                                     arm_bands=self.arm_bands or None, fixed=(poses[tname][0][:2], fig_yaw))
+                                                     arm_bands=self.arm_bands or None, fixed=(poses[tname][0][:2], fig_yaw),
+                                                     grasp_allowed=self._campaign_layout_grasp_allowed)
             except Reject as e:
                 errors.append(f"yaw {deg(yaw)}: {str(e)[:200]}")
                 continue

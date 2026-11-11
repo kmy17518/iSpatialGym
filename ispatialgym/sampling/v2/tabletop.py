@@ -4566,7 +4566,8 @@ def _held_turn(s, draft, g, report: Dict[str, Any], rerun: Callable[[], Dict[str
     base = {"stage": "held chain", "arm": g.arm, "recorded": label0, "safe_margin_rad": round(safe, 4), "actions": list(mine["actions"])}
     barred = str((tc.get("row") or {}).get("why") or "") if C.split_twin(label0)[1] else ""  # only a row is ever barred
     recheck = getattr(s, "turn_recheck", None)
-    why_not = f"the draw barred it ({barred})" if barred in _BARRED else (None if recheck is not None else "no turn re-check in this task module")
+    barred_names = tc.get("barred_grasp_names", ())
+    why_not = f"the draw barred it ({barred or label1})" if barred in _BARRED or label1 in barred_names else (None if recheck is not None else "no turn re-check in this task module")
     b, rep2, why, theirs = None, None, "", None
     if why_not is None:
         q_first = None
@@ -4790,7 +4791,8 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                   support_z: Optional[float] = None, margin: float = SUPPORT_MARGIN, focus_radius: float = FOCUS_RADIUS, yaws: Sequence[float] = YAWS,
                   arm: str = "right", object_name: Optional[str] = None, scale_key: Any = None, eef_of_grasp: Optional[Callable[[Any], Pose]] = None,
                   bands: Optional[RB.ReachBands] = None, jitter: float = YAW_JITTER, n_positions: int = 5, arms: Optional[Sequence[str]] = None,
-                  arm_bands: Optional[Dict[str, RB.ReachBands]] = None, fixed: Optional[Tuple[Any, float]] = None) -> Tuple[Pose, GraspRecord]:
+                  arm_bands: Optional[Dict[str, RB.ReachBands]] = None, fixed: Optional[Tuple[Any, float]] = None,
+                  grasp_allowed: Optional[Callable[[str], bool]] = None) -> Tuple[Pose, GraspRecord]:
     """§4.6 step 1: screen the 8 fixed yaws x ``grasps`` at the focus cell (12-seed IK from ``manip``, support ignored for
     the grasp pose only) -> feasible set F (stored in the band cache under (trunk, cell); empty F removes the cell);
     draw (yaw, grasp) uniformly from F, jitter ±22.5°, place the object within 5 cm of the focus with its footprint on
@@ -5060,7 +5062,8 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     sc = MF.width_of(s).of(mf_key) if mf_key is not None else 1.0  # AdaptiveWidth of the focus's map cell (seed mode)
     while F:
         out = _phase3_draw(s, F, rng, jitter * sc, n_positions, focus_radius * sc, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins,
-                           band_of, name, offered, arm, manip, fails, ev_of if ev_on else None, gname, tried, verify=task_objs if refine else None)
+                           band_of, name, offered, arm, manip, fails, ev_of if ev_on else None, gname, tried, verify=task_objs if refine else None,
+                           grasp_allowed=grasp_allowed)
         if isinstance(out, tuple):
             if mf_key is not None:
                 MF.width_of(s).update(mf_key, True)
@@ -5399,8 +5402,15 @@ def _scene_mask_draw_note(s, yaw0, g, arm, fails_at, fails, outcome: str) -> Non
                                                "support_fails": int(fails["support"] - fails_at["support"]), "ik_fails": int(fails["ik"] - fails_at["ik"])}))
 
 
+def allowed_grasp_turns(grasp, twins, allowed=None):
+    """Bar only an exact published turn; every retained turn still needs exact IK."""
+    name = getattr(grasp, "name", None)
+    return (allowed is None or allowed(name),
+            bool(twins and (allowed is None or allowed(C.twin_name(name)))))
+
+
 def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins, band_of,
-                 name, offered, arm, manip, fails, ev_of, gname, tried, verify=None):
+                 name, offered, arm, manip, fails, ev_of, gname, tried, verify=None, grasp_allowed=None):
     """:func:`phase3_target`'s draw over F (without replacement): ``(pose, GraspRecord)`` on the first exact-IK confirmation, else the last
     IK failure reason. With ``ev_of`` (BAND_EVIDENCE) each tried pair's outcome is counted in its arm's evidence (a pair whose positions
     all left the support counts nothing); ``tried`` collects the pairs drawn."""
@@ -5409,6 +5419,10 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
 
     for i in MF.draw_order(rng, F, getattr(s, "_map_F_w", None)):
         yaw0, g, arms_i = F[int(i)]
+        row_allowed, twin_allowed = allowed_grasp_turns(g, twins, grasp_allowed)
+        if not row_allowed and not twin_allowed:
+            last_reason = "both exact grasp names barred by caller"
+            continue
         a0 = arms_i[0]
         tried.add((round(float(yaw0), 4), str(getattr(g, "name", id(g)))))
         yaw = float(yaw0) + float(rng.uniform(-jitter, jitter))
@@ -5438,7 +5452,9 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
                 g_rec, eef_in_object, pick, arm_c = g, eef_of(g), None, a0
                 if (twins or len(arms_i) > 1) and getattr(g, "name", None):
                     pick = pick_twin(s, st_of[a0], a0, g, eef_in_object, eef, pre, res, exact_kw, support_z=z_here, where="phase3_target", arms=arms_i,
-                                     stances=st_of, twins=twins)
+                                     stances=st_of, twins=twin_allowed, row_allowed=row_allowed)
+                    if grasp_allowed is not None:
+                        pick.facts["barred_grasp_names"] = [n for n in (g.name, C.twin_name(g.name)) if not grasp_allowed(n)]
                     g_rec, eef_in_object, eef, pre, res, arm_c = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res, pick.arm
                     for o in pick.facts["orient"]["options"]:
                         if o.get("source") == "ik" and band_of.get(o.get("arm")) is not None and band_of[o["arm"]].meta.get("mirrored_from"):

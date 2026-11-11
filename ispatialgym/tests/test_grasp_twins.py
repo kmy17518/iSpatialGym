@@ -567,6 +567,18 @@ def test_phase3_target_records_the_twin_the_oracle_executes():
     assert sd["eef_in_object"]["position"] == pytest.approx(g.position.tolist())
 
 
+@pytest.mark.parametrize('barred', ['grasp_4','grasp_4~r180'])
+def test_phase3_exact_name_filter_keeps_only_unused_checked_turn(barred):
+    q=_q([0.0,-1.0,0.0,-1.5,-2.2,0.0,0.0])
+    qt=_q([0.0,-1.0,0.0,-1.5,0.94,0.0,0.0])
+    s,g,manip,top=_phase3_stub(True,(q,q,''),q,twin_answer=(qt,qt,''))
+    _,rec=TT.phase3_target(s,manip,np.random.default_rng(0),[g],th.zeros(8,3),C.IDENTITY_QUAT,[],top=top,
+        object_name='apple.n.01_1',n_positions=1,grasp_allowed=lambda n:n!=barred)
+    assert rec.grasp_name==C.twin_name(barred)
+    assert rec.extras['twin_choice']['barred_grasp_names']==[barred]
+    assert s.calls, 'the retained assignment still needs exact IK'
+
+
 def test_phase3_target_without_twins_records_the_row_as_before():
     q = _q([0.0, -1.0, 0.0, -1.5, -2.2, 0.0, 0.0])  # 0.16 rad from joint 5's limit: safe, 0.63 rad of wrist from the stance
     s, g, manip, top = _phase3_stub(False, (q, q, ""), q)
@@ -831,6 +843,14 @@ def test_held_turns_keeps_the_recorded_turn_unless_the_rule_puts_the_other_first
     h = rec.extras["twin_choice"]["held"]
     assert rec.grasp_name == "grasp_2" and h["status"] == "switched" and h["reason"] == "default" and h["against_default"] is False
     assert rec.extras["wrist_flip"] is False and rec.extras["twin_choice"]["chosen"] == "row"
+
+
+def test_held_turn_does_not_reintroduce_a_published_twin():
+    s,rec,draft,report,rerun,calls=_held_stub({'grasp_2':0.0177,'grasp_2~r180':0.18})
+    rec.extras['twin_choice']['barred_grasp_names']=['grasp_2~r180']
+    assert TT.held_turns(s,draft,report,rerun) is report
+    assert rec.grasp_name=='grasp_2' and calls=={'recheck':[],'rerun':[]}
+    assert rec.extras['twin_choice']['held']['status']=='not offered'
 
 
 def test_held_turns_never_re_checks_a_safe_chain():

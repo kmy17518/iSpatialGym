@@ -19,6 +19,10 @@ def test_puzzle_group_remembers_only_published_grasps_and_resets_by_group(tmp_pa
         'class_id':'disembedding_01','runtime':{'goal_group':{
             'group_id':'g1','requested_start':{'grasp':'top_13~r180'}}}}}}))
     Disembedding.campaign_instance_published(s,p)
+    assert [g.name for g in Disembedding._campaign_layout_grasps(s)]==['top_13','top_13~r180','top_2']
+    assert Disembedding._campaign_layout_grasp_allowed(s,'top_13')
+    assert not Disembedding._campaign_layout_grasp_allowed(s,'top_13~r180')
+    s._campaign_layout_published_grasps['g1'].add('top_13')
     assert [g.name for g in Disembedding._campaign_layout_grasps(s)]==['top_2']
     # Another goal retains the full checked grasp library.
     s._campaign_tray_active=SimpleNamespace(group_id='g2')
@@ -30,6 +34,16 @@ def test_puzzle_without_campaign_does_not_open_published_artifact():
     s=SimpleNamespace(pick_grasps=[SimpleNamespace(name='top_1')])
     Disembedding.campaign_instance_published(s,'/missing/noncampaign.tro')
     assert Disembedding._campaign_layout_grasps(s)==s.pick_grasps
+
+
+def test_exact_turn_filter_retains_other_wrist_configuration_without_enabling_twins():
+    from ispatialgym.sampling.v2.tabletop import allowed_grasp_turns
+    grasp=SimpleNamespace(name='top_13')
+    assert allowed_grasp_turns(grasp,True,lambda n:n!='top_13~r180')==(True,False)
+    assert allowed_grasp_turns(grasp,True,lambda n:n!='top_13')==(False,True)
+    assert allowed_grasp_turns(grasp,False,lambda n:n!='top_13')==(False,False)
+    assert allowed_grasp_turns(grasp,True,lambda n:False)==(False,False)
+    assert allowed_grasp_turns(grasp,True)==(True,True)
 
 
 def test_reference_start_proposal_is_scoped_and_provenance_required():
