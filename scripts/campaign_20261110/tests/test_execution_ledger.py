@@ -62,5 +62,29 @@ class ExecutionLedgerTests(unittest.TestCase):
                 self.assertEqual(row['stages']['native']['evidence']['returncode'],returncode)
                 self.assertEqual(row['stages']['physics_replay']['status'],'unobserved')
 
+    def test_fresh_wrapper_cannot_make_stale_worker_jobs_current(self):
+        self.put('canonical', {'classes': [{'class_id': 'jar'}]})
+        self.put('standard', {'observed_at': 1700, 'classes': [{'class_id': 'jar',
+            'worker_observed_at': 1000, 'active_jobs': ['old-job'],
+            'acceptance': {'accepted_standard': 3}}]})
+        r = build(self.root, 1701)['rows'][0]
+        self.assertEqual(r['evidence_state'], 'current')
+        self.assertEqual(r['active_work'], [])
+        self.assertEqual(r['reported_work'], ['old-job'])
+        self.assertEqual(r['activity_observation']['state'], 'stale')
+        self.assertEqual(r['acceptance']['accepted_standard'], 3)
+
+    def test_worker_activity_needs_its_own_plausible_timestamp(self):
+        self.put('canonical', {'classes': [{'class_id': 'jar'}]})
+        for timestamp, expected in ((None, 'timestamp_missing'), (2000, 'future_timestamp'),
+                                    (1000, 'current_worker_report')):
+            with self.subTest(timestamp=timestamp):
+                self.put('standard', {'classes': [{'class_id': 'jar',
+                    'worker_observed_at': timestamp, 'active_jobs': ['owned-job']}]})
+                r = build(self.root, 1001)['rows'][0]
+                self.assertEqual(r['activity_observation']['state'], expected)
+                self.assertEqual(r['active_work'], ['owned-job'] if expected == 'current_worker_report' else [])
+                self.assertEqual(r['reported_work'], ['owned-job'])
+
 
 if __name__=='__main__':unittest.main()

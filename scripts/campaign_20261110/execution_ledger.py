@@ -59,6 +59,20 @@ def stage(value=None):
     return {'status': 'unobserved'} if value is None else {'status': 'source_evidence', 'evidence': value}
 
 
+def worker_activity(observation, now):
+    """A freshly published wrapper cannot refresh an old worker job report."""
+    reported = observation.get('active_jobs', [])
+    observed = observation.get('worker_observed_at')
+    timestamp = epoch(observed)
+    age = None if timestamp is None else now - timestamp
+    state = ('timestamp_missing' if age is None else 'future_timestamp' if age < -30
+             else 'stale' if age > 600 else 'current_worker_report')
+    return {'active_work': reported if state == 'current_worker_report' else [],
+            'reported_work': reported,
+            'activity_observation': {'observed_at': observed, 'age_seconds': age, 'state': state,
+                'semantics': 'Dated worker ownership report; execution requires separate fresh scheduler or worker evidence.'}}
+
+
 def row(identifier, kind, owner, reference, **fields):
     return {'id': identifier, 'kind': kind, 'owner': owner, 'observed_at': reference.get('observed_at'),
             'evidence_state': reference['state'], 'requirement_ids': [], 'dependencies': [],
@@ -108,7 +122,7 @@ def build(root, now=None):
             class_id=c['class_id'], task=c.get('task'), requirement_ids=reqs(c.get('task')),
             configuration=observed.get('configuration'), runtime=observed.get('runtime'),
             status=observed.get('state', c.get('status','unobserved')), stages=stages,
-            dependencies=observed.get('dependencies',[]), active_work=observed.get('active_jobs',[]),
+            dependencies=observed.get('dependencies',[]), **worker_activity(observed, now),
             controller=observed.get('controller'), acceptance=observed.get('acceptance',c.get('acceptance',{})),
             verification=c, last_progress_at=observed.get('last_progress_at'), blocker=observed.get('blocker'),
             next_action=observed.get('next_action') or 'Reconcile exact accepted quota and current refill owner.'))
