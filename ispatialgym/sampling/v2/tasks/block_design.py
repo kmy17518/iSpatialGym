@@ -394,20 +394,49 @@ class BlockDesign(SamplerV2):
     def _flip_directions(self) -> List[str]:
         return [str(v) for v in (self.gen("flip_directions", None) or FLIP_DIRECTIONS)]
 
+    def _start_face_profile(self):
+        """A fixed group profile, or an opt-in profile for finding its native anchor.
+
+        Anchor proposals leave board placement and robot stances to the native
+        search. They retain every geometry, visibility and manipulation check.
+        """
+        plan = getattr(self, "_campaign_block_active", None)
+        if plan is not None:
+            return tuple(plan.pattern), tuple(plan.initial_up_faces)
+        profile = self.gen("campaign_start_profile", None)
+        if profile is None:
+            return None
+        patterns = self.g("patterns") or {}
+        if not isinstance(profile, dict) or profile.get("pattern_id") not in patterns:
+            raise Reject("spec", "start-face proposal needs an existing pattern")
+        pattern = tuple(patterns[profile["pattern_id"]])
+        up = profile.get("initial_up_faces")
+        faces = self.color_to_face()
+        if (not isinstance(up, list) or len(up) != 4 or len(set(up)) != 4 or len(pattern) != 4
+                or any(f not in self.faces for f in up) or any(c not in faces for c in pattern)):
+            raise Reject("spec", "start-face proposal needs four distinct native faces")
+        goals = [faces[c] for c in pattern]
+        if any(f == TT.opposite_face(g) for f, g in zip(up, goals)):
+            raise Reject("spec", "start-face proposal cannot require an opposite-face flip")
+        flips = sum(f != g for f, g in zip(up, goals))
+        if type(profile.get("required_flips")) is not int or profile["required_flips"] != flips or not 1 <= flips <= 4:
+            raise Reject("spec", "start-face proposal flip count differs from native faces")
+        return pattern, tuple(up)
+
     def _n_flips(self) -> int:
         """Blocks that must flip for the configured pattern(s): the up faces are distinct, so of the blocks sharing a goal
         colour only one shows it up (``block_no_flip`` makes that preference certain) - ``n - distinct colours`` at least."""
-        plan = getattr(self, "_campaign_block_active", None)
-        if plan is not None:
+        profile = self._start_face_profile()
+        if profile is not None:
             faces = self.color_to_face()
-            return sum(up != faces[color] for up, color in zip(plan.initial_up_faces, plan.pattern))
+            return sum(up != faces[color] for up, color in zip(profile[1], profile[0]))
         patterns = self.g("patterns") or {}
         if not patterns:
             return 0
         return max(len(p) - len(set(p)) for p in patterns.values())
 
     def _flips_expected(self) -> bool:
-        if getattr(self, "_campaign_block_active", None) is not None:
+        if self._start_face_profile() is not None:
             return self._n_flips() > 0
         return self._n_flips() > 0 and (bool(self.gen("block_no_flip", False)) or float(self.gen("goal_face_up_prob", 0.5)) > 0.0)
 
@@ -431,13 +460,13 @@ class BlockDesign(SamplerV2):
         oi = sorted(range(len(cs)), key=lambda i: sc[i])
         gf = {bi: slot_faces[si] for si, bi in enumerate(oi)}
         anchor_bi = oi[0]
-        plan = getattr(self, "_campaign_block_active", None)
-        if plan is not None:
+        profile = self._start_face_profile()
+        if profile is not None:
             # Fixed campaign profiles may require more flips than duplicate
             # goal colors alone. Screen their actual image-ordered flip set
             # before choosing cells or a board placement, using the same reach
             # and approach-clearance rules as the final sample check.
-            flips = {bi for si, bi in enumerate(oi) if plan.initial_up_faces[si] != slot_faces[si]}
+            flips = {bi for si, bi in enumerate(oi) if profile[1][si] != slot_faces[si]}
             if flip_mode and any(not self._flip_cell_ok(cs[bi], manip, init, primary_dir) for bi in flips):
                 return None
         else:
@@ -854,6 +883,9 @@ class BlockDesign(SamplerV2):
         plan = getattr(self, "_campaign_block_active", None)
         if plan is not None:
             return plan.pattern_id, list(plan.pattern)
+        profile = self._start_face_profile()
+        if profile is not None:
+            return self.gen("campaign_start_profile")["pattern_id"], list(profile[0])
         patterns = self.g("patterns") or {}
         if not patterns:
             raise Reject("spec", "generation.patterns is empty")
@@ -1175,8 +1207,9 @@ class BlockDesign(SamplerV2):
                 up_of[bi] = side_options[int(rng.integers(len(side_options)))] if side_options else options[0]
             else:
                 up_of[bi] = goal_face[bi] if rng.random() < p_goal_up else options[int(rng.integers(len(options)))]
-        if campaign_plan is not None:
-            up_of = {bi: campaign_plan.initial_up_faces[slot_of[bi]] for bi in range(n)}
+        start_profile = self._start_face_profile()
+        if start_profile is not None:
+            up_of = {bi: start_profile[1][slot_of[bi]] for bi in range(n)}
             if any(up_of[bi] == TT.opposite_face(goal_face[bi]) for bi in range(n)):
                 raise Reject("campaign_block_profile", "initial face is opposite its goal face")
             expected = {bi for bi in range(n) if up_of[bi] != goal_face[bi]}

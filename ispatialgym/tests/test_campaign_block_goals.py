@@ -151,3 +151,31 @@ def test_board_feasibility_cache_and_pattern_are_scoped_to_fixed_goal():
     s._campaign_block_active=None
     assert s._board_feasible(0,stance);assert seen[-1]==['-z']
     assert len(seen)==3
+
+
+@pytest.mark.parametrize('count,up', [(3,['+z','-x','+y','+x']), (4,['-x','-y','+y','+x'])])
+def test_native_anchor_profile_preserves_flip_geometry_without_freezing_board(count,up):
+    s=object.__new__(BlockDesign)
+    proposal={'pattern_id':'rbbr','initial_up_faces':up,'required_flips':count}
+    s.gen=lambda key,default=None: proposal if key=='campaign_start_profile' else default
+    s.g=lambda _: {'rbbr':['red','blue','blue','red']}
+    s.faces={'+z':'red','-z':'blue','+x':'white','-x':'yellow','+y':'blue|yellow','-y':'red|white'}
+    s._has_board=lambda: True
+    assert s._n_flips()==count and s._flips_expected()
+    assert s.pattern(None)==('rbbr',['red','blue','blue','red'])
+    assert getattr(s,'_campaign_block_active',None) is None
+    cells=[th.tensor([.3*i,0.]) for i in range(4)]
+    stance=NS(world_to_base=lambda c:c)
+    s._flip_cell_ok=lambda c,*args: float(c[0])<.8
+    assert s._flip_plan(cells,lambda c:float(c[0]),['+z','-z','-z','+z'],stance,stance,'right',True) is None
+    s._flip_cell_ok=lambda *args: True
+    assert len(s._flip_plan(cells,lambda c:float(c[0]),['+z','-z','-z','+z'],stance,stance,'right',True))==count
+    proposal['required_flips']=count-1
+    with pytest.raises(Reject,match='flip count'):
+        s._n_flips()
+    proposal.update(required_flips=count,initial_up_faces=['+x']*4)
+    with pytest.raises(Reject,match='distinct native faces'):
+        s.pattern(None)
+    proposal['initial_up_faces']=['-z','-x','+y','+x']
+    with pytest.raises(Reject,match='opposite-face'):
+        s._n_flips()
