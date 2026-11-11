@@ -6853,3 +6853,25 @@ oracle_failed:not_reached in about half its written demos (int2_31: 4 written, 2
 - Acts only where the heel_first lock is set (the two sandal-under-bed variants); the oracle is unchanged.
 - Kit counters `push_heel_tight.dropped` (a yaw today's tolerance keeps and the tight one does not) and `push_heel_tight.jitter_capped`;
   `template_facts.push_under_yaw.heel_angle_rest_deg` and one INFO line 'push-under yaw lock heel_first: tolerance ...'.
+- r2 (3a6dcc5e): the 5 deg window is centred on the grid yaw nearest heel-back (the sandal's heel stands 6 deg off heel-back at yaw 0;
+  r1's window around heel-back itself kept none of the 16 yaws).
+- r3 (24e642f1): keep the right arm.
+  - Under r2, 360002 and 360003 grasped with the LEFT arm and failed robot_touching_itself (left_arm_link3 / link5, left j4 -2.081 /
+    -2.087). Cause: the right arm's F_init at the first B held no heel-back yaw, and the segment coupled the left arm at that same B
+    before the right arm was tried at any other B.
+  - Now the default arm runs at every B whose pre-screen shows a kept yaw first, then each B's other arms (`heel_tight_couple_plan`,
+    kit `push_heel_tight.arm_deferred`).
+  - A program whose planned left j4 comes within 30 mrad of its limit is rejected (`PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD`, kit
+    `push_heel_tight.left_j4_checked` / `.left_j4_rejected`). Over the 23 left-arm demos, the 3 self-touches planned 2.1-2.3 mrad from
+    the limit, and the other 20 planned 57 mrad or more.
+- r3b (27ff96ac): after 2 left-j4 rejections of one instance, its later attempts couple the default arm only. Not exercised by the A/B.
+- **A/B result (r3)**, N 8 (360000 + 360100), svl titanrtx, own caches:
+
+  | arm | attempts / written / ok | GPU-h per ok | arms | failures |
+  |---|---|---|---|---|
+  | OFF uh_ul01_off (b413aab9) | 26 / 8 / 6 | 1.35 | 8 right | not_reached (360002, -22.5 deg), robot_touching_objects |
+  | ON r2 uh2_ul01_on (3a6dcc5e) | 17 / 8 / 6 | 0.66 | 5 right, 3 left | 2 robot_touching_itself (left) |
+  | ON r3 uh3_ul01_on (24e642f1) | 20 / 8 / 7 | 0.575 | 7 right, 1 left (planned -2.0324) | symbolic_only (360003, carried -3.5 deg, ori 0.173) |
+
+  - 360002 succeeded right-arm at yaw 0 under r3, after the guard rejected 2 left programs.
+  - The flip rule passes: the switch acts, ok is 7 vs 6, and GPU-h per ok is 0.575 vs 1.35. Not flipped; the lead decides.
