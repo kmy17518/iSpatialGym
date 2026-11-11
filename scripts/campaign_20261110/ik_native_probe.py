@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
@@ -84,6 +85,9 @@ def main():
         raise ValueError('effective configuration differs from probe spec')
     if os.environ.get('ISPATIALGYM_EXACT_IK_MANIFEST') != str(paths['manifest']):
         raise ValueError('effective exact-IK manifest differs from probe spec')
+    # Only typed, explicitly imported witnesses may carry across this experiment.
+    # Other sampler caches begin empty for each probe and never touch the source.
+    os.environ['ISPATIALGYM_SAMPLING_CACHE'] = str(output / 'ordinary_sampling_cache')
     report = {'schema': SCHEMA, 'campaign_id': CAMPAIGN, 'diagnostic_only': True,
               'benchmark_credit': 0, 'eligible_for_admission_or_acceptance': False,
               'spec_sha256': sha(args.spec), 'snapshot': str(paths['snapshot']),
@@ -102,6 +106,12 @@ def main():
     from ispatialgym.sampling.v2.ik import IKChecker
     from ispatialgym.sampling.v2.core import SamplerV2
     from ispatialgym.sampling import exact_exchange
+    modules = [multiply_isg, importlib.import_module(IKChecker.__module__),
+               importlib.import_module(SamplerV2.__module__), exact_exchange]
+    for module in modules:
+        descendant(module.__file__, paths['snapshot'])
+    report['loaded_native_modules'] = {m.__name__: str(Path(m.__file__).resolve()) for m in modules}
+    report['ordinary_sampling_cache'] = os.environ['ISPATIALGYM_SAMPLING_CACHE']
     original_exact = IKChecker.exact
     original_register = exact_exchange.register_query
     original_write = SamplerV2.write_instance
