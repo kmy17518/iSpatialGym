@@ -82,7 +82,25 @@ def test_measured_small_pair_scope_preserves_unmeasured_and_large_classes():
         cls='inter_object_relation_satisfaction-'+relation+'_small_scale_'+suffix
         assert not source_stance_hint_enabled(relation,'small',cls)
     assert not source_stance_hint_enabled('under','small',
-        'inter_object_relation_satisfaction-under_small_scale-rubber_eraser-notepad')
+        'inter_object_relation_satisfaction-under_small_scale-unreviewed_pair')
+
+
+def test_category_under_source_torso_enters_checked_shortlist_only_for_exact_class():
+    from ispatialgym.sampling.campaign_tabletop_starts import (
+        prioritize_written_stances, source_stance_hint_enabled)
+    cls='inter_object_relation_satisfaction-under_small_scale-rubber_eraser-notepad'
+    assert source_stance_hint_enabled('under','small',cls)
+    assert not source_stance_hint_enabled('under','large',cls)
+    assert not source_stance_hint_enabled('ontop','small',cls)
+    # Source1721 passed with .75/-.5638; group1740 omitted its manipulation
+    # hint and repeatedly tried .5/-.45 or0/-.61, failing all45 place draws.
+    source={'base_pose2d':[-.106262,14.655634,-1.570795],
+            'focus':[-.106261,13.905634,.669136],'translate':.75,'tilt':-.5638}
+    candidates=[SimpleNamespace(**{**source,'translate':.5,'tilt':-.45}) for _ in range(8)]
+    candidates.append(SimpleNamespace(**source))
+    order=list(range(9));ranked=prioritize_written_stances(order,candidates,[source])
+    assert ranked[:4]==order[:4] and ranked[4]==8
+    assert sorted(ranked)==order and len(set(ranked))==len(order)
 
 
 def test_under_model_source_torso_survives_frame_ranked_shortlist():
