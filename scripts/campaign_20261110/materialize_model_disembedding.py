@@ -18,6 +18,9 @@ def main():
         p.add_argument('--' + name, type=Path, required=True)
     p.add_argument('--support-scene-proof', type=Path)
     p.add_argument('--measurement-reservations', type=Path)
+    p.add_argument('--class-id', action='append', help='Materialize only these reserved variable-count classes')
+    p.add_argument('--destination-side', choices=('left', 'right'),
+                   help='Choose a fresh tray layout side while preserving the task, ready models and geometry gates')
     a = p.parse_args()
     require(not a.out.exists() and a.out.resolve().is_relative_to(a.root.resolve()), 'new owned output required')
     policy, hashes, defaults, review, trays = [json.loads(path.read_text()) for path in
@@ -76,9 +79,13 @@ def main():
     import numpy as np
     proposals = [row for row in policy['model_holdout_templates'] if row['task'] == 'disembedding' and row['class_id'] != 'disembedding_01']
     require(len(proposals) == 9, 'expected nine variable-count held classes; LEF remains fixed')
+    selected = set(a.class_id or [row['class_id'] for row in proposals])
+    require(selected and selected <= {row['class_id'] for row in proposals}, 'unreserved disembedding class selection')
     a.out.mkdir(parents=True); templates, jobs, grasp_jobs, requests = [], [], [], []
     for index, proposal in enumerate(proposals):
         cls = proposal['class_id']; actors = proposal['roles']
+        if cls not in selected:
+            continue
         target_key = next(row['category'] + '/' + row['model'] for row in actors if row['role'] == 'target')
         # The category list is a pool. The native task excludes target-identical
         # distractors; choose one copy of each other admitted model initially.
@@ -94,6 +101,9 @@ def main():
                 require(review['objects'][key]['status'] == 'passed' and file_digest(Path(row['asset_path'])) == row['asset_sha256'], 'native role review or USD differs')
         entry = copy.deepcopy(originals[records[cls]['row']['alias']]); source_definition = digest(entry)
         require(not entry['generation'].get('fixed_layout'), 'fixed puzzle cannot use variable counts')
+        source_side = entry['generation'].get('destination_side')
+        if a.destination_side:
+            entry['generation']['destination_side'] = a.destination_side
         iddl = parse_file(str(a.snapshot / 'ispatialgym/assets/iddl' / entry['iddl']))
         for role in ('target', 'source', 'destination'):
             row = role_rows[role]; key = row['category'] + '/' + row['model']
@@ -149,8 +159,15 @@ def main():
         if a.support_scene_proof:
             proof['support_scene_proof'] = dict(path=str(a.support_scene_proof), sha256=file_digest(a.support_scene_proof))
             proof['support_adaptation'] = 'Globally reserved default-scale table inserted into a collision-checked private scene; original objects unchanged'
+        if a.destination_side:
+            proof['tray_side_adaptation'] = dict(original_destination_side=source_side,
+                destination_side=a.destination_side, original_definition_sha256=source_definition,
+                reason='Fresh permitted left/right tray layout; native stance, fit, demo and replay gates unchanged')
         entry['campaign_provenance'] = proof
-        template = Template('held_model__' + cls + '__initial_count_' + str(len(distractors)), 'disembedding', cls, 'eval_model', scene, room, tuple(refs),
+        candidate_id = 'held_model__' + cls + '__initial_count_' + str(len(distractors))
+        if a.destination_side:
+            candidate_id += '__destination_' + a.destination_side
+        template = Template(candidate_id, 'disembedding', cls, 'eval_model', scene, room, tuple(refs),
                             digest(dict(entry=entry, bddl_sha256=file_digest(bddl))), {**proof, 'task_rooms': [room], 'inst_to_name': names,
                             'runtime_bddl_sha256': file_digest(bddl), 'customs_alias': alias, 'fresh_geometry': 'pending', 'fresh_demo': 'pending',
                             'fresh_replay': 'pending', 'coverage': 'Native area profile required before count expansion', 'perturbations': False})
