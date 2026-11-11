@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.campaign_20261110.ik_native_probe import CAMPAIGN, SCHEMA, sha, validate_spec
+from scripts.campaign_20261110.ik_native_probe import CAMPAIGN, SCHEMA, sha, validate_spec, compatibility_difference
 
 
 class ProbeBoundaryTests(unittest.TestCase):
@@ -53,6 +53,13 @@ class ProbeBoundaryTests(unittest.TestCase):
         self.spec['benchmark_credit'] = 0; self.spec['total_query_limit'] = 501
         with self.assertRaisesRegex(ValueError, 'query bounds'):
             validate_spec(self.spec, self.output)
+
+    def test_compatibility_report_distinguishes_interpreter_hashes_from_settings(self):
+        expected = {'modules': {'ik.py': 'old'}, 'settings': {'ISPATIALGYM_FAST': '1'},
+                    'objects': [{'applied_scale': [1., 1., 1.]}]}
+        actual = {'modules': {'ik.py': 'new'}, 'settings': {'ISPATIALGYM_FAST': '1'},
+                  'objects': [{'applied_scale': (1., 1., 1.)}]}
+        self.assertEqual(compatibility_difference(expected, actual), {'modules': ['ik.py']})
 
 
 if __name__ == '__main__':

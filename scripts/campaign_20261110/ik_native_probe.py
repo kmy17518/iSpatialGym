@@ -24,6 +24,23 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def compatibility_difference(expected, actual):
+    """Bounded, credential-free differences; normalize JSON tuple/list values."""
+    def same(a, b):
+        return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+    result = {}
+    for key in sorted(set(expected) | set(actual)):
+        left, right = expected.get(key), actual.get(key)
+        if same(left, right):
+            continue
+        if isinstance(left, dict) and isinstance(right, dict):
+            result[key] = [name for name in sorted(set(left) | set(right))
+                           if not same(left.get(name), right.get(name))]
+        else:
+            result[key] = 'differs'
+    return result
+
+
 def descendant(path, root):
     path, root = Path(path).resolve(), Path(root).resolve()
     if not path.is_relative_to(root):
@@ -100,6 +117,28 @@ def main():
         temporary.write_text(json.dumps(report, indent=2) + '\n')
         temporary.replace(output / 'probe_report.json')
 
+    save()
+    # Build with the actual native interpreter and effective worker environment.
+    # ast.dump fingerprints differ between Python versions: a manifest prepared
+    # by a separate coordinator can otherwise fail only after costly GPU setup.
+    from scripts.campaign_20261110 import ik_compatibility
+    descendant(ik_compatibility.__file__, paths['snapshot'])
+    try:
+        manifest = ik_compatibility.validate_manifest(json.loads(paths['manifest'].read_text()))
+        actual = ik_compatibility.build_manifest(paths['snapshot'], paths['config'], dict(os.environ),
+                                                manifest['provenance']['robot_refs'])
+        report['compatibility_preflight'] = {
+            'python_version': sys.version.split()[0],
+            'declared_sha256': manifest['compatibility_sha256'],
+            'actual_sha256': actual['compatibility_sha256'],
+            'differences': compatibility_difference(manifest['compatible_identity'], actual['compatible_identity'])}
+        if actual['compatibility_sha256'] != manifest['compatibility_sha256']:
+            raise ValueError('native interpreter/effective inputs differ from cache manifest')
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        report.update(status='failed_compatibility_preflight', error=str(exc), published_tro_files=0,
+                      completed_at=datetime.now(timezone.utc).isoformat())
+        save()
+        raise
     save()
     # Import through the pinned native snapshot, following normal bootstrap.
     from ispatialgym.sampling import multiply_isg
