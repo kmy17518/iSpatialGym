@@ -415,3 +415,28 @@ def test_large_opening_author_selects_fixed_joint_goal_in_requested_bucket_befor
         assert 1 < goals[-1] <= 2 and plan['goal_joints']['other'] == .3
         assert plan['goal_joint_proposal']['requires_native_passive_stability']
     assert goals[0] != goals[1]
+
+
+def test_large_opening_anchor_reuse_preserves_verified_goal_and_strict_bucket(tmp_path):
+    import pytest
+    job, ledger, _, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    template = replace(template, task='configuration_matching-articulation_open_large_scale',
+                       objects=(replace(template.objects[0], joint='hinge'),))
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    target = template.objects[0].instance
+    anchor['summary'].update(joint='hinge', direction='open')
+    anchor['joint_names'] = {target: ['hinge', 'other']}
+    anchor['planned_goal_joints'] = {target: [.28274476528167725, .3]}
+    anchor['template_meta']['template_facts'] = {'limits': [0., 1.5707963267948966]}
+    kwargs = dict(anchor=anchor, template=template, campaign_id='new',
+        code_sha256=c.file_digest(code / '.snapshot_commit'), physics_sha256=c.digest('physics'),
+        data_sha256=c.digest('maps'), reuse_anchor_goal=True)
+    out = tmp_path / 'groups/reuse_opening'
+    g.prepare_group(**kwargs, group_id='reuse_opening', output=out, magnitude_range=[0., .5])
+    plan = g.read_json(out / 'goal_plan.json')
+    assert plan['goal_joints'] == {'hinge': .28274476528167725, 'other': .3}
+    assert plan['goal_joint_proposal']['method'] == 'verified_anchor_joint_goal_before_starts'
+    assert plan['goal_joint_proposal']['requires_native_passive_stability'] is True
+    with pytest.raises(c.ContractError, match='outside the requested strict bucket'):
+        g.prepare_group(**kwargs, group_id='wrong_bucket', output=tmp_path / 'groups/wrong_bucket',
+                        magnitude_range=[.5, 1.])

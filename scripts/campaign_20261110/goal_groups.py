@@ -455,11 +455,18 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             require(limits and len(limits) == 2 and limits[0] < limits[1], "opening anchor lacks authoritative joint limits")
             lo, hi = plan["magnitude_range"]
             require(0 <= lo < hi <= 1, "opening goal bucket is invalid")
-            uniform = (int(digest({"group": group_id, "anchor": anchor["instance_id"], "joint": joint})[:16], 16)+.5)/(2**64)
-            fraction = lo+(hi-lo)*uniform
-            plan["goal_joint_proposal"] = {"method": "uniform_requested_fraction_before_starts",
+            if reuse_anchor_goal:
+                fraction = (joints[joint]-float(limits[0]))/(float(limits[1])-float(limits[0]))
+                require(lo <= fraction <= hi, "verified opening anchor is outside the requested strict bucket")
+                method = "verified_anchor_joint_goal_before_starts"
+            else:
+                uniform = (int(digest({"group": group_id, "anchor": anchor["instance_id"], "joint": joint})[:16], 16)+.5)/(2**64)
+                fraction = lo+(hi-lo)*uniform
+                method = "uniform_requested_fraction_before_starts"
+            plan["goal_joint_proposal"] = {"method": method,
                 "anchor_value": joints[joint], "fraction": fraction, "requires_native_passive_stability": True}
-            joints[joint] = float(limits[0])+fraction*(float(limits[1])-float(limits[0]))
+            if not reuse_anchor_goal:
+                joints[joint] = float(limits[0])+fraction*(float(limits[1])-float(limits[0]))
         plan.update(schema=JOINT_SCHEMA, target=target, joint=joint, goal_joints=joints, fraction_range=plan.pop("magnitude_range"))
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
         validate_joint_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room],
