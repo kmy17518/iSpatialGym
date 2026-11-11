@@ -183,7 +183,8 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     state["phase_keys"][phase] = actual
     require(prepared["candidate_instances"] == 3 * decision["groups"], "generic author changed the reserved instance count")
     original_env = read_env(Path(spec["anchor_job"]) / "job.env")
-    names = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR")
+    names = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR",
+             "ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY")
     extras = [name + "=" + original_env[name] for name in names if original_env.get(name)]
     extras += ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"]
     command = submission_command(prepared["queue"], snapshot=snapshot, campaign_root=root, v2_root=spec["v2_root"],

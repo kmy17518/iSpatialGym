@@ -257,7 +257,8 @@ def prepare(proof, allocation, cfg, root):
         magnitude_range=groups.ranges(template)[decision["bucket"]], seed=cfg["seed"], campaign_id=cfg["campaign_id"],
         code_sha256=file_digest(Path(cfg["snapshot"]) / ".snapshot_commit"), physics_sha256=proof["validation_key"]["physics_sha256"],
         data_sha256=proof["validation_key"]["data_sha256"], budget_seconds=group_budget(cfg, template.task))
-    keys = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR")
+    keys = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR",
+            "ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY")
     extras = [k + "=" + env[k] for k in keys if env.get(k)] + ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"]
     command = submission_command(prepared["queue"], snapshot=cfg["snapshot"], campaign_root=root, v2_root=v2_root,
         base_index=index, extra_env=extras)
