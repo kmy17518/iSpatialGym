@@ -90,6 +90,27 @@ def row(identifier, kind, owner, reference, **fields):
             'stages': {s: stage() for s in STAGES}, 'sources': [reference], **fields}
 
 
+def assignment_observation(root, assignment, reference, now):
+    """Read the owner's current report; an old assignment is not a heartbeat."""
+    pointer = assignment.get('worker_record')
+    if not pointer:
+        return assignment, reference, assignment.get('jobs', [])
+    path = (root / pointer).resolve()
+    if not path.is_relative_to(root):
+        return {}, {'path': str(path), 'state': 'unavailable', 'observed_at': None,
+                    'sha256': None, 'error': 'worker report outside campaign'}, []
+    worker, observed = read(root, str(path.relative_to(root)), now)
+    if worker and worker.get('owner') != assignment['owner']:
+        return {}, {**observed, 'state': 'unavailable', 'observed_at': None,
+                    'error': 'worker owner differs from assignment'}, []
+    classes = worker.get('classes', [])
+    jobs = worker.get('active_jobs', [job for item in classes for job in item.get('active_jobs', [])])
+    # The canonical root worker reports its class inside the existing recovery
+    # schema. Preserve the dated outer observation and use its concrete action.
+    details = classes[0] if len(classes) == 1 else {}
+    return {**details, **worker}, observed, jobs
+
+
 def build(root, now=None):
     now = time.time() if now is None else now; root = Path(root).resolve()
     observations = {k: read(root, path, now) for k,path in SOURCES.items()}
@@ -98,16 +119,20 @@ def build(root, now=None):
     def reqs(task):
         return [r['id'] for r in requirements if task in (r.get('tasks') or []) or r.get('scope') == 'all']
     for assignment in values['assignments'].get('workstreams', []):
-        activity = worker_activity({'worker_observed_at': assignment.get('observed_at'),
-                                    'active_jobs': assignment.get('jobs', [])}, now)
-        result.append(row('workstream:'+assignment['id'], 'workstream', assignment['owner'], refs['assignments'],
-            status=assignment.get('status', 'assigned'), **activity,
+        worker, observed, jobs = assignment_observation(root, assignment, refs['assignments'], now)
+        activity = worker_activity({'worker_observed_at': worker.get('observed_at'),
+                                    'active_jobs': jobs}, now)
+        result.append(row('workstream:'+assignment['id'], 'workstream', assignment['owner'], observed,
+            status=worker.get('status', worker.get('state', assignment.get('status', 'assigned'))), **activity,
             requirement_ids=assignment.get('requirement_ids', []),
             responsibilities=assignment.get('responsibilities', []),
-            dependencies=assignment.get('dependencies', []), artifacts=assignment.get('evidence', []),
-            controller=assignment.get('controllers', []),
-            engineering_activity=assignment.get('engineering_activity'),
-            next_artifact=assignment.get('next_artifact'), next_action=assignment.get('next_action'),
+            dependencies=worker.get('dependencies', assignment.get('dependencies', [])),
+            artifacts=worker.get('evidence', assignment.get('evidence', [])),
+            controller=worker.get('controllers', worker.get('controller', assignment.get('controllers', []))),
+            engineering_activity=worker.get('engineering_activity', worker.get('engineering_status', assignment.get('engineering_activity'))),
+            next_artifact=worker.get('next_artifact', assignment.get('next_artifact')),
+            next_action=worker.get('next_action', assignment.get('next_action')),
+            sources=[refs['assignments']] + ([observed] if assignment.get('worker_record') else []),
             exit_criteria=assignment.get('exit_criteria'),
             verification={'status': 'assignment_only', 'verification_requires_original_artifacts': True},
             acceptance={'status': 'not_applicable', 'assignment_does_not_authorize_release': True}))

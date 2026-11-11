@@ -117,5 +117,37 @@ class ExecutionLedgerTests(unittest.TestCase):
         self.assertIsNone(value['accepted']['counts'])
         self.assertEqual(build(self.root, 1701)['rows'][0]['active_work'], [])
 
+    def test_current_worker_replaces_old_assignment_job_without_refreshing_stale_reports(self):
+        self.put('assignments', {'workstreams': [{'id': 'canonical', 'owner': '/root',
+            'observed_at': 900, 'jobs': [{'job_id': 'old', 'status': 'running'}],
+            'worker_record': 'worker.json'}]})
+        path = self.root/'worker.json'
+        def put(status, observed=1000):
+            path.write_text(json.dumps({'campaign_id': 'campaign_20261110', 'owner': '/root',
+                'observed_at': observed, 'classes': [{'next_action': 'Own replay',
+                    'active_jobs': [{'job_id': 'actual', 'status': status}]}]}))
+        put('running'); r = build(self.root, 1001)['rows'][0]
+        self.assertEqual(r['active_work'], [{'job_id': 'actual', 'status': 'running'}])
+        self.assertEqual(r['next_action'], 'Own replay')
+        self.assertEqual(len(r['sources']), 2)
+        put('complete', 1002)
+        self.assertEqual(build(self.root, 1003)['rows'][0]['active_work'], [])
+        put('running', 300)
+        r = build(self.root, 1003)['rows'][0]
+        self.assertEqual(r['activity_observation']['state'], 'stale')
+        self.assertEqual(r['active_work'], [])
+
+    def test_missing_foreign_or_outside_worker_cannot_reuse_assigned_running_job(self):
+        for pointer, owner in [('missing.json', '/root'), ('worker.json', '/other'), ('../outside.json', '/root')]:
+            with self.subTest(pointer=pointer):
+                self.put('assignments', {'workstreams': [{'id': 'canonical', 'owner': '/root',
+                    'observed_at': 1000, 'jobs': [{'job_id': 'old', 'status': 'running'}],
+                    'worker_record': pointer}]})
+                (self.root/'worker.json').write_text(json.dumps({'campaign_id': 'campaign_20261110',
+                    'owner': owner, 'observed_at': 1000, 'active_jobs': [{'job_id': 'foreign', 'status': 'running'}]}))
+                r = build(self.root, 1001)['rows'][0]
+                self.assertEqual(r['active_work'], [])
+                self.assertEqual(r['evidence_state'], 'unavailable')
+
 
 if __name__=='__main__':unittest.main()
