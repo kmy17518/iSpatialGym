@@ -17,6 +17,8 @@ import math
 from pathlib import Path
 import random
 
+from scripts.campaign_20261110.training_coupled_profiles import candidate_profile
+
 SCHEMA = "isg-full-training-dependency-inventory-v1"
 OWNER = "/root/templates_assets"
 
@@ -109,7 +111,7 @@ def requirements(task):
 
 def build(candidates, assets, height_profiles, policy, *, sources, generator_inputs):
     observed = datetime.now(timezone.utc).isoformat()
-    artifacts, configurations, gaps = {}, [], []
+    artifacts, configurations, gaps, coupled_profiles = {}, [], [], {}
     profiles = {key: object_profile(asset) for key, asset in assets.items()}
     supports = {(b["scene"], b["name"]): (key, b, height_profiles["profiles"][b["profile_id"]])
                 for key, b in height_profiles["bindings"].items() if b.get("shared_anchor")}
@@ -145,6 +147,9 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
             roles.append(("support", support))
         role_rows = [(name, assets[obj["category"] + "/" + obj["model"]]) for name, obj in roles if obj]
         candidate_blockers = sorted({why for _, a in role_rows for why in a["blockers"]})
+        coupled_profile, coupled_roles = candidate_profile(candidate, assets)
+        if coupled_profile:
+            coupled_profiles[coupled_profile["id"]] = coupled_profile
         if {(anchor["scene"], r) for r in anchor["rooms"]} & held_rooms:
             candidate_blockers.append("current_global_room_holdout")
         for scale_slot, height_slot in slots(candidate):
@@ -170,6 +175,10 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
                     # independent per-model draws cannot silently stand in for it.
                     scale = None
                     scale_reason = "coupled_pair_or_group_profile_requires_exact_native_defaults"
+                coupled_key = coupled_roles.get((role, asset["model_key"]))
+                if coupled_profile and coupled_key and scale_slot is not None:
+                    scale = coupled_profile["absolute_scales"][coupled_key][scale_slot]
+                    scale_reason = "persisted_" + coupled_profile["kind"] + "_common_relative_scale"
                 if task.endswith("_large_scale") and role in ("partner", "support", "target"):
                     scale = None
                     scale_reason = "exact_scene_initialization_or_bounded_replacement_scale_required"
@@ -181,7 +190,8 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
                     "model": asset["model"], "dataset": asset["dataset"], "asset_sha256": asset["asset_sha256"],
                     "ready": asset["ready"], "readiness_source": asset["readiness_source"],
                     "original_default_scale": geometry["default_scale"] if geometry else None,
-                    "applied_scale": scale, "scale_rule": scale_reason, "scale_profile": profile["id"] if profile else None})
+                    "applied_scale": scale, "scale_rule": scale_reason,
+                    "scale_profile": coupled_profile["id"] if coupled_key else profile["id"] if profile else None})
                 if role == "target" and "articulation_" in task:
                     selected_roles[-1]["joint"] = candidate.get("selected_joint")
             if task.startswith("camera_relocalization"):
@@ -271,7 +281,7 @@ def build(candidates, assets, height_profiles, policy, *, sources, generator_inp
             "resolved_physical_artifact_identities": sum(a["physical_artifact_id"] is not None for a in artifacts.values()),
             "dependency_statuses": dict(counts), "denominator_complete": False,
             "denominator_note": "All original proposal rows retained; listed joint/pool/scene scope expansions remain explicit, so this is a lower-bound configuration denominator."},
-        "scope_gaps": gaps, "per_class": per_class, "configurations": configurations,
+        "scope_gaps": gaps, "per_class": per_class, "coupled_profiles": coupled_profiles, "configurations": configurations,
         "artifact_requests": list(artifacts.values())}
 
 

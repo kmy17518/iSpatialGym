@@ -60,13 +60,28 @@ class FullTrainingInventoryTests(unittest.TestCase):
         candidate["anchor"]["category"] = "walls"
         self.assertEqual(len(slots(candidate)), 2)
 
-    def test_coupled_scale_is_not_independent_per_model_draw(self):
+    def test_measured_attachment_has_common_persisted_scale_without_claiming_fit(self):
         candidate = copy.deepcopy(self.candidate)
         candidate["task"] = "configuration_matching-attachment"
         candidate["partner"] = candidate["target"]
         result = self.inventory([candidate])
-        self.assertTrue(all(r["applied_scale"] is None for c in result["configurations"] for r in c["roles"]))
+        for configuration in result["configurations"]:
+            target, partner = configuration["roles"]
+            self.assertEqual(target["applied_scale"], partner["applied_scale"])
+            self.assertIn("attachment_common_relative_scale", target["scale_rule"])
+            self.assertEqual(target["scale_profile"], partner["scale_profile"])
+        self.assertEqual(len(result["coupled_profiles"]), 1)
+        self.assertEqual(result["summary"]["fully_served_configurations"], 0)
         self.assertFalse(result["summary"]["denominator_complete"])
+
+    def test_missing_coupled_default_remains_unresolved(self):
+        candidate = copy.deepcopy(self.candidate)
+        candidate["task"] = "configuration_matching-attachment"
+        candidate["partner"] = candidate["target"]
+        asset = copy.deepcopy(self.asset)
+        asset["native_default_geometry"] = None
+        result = self.inventory([candidate], asset)
+        self.assertTrue(all(r["applied_scale"] is None for c in result["configurations"] for r in c["roles"]))
 
     def test_each_measured_movable_joint_gets_distinct_required_slots(self):
         candidate = copy.deepcopy(self.candidate)
