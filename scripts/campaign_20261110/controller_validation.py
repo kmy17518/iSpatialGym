@@ -116,6 +116,14 @@ def publish_recovered_gate(entry, root):
     evidence=canonical.parent/'recovered_gate_provenance.json'
     if evidence.exists() and read(evidence,None)!=proof:raise ValueError('recovered gate provenance already differs')
     if not evidence.exists():atomic(evidence,proof)
+    if entry.get('replay_backend')=='vast':
+        # Keep native report paths within the resolved gate attempt tree. The
+        # original failure folder and provenance remain immutable and visible.
+        attempt=pathlib.Path(entry['vast_migration']['job_dir']).resolve()/'gate'
+        if not attempt.is_relative_to(root/'out/vast_replay') or source.resolve().parent!=attempt:
+            raise ValueError('recovered Vast gate lies outside its pinned transport')
+        canonical.symlink_to(source.resolve())  # Never replaces existing evidence.
+        return
     staged=canonical.with_suffix('.json.recovery_new')
     with staged.open('wb') as handle:
         handle.write(body);handle.flush();os.fsync(handle.fileno())

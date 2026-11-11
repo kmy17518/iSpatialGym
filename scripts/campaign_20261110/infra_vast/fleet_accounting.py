@@ -84,7 +84,7 @@ def snapshot(root, timestamp=None):
         records.append(record)
     orphan_presence=sorted({item['instance'] for row in observations for item in row['instances']} - set(created))
     unavailable = not complete or bool(window_unknown or orphan_presence)
-    return {'schema':'isg-vast-rental-gpu-accounting-v1','observed_at_unix':timestamp,
+    return {'schema':'isg-vast-rental-gpu-accounting-v1','campaign_id':'campaign_20261110','observed_at_unix':timestamp,
             'provider_observed_at_unix':observed,'instrumentation_epoch_unix':epoch,
             'fleet_window_estimated_gpu_seconds':None if unavailable else window_total,
             'fleet_window_measured_attributed_worker_gpu_seconds':window_attributed,

@@ -80,3 +80,20 @@ def test_explicit_retry_archives_prior_transport_ownership(tmp_path):
     assert apply_retry_request(e,request,tmp_path,{})
     assert 'vast_migration' not in e and 'replay_backend' not in e
     assert e['attempt_history'][0]['vast_migration']['original_replay_job_id']=='old'
+
+
+def test_recovered_vast_gate_preserves_strict_native_report_tree(tmp_path):
+    from scripts.campaign_20261110.controller_validation import publish_recovered_gate
+    from scripts.campaign_20261110.acceptance import replay_report_path
+    job=tmp_path/'out/vast_replay/retry';out=job/'gate';out.mkdir(parents=True)
+    report=out/'replay/instance/meta.json';report.parent.mkdir(parents=True)
+    report.write_text(json.dumps({'instance_id':'instance','mode':'replay'}))
+    gate={'success':True,'replay_meta_paths':[str(report)]}
+    (out/'gate.json').write_text(json.dumps(gate))
+    canonical=tmp_path/'validation/open_loop/task/456/gate.json';canonical.parent.mkdir(parents=True)
+    failure=canonical.parent/'failed_gate.json';failure.write_text('original failed gate')
+    e={'source_job_id':'456','key':'task','output':str(out),'gate':gate,'retry_request':{'request_id':'retry'},
+       'replay_job_id':'900000001','replay_backend':'vast','vast_migration':{'job_dir':str(job)}}
+    publish_recovered_gate(e,tmp_path)
+    assert canonical.is_symlink() and failure.read_text()=='original failed gate'
+    assert replay_report_path(gate,canonical,'instance',root=tmp_path,started_at=0)==report
