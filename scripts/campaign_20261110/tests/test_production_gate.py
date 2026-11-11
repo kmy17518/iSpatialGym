@@ -287,3 +287,18 @@ def test_old_canary_without_parallel_evidence_cannot_bypass_bulk_hold(tmp_path):
     assert not check_dispatch(tmp_path,cmd)['allowed']
     report.write_text(json.dumps({'schema':'isg-canonical-template-validation-v1','total':100,'validated':100,'classes':[]}))
     assert not check_dispatch(tmp_path,cmd)['allowed']
+
+
+def test_bulk_hold_never_checks_canonical_count_for_either_heldout_split(tmp_path,monkeypatch):
+    def forbidden(*args,**kwargs):raise AssertionError('bulk canonical gate leaked into heldout evaluation')
+    monkeypatch.setattr('scripts.campaign_20261110.production_gate.canonical_training_ready',forbidden)
+    for split in ('eval_model','eval_category'):
+        root=tmp_path/split;root.mkdir();env,cmd,job=setup(root,split)
+        policy=root/'controllers';policy.mkdir()
+        (policy/'training_production_gate.json').write_text(json.dumps({'schema':'isg-training-production-gate-v1',
+            'campaign_id':'campaign_20261110','mode':'blocked','standalone_training_allowed':False}))
+        assert check_dispatch(root,cmd)['allowed']
+        assert check_job(root,job)['allowed']
+        replay=root/'replay';replay.mkdir()
+        (replay/'replay_inputs.json').write_text(json.dumps({'source_job':str(job)}))
+        assert check_job(root,replay,kind='physics_replay')['allowed']

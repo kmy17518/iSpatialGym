@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import time
-from scripts.campaign_20261110.contracts import file_digest, require, write_json_atomic
+from scripts.campaign_20261110.contracts import file_digest, require, write_json_atomic, task_quotas
 
 
 def read(path): return json.loads(Path(path).read_text())
@@ -61,6 +61,13 @@ def observe(root, *, now=None):
                     'request': current_request, 'original_request': original_request,
                     'status': 'native_not_observed', 'native': None,
                     'review': None, 'benchmark_credit': 0, 'quota_consumed': 0}
+                config_path = request.get('config_path')
+                if config_path:
+                    config_path = Path(config_path).resolve()
+                    require(config_path.is_relative_to(root) and file_digest(config_path)==request['config_sha256'],
+                            'native configuration evidence changed')
+                    row['task'] = read(config_path)['template']['task']
+                    row['configuration'] = ref(config_path)
                 output = Path(request['output']).resolve()
                 require(output.is_relative_to(base), 'native output outside pipeline scope')
                 gate_path = output/'sampling_gate.json'
@@ -83,6 +90,13 @@ def observe(root, *, now=None):
                         proof = read(review_path)
                         require(proof['validation_passed'] is True and proof['accepted'] is False and
                                 proof['quota_consumed'] == 0, 'review is not zero-credit canary evidence')
+                        row['task'] = proof['export_record']['task']
+                        row['validated_evidence'] = {'review': ref(review_path),
+                            'validation_key': proof['export_record']['validation_key'],
+                            'scope': 'this exact configuration and instance only',
+                            'native': True, 'demo': True, 'physics_replay': True, 'hard_qa': True,
+                            'export_provenance': True, 'benchmark_acceptance': False,
+                            'perturbations': proof['export_record'].get('perturbations', {})}
                 result['records'].append(row)
         except Exception as error:
             result['errors'].append({'path': str(path), 'error': f'{type(error).__name__}: {error}'})
@@ -90,6 +104,16 @@ def observe(root, *, now=None):
         batch = {'request': ref(request), 'batch': str(request.parent.relative_to(base)),
                  'observed_at': timestamp(request), 'status': 'prepared_unvalidated', 'stages': [],
                  'benchmark_credit': 0, 'quota_consumed': 0}
+        batch['tasks'] = []
+        for source in read(request).get('canaries', []):
+            try:
+                source_path = Path(source['path']).resolve()
+                require(source_path.is_relative_to(root) and file_digest(source_path)==source['sha256'],
+                        'batch canary review changed')
+                task = read(source_path)['export_record']['task']
+                if task not in batch['tasks']: batch['tasks'].append(task)
+            except Exception as error:
+                batch.setdefault('source_errors', []).append(str(error))
         failure = request.parent/'preflight_failure.json'
         if failure.exists(): batch.update(status='preflight_failed', failure={**ref(failure), **read(failure)})
         elif (request.parent/'preflight.json').exists(): batch['status'] = 'ready_for_bounded_probe'
@@ -120,10 +144,17 @@ def observe(root, *, now=None):
             stage = {'kind': kind, 'status': 'not_observed'}
             if kind in submissions:
                 stage.update(status='submitted', allocation=submissions[kind], scheduler_state='unavailable')
+            native_failure = request.parent/name/'failure.json'
+            if native_failure.exists():
+                stage.update(status='failed_execution', failure=ref(native_failure),
+                             error=read(native_failure).get('error'), observed_at=timestamp(native_failure))
             if probe.exists():
                 stage.update(evidence=ref(probe), observed_at=timestamp(probe), status='incomplete')
                 try:
                     native = read(probe); stage['episodes_observed'] = len(native.get('entries', []))
+                    if any(entry.get('returncode', 0)!=0 or entry.get('result', {}).get('success') is False
+                           for entry in native.get('entries', [])):
+                        stage['status'] = 'failed_execution'
                     if stage['episodes_observed'] == 3:
                         from scripts.campaign_20261110.training_restoration import verify_batch
                         verify_batch(root, ref(probe), 1794321600, kind)
@@ -137,9 +168,41 @@ def observe(root, *, now=None):
     require(len(keys) == len(set(keys)), 'duplicate exact canary attempt in projection')
     result['counts'] = dict(Counter(r['status'] for r in result['records']))
     result['attempts_observed'] = len(result['records'])
+    result['family_paths'] = family_paths(result['records'], result['batch_stages'])
     if result['errors']: result['status'] = 'partial_observation'
     return result
 
+
+
+def family_paths(records, batches):
+    """All23 paths remain explicit; one exact canary never validates a family."""
+    result=[]
+    for quota in task_quotas():
+        selected=[r for r in records if r.get('task')==quota.task]
+        passed=[r for r in selected if r.get('validated_evidence')]
+        evidence=[r['validated_evidence']['review'] for r in passed]
+        paths={}
+        for kind in ('physics_action_open_loop','kinematic_observation_rendering'):
+            stages=[(batch,stage) for batch in batches if quota.task in batch.get('tasks',[])
+                    for stage in batch['stages'] if stage['kind']==kind]
+            verified=[stage['evidence'] for _,stage in stages if stage['status']=='verified']
+            paths[kind]={'status':'partial' if verified else
+                'failed' if any(stage['status'] in ('failed_execution','failed_validation') for _,stage in stages) else
+                'pending' if stages else 'untested',
+                'verified_exact_probes':verified,'attempts':[{'request':b['request'],**stage}for b,stage in stages],
+                'owner':'/root/dataset_contract','scope':'only the referenced configurations; no whole-family inference'}
+        result.append({'task':quota.task,'standard_classes':quota.standard_classes,
+            'native_attempts_observed':len(selected),'native_written':sum((r.get('native')or{}).get('written')or 0 for r in selected),
+            'exact_configurations_with_demo_physics_export':len({r['configuration_sha256']for r in passed}),
+            'exact_validation':{'status':'partial' if passed else 'untested','evidence':evidence},
+            'aba_restoration':paths,
+            'model_pool_switch_active_only_export':{'status':'untested','owner':'/root',
+                'next_action':'Execute different active model selections in a reused preloaded world and audit exports; A/B/A is separate.'},
+            'required_configuration_denominator':None,'denominator_status':'owned_full_selected_inventory_in_progress',
+            'dependency_owner':'/root/templates_assets','runtime_owner':'/root',
+            'next_action':'Advance each dependency-ready exact configuration independently; validate this family path with bounded zero-credit canaries.',
+            'production_released':False})
+    return result
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

@@ -6,6 +6,9 @@ means implementation exists; it does not turn a requirement into executed proof.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
+import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -96,21 +99,147 @@ def checklist(code_root: Path):
     rows=[]
     for key,scope,rule,files in common:
         paths=[code_root/'scripts/campaign_20261110'/p if not p.startswith('../') else code_root/p[3:] for p in files]
-        rows.append(dict(id=key,family=scope,requirement=rule,status='end_to_end_unverified',
+        rows.append(dict(id=key,family=scope,requirement=rule,status='untested',
             implementation=[dict(path=str(p.relative_to(code_root)),exists=p.is_file(),sha256=file_digest(p) if p.is_file() else None) for p in paths],
             evidence=[],next_action='Join actual runtime and acceptance evidence; missing or partial implementation does not release this requirement.'))
     for i,(task,rule) in enumerate(task_rules().items(),1):
         for suffix,field in [('A','anchoring'),('M','models'),('S','scales'),('B','semantics'),('G','grouping')]:
-            rows.append(dict(id=f'T{i:02}{suffix}',tasks=[task],requirement=rule[field],status='end_to_end_unverified',
+            rows.append(dict(id=f'T{i:02}{suffix}',tasks=[task],requirement=rule[field],status='untested',
                 implementation=['training_candidates.py','materialize_train_rooms.py','support_height_profiles.py','ispatialgym/sampling/campaign_runtime.py'],
                 evidence=[],next_action='Verify materialized and accepted distribution for this exact task; then add bounded missing-path canary.'))
     return rows
 
 
+
+EXTRA_REQUIREMENTS = [
+    ('G16','Reusable selected model pool','Preload all selected compatible variants, switch active models, park inactive objects and export only active task bindings; prove isolation in one live world.', ['/root'], ['ispatialgym/sampling/sim_utils.py']),
+    ('G17','Complete selected dependency preparation','Map every selected configuration of all100 classes to compatible positive grasp/reach dependencies; measured support heights, complete disjoint shards and native reader audits.', ['/root/templates_assets','/root/compute'], ['scripts/campaign_20261110/scale_prebuild.py']),
+    ('G18','Applicable family paths','Validate each materially different task path independently; exact under-small evidence does not validate articulation, attachment, block, alignment, disembedding, floating or camera.', ['/root/dataset_contract','/root'], ['scripts/campaign_20261110/training_pipeline_status.py']),
+    ('G19','Independent held-out evaluation','Bulk100-class hold must not block model/category evaluation, exact dependencies or bounded canaries; related unfinished held-out streams need active ownership/evidence.', ['/root/templates_assets','/root/compute','/root/dataset_contract'], ['scripts/campaign_20261110/production_gate.py']),
+    ('G20','Resource and spending execution','Use useful compatible capacity across both accounts and Vast within3000USD including commitments; distinguish excluded queue from dispatchable work and include startup/failures in cost.', ['/root/compute'], ['scripts/campaign_20261110/vastctl.py']),
+]
+
+
+def executed_audit(code_root, campaign_root, sources):
+    """Join authoritative observations without treating checklist placeholders as failures."""
+    code_root,campaign_root=Path(code_root),Path(campaign_root)
+    rows=checklist(code_root);observations={};errors=[]
+    locations={
+        'canonical':'infra/standard_recovery/canonical_validation.json',
+        'eligibility':'accounting/current_eligibility.json',
+        'training_eligibility':'accounting/training_eligibility.json',
+        'pipeline':'training_pipeline_canaries/pipeline_status.json',
+        'gate':'controllers/training_production_gate.json',
+        'backend_holdout':'infra/capacity_recovery/holdout_backend_gate_audit_r1.json',
+        'queue':'infra/capacity_recovery/vast_excluded_queue_audit_r2.json',
+        'yield':'infra/goal_group_yield.json',
+        'selected_assets':'training_preparation/full_scope_r1/selection_reconciliation.json',
+        'dependency_jobs':'training_preparation/full_scope_r1/jobs_asset_geometry.json',
+    }
+    # The canonical observer has one authoritative output; accept its established
+    # validation directory or older monitor location only when exactly present.
+    for label,relative in locations.items():
+        path=campaign_root/relative
+        if label=='canonical' and not path.exists():path=campaign_root/'monitoring/canonical_validation.json'
+        if not path.exists():continue
+        try:
+            value=json.loads(path.read_text())
+            if value.get('campaign_id',CAMPAIGN)!=CAMPAIGN:raise ValueError('foreign observation')
+            observations[label]={'reference':{'path':str(path),'sha256':file_digest(path)},'value':value,
+                                 'observed_at':value.get('observed_at')}
+        except Exception as exc:errors.append({'path':str(path),'error':repr(exc)})
+    def evidence(label,scope,stage,facts):
+        if label not in observations:return None
+        source=observations[label]
+        return {**source['reference'],'observed_at':source['observed_at'],'scope':scope,'stage':stage,'facts':facts}
+    for key,scope,rule,owners,files in EXTRA_REQUIREMENTS:
+        rows.append({'id':key,'family':scope,'requirement':rule,'status':'untested','owners':owners,
+                     'implementation':[{'path':f,'exists':(code_root/f).is_file(),
+                         'sha256':file_digest(code_root/f)if(code_root/f).is_file()else None}for f in files],
+                     'evidence':[]})
+    pipeline=observations.get('pipeline',{}).get('value',{});families={r['task']:r for r in pipeline.get('family_paths',[])}
+    for row in rows:
+        key=row['id'];task=(row.get('tasks')or[None])[0]
+        row['source_requirements']=sources
+        row['evidence']=[];row['scope_status']='unknown_until_evidence_reconciled'
+        row['implementation_status']='present' if any(isinstance(x,dict)and x.get('exists') for x in row['implementation']) else 'not_audited'
+        row['owners']=row.get('owners') or (['/root/templates_assets','/root/compute']if key.startswith('T')and key[-1]in('A','M','S')else ['/root/dataset_contract'])
+        row['next_action']=('Materialize exact selected configurations and map each to positive measured dependencies; stream ready builds independently.'
+                            if key.startswith('T')and key[-1]in('A','M','S') else
+                            'Join this exact requirement to the scoped native evidence and run a bounded discriminating check for missing behavior.')
+        row['exit_criteria']='Executed evidence covers the stated scope; exact configuration proof never substitutes for full selected coverage.'
+        if task and task in families:
+            family=families[task]
+            row['evidence']=[evidence('pipeline',task,'scoped_pipeline',family)]
+            if family['exact_configurations_with_demo_physics_export']:row['status']='partial'
+            row['next_action']='Advance the next dependency-ready configuration of '+task+' through its own native/demo/physics/render gates; retain full selected denominator.'
+        mapping={'G01':('gate','dispatch_policy'),'G02':('eligibility','historical_and_current_acceptance'),
+            'G03':('canonical','exact_standard_chains'),'G04':('canonical','accepted_exact_template_checks'),
+            'G05':('pipeline','recorded_group_perturbations'),'G06':('pipeline','recorded_scene_removal'),
+            'G07':('pipeline','recorded_lighting'),'G08':('pipeline','recorded_scales'),
+            'G10':('pipeline','aba_restoration'),'G11':('training_eligibility','observed_accepted_coverage'),
+            'G13':('yield','attempt_and_cost_denominators'),'G14':('gate','bulk_and_canary_policy'),
+            'G15':('canonical','canonical_progress'),'G18':('pipeline','family_path_coverage'),
+            'G17':('selected_assets','selected_inventory_reconciliation'),'G19':('backend_holdout','backend_gate_decisions'),'G20':('queue','queue_disposition')}
+        if key in mapping:
+            label,stage=mapping[key]
+            if label in observations:
+                value=observations[label]['value']
+                facts=({k:value[k]for k in ('validated','total','state_counts')if k in value}if label=='canonical'else
+                       {k:value[k]for k in ('counts','coverage','coverage_complete','review_inventory_complete','eligible_accepted','excluded','unverified')if k in value}if label in ('eligibility','training_eligibility')else
+                       {k:value[k]for k in ('attempts_observed','counts','family_paths','batch_stages','benchmark_credit')if k in value}if label=='pipeline'else
+                       {k:v for k,v in value.items()if k not in ('allowed_canaries','allowed_existing_canary_reviews','records','jobs')})
+                row['evidence'].append(evidence(label,'only the explicitly enumerated observations',stage,facts));row['status']='partial'
+        if key=='G16':
+            row['next_action']='Root is implementing model-pool preload/activation/active-only export; execute different active model selections and hash-audit their exports.'
+        if key=='G17':row['next_action']='Assets reconciles all selected candidates and exact dependencies; compute dispatches disjoint positive-grasp/reach builds across both accounts.'
+        if key in ('G05','G06','G07','G08','G10','G18'):
+            row['owners']=['/root/dataset_contract','/root'];row['next_action']='Complete corrected A/B/A physics/render probes on unchanged native99f; then independently validate each other applicable family path and model-pool switching.'
+        row['scope_status']='partial_executed_evidence'if row['evidence']else'unknown_no_executed_evidence'
+        row['status']='partial'if row['evidence']else'untested'
+        row['last_observed_progress']=max((str(e.get('observed_at')or'')for e in row['evidence']),default=None)
+        row['chain']={'dependencies':[observations[label]['reference'] for label in ('selected_assets','dependency_jobs')if label in observations] if key=='G17' or task else [],
+            'owners':row['owners'],'active_work':{'state':'owned_next_action','action':row['next_action']},
+            'artifacts':[{'path':e['path'],'sha256':e['sha256'],'observed_at':e.get('observed_at')}for e in row['evidence']],
+            'verification':{'state':row['scope_status'],'scope':'explicit evidence only','complete_requirement':False},
+            'acceptance':{'state':'observed_current_projection'if key in ('G02','G11','G15')and row['evidence']else'not_claimed',
+                          'benchmark_canary_credit':0}}
+
+    return {'schema':'isg-training-requirements-audit-v2','campaign_id':CAMPAIGN,
+        'observed_at':datetime.now(timezone.utc).isoformat(),'status':'partial_executed_audit',
+        'production_authorization':False,'sources':sources,'requirements':rows,'task_rules':task_rules(),
+        'counts':dict(Counter(r['status']for r in rows)),'observation_errors':errors,
+        'unknown_is_failure':False,'implementation_presence_is_execution':False,
+        'family_evidence_transfers_to_other_tasks':False,
+        'superseded_instructions':[
+            {'instruction':'Hold all standalone canaries until100canonical','current':'Bulk-only hold; bounded zero-credit canaries and all dependency preparation proceed now','source':sources[-1]if sources else None},
+            {'instruction':'Owner-artifact holds for five standard classes','current':'All owner artifacts released; fresh exact native/replay/sibling gates still required','source':sources[-1]if sources else None},
+            {'instruction':'Treat130 generated unverified placeholders as actual failed requirements','current':'Placeholders mean unknown; this audit distinguishes scoped execution from missing evidence','source':sources[-1]if sources else None}],
+        'independent_workstreams':['remaining_standard_eval','model_holdout','category_room_holdout',
+            'full_selected_dependencies','bounded_pipeline_validation','model_pool_implementation'],
+        'bulk_release_condition':'100canonical AND shared/applicable-path/exact-configuration proof; not a dependency or holdout barrier'}
+
+
+def publish_executed_audit(code_root,campaign_root,sources,output):
+    value=executed_audit(code_root,campaign_root,sources);output=Path(output)
+    if output.exists():
+        archive=output.parent/'training_requirements_history'/(str(time.time_ns())+'.json')
+        archive.parent.mkdir(parents=True,exist_ok=True);archive.write_bytes(output.read_bytes())
+        value['previous_observation']={'path':str(archive),'sha256':file_digest(archive)}
+    write_json_atomic(output,value)
+    return value
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--out',type=Path,required=True)
-    p.add_argument('--original-prompt',type=Path,required=True);p.add_argument('--correction',type=Path,required=True)
+    p.add_argument('--original-prompt',type=Path,required=True);p.add_argument('--correction',type=Path,required=True);p.add_argument('--campaign-root',type=Path);p.add_argument('--source',type=Path,action='append',default=[]);p.add_argument('--interval',type=float,default=0)
     a=p.parse_args();root=Path(__file__).resolve().parents[2]
+    if a.campaign_root:
+        sources=[{'path':str(x.resolve()),'sha256':file_digest(x)}for x in [a.original_prompt,a.correction,*a.source]]
+        while True:
+            value=publish_executed_audit(root,a.campaign_root,sources,a.out)
+            print(json.dumps({'observed_at':value['observed_at'],'counts':value['counts']}),flush=True)
+            if a.interval<=0:return
+            time.sleep(a.interval)
     write_json_atomic(a.out,dict(campaign_id=CAMPAIGN,observed_at=datetime.now(timezone.utc).isoformat(),
         status='blocked_pending_executed_evidence',production_authorization=False,
         sources=[dict(path=str(x.resolve()),sha256=file_digest(x)) for x in (a.original_prompt,a.correction)],

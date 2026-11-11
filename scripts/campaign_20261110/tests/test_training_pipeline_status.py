@@ -63,3 +63,14 @@ def test_authorization_refresh_preserves_one_native_attempt(tmp_path):
     write_json_atomic(folder/'current_request.json', {'previous': original, 'current': status.ref(current)})
     value = status.observe(tmp_path)
     assert value['attempts_observed'] == 0 and 'changed native attempt identity' in value['errors'][0]['error']
+
+
+def test_family_evidence_does_not_validate_unrelated_paths():
+    rows=[{'task':'disembedding','configuration_sha256':'a','native':{'written':1},
+           'validated_evidence':{'review':{'path':'/review','sha256':'x'}}}]
+    families={r['task']:r for r in status.family_paths(rows,[])}
+    assert len(families)==23
+    assert families['disembedding']['exact_validation']['status']=='partial'
+    assert families['configuration_matching-attachment']['exact_validation']['status']=='untested'
+    assert all(r['model_pool_switch_active_only_export']['status']=='untested' for r in families.values())
+    assert sum(r['standard_classes'] for r in families.values())==100
