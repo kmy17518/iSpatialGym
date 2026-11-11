@@ -95,7 +95,8 @@ def return_report(output):
                     f"Owner: {row['owner']}; engineering: {row['engineering_status']}; worker observation: {row['worker_observed_at']}",
                     'Blocker: '+str(row['blocker']), 'Next action: '+str(row['next_action']),
                     'Active jobs/controller: '+json.dumps([row['active_jobs'],row['controller']]),
-                    'Exact configuration/runtime/native/demo/replay: '+json.dumps({k:row.get(k) for k in ('configuration','runtime','native','demo','replay')}), '']
+                    'Exact configuration/runtime/native/demo/replay: '+json.dumps({k:row.get(k) for k in ('configuration','runtime','native','demo','replay')}),
+                    'Successful reference / causal diagnosis: '+json.dumps(row.get('diagnosis',{})), '']
             target=output.parent/'STANDARD_RECOVERY.txt';temp=target.with_suffix('.tmp');temp.write_text('\n'.join(report_lines)+'\n');temp.replace(target)
     lines += ['', 'Resource observation: ' + chicago(live.get('cluster_observed_at')),
         f"Campaign cluster: {live.get('campaign_cluster_running_gpus', 'unavailable')} GPUs running; "
