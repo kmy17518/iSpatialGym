@@ -16,15 +16,41 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     for name in ('root', 'snapshot', 'inventory', 'defaults', 'visual-review', 'tray-floor-proof', 'reservations', 'reserved-asset-hashes', 'out'):
         p.add_argument('--' + name, type=Path, required=True)
+    p.add_argument('--support-scene-proof', type=Path)
+    p.add_argument('--measurement-reservations', type=Path)
     a = p.parse_args()
     require(not a.out.exists() and a.out.resolve().is_relative_to(a.root.resolve()), 'new owned output required')
     policy, hashes, defaults, review, trays = [json.loads(path.read_text()) for path in
         (a.reservations, a.reserved_asset_hashes, a.defaults, a.visual_review, a.tray_floor_proof)]
-    require(hashes['reservation_sha256'] == file_digest(a.reservations) == defaults['reservation_sha256'], 'policy/default identity differs')
+    require(hashes['reservation_sha256'] == file_digest(a.reservations), 'reservation asset identity differs')
+    measured_policy = a.measurement_reservations or a.reservations
+    require(defaults['reservation_sha256'] == file_digest(measured_policy), 'native measurement policy differs')
+    ancestor = json.loads(measured_policy.read_text())
+    for field in ('model_holdout_models', 'category_holdout_models', 'train_exclude_models'):
+        require(set(ancestor[field]) <= set(policy[field]), 'native measurement policy is not an ancestor')
+    for field in ('category_holdout_categories', 'train_exclude_categories'):
+        require(set(ancestor[field]) <= set(policy[field]), 'category reservation removed since native measurement')
+    require({(row['scene'], row['room']) for row in ancestor['category_holdout_rooms']} <=
+            {(row['scene'], row['room']) for row in policy['category_holdout_rooms']},
+            'room reservation removed since native measurement')
     require(defaults['status'] == 'native_defaults_and_geometry_recorded' and review['default_geometry_sha256'] == file_digest(a.defaults), 'native review identity differs')
     require(trays['status'] == 'native_tray_floor_measurement_passed', 'tray floor proof incomplete')
     b1k = a.snapshot / 'Behavior-1K'; scene, room = trays['scene'], trays['room']
     scene_path = b1k / 'datasets/2026-challenge-task-instances/scenes' / scene / 'json' / (scene + '_stable.json')
+    scene_environment = {}
+    if a.support_scene_proof:
+        support_proof = json.loads(a.support_scene_proof.read_text())
+        require(a.support_scene_proof.resolve().is_relative_to(a.root.resolve()), 'support proof outside campaign')
+        require(support_proof['status'] == 'private_support_geometry_and_reload_passed'
+                and support_proof['split'] == 'eval_model' and support_proof['original_object_values_unchanged'],
+                'private support scene lacks native geometry/reload proof')
+        require((support_proof['scene'], support_proof['room'], support_proof['object_name']) ==
+                (scene, room, trays['support_name']), 'support/tray context differs')
+        require(file_digest(scene_path) == support_proof['source_scene_sha256'], 'original support context changed')
+        scene_path = Path(support_proof['native_scene_path']).resolve()
+        require(scene_path.is_relative_to(a.root.resolve())
+                and file_digest(scene_path) == support_proof['native_scene_sha256'], 'private support scene changed')
+        scene_environment = {'ISPATIALGYM_STABLE_SCENE_DIR': str(scene_path.parent)}
     require(file_digest(scene_path) == trays['native_scene_sha256'], 'native support scene changed')
     init = json.loads(scene_path.read_text())['objects_info']['init_info']; support = init[trays['support_name']]['args']
     require(support['scale'] == trays['support_scale'], 'measured support scale differs')
@@ -120,6 +146,9 @@ def main():
         proof = dict(defaults_sha256=file_digest(a.defaults), visual_review_sha256=file_digest(a.visual_review), tray_floor_probe_sha256=file_digest(a.tray_floor_proof),
                      native_scene_sha256=file_digest(scene_path), source_customs_sha256=file_digest(source), reservation_sha256=file_digest(a.reservations),
                      support_adaptation='Existing globally reserved table at exact measured native scale and height', production_released=False)
+        if a.support_scene_proof:
+            proof['support_scene_proof'] = dict(path=str(a.support_scene_proof), sha256=file_digest(a.support_scene_proof))
+            proof['support_adaptation'] = 'Globally reserved default-scale table inserted into a collision-checked private scene; original objects unchanged'
         entry['campaign_provenance'] = proof
         template = Template('held_model__' + cls + '__initial_count_' + str(len(distractors)), 'disembedding', cls, 'eval_model', scene, room, tuple(refs),
                             digest(dict(entry=entry, bddl_sha256=file_digest(bddl))), {**proof, 'task_rooms': [room], 'inst_to_name': names,
@@ -133,6 +162,7 @@ def main():
         templates.append({**asdict(template), 'fingerprint': template.fingerprint})
         jobs.append(dict(candidate_id=template.template_id, class_id=cls, task='disembedding', alias=alias, scene=scene, room=room, split='eval_model',
                          template_fingerprint=template.fingerprint, source_manifest=str((a.out / 'validation_jobs.json').resolve()), required_new_grasp_key=gkey,
+                         environment=scene_environment,
                          production_released=False, sample_argv=['python', '-m', 'ispatialgym.sampling.sample_isg', '--variant', alias, '--customs', str(customs),
                          '--bddl-root', str(directory / 'bddl'), '--scene', scene, '--templates', '1', '--instances-per-template', '1', '--max-attempts', '3', '--seed', '20261110',
                          '--no-write-back', '--out', '${CAMPAIGN_OUT}/validation/' + cls]))

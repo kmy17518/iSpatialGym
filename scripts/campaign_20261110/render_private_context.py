@@ -19,7 +19,8 @@ def main():
     a = p.parse_args()
     assert not a.output.exists() and a.output.resolve().is_relative_to(a.campaign_root.resolve())
     proof = json.loads(a.scene_probe.read_text())
-    assert proof['status'] == 'private_context_geometry_and_reload_passed'
+    assert proof['status'] in ('private_context_geometry_and_reload_passed',
+                               'private_support_geometry_and_reload_passed')
     scene_path = Path(proof['native_scene_path'])
     assert sha(scene_path) == proof['native_scene_sha256']
     a.output.mkdir(parents=True)
@@ -44,7 +45,7 @@ def main():
         assert len(cells)
         xy = np.array([seg.map_to_world(th.tensor(ij)).tolist() for ij in cells])
         meta = json.loads(scene_path.read_text())['metadata']['ispatialgym']['campaign_added_support']
-        names = [meta['name']] + [x['name'] for x in proof['objects']]
+        names = [meta['name']] + [x['name'] for x in proof.get('objects', [])]
         bounds = [world.obj(name).aabb for name in names]
         lower = np.min([a.cpu().numpy() for a, b in bounds], axis=0)
         upper = np.max([b.cpu().numpy() for a, b in bounds], axis=0)
