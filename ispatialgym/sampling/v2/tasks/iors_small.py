@@ -2177,6 +2177,8 @@ class IORSSmall(SamplerV2):
     def sample(self, rng: np.random.Generator) -> Draft:
         from ispatialgym.sampling.v2.core import start_per_attempt
 
+        if os.environ.get(CPG.ENV) and self.shelf_start is not None:
+            self._campaign_pair_active = self.campaign_pair_plan()
         shelf_draw = shelf_draw_on(self)
         if shelf_draw:
             # oracle-fix 2026-11-06 (generation.shelf_start_draw): the board the target leans against first - it names the working arm, whose
@@ -2649,8 +2651,14 @@ class IORSSmall(SamplerV2):
                 raise Reject("campaign_group_complete", "pair goal-group member limit reached")
             if (plan.target_name, plan.partner_name) != (self.bindings.one("target").name, self.bindings.one("partner").name):
                 raise Reject("campaign_goal_plan", "pair plan role bindings differ from template")
-            if self.shelf_partner_pose is not None or self.meta_spots is not None:
-                raise Reject("campaign_goal_plan", "shelf/meta-link pair goal adapter is pending")
+            if self.meta_spots is not None:
+                raise Reject("campaign_goal_plan", "meta-link pair goal adapter is pending")
+            shelf = plan.shelf_tip_context
+            if self.shelf_start is not None:
+                if shelf is None or not self.shelf_tip() or self.support.name != shelf['support_name']:
+                    raise Reject('campaign_goal_plan', 'shelf group requires its audited native tip-release context')
+            elif shelf is not None:
+                raise Reject('campaign_goal_plan', 'shelf context cannot be used on a tabletop pair')
             self._campaign_pair_plan_sha = plan.sha256
             return plan
         except CPG.GoalGroupTimeout as exc:
@@ -2850,7 +2858,14 @@ class IORSSmall(SamplerV2):
                             self.record_stance_travel(init, m)
                         # oracle-fix 2026-11-05 (speed, opt-in generation.shelf_transit_per_grasp): the transit check judges each grasp that passes
                         # the IK - the first with a clear transit is taken - instead of failing the stance on the first grasp's transit
-                        accept = (lambda rec: self.shelf_transit_why(m, rec, _default, _pre_open)) if _per_grasp else None
+                        def accept(rec):
+                            plan = getattr(self, '_campaign_pair_active', None)
+                            if plan is not None and plan.shelf_tip_context is not None:
+                                from ispatialgym.sampling.campaign_shelf_goals import same_start_grasp
+                                for prior_pose, prior_grasp in getattr(self, '_campaign_written_shelf_starts', {}).get(plan.sha256, []):
+                                    if same_start_grasp(t_pose, rec.grasp_name, prior_pose, prior_grasp):
+                                        return 'campaign distinct shelf start/grasp already published'
+                            return self.shelf_transit_why(m, rec, _default, _pre_open) if _per_grasp else None
                         g = TT.grasp_at_pose(self, m, t_pose, self.grasps, [], self.edge.yaw, arm=_default, scale_key=self.choice.models["target"].scale,
                                              fingers=_pre_open, accept=accept, prescreen=bool(self.gen("fixed_start_prescreen")))
                         if _pre_open is not None:  # oracle-fix 2026-11-04 round 4: checked pre-shaped -> the oracle's transit to the pre-grasp pre-shaped too
@@ -3463,6 +3478,16 @@ class IORSSmall(SamplerV2):
         campaign_plan = getattr(self, "_campaign_pair_active", None)
         if campaign_plan is not None:
             pose = tuple(G.t(v) for v in campaign_plan.partner)
+            if campaign_plan.shelf_tip_context is not None:
+                # draw_shelf_layout already rechecked the board rays, interior
+                # support and free span against this fixed partner. It is held
+                # by the shelf wall; the tabletop push/brace rules do not apply.
+                dp, dq = CPG.pose_error(self.shelf_partner_pose, pose)
+                if dp > 1e-6 or dq > 1e-5:
+                    raise Reject('campaign_partner_drift', 'shelf draw lost its fixed partner')
+                self._brace_gate = {'ok': False, 'why': 'native shelf side board holds the fixed partner'}
+                self.partner_draw = {'source': 'shelf_goal_plan', 'group_id': campaign_plan.group_id}
+                return pose
             why = TT.partner_pose_why(self, self.world.footprint(self.hull["target"], t_pose), self.hull["partner"], pose,
                                       top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
             if not why and getattr(self, "flat_top", None) is not None:
@@ -4007,6 +4032,10 @@ class IORSSmall(SamplerV2):
         campaign_plan = getattr(self, "_campaign_pair_active", None)
         if campaign_plan is not None and self.relation == "touching":
             planned = tuple(G.t(v) for v in campaign_plan.place)
+            if campaign_plan.shelf_tip_context is not None:
+                # A tip release has no push gap. The source-bound release is
+                # independently settled and every new grasp's path is checked.
+                return planned
             native_pos = G.t(campaign_plan.goal[0]) - th.tensor([float(manip.tangent[0]), float(manip.tangent[1]), 0.0]) * self.place_gap()
             dp, dq = CPG.pose_error((native_pos, G.t(campaign_plan.goal[1])), planned)
             if dp > self.ikc.WITNESS_POS_TOL or dq > self.ikc.WITNESS_ANG_TOL:
@@ -4148,6 +4177,34 @@ class IORSSmall(SamplerV2):
         candidates belong to its arm) and, for eval, to the board opposite ``generation.partner_side``."""
         spec = self.shelf_start_draw()
         base = self._shelf_template
+        plan = getattr(self, '_campaign_pair_active', None)
+        if plan is not None and plan.shelf_tip_context is not None:
+            ctx = plan.shelf_tip_context
+            side = 1.0 if ctx['target_board'] == 'left' else -1.0
+            z = self.shelf_row_key(ctx['row_z'])
+            layouts = [(b, sd, self._shelf_row_z0) for b, sd in spec['layouts']]
+            layouts += [(b, sd, self.shelf_row_key(h)) for h, rows in spec.get('rows', []) for b, sd in rows]
+            if not any(abs(b-ctx['bay_m']) < 1e-6 and sd == side and h == z for b, sd, h in layouts):
+                raise Reject('campaign_shelf_context', 'source compartment is outside native shelf layouts')
+            states = [st for st in (getattr(self, '_board_keys', None) or {}).get(side, [])
+                      if z in st['rows'] and ctx['arm'] in st.get('arms', {}).get(z, [])]
+            if not states or not any(st['key'] == ctx['grasp_key'] for st in states):
+                raise Reject('campaign_shelf_context', 'source shelf rest/arm lacks a positive native row map')
+            st = states[int(rng.integers(len(states)))]
+            self.apply_board_key(st, z)
+            self._shelf_arm_override = None if ctx['arm'] == ctx['target_board'] else ctx['arm']
+            base = self._shelf_template
+            self.shelf_start = {'key': base['key'], 'lean_side': side, 'lean_deg': base['lean_deg'],
+                                'partner_lean_deg': ctx['partner_lean_deg'], 'context': base.get('context')}
+            self.rest['target'], self.rest['partner'] = self.shelf_rests(side, base['lean_deg'], ctx['partner_lean_deg'])
+            self.shelf_use_arm(ctx['arm'])
+            self.shelf_pose = self.shelf_partner_pose = None
+            self._shelf_side_layouts = [(ctx['bay_m'], side)]
+            self._shelf_draw = {'layout': [ctx['bay_m'], ctx['target_board']], 'n_layouts': 1,
+                                'restricted': 'immutable campaign shelf compartment',
+                                'board_draw': {'grasp_key': st['key'], 'lean_deg': base['lean_deg'], 'row_z': z,
+                                               'n_rests': len(states), 'arm': ctx['arm']}}
+            return
         layouts, why = list(spec["layouts"]), None
         assigned = self.gen("partner_side")
         fixed = (-1.0 if assigned == "left" else 1.0) if assigned in ("left", "right") else None
@@ -4597,6 +4654,10 @@ class IORSSmall(SamplerV2):
         span_min = float(self.gen("shelf_free_span_min_m", 0.15))
         tried: List[str] = []
         last: Optional[Reject] = None
+        plan = getattr(self, '_campaign_pair_active', None)
+        ctx = None if plan is None else plan.shelf_tip_context
+        if ctx is not None and self.edge.name != ctx['edge_name']:
+            raise Reject('campaign_shelf_context', 'fixed compartment requires its native source edge')
         for k in range(int(spec["tries"])):
             if k:
                 bay = float(same[int(rng.integers(len(same)))][0])
@@ -4604,11 +4665,21 @@ class IORSSmall(SamplerV2):
             if TT.lean_rest_side(getattr(self, "grasp_key", None)) is not None:  # i7-lean: the v2 lean rest's own angle (the partner's lean is still drawn)
                 lean_t = float(base["lean_deg"])
             spine = float(rng.uniform(*spec["spine_behind_edge_m"])) if spec["spine_behind_edge_m"] else None
+            if ctx is not None:
+                lean_p = ctx['partner_lean_deg']
             rest_t, rest_p = self.shelf_rests(side, lean_t, lean_p)
             label = f"bay {bay:+.2f} {TT.side_name(side)} board, leans {lean_t:.1f} / {lean_p:.1f} deg" + ("" if spine is None else f", spine {spine:.3f} m")
             try:
                 t_pose, tf = TT.shelf_lean_pose(self, self.hull["target"], rest_t, self.top, self.edge, self.support, side, spine_behind=spine, lateral0=bay)
                 p_pose, pf = TT.shelf_lean_pose(self, self.hull["partner"], rest_p, self.top, self.edge, self.support, -side, spine_behind=spine, lateral0=bay)
+                if ctx is not None:
+                    nominal, pf = TT.shelf_lean_pose(self, self.hull['partner'], rest_p, self.top, self.edge, self.support, -side,
+                                                   spine_behind=ctx['spine_behind_edge_m'], lateral0=bay)
+                    fixed = tuple(G.t(v) for v in plan.partner)
+                    dp, dq = CPG.pose_error(nominal, fixed)
+                    if dp > float(self.gen('partner_moved_max_m', .005)) or dq > self.tol('orientation', .20):
+                        raise Reject('campaign_shelf_context', 'fixed partner differs from native board-supported pose')
+                    p_pose = fixed
                 free = shelf_free_span(self.world.hull_at(self.hull["target"], t_pose), self.world.hull_at(self.hull["partner"], p_pose), self.edge, side)
                 span_facts = None
                 if shelf_span_rule_on():  # 5k.1: the requirement at this attempt's drawn leans
@@ -5851,8 +5922,16 @@ class IORSSmall(SamplerV2):
                 # Inside drops also retain the original release attitude: a
                 # settled candy can roll without changing its position goal.
                 reference = campaign_plan.native_geometry_reference
+                saved_shelf = None
+                if campaign_plan.shelf_tip_context is not None:
+                    ctx = campaign_plan.shelf_tip_context
+                    reference = ctx['source_target_start']
+                    saved_shelf = self.shelf_start
+                    self.shelf_start = dict(saved_shelf, lean_deg=ctx['target_lean_deg'], partner_lean_deg=ctx['partner_lean_deg'])
                 native = IORSSmall.goal_pose(self, tuple(G.t(v) for v in reference), tuple(G.t(v) for v in campaign_plan.partner))
             finally:
+                if 'saved_shelf' in locals() and saved_shelf is not None:
+                    self.shelf_start = saved_shelf
                 self._campaign_native_goal = False
             dp, dq = CPG.pose_error(native, campaign_plan.release)
             if campaign_plan.release_policy == "native_grasp_height":
@@ -6460,7 +6539,8 @@ class IORSSmall(SamplerV2):
             draft.summary["campaign_goal_group"]["phase"] = "settled_goal_verified"
         path = super().write_instance(draft, index, seed)
         if getattr(self, "_campaign_pair_active", None) is not None:
-            self._campaign_group_written = getattr(self, "_campaign_group_written", 0) + 1
+            if self._campaign_pair_active.shelf_tip_context is None:
+                self._campaign_group_written = getattr(self, "_campaign_group_written", 0) + 1
             if self.relation == "inside":
                 # Only a fully validated and durably written native member can
                 # guide later siblings of this exact immutable goal group.
@@ -6473,6 +6553,11 @@ class IORSSmall(SamplerV2):
     def check_goal_occlusion(self, draft: Draft, tro_path: str) -> None:
         super().check_goal_occlusion(draft, tro_path)
         plan = getattr(self, '_campaign_pair_active', None)
+        if plan is not None and plan.shelf_tip_context is not None:
+            # A staged write that subsequently fails visibility is not a member.
+            self._campaign_group_written = getattr(self, '_campaign_group_written', 0) + 1
+            self.__dict__.setdefault('_campaign_written_shelf_starts', {}).setdefault(plan.sha256, []).append(
+                (draft.object_poses[plan.target_name], draft.summary['grasp']['name']))
         if self.relation == 'under' and plan is not None:
             from ispatialgym.sampling.campaign_visibility import required
             if required():
@@ -6551,7 +6636,7 @@ class IORSSmall(SamplerV2):
                     place_pos = goal_pos - self.shelf_push_direction(manip) * self.place_gap()
                 self._touching_place_pos = place_pos
                 draft.summary["touching"] = {"place_gap_m": round(self.place_gap(), 4)}
-                if getattr(self, "_campaign_pair_active", None) is not None:
+                if getattr(self, "_campaign_pair_active", None) is not None and self._campaign_pair_active.shelf_tip_context is None:
                     fixed = self.place_pose_for(draft.object_poses[tname], self.obj("partner").get_position_orientation(), manip)
                     dp, dq = CPG.pose_error((place_pos, goal_quat), fixed)
                     if dp > self.ikc.WITNESS_POS_TOL or dq > self.ikc.WITNESS_ANG_TOL:

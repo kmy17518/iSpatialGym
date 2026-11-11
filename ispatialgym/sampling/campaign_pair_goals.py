@@ -42,6 +42,7 @@ class PairGoalPlan:
     floor_push: dict | None = None
     anchor_manipulation_stance: dict | None = None
     inside_release_attitude: dict | None = None
+    shelf_tip_context: dict | None = None
 
     @property
     def orientation_required(self):
@@ -79,6 +80,8 @@ class PairGoalPlan:
             result["floor_push"] = self.floor_push
         if self.inside_release_attitude is not None:
             result["inside_release_attitude"] = self.inside_release_attitude
+        if self.shelf_tip_context is not None:
+            result['shelf_tip_context'] = self.shelf_tip_context
         return result
 
     def verify_settled(self, target, partner, *, position_tol=.03, orientation_tol=.20, partner_position_tol=.005):
@@ -215,9 +218,11 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     # use to measured class recoveries; native feasibility remains mandatory.
     _require(hint is None or (scale == 'small' and relation in ('inside', 'nextto', 'touching', 'ontop', 'under')),
              'source manipulation proposal requires a supported small pair relation')
+    from ispatialgym.sampling.campaign_shelf_goals import checked_context
+    shelf = checked_context(raw, relation=relation, scale=scale, release=release, place=place)
     return PairGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, relation,
                         raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push, placement_mode, release_policy, anchor_base(raw), floor_push, hint,
-                        checked_inside_release_attitude(raw, release, relation=relation, scale=scale))
+                        checked_inside_release_attitude(raw, release, relation=relation, scale=scale), shelf)
 
 
 def checked_inside_release_attitude(raw, release, *, relation, scale):

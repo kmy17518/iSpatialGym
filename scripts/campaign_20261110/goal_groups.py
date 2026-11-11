@@ -530,6 +530,16 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                     "touching anchor lacks one verified pre-push grasp/place")
             placed = object_pose_from_grasp(grasps[0]["place"], grasps[0]["eef_in_object"])
             plan["place_pose"] = {"position": placed[0], "orientation": placed[1]}
+            if template.class_id == 'inter_object_relation_satisfaction-touching_03':
+                from ispatialgym.sampling.campaign_shelf_goals import author_context
+                proof = anchor['sources']['summary']
+                require(file_digest(proof['path']) == proof['sha256'], 'shelf source summary changed after audit')
+                require(grasps[0].get('place_kind') == 'shelf_tip', 'shelf source sidecar lacks native tip-release proof')
+                supports = [b['scene_object_name'] for b in tm['bindings']
+                            if b.get('role') == 'support' and b.get('category') == 'bookcase']
+                require(len(supports) == 1, 'shelf source lacks one bookcase support')
+                plan['class_id'] = template.class_id
+                plan['shelf_tip_context'] = author_context(anchor, target_name=plan['target_name'], support_name=supports[0])
         if relation == "nextto" and scale == "small" and not reuse_anchor_goal:
             summary = anchor["summary"]
             require("nextto_gap_m" in summary and "g_NT" in summary.get("pair", {}), "nextto anchor lacks measured gap range")

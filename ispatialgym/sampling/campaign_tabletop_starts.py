@@ -13,7 +13,8 @@ def source_stance_hint_enabled(relation, scale, class_id):
         'nextto': {'inter_object_relation_satisfaction-nextto_01',
                    'inter_object_relation_satisfaction-nextto_02',
                    'inter_object_relation_satisfaction-nextto_03'},
-        'touching': {'inter_object_relation_satisfaction-touching_01'},
+        'touching': {'inter_object_relation_satisfaction-touching_01',
+                     'inter_object_relation_satisfaction-touching_03'},
         'ontop': {'inter_object_relation_satisfaction-ontop_small_scale_'+suffix
                   for suffix in ('01', '02', '04')},
         'under': {'inter_object_relation_satisfaction-under_small_scale_'+suffix
