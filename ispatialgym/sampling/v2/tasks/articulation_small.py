@@ -2319,6 +2319,10 @@ class ArticulationSmall(SamplerV2):
         to the goal (a fist push from inside when its reach ends, stage 2). Both flaps' springs / brake as v2."""
         from ispatialgym.sampling.v2.stances import ContactRecord
 
+        from ispatialgym.sampling.campaign_runtime import contact_recovery
+
+        check_residual_slide = contact_recovery('carton_press_slide_envelope')
+
         tname, main_arm, lever_arm = self.tname, self.handle_arm, self.brace_arm
         other = str(self.gen("prep_push_joint", ""))
         if other not in target.joints or other == self.joint_name:
@@ -2498,6 +2502,17 @@ class ArticulationSmall(SamplerV2):
                 if err:
                     return err
                 p_prev = wp
+            if check_residual_slide:
+                from ispatialgym.sampling.campaign_carton_contacts import press_slide_extensions
+
+                error, cap = press_slide_extensions(track=track, set_flap=lambda q: set_flaps(self.q_init, q),
+                    q_press=q_prev, press_waypoints=[press_pose, press_mid, press_goal], direction=-z,
+                    slide_pose=lift_init, q_other=q0o, angle=angle, lower=target.joints[other].lower_limit,
+                    tolerance=min(self._joint_tol(self.q_goal-self.q_init), .5*angle))
+                if error:
+                    return 'residual press-to-slide screen: ' + error
+                self.template_facts['carton_press_slide_envelope'] = {
+                    'fractions': [.5, 1.], 'max_extension_rad': cap, 'native_tracking_required': True}
             set_flaps(self.q_init, q0o - angle)
             q_prev, err = track(q_prev, p_prev, lift_init, "slide into the gap")
             if err:
