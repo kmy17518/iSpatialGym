@@ -156,3 +156,23 @@ def test_reporting_cache_keeps_audit_time_and_invalidates_changed_nested_artifac
     assert 'changed native artifact' in failed['error']
     assert status.observed_batch_verification(tmp_path,status.ref(probe),'physics_action_open_loop')['status']=='failed_validation'
     assert len(calls)==2
+
+
+def test_repeated_native_tree_references_are_walked_once(tmp_path,monkeypatch):
+    from pathlib import Path
+    native=tmp_path/'code/trunk_example'
+    for folder in ('ispatialgym','scripts'):
+        (native/folder).mkdir(parents=True)
+        (native/folder/'runtime.py').write_text('original')
+    (native/'.snapshot_commit').write_text('exact')
+    probe=tmp_path/'probe.json'
+    write_json_atomic(probe,{'repeated':[str(native)]*30})
+    calls=[];original=Path.rglob
+    def counted(path,pattern):
+        calls.append(path)
+        return original(path,pattern)
+    monkeypatch.setattr(Path,'rglob',counted)
+    stamps=status._evidence_stamps(tmp_path,probe)
+    assert len(calls)==2
+    assert str(native/'ispatialgym/runtime.py') in stamps
+    assert str(native/'scripts/runtime.py') in stamps

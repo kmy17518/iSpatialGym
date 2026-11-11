@@ -23,7 +23,7 @@ def _evidence_stamps(root, probe):
     This is a read-only reporting cache. Release verifiers continue to hash and
     audit the original artifacts directly; they never consume this cache.
     """
-    root=Path(root).resolve(); watched=set(); visited=set()
+    root=Path(root).resolve(); watched=set(); visited=set(); seen=set()
     def visit(value):
         if isinstance(value,dict):
             for item in value.values(): visit(item)
@@ -31,6 +31,8 @@ def _evidence_stamps(root, probe):
             for item in value: visit(item)
         elif isinstance(value,str) and value.startswith(str(root)+'/'):
             path=Path(value)
+            if path in seen: return
+            seen.add(path)
             if not path.exists():
                 watched.add(path)
                 return
