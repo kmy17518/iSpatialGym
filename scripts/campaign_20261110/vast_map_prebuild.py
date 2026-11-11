@@ -83,6 +83,7 @@ def prepare(root, plan, index, native, helper, token):
              'kind': 'tabletop_maps', 'scenes': [], 'time_limit_s': 9000,
              'new_native_instances': 0, 'benchmark_credit': 0, 'production_released': False}
     write(job/'native_inputs.json', value)
+    (job/'sample.log').symlink_to('result/native_'+unit['arms'][0]+'.log')
     return job
 
 
@@ -127,6 +128,9 @@ def run(job):
     if (job/'seed_maps').exists(): shutil.copytree(job/'seed_maps', output/'maps')
     start = time.time(); rows = []
     for arm in unit['arms']:
+        live = job/'sample.log'
+        if live.is_symlink(): live.unlink()
+        live.symlink_to('result/native_'+arm+'.log')
         argv = [sys.executable, '-u', '-m', 'ispatialgym.sampling.reach_maps', 'compute', '--kind', 'tabletop',
                 '--jobs', value['selected_manifest'], '--glib', value['private_glib'], '--anchors', value['anchors'],
                 '--heights', unit['height'], '--arm', arm, '--out', str(output/'maps'), '--skip-existing']
