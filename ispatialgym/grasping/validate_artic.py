@@ -586,6 +586,10 @@ class MotionWorld:
         """
         return motion["motion"] == "push_close"
 
+    def follow_hand_rotation(self, motion, delta_rotation, initial_rotation):
+        """Ordinary motions rigidly follow the hinge; diagnostics may specialize."""
+        return delta_rotation @ initial_rotation
+
     # -- the alias's object, motion, profile and rest
 
     def setup(self, alias: str, root: str, customs_path: Optional[str] = None) -> Dict[str, Any]:
@@ -886,7 +890,7 @@ class MotionWorld:
         for i in range(1, n + 1):
             R = _axis_angle(axis, remaining * i / n)  # conventions.handle_waypoints: +dq turns the link (and the hand on it) +dq about the axis
             Ti = np.eye(4)
-            Ti[:3, :3] = R @ T0[:3, :3]
+            Ti[:3, :3] = self.follow_hand_rotation(motion, R, T0[:3, :3])
             Ti[:3, 3] = centre + R @ (T0[:3, 3] - centre)
             dense.append(pose_t(Ti))
         goal_q = float(motion["q_goal"]) if push else float(motion["upper"])

@@ -78,6 +78,7 @@ def main():
     p.add_argument('--out',required=True);p.add_argument('--arm',choices=['right','left'],required=True)
     p.add_argument('--max-trials',type=int,choices=[1,2],default=2)
     p.add_argument('--observe-contact-forces',action='store_true')
+    p.add_argument('--keep-hand-orientation',action='store_true')
     a=p.parse_args();out=Path(a.out).resolve();require(not out.exists(),'preserve existing diagnostic output')
     audit=json.loads(Path(a.audit).read_text());variants=contact_variants(audit,a.arm)[:a.max_trials]
     # All imports of simulation infrastructure occur after bounded inputs pass.
@@ -102,6 +103,14 @@ def main():
                     'unexpected diagnostic motion')
             return True
 
+        def follow_hand_rotation(self,motion,delta_rotation,initial_rotation):
+            if a.keep_hand_orientation:
+                require(motion['motion']==KIND and motion['diagnostic_only']is True
+                        and motion['alias']==ALIAS and motion['q_start']==0.,
+                        'constant hand orientation is diagnostic-only')
+                return initial_rotation.copy()
+            return super().follow_hand_rotation(motion,delta_rotation,initial_rotation)
+
     kw={'arm':a.arm}
     if a.arm=='left':kw['base_offsets']=VA.mirrored_offsets(VT.ValidateConfig().base_offsets)
     world=VT.TabletopWorld(VT.ValidateConfig(base_yaws=1,**kw))
@@ -115,6 +124,7 @@ def main():
             'audit':str(Path(a.audit).resolve()),'audit_sha256':file_digest(a.audit),
             'customs_sha256':file_digest(a.customs),'runtime':str(native),
             'max_trials':a.max_trials,'contact_force_observation':a.observe_contact_forces,
+            'keep_hand_orientation':a.keep_hand_orientation,
             'trials':[],'started_at':t0,
             'limitations':'Contact/motion diagnosis only. No native program, approach/body-contact certificate, demo, replay or acceptance pass.'}
     write_json_atomic(out/'probe.json',report)

@@ -181,3 +181,13 @@ def test_left_arm_validation_has_its_own_library_segment_ids_and_mirrored_stance
     lib = VA.build_motion_library(dict(m, category="c", model="m", scale=[1, 1, 1], q_start=0.0, handle_arm="right"), {"rest_id": "r0"}, {},
                                   [dict(tr, arm_validated="left")], VA.MotionConfig(wp_step_m=1.0), {"validator": "v"})
     assert lib["arm_validated"] == "left" and lib["segments"][0]["arm_validated"] == "left"
+
+
+def test_default_motion_rotation_still_rigidly_follows_hinge():
+    import numpy as np
+    from scipy.spatial.transform import Rotation
+    initial = Rotation.from_euler('xyz', [.2, -.4, .7]).as_matrix()
+    delta = Rotation.from_rotvec([.04, -.12, .08]).as_matrix()
+    world = VA.MotionWorld.__new__(VA.MotionWorld)
+    for motion in ['push_close', 'pull_open', 'pinch_open']:
+        assert np.array_equal(world.follow_hand_rotation({'motion': motion}, delta, initial), delta @ initial)
