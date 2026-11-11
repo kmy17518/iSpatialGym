@@ -71,7 +71,7 @@ def bind_training_candidate(template, job, metadata_path, code, reservations, ha
     return replace(bound,objects=tuple(refs),scene_setup=setup),Perturbations(mapped)
 
 
-def materialize(root, release, code, output, classes):
+def materialize(root, release, code, output, classes, *, plan_builder=scale_plan, jobs_manifest=None):
     root,release,code,output=map(lambda p:Path(p).resolve(),(root,release,code,output))
     require(output.is_relative_to(root) and not output.exists(), 'new private preparation directory required')
     canonical_path=root/'infra/standard_recovery/canonical_validation.json'
@@ -82,7 +82,9 @@ def materialize(root, release, code, output, classes):
     proof=json.loads(Path(dep['audit']).read_text())
     require(file_digest(dep['audit'])==dep['audit_sha256'], 'source dependency audit changed')
     profiles=json.loads((root/'manifests/support_height_profiles.json').read_text())
-    jobs={j['id']:j for j in json.loads((root/'manifests/train_scale_glib_jobs.json').read_text())}
+    jobs_path=Path(jobs_manifest).resolve() if jobs_manifest else root/'manifests/train_scale_glib_jobs.json'
+    require(jobs_path.is_relative_to(root), 'training dependency jobs outside campaign')
+    jobs={j['id']:j for j in json.loads(jobs_path.read_text())}
     pointer,policy,hashes=active_policy(root)
     require(proof['active_policy_sha256']==pointer['policy_sha256'], 'holdout policy changed')
     require(all(source[c]['validated'] is True for c in classes), 'canonical source has not validated')
@@ -95,7 +97,7 @@ def materialize(root, release, code, output, classes):
         profile=profiles['profiles'][probe['profile_id']]
         for cls in sorted(selected):
             baseline=load_contract({**source[cls]['configuration'], 'fingerprint':source[cls]['validation_key']['template_sha256']})
-            plan=scale_plan(baseline,req,probe,profile,jobs[req['entry_id']])
+            plan=plan_builder(baseline,req,probe,profile,jobs[req['entry_id']])
             source_dir=Path(baseline.scene_setup['source_template']);meta=json.loads((source_dir/'template_meta.json').read_text())
             # Freeze the exact source declaration, including role order. Fresh
             # geometry still checks the altered scale, support and full layout.
