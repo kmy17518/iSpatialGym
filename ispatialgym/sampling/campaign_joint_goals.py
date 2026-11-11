@@ -115,7 +115,10 @@ class JointGoalPlan:
                 continue
             fraction = ((q1 if direction == "open" else q0)-lower)/(upper-lower)
             if self.split == "train" or (lo <= fraction <= hi and (lo == 0 or fraction > lo)):
-                result.append((float(q0), float(goal)))
+                # Keep the exact native probe identity. Callers select records
+                # by this pair; replacing q1 with a close float from the TRO
+                # would discard a valid record during the subsequent draw.
+                result.append((float(q0), float(q1)))
         _require(bool(result), "no native angle pair satisfies the fixed goal and articulation bucket")
         return result
 

@@ -64,6 +64,22 @@ def test_physics_probed_half_angle_is_not_rounded_out_of_strict_bucket():
         j.unique_probed_angles([float("nan")])
 
 
+def test_opening_pair_retains_native_float_identity_for_record_selection():
+    goal = .501782238483429
+    native = (0., .5017822310328484)
+    p = replace(plan(), joints={'hinge':goal,'other':.3}, fraction_range=(.5,1.))
+    eligible = set(p.eligible_pairs([native], direction='open', lower=0., upper=.872664749622345))
+    assert native in eligible
+    assert (native[0],goal) not in eligible
+    # Existing goal tolerance and strict native bucket remain unchanged.
+    with pytest.raises(j.GoalPlanError):
+        p.eligible_pairs([(0.,goal+.00001)], direction='open', lower=0., upper=.872664749622345)
+    half=.5*.872664749622345
+    with pytest.raises(j.GoalPlanError):
+        replace(p,joints={'hinge':half+1e-8,'other':.3}).eligible_pairs(
+            [(0.,half)], direction='open', lower=0., upper=.872664749622345)
+
+
 def test_articulation_plan_rejects_wrong_identity_and_queue_time_does_not_consume_budget():
     raw={"schema":j.SCHEMA,"campaign_id":"fresh","group_id":"g","split":"train","template_id":"t",
          "contract_template_sha256":"a"*64,"scene":"scene","room":"room","target":"target","joint":"hinge",
