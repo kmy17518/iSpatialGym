@@ -102,7 +102,7 @@ def source_proof(gate_path, *, root, started_at, campaign_id, permitted_split=No
         "active_policy_sha256": policy[0]["policy_sha256"], "source_is_final_member": False}
 
 
-def admission_id(template, snapshot, perturbations, split="train"):
+def admission_id(template, snapshot, perturbations, split="train", author_revision=None):
     require(split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid admission split")
     identity = {"task": template.task, "class_id": template.class_id, "physical": physical_template(template),
                    "definition": template.definition_sha256, "runtime_bddl": template.scene_setup.get("runtime_bddl_sha256"),
@@ -110,6 +110,9 @@ def admission_id(template, snapshot, perturbations, split="train"):
                    "code": file_digest(Path(snapshot) / ".snapshot_commit"), "perturbations": perturbations}
     if split != "train":  # Preserve every existing training admission identity.
         identity["admission_split"] = split
+    if author_revision is not None:
+        require(split == 'eval_standard' and author_revision == 'standard_native_coverage_v1', 'unsupported admission author revision')
+        identity['author_revision'] = author_revision
     return digest(identity)
 
 
@@ -232,10 +235,13 @@ def prepare(proof, allocation, cfg, root):
     require_source_runtime(proof, cfg, root)
     env = read_env(Path(allocation["job_dir"]) / "job.env")
     v2_root = source_release(template, env, cfg)
-    identity = admission_id(source_template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"))
+    identity = admission_id(source_template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"), cfg.get('author_revision'))
     name = "group_admit_" + identity[:20]
     anchor = successful_anchor(allocation["job_dir"], campaign_root=root, ledger=allocation["ledger"], campaign_started_at=cfg["started_at"])
     template = bind_missing_runtime_identity(template, anchor)
+    if cfg.get('author_revision') == 'standard_native_coverage_v1':
+        from scripts.campaign_20261110.disembedding_coverage import bind_standard_coverage
+        template = bind_standard_coverage(template, anchor)
     if template.task.startswith("alignment-") and not template.scene_setup.get("bucket_policy"):
         from scripts.campaign_20261110.goal_groups import with_alignment_buckets
         template = with_alignment_buckets(template, anchor["template_meta"].get("template_facts", {}).get("deviation_range_applied_deg"),
@@ -409,7 +415,7 @@ def main():
                 record = read(source); template = held.template_from(read(record["prepared"]["config"])["template"])
                 scoped_template(template, cfg)
                 model_class_pin(template, state, cfg, commit=True)
-                identity = admission_id(template, cfg["snapshot"], read(record["prepared"]["config"])["perturbations"], cfg.get("admission_split", "train"))
+                identity = admission_id(template, cfg["snapshot"], read(record["prepared"]["config"])["perturbations"], cfg.get("admission_split", "train"), cfg.get('author_revision'))
                 if identity not in state["records"]:
                     record["admission_id"] = identity
                     record["status"] = "external_submission"
@@ -448,7 +454,7 @@ def main():
                     template = held.template_from(proof["template"])
                     scoped_template(template, cfg)
                     model_class_pin(template, state, cfg)
-                    identity = admission_id(template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"))
+                    identity = admission_id(template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"), cfg.get('author_revision'))
                     found = [r for r in rows if Path(r["job_dir"]).resolve() == Path(proof["source_job"])]
                     require(len(found) == 1, "anchor allocation missing or ambiguous")
                     if not held.job_terminal(found[0], root, queue):

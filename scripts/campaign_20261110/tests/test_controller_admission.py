@@ -84,6 +84,10 @@ def test_admission_identity_keeps_applied_scale_and_light_separate(tmp_path, mon
               "binding_pool": template.scene_setup.get("binding_pool"), "code": c.file_digest(snapshot / ".snapshot_commit"),
               "perturbations": {"scales": [1,1,1], "lighting": {}}}
     assert base == c.digest(legacy)
+    standard = admission.admission_id(template, snapshot, {}, 'eval_standard')
+    assert standard != admission.admission_id(template, snapshot, {}, 'eval_standard', 'standard_native_coverage_v1')
+    with pytest.raises(c.ContractError, match='unsupported admission author revision'):
+        admission.admission_id(template, snapshot, {}, 'train', 'standard_native_coverage_v1')
 
 
 def test_legacy_single_group_binds_actual_native_identity_for_new_queue(tmp_path, monkeypatch):
