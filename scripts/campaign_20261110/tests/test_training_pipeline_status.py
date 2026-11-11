@@ -39,7 +39,7 @@ def test_instance_refresh_publishes_before_slow_batch_and_preserves_prior_dates(
         assert first['batch_stages'][0]['stages'][0]['verification_observed_at']=='2026-11-11T00:01:00Z'
         return {'status': 'failed_validation', 'error': 'unchanged strict failure'}
     monkeypatch.setattr(status,'observed_batch_verification',verify)
-    final=status.observe(tmp_path,publish=lambda value:published.append(copy.deepcopy(value)),previous_batches=[prior])
+    final=status.observe(tmp_path,publish=lambda value:published.append(copy.deepcopy(value)),previous_batches=[prior],batch_verifier=verify)
     assert final['cycle_phase']=='complete' and final['cycle_finished_at'] is not None
     assert final['batch_stages'][0]['observation_current_cycle'] is True
     assert final['batch_stages'][0]['status']=='failed_validation'
@@ -176,3 +176,30 @@ def test_repeated_native_tree_references_are_walked_once(tmp_path,monkeypatch):
     assert len(calls)==2
     assert str(native/'ispatialgym/runtime.py') in stamps
     assert str(native/'scripts/runtime.py') in stamps
+
+
+def test_slow_batch_worker_returns_pending_without_blocking_instance_polling(tmp_path,monkeypatch):
+    import threading
+    started=threading.Event();finish=threading.Event();calls=[]
+    def slow(*args):
+        calls.append(args);started.set()
+        assert finish.wait(3)
+        return {'status':'failed_validation','error':'preserved strict failure',
+                'verification_observed_at':'2026-11-11T18:00:00Z'}
+    monkeypatch.setattr(status,'observed_batch_verification',slow)
+    worker=status.BatchObservationWorker();reference={'path':str(tmp_path/'probe.json'),'sha256':'a'*64}
+    try:
+        first=worker.observe(tmp_path,reference,'physics_action_open_loop')
+        assert first['status']=='verification_pending' and started.wait(1)
+        second=worker.observe(tmp_path,reference,'physics_action_open_loop')
+        assert second['status']=='verification_pending' and len(calls)==1
+        folder,row=request(tmp_path,'independent',44)
+        snapshot=status.observe(tmp_path,batch_verifier=worker.observe)
+        assert snapshot['records'][0]['start']==44 and snapshot['cycle_finished_at']
+        finish.set()
+        next(iter(worker.work.values()))['future'].result(timeout=1)
+        result=worker.observe(tmp_path,reference,'physics_action_open_loop')
+        assert result['status']=='failed_validation' and not result['verification_refresh_pending']
+        assert result['verification_observed_at']=='2026-11-11T18:00:00Z'
+    finally:
+        finish.set();worker.executor.shutdown(wait=True)

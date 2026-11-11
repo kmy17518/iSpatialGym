@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import time
+from concurrent.futures import ThreadPoolExecutor
 from scripts.campaign_20261110.contracts import file_digest, require, write_json_atomic, task_quotas
 
 
@@ -81,11 +82,34 @@ def observed_batch_verification(root, reference, kind):
         result.update(status='failed_validation',error=f'{type(error).__name__}: {error}')
     after={path:_stamp(path) for path in before}
     require(after==before,'batch evidence changed during observation')
+    result['verification_finished_at']=datetime.now(timezone.utc).isoformat()
     _BATCH_OBSERVATION_CACHE[key]={'stamps':after,'result':result}
     return result
 
 
-def observe(root, *, now=None, publish=None, previous_batches=()):
+class BatchObservationWorker:
+    """Bounded read-only audit worker; slow proofs never block instance polling."""
+    def __init__(self):
+        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='batch-proof-report')
+        self.work = {}
+
+    def observe(self, root, reference, kind):
+        key=(str(Path(root).resolve()),reference['path'],reference['sha256'],kind)
+        entry=self.work.setdefault(key,{})
+        future=entry.get('future')
+        if future is not None and future.done():
+            try: entry['result']=future.result()
+            except Exception as error:
+                entry['result']={'status':'verification_unavailable','error':f'{type(error).__name__}: {error}'}
+            entry.update(future=None,finished=time.monotonic())
+        if entry.get('future') is None and time.monotonic()-entry.get('finished',-float('inf'))>=30:
+            entry['future']=self.executor.submit(observed_batch_verification,root,reference,kind)
+        return {**entry.get('result',{'status':'verification_pending'}),
+                'verification_refresh_pending':entry.get('future') is not None,
+                'verification_scope':'read-only reporting; release rechecks original evidence'}
+
+
+def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier=observed_batch_verification):
     root = Path(root).resolve(); base = root/'training_pipeline_canaries'
     result = {'schema': 'isg-training-pipeline-status-v1', 'campaign_id': 'campaign_20261110',
         'observed_at': now or datetime.now(timezone.utc).isoformat(), 'records': [], 'batch_stages': [],
@@ -282,7 +306,17 @@ def observe(root, *, now=None, publish=None, previous_batches=()):
                            for entry in native.get('entries', [])):
                         stage['status'] = 'failed_execution'
                     if stage['episodes_observed'] == 3:
-                        stage.update(observed_batch_verification(root,ref(probe),kind))
+                        stage.update(batch_verifier(root,ref(probe),kind))
+                        if stage['status'] in ('verification_pending','verification_unavailable'):
+                            prior=next((s for b in previous_batches if b.get('request')==batch['request']
+                                        for s in b.get('stages',[]) if s.get('kind')==kind
+                                        and s.get('evidence')==stage['evidence']),None)
+                            if prior:
+                                history=prior.get('historical_verification')
+                                if prior.get('status') in ('verified','failed_validation'):
+                                    history={k:prior.get(k) for k in ('status','error','evidence',
+                                             'verification_observed_at','verification_finished_at')}
+                                if history: stage['historical_verification']=history
                 except Exception as error:
                     stage.update(status='failed_validation', error=f'{type(error).__name__}: {error}')
             job_id=str(submissions.get(kind,{}).get('job_id',''))
@@ -299,6 +333,7 @@ def observe(root, *, now=None, publish=None, previous_batches=()):
         if all(s['status'] == 'verified' for s in batch['stages']): batch['status'] = 'batch_restoration_verified'
         elif any(s['status'] in ('failed_execution','failed_validation')for s in batch['stages']):batch['status']='failed_validation'
         elif any(s['status']=='completed_without_complete_probe'for s in batch['stages']):batch['status']='incomplete_terminal_evidence'
+        elif any(s['status'] in ('verification_pending','verification_unavailable')for s in batch['stages']):batch['status']='verification_pending'
         elif submissions:batch['status']='submitted'
         batch['observation_current_cycle'] = True
         batch['last_observed_at'] = datetime.now(timezone.utc).isoformat()
@@ -354,10 +389,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True); parser.add_argument('--interval', type=float, default=0)
     args = parser.parse_args(); output = args.root/'training_pipeline_canaries/pipeline_status.json'
+    worker=BatchObservationWorker() if args.interval>0 else None
     while True:
         previous = read(output).get('batch_stages', []) if output.exists() else []
         value = observe(args.root, publish=lambda value: write_json_atomic(output, value),
-                        previous_batches=previous)
+                        previous_batches=previous,
+                        batch_verifier=worker.observe if worker else observed_batch_verification)
         write_json_atomic(output, value)
         print(json.dumps({'observed_at': value['observed_at'], 'attempts': value['attempts_observed'],
             'errors': len(value['errors']), 'benchmark_credit': 0}), flush=True)
