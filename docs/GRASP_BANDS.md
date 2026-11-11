@@ -6837,3 +6837,65 @@ The switch acts only on the under_large_02 variant's pitched floor push of an el
     - The 2 failures are not the push: arm_stutter in the final retreat, and the wheel touching the briefcase in the first navigate.
   - Baseline ug_ul02_off (partial, one job still running): 6 demos, 0 ok. End yaw 0.4-20.9 deg, 2 topples.
   - Flip recommended by the standard rule; not flipped on this branch.
+
+## under_large_01: not_reached is the heel-first lock's -22.5 deg yaw (branch `i7-ul01reach`, round 4, 2026-11-10)
+
+Task: under_large_01 (the sandal chgcrm pushed under bed_rrcvaq_0, the flat floor blade in 3 strokes of ~0.10 m) failed as
+oracle_failed:not_reached in about half its written demos (int2_31: 4 written, 2 ok, 2 not_reached).
+
+### Evidence (every under_large_01 demo under $OFH/out, 2026-11-06..10: 138 written demos, 38 tags)
+
+- **28 not_reached, all the same failure.** The 3 strokes run to the end (`push_stop` leg_end); the sandal ends 0.18-0.19 m short
+  of the goal line (`push_residual`), position error 0.20-0.21 m, orientation error 0.22-0.30 rad (tolerances 0.05 / 0.15).
+  - Stroke 1: the hand travels 0.112 m, the sandal advances 0.035-0.042 m (a good stroke: 0.094) and slides ~26 mm sideways; yaw
+    unchanged (+-3 deg).
+  - Stroke 2: the root is 25-37 mm off the line, the re-aim follows (cap 30 mm); the sandal advances 0.052-0.060 m and turns +5..+9 deg.
+  - Stroke 3: the root is ~75 mm off the line, past the 30 mm re-aim cap: the blade meets only the sandal's edge (contact +37 mm), the
+    sandal advances 4-10 mm and turns to +13..+17 deg.
+  - No base nudge or place phase is involved: the place ends normally and the push stops at leg_end, not on a stall.
+- **The cause is the carried yaw** (the instance summary's `grasp.yaw`, which the place keeps as the goal orientation):
+
+  | carried yaw | written demos | outcome |
+  |---|---|---|
+  | 0 / -0.03 / -0.04 rad | 96 | 78 ok; the rest unrelated (pause 5, wobble 4, touching 5, stutter 2, plan 1, collision 1) |
+  | -0.12 .. -0.24 rad (jittered) | 7 | 7 symbolic_only (orientation error 0.19-0.31 rad) |
+  | -0.35 .. -0.39 rad (jittered), 5.89 rad (= -22.5 deg grid) | 34 | 28 not_reached, 6 plan_failed, 0 ok |
+  | -0.48 rad | 1 | execution |
+
+  Every not_reached instance has the sandal placed at -20..-22.4 deg to the push. It is deterministic per instance: 360002 failed in
+  all 17 tags that wrote it at -22.5 deg (14 not_reached + 3 plan_failed); the one tag that drew yaw 0 for it (fp_def, right arm from
+  B (0.0, -1.22)) succeeded.
+- **Why that yaw is sampled.** `generation.push_under_yaw` = `heel_first` keeps the yaws at which the heel points back within one step of
+  the 16-yaw grid (22.5 deg): the grid yaws 0 and 5.89 rad ('push-under yaw lock heel_first: kept 2 of N yaws ... [0.0, 5.89]'), and the
+  B IK's retries jitter the drawn yaw by up to 22.5 deg (`TARGET_JITTER`). Of 186 written instances 43 carry 5.89 rad and 18 another
+  jittered yaw beyond 0.04 rad.
+
+### The switch: `ISPATIALGYM_PUSH_HEEL_TIGHT` (default off; commit b413aab9)
+
+- "1" = heel_first's tolerance 5 deg (`PUSH_HEEL_TIGHT_TOL_DEG`), a number = that many degrees; never wider than the spec's
+  `push_under_yaw_tol_deg`. The init-yaw jitter is capped at 0.8 of it (4 deg), so the B IK's retries stay inside the lock.
+- Acts only where the heel_first lock is set (the two sandal-under-bed variants); the oracle is unchanged.
+- Kit counters `push_heel_tight.dropped` (a yaw today's tolerance keeps and the tight one does not) and `push_heel_tight.jitter_capped`;
+  `template_facts.push_under_yaw.heel_angle_rest_deg` and one INFO line 'push-under yaw lock heel_first: tolerance ...'.
+- r2 (3a6dcc5e): the 5 deg window is centred on the grid yaw nearest heel-back (the sandal's heel stands 6 deg off heel-back at yaw 0;
+  r1's window around heel-back itself kept none of the 16 yaws).
+- r3 (24e642f1): keep the right arm.
+  - Under r2, 360002 and 360003 grasped with the LEFT arm and failed robot_touching_itself (left_arm_link3 / link5, left j4 -2.081 /
+    -2.087). Cause: the right arm's F_init at the first B held no heel-back yaw, and the segment coupled the left arm at that same B
+    before the right arm was tried at any other B.
+  - Now the default arm runs at every B whose pre-screen shows a kept yaw first, then each B's other arms (`heel_tight_couple_plan`,
+    kit `push_heel_tight.arm_deferred`).
+  - A program whose planned left j4 comes within 30 mrad of its limit is rejected (`PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD`, kit
+    `push_heel_tight.left_j4_checked` / `.left_j4_rejected`). Over the 23 left-arm demos, the 3 self-touches planned 2.1-2.3 mrad from
+    the limit, and the other 20 planned 57 mrad or more.
+- r3b (27ff96ac): after 2 left-j4 rejections of one instance, its later attempts couple the default arm only. Not exercised by the A/B.
+- **A/B result (r3)**, N 8 (360000 + 360100), svl titanrtx, own caches:
+
+  | arm | attempts / written / ok | GPU-h per ok | arms | failures |
+  |---|---|---|---|---|
+  | OFF uh_ul01_off (b413aab9) | 26 / 8 / 6 | 1.35 | 8 right | not_reached (360002, -22.5 deg), robot_touching_objects |
+  | ON r2 uh2_ul01_on (3a6dcc5e) | 17 / 8 / 6 | 0.66 | 5 right, 3 left | 2 robot_touching_itself (left) |
+  | ON r3 uh3_ul01_on (24e642f1) | 20 / 8 / 7 | 0.575 | 7 right, 1 left (planned -2.0324) | symbolic_only (360003, carried -3.5 deg, ori 0.173) |
+
+  - 360002 succeeded right-arm at yaw 0 under r3, after the guard rejected 2 left programs.
+  - The flip rule passes: the switch acts, ok is 7 vs 6, and GPU-h per ok is 0.575 vs 1.35. Not flipped; the lead decides.
