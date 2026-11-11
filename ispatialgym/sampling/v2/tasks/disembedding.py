@@ -1336,6 +1336,14 @@ class Disembedding(SamplerV2):
         if os.environ.get(CTG.ENV):
             self._campaign_tray_active = self.campaign_tray_plan()
             self._campaign_latest_proposal = None
+        if CTG.configured_reference_start() is not None and getattr(self, '_split_cone_cands', None):
+            # Core first chooses one random focus and narrows the checked pool
+            # to its few stances. The audited reference proposal must rank the
+            # full native Phase-2 survivors, before that focus lottery removes
+            # its candidates. No stance is introduced or exempted from checks.
+            self.manip_candidates = list(self._split_cone_cands)
+            TT._count(self, 'campaign_reference.checked_pool_restored')
+            return Disembedding._sample_position(self, rng)
         redraws = disemb_pos_redraws()
         if not redraws or getattr(self, "_split_cone_pools", None) is None:
             return Disembedding._sample_position(self, rng)  # (the class's own: stub tests call it with a namespace)

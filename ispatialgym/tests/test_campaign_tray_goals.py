@@ -26,6 +26,18 @@ def test_reference_start_proposal_is_scoped_and_provenance_required():
     with pytest.raises(GoalPlanError,match='sidecar_sha256'):reference_start_proposal(t)
 
 
+def test_reference_ranking_sees_original_checked_pool_before_random_focus(monkeypatch):
+    from ispatialgym.sampling import campaign_tray_goals as CTG
+    monkeypatch.delenv(ENV, raising=False)
+    checked=[object(),object(),object()]
+    sampler=SimpleNamespace(manip_candidates=[checked[2]],_split_cone_cands=checked,kit=SimpleNamespace(stats={}))
+    monkeypatch.setattr(CTG,'configured_reference_start',lambda:{'manipulation':{}})
+    monkeypatch.setattr(Disembedding,'_sample_position',lambda self,rng:list(self.manip_candidates))
+    result=Disembedding.sample_instance(sampler,None)
+    assert result==checked and all(a is b for a,b in zip(result,checked))
+    assert sampler.kit.stats['campaign_reference.checked_pool_restored']==1
+
+
 def plan():
     return TrayGoalPlan("fresh", "g1", "eval_standard", "template", "a" * 64, "target", "source", "dest",
                         ((1., 2., .8), (0., 0., 0., 1.)), ((0., 2., .7), (0., 0., 0., 1.)),
