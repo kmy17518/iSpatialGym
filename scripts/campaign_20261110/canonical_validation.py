@@ -14,6 +14,7 @@ from scripts.campaign_20261110.export_release import ArtifactAudit, normalize_re
 from scripts.campaign_20261110.reservation_policy import active_policy
 from scripts.campaign_20261110.standard_recovery import owner
 from scripts.campaign_20261110.production_gate import PARKED_CLASSES
+from scripts.campaign_20261110.current_eligibility import assess, read_ledger
 
 CAMPAIGN='campaign_20261110'
 
@@ -22,6 +23,8 @@ def audit(root, catalog, auditor, started_at):
     records, groups, sources=snapshot_allocations(root)
     policy=active_policy(root)
     require(policy is not None,'active reservation policy unavailable')
+    ledger,ledger_ref=read_ledger(root)
+    eligibility,consequences=assess(root,records,groups,ledger)
     by_class=defaultdict(list);by_group=defaultdict(list)
     for row in records:
         if row.get('group_id'):by_group[row['group_id']].append(row)
@@ -32,19 +35,25 @@ def audit(root, catalog, auditor, started_at):
     templates={}
     for cls,task in sorted(catalog.items()):
         row=dict(class_id=cls,task=task,validated=False,owner=owner(cls),
-                 historical_accepted_standard=len(by_class[cls]),status='awaiting_complete_proof',
+                 historical_accepted_standard=len(by_class[cls]),
+                 current_eligible_standard=sum(eligibility[r['instance_id']]['quota_eligible'] for r in by_class[cls]),
+                 change_impact_status_counts=dict(Counter(eligibility[r['instance_id']]['status'] for r in by_class[cls])),
+                 status='awaiting_complete_proof',
                  evidence=[],errors=[],next_action='Diagnose first failing stage and validate an exact configuration with its own replay and distinct sibling.')
         if cls in PARKED_CLASSES:
             row.update(status='parked_owner_artifact',next_action='Await the under_large_01 replacement oracle/template; retain historical outcomes separately.')
             rows.append(row);continue
         for accepted in reversed(by_class[cls]):
             try:
+                outcome=eligibility[accepted['instance_id']]
+                require(outcome['quota_eligible'],'current eligibility blocked: '+str(outcome.get('reasons')))
                 members=by_group[accepted['group_id']] if accepted.get('group_id') else [accepted]
                 camera=task.startswith('camera_relocalization-')
                 if not camera:
                     group=groups[accepted['group_id']]
-                    require(2<=len(members)<=3,'standard goal group lacks2–3 successful accepted members')
-                    require(group['accepted']=={r['instance_id']:r['split'] for r in members},'accepted group is incomplete')
+                    require(group['accepted']=={r['instance_id']:r['split'] for r in members},'historical accepted group is incomplete')
+                    members=[r for r in members if eligibility[r['instance_id']]['quota_eligible']]
+                    require(2<=len(members)<=3,'standard goal group lacks2–3 successful current eligible members')
                     require(sum(r['split']=='eval_standard' for r in members)==1 and any(r['split']=='train' for r in members),'required accepted training sibling missing')
                     require(len({r['instance_id'] for r in members})==len(members),'duplicate accepted member IDs')
                 checked=[]
@@ -77,7 +86,9 @@ def audit(root, catalog, auditor, started_at):
     return dict(campaign_id=CAMPAIGN,observed_at=datetime.now(timezone.utc).isoformat(),
         schema='isg-canonical-template-validation-v1',total=100,validated=sum(r['validated']for r in rows),
         state_counts=dict(Counter(r['status']for r in rows)),classes=rows,sources=sources,
-        semantics='One exact configuration per canonical class verified from original accepted artifacts, demo and native replay evidence; noncamera classes include accepted training siblings. Historical accepted counts are separate. Only under_large_01 remains held for an owner artifact; availability never substitutes for the exact validation chain.')
+        current_eligibility=dict(ledger=ledger_ref,review_inventory_complete=bool(ledger and ledger.get('coverage',{}).get('complete')),
+            group_consequences=consequences,history_preserved=True),
+        semantics='One exact configuration per canonical class verified from original accepted artifacts, demo and native replay evidence; noncamera classes include accepted training siblings. Historical accepted counts are separate. Explicit affected unresolved/invalid records and required-sibling consequences are excluded from validation; unfinished unrelated change inventory is not a blanket exclusion or a completed review. Only under_large_01 remains held for an owner artifact; availability never substitutes for the exact validation chain.')
 
 
 def main():

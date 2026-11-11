@@ -67,6 +67,27 @@ class RecoveryLedgerTests(unittest.TestCase):
   self.assertEqual(row['accepted_standard'],1)
   self.assertEqual(row['state'],'parked')
   self.assertIs(row['canonical_validation_eligible'],False)
+ def test_current_eligibility_overrides_history_and_reports_review(self):
+  self.current['classes'][0]['accepted']=3
+  projection={'schema':'isg-current-eligibility-v1','campaign_id':CAMPAIGN,'observed_at':'2026-11-11T06:00:00+00:00',
+   'review_inventory_complete':False,'classes':[{'class_id':self.key,'split':'eval_standard','historical':3,'current_eligible':0,'under_review':3}]}
+  d=combine(self.baseline,self.current,{},[],eligibility=projection)
+  self.assertEqual(d['covered_classes'],0);self.assertEqual(d['zero_classes'],1)
+  self.assertEqual(d['classes'][0]['historical_accepted_standard'],3)
+  self.assertEqual(d['classes'][0]['accepted_standard'],0)
+  self.assertEqual(d['acceptance_observed_at'],projection['observed_at'])
+  self.assertEqual(d['newly_covered'],[])
+ def test_newly_zero_class_enters_ledger_even_if_absent_from_original_baseline(self):
+  self.current['classes'].append({'class_id':'new_zero','task':'other','split':'eval_standard','accepted':2})
+  projection={'schema':'isg-current-eligibility-v1','campaign_id':CAMPAIGN,'observed_at':'now','classes':[]}
+  d=combine(self.baseline,self.current,{},[],eligibility=projection)
+  self.assertEqual(d['baseline_zero_classes'],1);self.assertEqual(d['zero_classes'],2)
+  self.assertEqual(len(d['classes']),2)
+  row=next(r for r in d['classes'] if r['class_id']=='new_zero')
+  self.assertIsNone(row['baseline_accepted']);self.assertEqual(row['historical_accepted_standard'],2)
+ def test_foreign_eligibility_projection_is_rejected(self):
+  with self.assertRaisesRegex(ValueError,'invalid current eligibility'):
+   combine(self.baseline,self.current,{},[],eligibility={'campaign_id':'old'})
  def test_artifact_audit_requires_unchanged_ready_source_proof(self):
   with tempfile.TemporaryDirectory() as directory:
    root=Path(directory);target=root/'infra/standard_recovery';target.mkdir(parents=True)

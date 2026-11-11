@@ -28,6 +28,8 @@ COMPUTE={*(f'inter_object_relation_satisfaction-inside_large_scale_{i:02}' for i
 
 def owner(key):
  if key in PARKED_CLASSES:return 'user_artifacts; tracking /root'
+ if key in {'disembedding_01','disembedding_05','inter_object_relation_satisfaction-touching_02'}:return '/root/dataset_contract'
+ if key=='inter_object_relation_satisfaction-nextto_01':return '/root/templates_assets'
  if key in DATASET:return '/root/dataset_contract'
  if key in ROOT:return '/root'
  if key in COMPUTE:return '/root/compute'
@@ -108,11 +110,20 @@ def state_from_attempts(attempts):
  if attempts:return 'failed'
  return 'unattempted'
 
-def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=None):
+def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=None,eligibility=None):
  """Acceptance is authoritative; a worker cannot promote a demo to acceptance."""
  now=datetime.now(timezone.utc).isoformat();previous=previous or {};artifact_updates=artifact_updates or {}
  current={r['class_id']:r for r in evidence['classes'] if r['split']=='eval_standard'}
+ historical={k:dict(v) for k,v in current.items()}
+ if eligibility is not None:
+  if eligibility.get('campaign_id')!=CAMPAIGN or eligibility.get('schema')!='isg-current-eligibility-v1':raise ValueError('invalid current eligibility projection')
+  eligible={r['class_id']:r for r in eligibility['classes'] if r['split']=='eval_standard'}
+  current={k:{**r,'accepted':eligible.get(k,{}).get('current_eligible',0)} for k,r in current.items()}
  initial={r['class_id']:r for r in baseline['classes']}
+ baseline_size=len(initial)
+ for key,c in current.items():
+  if c['accepted']==0 and key not in initial:initial[key]={**c,'accepted':None}
+ acceptance_time=eligibility['observed_at'] if eligibility is not None else evidence.get('observed_at')
  prior={r['class_id']:r for r in previous.get('classes',[])}
  notes={}
  for doc in workers:
@@ -129,10 +140,11 @@ def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=N
   elif count and count>0:state='accepted'
   elif state in ('accepted','parked'):state='failed'
   first=prior.get(key,{}).get('first_accepted_observed_at')
-  if count and count>0 and not first:first=evidence.get('observed_at')
+  if count and count>0 and not first:first=acceptance_time
   latest=attempts[0] if attempts else {}
   rows.append({'class_id':key,'task':b['task'],'accepted_standard':count,'target':10,
     'remaining':max(0,10-count) if count is not None else None,'baseline_accepted':b['accepted'],
+    'historical_accepted_standard':historical.get(key,{}).get('accepted'),
     'first_accepted_observed_at':first,'state':state,'owner':artifact_updates.get(key,{}).get('owner',owner(key)),
     'artifact_update':artifact_updates.get(key),
     'canonical_validation_eligible':False if parked else None,
@@ -142,7 +154,8 @@ def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=N
     'next_action':'Resume only after the promised artifact arrives; continue independent classes.' if parked else w.get('next_action','Read exact native/demo failure and implement a bounded correction; do not repeat unchanged failed configurations.'),
     'configuration':w.get('configuration') or latest.get('configuration'), 'runtime':w.get('runtime') or latest.get('runtime'),
     'native':w.get('native') or latest.get('native'), 'demo':w.get('demo') or latest.get('demo'), 'replay':w.get('replay') or latest.get('replay'),
-    'acceptance':{'accepted_standard':count,'observed_at':evidence.get('observed_at'),'source':'locked allocation audit',
+    'acceptance':{'accepted_standard':count,'observed_at':acceptance_time,'source':'current eligibility projection over locked allocation audit' if eligibility is not None else 'locked allocation audit',
+      'change_impact':next((r for r in eligibility['classes'] if r['class_id']==key and r['split']=='eval_standard'),{}) if eligibility is not None else None,
       'worker_analysis':w.get('acceptance'),'required':'Exact physics replay + hard QA + compatible configuration + a distinct accepted training sibling'},
     'active_jobs':w.get('active_jobs',[]),'controller':w.get('controller',[]),
     'diagnosis':w.get('diagnosis',{'status':'reference_comparison_pending',
@@ -153,8 +166,9 @@ def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=N
  tasks=Counter()
  for c in current.values():tasks[c['task']]+=c['accepted']
  return {'schema':'isg-standard-recovery-v1','campaign_id':CAMPAIGN,'observed_at':now,
-  'acceptance_observed_at':evidence.get('observed_at'),'baseline_observed_at':baseline['observed_at'],
-  'baseline_zero_classes':len(initial),'zero_classes':sum(c['accepted']==0 for c in current.values()),
+  'acceptance_observed_at':acceptance_time,'baseline_observed_at':baseline['observed_at'],
+  'current_eligibility':{'ledger':eligibility.get('ledger'),'review_inventory_complete':eligibility.get('review_inventory_complete')} if eligibility is not None else None,
+  'baseline_zero_classes':baseline_size,'zero_classes':sum(c['accepted']==0 for c in current.values()),
   'covered_classes':sum(c['accepted']>0 for c in current.values()),'standard_classes':len(current),
   'zero_tasks':[t for t,n in tasks.items() if n==0],
   'newly_covered':[r['class_id'] for r in rows if r['accepted_standard'] and r['baseline_accepted']==0],
@@ -197,7 +211,7 @@ def main():
      if rec is not None:technical[row['key']].append(rec)
     except (OSError,ValueError,KeyError,TypeError):continue
    workers=[read(f,{}) for f in sorted(directory.glob('worker_*.json'))]
-   value=combine(baseline,evidence,technical,workers,read(destination,{}),received_artifacts(root))
+   value=combine(baseline,evidence,technical,workers,read(destination,{}),received_artifacts(root),read(root/'accounting/current_eligibility.json'))
    write_json_atomic(destination,value)
    target=directory/'REPORT.txt';temp=target.with_suffix('.tmp');temp.write_text(report(value));temp.replace(target)
    print(json.dumps({k:value[k] for k in ['observed_at','covered_classes','zero_classes','newly_covered','state_counts']}),flush=True)
