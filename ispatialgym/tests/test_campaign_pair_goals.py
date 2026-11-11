@@ -116,6 +116,37 @@ def test_verified_native_inside_release_is_preserved_but_settled_goal_remains_fi
     assert d.summary['campaign_goal_group']['release_geometry']['finger_clearance_m'] == .02
 
 
+@pytest.mark.parametrize("relation", ["ontop", "under"])
+def test_surface_release_geometry_uses_release_attitude_not_settled_tilt(relation):
+    import math
+    hull = th.tensor([[x, y, z] for x in (-.1, .1) for y in (-.1, .1) for z in (-.05, .05)])
+    partner_hull = th.tensor([[x, y, z] for x in (-.2, .2) for y in (-.2, .2) for z in (-.01, 0.)])
+    p = replace(plan(relation),
+                release=((0., 0., .753), (0., 0., 0., 1.)),
+                goal=((0., 0., .75), (math.sin(.15), 0., 0., math.cos(.15))))
+    s = SimpleNamespace(_campaign_pair_active=p, relation=relation,
+        sidecar=SimpleNamespace(stance=lambda name: None),
+        target_goal_quat=lambda pose, *args: I.G.t(pose[1]),
+        hull={'target': hull, 'partner': partner_hull},
+        world=SimpleNamespace(hull_at=lambda h, pose: I.G.local_points_world(h, pose)),
+        partner_aligned_to_target=lambda: False,
+        gen=lambda key, default=None: default,
+        release_surface=lambda xy, pose, top: {'z': .7},
+        ikc=SimpleNamespace(WITNESS_POS_TOL=.005, WITNESS_ANG_TOL=.05))
+    actual = I.IORSSmall.goal_pose(s, p.goal, p.partner)
+    assert th.allclose(actual[0], th.tensor(p.release[0]))
+    assert th.allclose(actual[1], th.tensor(p.release[1]))
+    # A release that violates native surface clearance is still rejected.
+    s._campaign_pair_active = replace(p, release=((0., 0., .78), p.release[1]))
+    with pytest.raises(Reject, match='release differs'):
+        I.IORSSmall.goal_pose(s, p.goal, p.partner)
+    # Without a campaign plan the existing caller-provided orientation remains.
+    s._campaign_pair_active = None
+    legacy = I.IORSSmall.goal_pose(s, p.goal, p.partner)
+    assert th.allclose(legacy[1], th.tensor(p.goal[1]))
+    assert float(legacy[0][2]) > p.release[0][2] + .02
+
+
 def test_large_goal_is_pinned_to_supported_cell_before_starts(monkeypatch):
     from dataclasses import replace
     from ispatialgym.sampling.v2.tasks.iors_large import IORSLarge

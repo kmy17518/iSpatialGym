@@ -5739,7 +5739,13 @@ class IORSSmall(SamplerV2):
             # physics and full path checks still judge the fixed release below.
             self._campaign_native_goal = True
             try:
-                native = IORSSmall.goal_pose(self, tuple(G.t(v) for v in campaign_plan.goal), tuple(G.t(v) for v in campaign_plan.partner))
+                # Surface placement is checked at the planned release attitude.
+                # The goal is the later physics-settled pose: feeding its tilt
+                # back into the release calculation changes the hull's lowest
+                # point and rejects a valid anchored release before any motion.
+                # Keep the independent settled-goal check in campaign_verify_pair.
+                reference = campaign_plan.release if self.relation in ("ontop", "under") else campaign_plan.goal
+                native = IORSSmall.goal_pose(self, tuple(G.t(v) for v in reference), tuple(G.t(v) for v in campaign_plan.partner))
             finally:
                 self._campaign_native_goal = False
             dp, dq = CPG.pose_error(native, campaign_plan.release)
