@@ -24,11 +24,11 @@ ROOT={*(f'disembedding_{i:02}' for i in [1,3,4,5,6]),
 COMPUTE={*(f'inter_object_relation_satisfaction-inside_large_scale_{i:02}' for i in [1,2,3]),
  *(f'inter_object_relation_satisfaction-ontop_large_scale_{i:02}' for i in [1,2,3]),
  'inter_object_relation_satisfaction-touching_large_scale_01',
- 'inter_object_relation_satisfaction-under_large_scale_02'}
+ 'inter_object_relation_satisfaction-under_large_scale_01','inter_object_relation_satisfaction-under_large_scale_02'}
 
 def owner(key):
  if key in PARKED_CLASSES:return 'user_artifacts; tracking /root'
- if key in {'disembedding_01','disembedding_05','inter_object_relation_satisfaction-touching_02'}:return '/root/dataset_contract'
+ if key in {'disembedding_01','disembedding_05','inter_object_relation_satisfaction-touching_02','inter_object_relation_satisfaction-inside_02'}:return '/root/dataset_contract'
  if key=='inter_object_relation_satisfaction-nextto_01':return '/root/templates_assets'
  if key in DATASET:return '/root/dataset_contract'
  if key in ROOT:return '/root'
@@ -110,6 +110,15 @@ def state_from_attempts(attempts):
  if attempts:return 'failed'
  return 'unattempted'
 
+def observation_time(value):
+ """Compare dated worker evidence independently of file enumeration order."""
+ try:
+  if isinstance(value,(int,float)):return float(value)
+  parsed=datetime.fromisoformat(str(value).replace('Z','+00:00'))
+  if parsed.tzinfo is None:parsed=parsed.replace(tzinfo=timezone.utc)
+  return parsed.timestamp()
+ except (TypeError,ValueError,OverflowError):return float('-inf')
+
 def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=None,eligibility=None):
  """Acceptance is authoritative; a worker cannot promote a demo to acceptance."""
  now=datetime.now(timezone.utc).isoformat();previous=previous or {};artifact_updates=artifact_updates or {}
@@ -129,7 +138,10 @@ def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=N
  for doc in workers:
   if doc.get('campaign_id')!=CAMPAIGN:continue
   rs=doc.get('classes',[]); rs=list(rs.values()) if isinstance(rs,dict) else rs
-  for row in rs:notes[row['class_id']]={**row,'worker_observed_at':doc.get('observed_at'),'responsible_worker':doc.get('owner')}
+  for row in rs:
+   key=row['class_id'];observed=row.get('observed_at',doc.get('observed_at'))
+   if key in notes and observation_time(observed)<observation_time(notes[key]['worker_observed_at']):continue
+   notes[key]={**row,'worker_observed_at':observed,'responsible_worker':doc.get('owner')}
  rows=[]
  for key,b in sorted(initial.items()):
   c=current.get(key);count=c.get('accepted') if c else None
@@ -145,7 +157,7 @@ def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=N
   rows.append({'class_id':key,'task':b['task'],'accepted_standard':count,'target':10,
     'remaining':max(0,10-count) if count is not None else None,'baseline_accepted':b['accepted'],
     'historical_accepted_standard':historical.get(key,{}).get('accepted'),
-    'first_accepted_observed_at':first,'state':state,'owner':artifact_updates.get(key,{}).get('owner',owner(key)),
+    'first_accepted_observed_at':first,'state':state,'owner':w.get('owner') or artifact_updates.get(key,{}).get('owner',owner(key)),
     'artifact_update':artifact_updates.get(key),
     'canonical_validation_eligible':False if parked else None,
     'engineering_status':'awaiting_promised_user_artifact' if parked else w.get('engineering_status','assigned_for_diagnosis'),

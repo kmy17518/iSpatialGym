@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 import json
 from pathlib import Path
 import tempfile
@@ -10,6 +11,26 @@ class RecoveryLedgerTests(unittest.TestCase):
   self.key='disembedding_07'
   self.baseline={'campaign_id':CAMPAIGN,'observed_at':'2026-11-11T03:55:50+00:00','classes':[{'class_id':self.key,'task':'disembedding','accepted':0}]}
   self.current={'campaign_id':CAMPAIGN,'observed_at':'2026-11-11T04:00:00+00:00','classes':[{'class_id':self.key,'task':'disembedding','split':'eval_standard','accepted':0}]}
+ def test_newest_worker_diagnosis_wins_in_either_file_order(self):
+  old={'campaign_id':CAMPAIGN,'observed_at':'2026-11-11T10:00:00Z','owner':'/root',
+   'classes':[{'class_id':self.key,'state':'running','blocker':'old','owner':'/root'}]}
+  new={'campaign_id':CAMPAIGN,'observed_at':'2026-11-11T11:00:00+00:00','owner':'/root/dataset_contract',
+   'classes':[{'class_id':self.key,'state':'failed','blocker':'actual replay failure','owner':'/root/dataset_contract'}]}
+  for docs in [[old,new],[new,old]]:
+   row=combine(self.baseline,self.current,{},docs)['classes'][0]
+   self.assertEqual(row['blocker'],'actual replay failure');self.assertEqual(row['state'],'failed')
+   self.assertEqual(row['owner'],'/root/dataset_contract');self.assertEqual(row['worker_observed_at'],new['observed_at'])
+   self.assertEqual(row['accepted_standard'],0)
+ def test_undated_worker_cannot_replace_dated_observation(self):
+  docs=[{'campaign_id':CAMPAIGN,'observed_at':'2026-11-11T11:00:00Z','classes':[{'class_id':self.key,'blocker':'fresh'}]},
+   {'campaign_id':CAMPAIGN,'classes':[{'class_id':self.key,'blocker':'undated'}]}]
+  self.assertEqual(combine(self.baseline,self.current,{},docs)['classes'][0]['blocker'],'fresh')
+ def test_delivered_heel_tight_has_compute_owner_and_requires_fresh_validation(self):
+  k='inter_object_relation_satisfaction-under_large_scale_01'
+  self.baseline['classes'][0]['class_id']=k;self.current['classes'][0]['class_id']=k
+  row=combine(self.baseline,self.current,{},[])['classes'][0]
+  self.assertEqual(row['owner'],'/root/compute');self.assertEqual(row['state'],'unattempted')
+  self.assertEqual(row['accepted_standard'],0)
  def test_worker_pass_cannot_invent_acceptance(self):
   doc={'campaign_id':CAMPAIGN,'classes':[{'class_id':self.key,'state':'accepted','acceptance':{'accepted_standard':10}}]}
   d=combine(self.baseline,self.current,{},[doc]);self.assertEqual(d['newly_covered'],[])
@@ -35,6 +56,7 @@ class RecoveryLedgerTests(unittest.TestCase):
  def test_foreign_worker_evidence_is_ignored(self):
   d=combine(self.baseline,self.current,{},[{'campaign_id':'older','classes':[{'class_id':self.key,'blocker':'wrong'}]}])
   self.assertNotEqual(d['classes'][0]['blocker'],'wrong')
+ @patch('scripts.campaign_20261110.standard_recovery.PARKED_CLASSES', {'inter_object_relation_satisfaction-under_large_scale_01'})
  def test_promised_artifacts_remain_parked(self):
   k='inter_object_relation_satisfaction-under_large_scale_01'
   self.baseline['classes'][0]['class_id']=k;self.current['classes'][0]['class_id']=k
@@ -55,11 +77,13 @@ class RecoveryLedgerTests(unittest.TestCase):
   self.assertEqual(d['classes'][0]['owner'],'/root/templates_assets')
   self.assertEqual(d['classes'][0]['accepted_standard'],0)
   self.assertEqual(d['newly_covered'],[])
+ @patch('scripts.campaign_20261110.standard_recovery.PARKED_CLASSES', {'inter_object_relation_satisfaction-under_large_scale_01'})
  def test_missing_artifact_update_does_not_clear_explicit_hold(self):
   k='inter_object_relation_satisfaction-under_large_scale_01'
   self.baseline['classes'][0]['class_id']=k;self.current['classes'][0]['class_id']=k
   d=combine(self.baseline,self.current,{},[],artifact_updates={'inter_object_relation_satisfaction-under_large_scale_03':{}})
   self.assertEqual(d['classes'][0]['state'],'parked')
+ @patch('scripts.campaign_20261110.standard_recovery.PARKED_CLASSES', {'inter_object_relation_satisfaction-under_large_scale_01'})
  def test_new_hold_preserves_historical_count_but_excludes_validation(self):
   k='inter_object_relation_satisfaction-under_large_scale_01'
   self.baseline['classes'][0]['class_id']=k;self.current['classes'][0].update(class_id=k,accepted=1)
