@@ -36,10 +36,17 @@ class RecoveryLedgerTests(unittest.TestCase):
   d=combine(self.baseline,self.current,{},[{'campaign_id':'older','classes':[{'class_id':self.key,'blocker':'wrong'}]}])
   self.assertNotEqual(d['classes'][0]['blocker'],'wrong')
  def test_promised_artifacts_remain_parked(self):
-  k='inter_object_relation_satisfaction-touching_03'
+  k='inter_object_relation_satisfaction-under_large_scale_01'
   self.baseline['classes'][0]['class_id']=k;self.current['classes'][0]['class_id']=k
   d=combine(self.baseline,self.current,{},[{'campaign_id':CAMPAIGN,'classes':[{'class_id':k,'state':'running'}]}])
   self.assertEqual(d['classes'][0]['state'],'parked')
+ def test_owner_released_classes_have_engineering_owners_without_automatic_acceptance(self):
+  for k,owner in [('touching_03','/root'),('under_large_scale_02','/root/compute'),('under_large_scale_03','/root/templates_assets'),('nextto_04','/root/templates_assets')]:
+   k='inter_object_relation_satisfaction-'+k
+   self.baseline['classes'][0]['class_id']=k;self.current['classes'][0]['class_id']=k
+   row=combine(self.baseline,self.current,{},[])['classes'][0]
+   self.assertEqual(row['state'],'unattempted');self.assertEqual(row['owner'],owner)
+   self.assertEqual(row['accepted_standard'],0)
  def test_received_artifact_lifts_only_its_park_without_inventing_acceptance(self):
   k='inter_object_relation_satisfaction-under_large_scale_03'
   self.baseline['classes'][0]['class_id']=k;self.current['classes'][0]['class_id']=k
@@ -54,7 +61,7 @@ class RecoveryLedgerTests(unittest.TestCase):
   d=combine(self.baseline,self.current,{},[],artifact_updates={'inter_object_relation_satisfaction-under_large_scale_03':{}})
   self.assertEqual(d['classes'][0]['state'],'parked')
  def test_new_hold_preserves_historical_count_but_excludes_validation(self):
-  k='inter_object_relation_satisfaction-nextto_04'
+  k='inter_object_relation_satisfaction-under_large_scale_01'
   self.baseline['classes'][0]['class_id']=k;self.current['classes'][0].update(class_id=k,accepted=1)
   row=combine(self.baseline,self.current,{},[])['classes'][0]
   self.assertEqual(row['accepted_standard'],1)

@@ -8,11 +8,12 @@ import json
 from pathlib import Path
 import time
 
-from scripts.campaign_20261110.contracts import PENDING_ALIASES, digest, require, write_json_atomic
+from scripts.campaign_20261110.contracts import digest, require, write_json_atomic
 from scripts.campaign_20261110.dashboard_evidence import standard_catalog
 from scripts.campaign_20261110.export_release import ArtifactAudit, normalize_record, snapshot_allocations, template_from
 from scripts.campaign_20261110.reservation_policy import active_policy
 from scripts.campaign_20261110.standard_recovery import owner
+from scripts.campaign_20261110.production_gate import PARKED_CLASSES
 
 CAMPAIGN='campaign_20261110'
 
@@ -33,8 +34,8 @@ def audit(root, catalog, auditor, started_at):
         row=dict(class_id=cls,task=task,validated=False,owner=owner(cls),
                  historical_accepted_standard=len(by_class[cls]),status='awaiting_complete_proof',
                  evidence=[],errors=[],next_action='Diagnose first failing stage and validate an exact configuration with its own replay and distinct sibling.')
-        if cls in PENDING_ALIASES:
-            row.update(status='parked_owner_artifact',next_action='Await owner completion confirmation and replacement oracle/template; retain historical outcomes separately.')
+        if cls in PARKED_CLASSES:
+            row.update(status='parked_owner_artifact',next_action='Await the under_large_01 replacement oracle/template; retain historical outcomes separately.')
             rows.append(row);continue
         for accepted in reversed(by_class[cls]):
             try:
@@ -76,7 +77,7 @@ def audit(root, catalog, auditor, started_at):
     return dict(campaign_id=CAMPAIGN,observed_at=datetime.now(timezone.utc).isoformat(),
         schema='isg-canonical-template-validation-v1',total=100,validated=sum(r['validated']for r in rows),
         state_counts=dict(Counter(r['status']for r in rows)),classes=rows,sources=sources,
-        semantics='One exact configuration per canonical class verified from original accepted artifacts, demo and native replay evidence; noncamera classes include accepted training siblings. Historical accepted counts are separate. Five current owner-artifact holds are excluded.')
+        semantics='One exact configuration per canonical class verified from original accepted artifacts, demo and native replay evidence; noncamera classes include accepted training siblings. Historical accepted counts are separate. Only under_large_01 remains held for an owner artifact; availability never substitutes for the exact validation chain.')
 
 
 def main():

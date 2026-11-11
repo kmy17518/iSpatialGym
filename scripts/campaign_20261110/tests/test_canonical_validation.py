@@ -33,11 +33,17 @@ class CanonicalValidationTests(unittest.TestCase):
         return dict(class_id=cls,task=task,instance_id=iid,split=split,group_id=group,validation_key={},contract={'class_id':cls})
 
     def test_historical_hold_is_never_counted_as_canonical_validation(self):
-        cls='inter_object_relation_satisfaction-nextto_04';task='inter_object_relation_satisfaction-nextto_small_scale'
+        cls='inter_object_relation_satisfaction-under_large_scale_01';task='inter_object_relation_satisfaction-under_large_scale'
         data=self.observe(cls,task,[self.record(cls,task,'e')])
         row=next(r for r in data['classes'] if r['class_id']==cls)
         self.assertEqual(row['historical_accepted_standard'],1)
         self.assertFalse(row['validated']);self.assertEqual(row['status'],'parked_owner_artifact')
+
+    def test_released_artifact_requires_chain_instead_of_remaining_parked(self):
+        cls='inter_object_relation_satisfaction-nextto_04';task='inter_object_relation_satisfaction-nextto_small_scale'
+        row=next(r for r in self.observe(cls,task,[self.record(cls,task,'e')],{'accepted':{'e':'eval_standard'}})['classes'] if r['class_id']==cls)
+        self.assertEqual(row['status'],'awaiting_complete_proof')
+        self.assertFalse(row['validated']);self.assertIn('lacks2–3',row['errors'][0]['reason'])
 
     def test_accepted_count_without_sibling_cannot_validate(self):
         cls='disembedding_01';task='disembedding';m=self.record(cls,task,'e')

@@ -31,7 +31,7 @@ assert.equal(training.historyRates,null,'Raw historical training growth never be
 const eligibleRates=await evaluate(`rateRows({...current,training_eligibility:{observed_at:'2026-11-11T01:00:00Z',eligible_accepted:120,history:[{observed_at:'2026-11-11T00:00:00Z',eligible_counts:{train:100}}]}}).rates.train`);
 assert.equal(eligibleRates,20,'Eligible throughput uses only audited eligibility history');
 const canonical=await evaluate(`({validated:current.canonical_validation.validated,total:current.canonical_validation.total,parked:current.canonical_validation.classes.filter(x=>x.status==='parked_owner_artifact').length,text:document.querySelector('#recovery-summary').innerText})`);
-assert.equal(canonical.total,100);assert.equal(canonical.parked,5);assert.ok(canonical.text.includes(String(canonical.validated)));
+assert.equal(canonical.total,100);assert.equal(canonical.parked,1);assert.ok(canonical.text.includes(String(canonical.validated)));
 
 assert.ok(training.text.includes('Flagged / excluded')&&training.text.includes('Compliant replacements'));
 const diversity=await evaluate(`({text:document.querySelector('#training-coverage').innerText,cards:[...document.querySelectorAll('#training-coverage .metric')].map(x=>x.innerText),missing:trainingCoverageHTML(null),escaped:trainingCoverageHTML({eligible_instances:0,missing_evidence:{'<script>':1}})})`);

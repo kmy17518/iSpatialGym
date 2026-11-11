@@ -9,6 +9,7 @@ import time
 
 from scripts.campaign_20261110.contracts import PENDING_ALIASES, file_digest, write_json_atomic
 from scripts.campaign_20261110.controller_families import allocations
+from scripts.campaign_20261110.production_gate import PARKED_CLASSES
 from scripts.campaign_20261110.goal_groups import read_env
 from scripts.campaign_20261110.replay_gate_quality import assess
 
@@ -19,13 +20,14 @@ DATASET={'configuration_matching-articulation_open_small_scale_01','configuratio
 ROOT={*(f'disembedding_{i:02}' for i in [1,3,4,5,6]),
  *(f'inter_object_relation_satisfaction-inside_{i:02}' for i in [2,3,4]),
  *(f'inter_object_relation_satisfaction-nextto_{i:02}' for i in [1,2]),
- *(f'inter_object_relation_satisfaction-touching_{i:02}' for i in [1,2,4])}
+ *(f'inter_object_relation_satisfaction-touching_{i:02}' for i in [1,2,3,4])}
 COMPUTE={*(f'inter_object_relation_satisfaction-inside_large_scale_{i:02}' for i in [1,2,3]),
  *(f'inter_object_relation_satisfaction-ontop_large_scale_{i:02}' for i in [1,2,3]),
- 'inter_object_relation_satisfaction-touching_large_scale_01'}
+ 'inter_object_relation_satisfaction-touching_large_scale_01',
+ 'inter_object_relation_satisfaction-under_large_scale_02'}
 
 def owner(key):
- if key in PENDING_ALIASES:return 'user_artifacts; tracking /root'
+ if key in PARKED_CLASSES:return 'user_artifacts; tracking /root'
  if key in DATASET:return '/root/dataset_contract'
  if key in ROOT:return '/root'
  if key in COMPUTE:return '/root/compute'
@@ -121,7 +123,7 @@ def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=N
  for key,b in sorted(initial.items()):
   c=current.get(key);count=c.get('accepted') if c else None
   attempts=technical.get(key,[]);w=notes.get(key,{})
-  parked=key in PENDING_ALIASES and key not in artifact_updates
+  parked=key in PARKED_CLASSES
   state=w.get('state',state_from_attempts(attempts))
   if parked:state='parked'
   elif count and count>0:state='accepted'

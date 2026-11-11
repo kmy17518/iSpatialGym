@@ -91,7 +91,7 @@ def checklist(code_root: Path):
         ('G12','Scheduling distribution','Traversable-area/usable-edge or compartment weights, model diversity and soft train buckets drive refill; strict eval buckets preserved.', ['controller_groups.py','training_candidates.py']),
         ('G13','Failures and denominators','Retain failed sampling start/goal states and demo failures with separate reasons; include failed attempts/startup in known GPU cost; no inferred missing denominator.', ['goal_group_yield.py','../ispatialgym/sampling/campaign_runtime.py']),
         ('G14','All-task release coverage','Bounded real production-path canaries cover all materially distinct families and actual scales/perturbations, exported provenance and strict acceptance. Mocks or one lighting canary cannot release production.', ['production_gate.py','training_eligibility.py']),
-        ('G15','Priority and ownership','Validate canonical100 standard templates first; five owner-artifact classes remain parked. Each unvalidated template has responsible engineer and discriminating next experiment.', ['standard_recovery.py']),
+        ('G15','Priority and ownership','Prioritize canonical100 standard template validation; only under_large_01 remains parked. Each unvalidated template has a responsible engineer and discriminating next experiment. Training may start after the complete training pipeline and exact training template validate, without an all100 eval completion barrier.', ['standard_recovery.py']),
     ]
     rows=[]
     for key,scope,rule,files in common:

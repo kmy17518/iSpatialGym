@@ -94,7 +94,7 @@ def materialize(root, release, code, output, classes):
         probe=json.loads(Path(req['probe']['path']).read_text())
         profile=profiles['profiles'][probe['profile_id']]
         for cls in sorted(selected):
-            baseline=load_contract(source[cls]['configuration'])
+            baseline=load_contract({**source[cls]['configuration'], 'fingerprint':source[cls]['validation_key']['template_sha256']})
             plan=scale_plan(baseline,req,probe,profile,jobs[req['entry_id']])
             source_dir=Path(baseline.scene_setup['source_template']);meta=json.loads((source_dir/'template_meta.json').read_text())
             # Freeze the exact source declaration, including role order. Fresh
