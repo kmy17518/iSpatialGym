@@ -6222,6 +6222,26 @@ Kit counts `round_symmetry.COUNTS`; `meta.success_yaw_free` per demo.
   - The lying briefcase always landed flat (tilt <= 0.1 deg) and never toppled. 0 ok in 4 lying demos, so **no default is flipped**; the
     lead cancelled the arms. The proposed fixes wait for the owner (DECISIONS 2026-11-10 i7-measure).
 
+
+**Round 2 (2026-11-10, lead #90-#92e).**
+- **Push nudge switches.** The QA pause rule counts base motion; the R1Pro's 6 virtual base joints are in `get_joint_positions`. Every pause
+  after a push nudge was the base not moving while the tracker commanded about 6 mm/s, the base's breakaway: in 529 recorded samples a
+  command below 0.012 m/s never moved it, and 0.03 m/s or more always did. Two switches fix it:
+  - `ISPATIALGYM_PUSH_NUDGE_STALL_STOP`: a plain push nudge stops when the base stalls.
+  - `ISPATIALGYM_PUSH_NUDGE_MIN_SPEED`: the nudge commands at least 0.025 m/s.
+  Both are default ON (829d0050 / 98ef3819). The evidence is a recollect of r2_ul02_stand 360102, the same instance on the same snapshot:
+  each switch acted, with the same verdict and 16-43 s less per demo. In the A/Bs on under_large_01, under_large_03 and nextto_04 no demo had a
+  nudge.
+- **Push symmetry.** The strokes aim at the root line, which is within 4-6 mm of the mass-centre plane. Over 47 lying strokes, each 5 cm
+  pushed turned the briefcase by 11.2 deg minus 1.95 deg per cm of contact offset: a constant bias, not a centring error.
+- **Lying, in order:**
+  - Singularity screen: dropped. Its lowering check rejected every drop it saw; only the up-retreat check is kept (1993f666).
+  - Partial-tilt release: `ISPATIALGYM_BRIEFCASE_LYING_TILT_DEG`, f949556b.
+  - Final yaw stroke: failed at the reach edge.
+  - Integral yaw re-aim (491fc9b9): r4_lying_a ended every push within 1.6 deg; 9 attempts / 5 written / 3 ok, about 1.69 GPU-h per ok.
+- **Verdict.** The standing push with the guide wall (ug2_ul02_on: 22 / 8 / 6, 0.89 GPU-h per ok) beats lying, so A2 and A4 stay off. The
+  owner decides.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
