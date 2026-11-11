@@ -33,7 +33,7 @@ class ClusterFirstTests(unittest.TestCase):
         self.assertFalse(self.assess()['allow_vast'])
     def test_gpu_inventory_requires_cpu_memory_model_state_and_exclusions(self):
         for key,value in [('CPUAlloc','70'),('AllocMem','490000'),('NodeName','svl9'),
-                          ('State','IDLE+DRAIN'),('CfgTRES','gres/gpu=8,gres/gpu:2080ti=8')]:
+                          ('State','IDLE+DRAIN'),('State','MIXED+PLANNED'),('CfgTRES','gres/gpu=8,gres/gpu:2080ti=8')]:
             with self.subTest(key=key):
                 n=self.observation['nodes'][0];old=n[key];n[key]=value
                 self.assertTrue(self.assess()['allow_vast']);n[key]=old

@@ -72,7 +72,7 @@ def slots(node, partition, demand):
     if partition not in node.get('Partitions','').split(',') or node.get('NodeName') in demand['excluded_nodes']:
         return 0
     state=node.get('State','')
-    if not any(s in state for s in ('IDLE','MIXED','ALLOCATED')) or any(s in state for s in ('DRAIN','DOWN','FAIL','POWER','RESERVED','MAINT','NOT_RESPOND')):
+    if not any(s in state for s in ('IDLE','MIXED','ALLOCATED')) or any(s in state for s in ('DRAIN','DOWN','FAIL','POWER','RESERVED','PLANNED','MAINT','NOT_RESPOND')):
         return 0
     cfg=dict(x.split('=',1)for x in node.get('CfgTRES','').split(',')if '='in x)
     allocated=dict(x.split('=',1)for x in node.get('AllocTRES','').split(',')if '='in x)
