@@ -121,7 +121,8 @@ def publish(root):
     for filename in ('prepared_category_jar_upper_r1.json','prepared_scoped_refill_r1.json',
                      'prepared_camera_hamper_recovery_r1.json','prepared_scaling_model_admission_r1.json',
                      'prepared_category_jar_brace_r1.json','prepared_scaling_native_regions_r1.json',
-                     'prepared_classroom_native_regions_r1.json','prepared_under_model_group_r2.json'):
+                     'prepared_classroom_native_regions_r1.json','prepared_under_model_group_r2.json',
+                     'prepared_axial_passed_groups_r1.json','prepared_under_model_stance86_r1.json'):
         receipt=root/'infra/heldout_recovery'/filename
         if receipt.exists():
             directory=pathlib.Path(load(receipt)['controller'])
