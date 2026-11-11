@@ -17,7 +17,9 @@ class MigrationTests(unittest.TestCase):
         D.shared_json(self.root/'manifests/family_index_reservations.json', {'reservations':{
             'old':{'start':50000000,'n':3},'new':{'start':50000100,'n':3}}})
         self.group = self.root/'groups/old'; self.group.mkdir(parents=True)
-        (self.group/'campaign_config.json').write_text('{"validation_key": {"exact": "same"}}\n')
+        D.shared_json(self.group/'campaign_config.json', {'validation_key': {'exact': 'same'},
+            'template': {'split': 'eval_standard', 'task': 'object_scaling',
+                         'class_id': 'object_scaling-apple'}})
         D.shared_json(self.group/'empty_eval_index.json', {'schema':'isg-instance-index-v1','n':0,'instances':[]})
         D.shared_json(self.group/'goal_plan.json', {'schema':'isg-pair-goal-plan-v1','group_id':'old',
             'max_members':3,'goal_pose':{'position':[1,2,3]},'created_at':12345,'budget_seconds':900})

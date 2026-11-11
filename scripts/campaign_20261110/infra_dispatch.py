@@ -294,7 +294,7 @@ def activate_vast(root, payload, row, timeout=25):
             time.sleep(.25)
 
 
-def execute(root, path, backend):
+def execute(root, path, backend, *, cluster_observation=None):
     root, path = Path(root).resolve(), Path(path)
     payload = json.loads(path.read_text())
     from scripts.campaign_20261110.production_gate import require_dispatch
@@ -311,10 +311,21 @@ def execute(root, path, backend):
             shared_json(receipt_path, {**prior, 'status': 'submitted', 'allocation': row, 'reconciled_at': time.time()})
             return
         require(prior.get('status') not in ('submitting', 'blocked', 'submitted'), 'prior outcome needs reconciliation')
+        cluster_first = None
+        if backend.startswith('vast_'):
+            from scripts.campaign_20261110.dispatch_cluster_first import check
+            cluster_first = check(root, payload, cluster_observation)
+            shared_json(root / 'dispatch/cluster_first' / (payload['token'] + '.json'), cluster_first)
+            if not cluster_first['allow_vast']:
+                # Leave the immutable intent unclaimed for either authorized
+                # cluster account. This is not a submission or a failed job.
+                return
         command, environment = routed_command(root, payload, backend)
         receipt = {'schema': 'isg-dispatch-receipt-v1', 'token': payload['token'], 'status': 'submitting',
                    'backend': backend, 'started_at': time.time(), 'command_sha256': payload['command_sha256'],
                    'routed_command': command, 'identity': payload['identity']}
+        if cluster_first is not None:
+            receipt['cluster_first'] = cluster_first
         if prior:
             archived = receipt_path.with_name(receipt_path.stem + '.attempt_' + uuid.uuid4().hex[:12] + '.receipt.json')
             shared_json(archived, prior)
@@ -347,7 +358,12 @@ def main():
     p.add_argument('--once', action='store_true')
     p.add_argument('--interval', type=float, default=20)
     a = p.parse_args(); os.umask(0o007)
+    def observed(phase, **fields):
+        shared_json(a.root / 'dispatch/backend_observations' / (a.backend + '.json'),
+            {'observed_at': time.time(), 'backend': a.backend, 'pid': os.getpid(),
+             'phase': phase, 'helper_sha256': file_digest(__file__), **fields})
     while True:
+        observed('polling')
         publish_owned_outputs(a.root)
         rows = []
         if not a.backend.startswith('vast_'):
@@ -366,10 +382,17 @@ def main():
                                 and prior.get('backend') == a.backend and a.backend.startswith('vast_'))
             if a.backend in payload['backends'] and (not receipt.exists() or activation_retry):
                 candidates.append((payload['priority'], path.name, path))
+        cluster_observation = None
+        if candidates and allowance and a.backend.startswith('vast_'):
+            from scripts.campaign_20261110.dispatch_cluster_first import probe
+            cluster_observation = probe()
         for _, _, path in sorted(candidates)[:allowance]:
-            try: execute(a.root, path, a.backend)
+            try:
+                observed('submitting', intent=path.stem)
+                execute(a.root, path, a.backend, cluster_observation=cluster_observation)
             except FileExistsError: pass
             except Exception as exc: print(json.dumps({'intent': str(path), 'error': str(exc)}), flush=True)
+            finally: observed('polling')
         if a.once: break
         time.sleep(a.interval)
 
