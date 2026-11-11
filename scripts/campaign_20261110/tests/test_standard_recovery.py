@@ -14,6 +14,15 @@ class RecoveryLedgerTests(unittest.TestCase):
   doc={'campaign_id':CAMPAIGN,'classes':[{'class_id':self.key,'state':'accepted','acceptance':{'accepted_standard':10}}]}
   d=combine(self.baseline,self.current,{},[doc]);self.assertEqual(d['newly_covered'],[])
   self.assertEqual(d['classes'][0]['accepted_standard'],0);self.assertEqual(d['classes'][0]['state'],'failed')
+ def test_reference_diagnosis_is_preserved_without_claiming_acceptance(self):
+  diagnosis={'reference':{'demo_passed':True,'sha256':'verified-reference'},
+    'first_failure_stage':'acceptance/orchestration','hypothesis':'missing distinct sibling',
+    'next_discriminating_experiment':'Run own strict sibling gate.'}
+  doc={'campaign_id':CAMPAIGN,'classes':[{'class_id':self.key,'state':'awaiting_acceptance','diagnosis':diagnosis}]}
+  d=combine(self.baseline,self.current,{},[doc]);row=d['classes'][0]
+  self.assertEqual(row['diagnosis'],diagnosis)
+  self.assertEqual(row['accepted_standard'],0);self.assertEqual(d['newly_covered'],[])
+  self.assertEqual(row['state'],'awaiting_acceptance')
  def test_first_coverage_requires_authoritative_count_and_retains_time(self):
   self.current['classes'][0]['accepted']=1
   d=combine(self.baseline,self.current,{},[]);self.assertEqual(d['newly_covered'],[self.key])

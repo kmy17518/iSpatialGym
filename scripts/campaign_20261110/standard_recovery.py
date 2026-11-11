@@ -139,6 +139,8 @@ def combine(baseline,evidence,technical,workers,previous=None,artifact_updates=N
     'acceptance':{'accepted_standard':count,'observed_at':evidence.get('observed_at'),'source':'locked allocation audit',
       'worker_analysis':w.get('acceptance'),'required':'Exact physics replay + hard QA + compatible configuration + a distinct accepted training sibling'},
     'active_jobs':w.get('active_jobs',[]),'controller':w.get('controller',[]),
+    'diagnosis':w.get('diagnosis',{'status':'reference_comparison_pending',
+      'next_discriminating_experiment':'Verify the indexed successful configuration and first failing campaign stage before another change.'}),
     'last_progress_at':w.get('last_progress_at') or latest.get('last_progress_at'),
     'worker_observed_at':w.get('worker_observed_at'),'technical_attempts':attempts,
     'evidence':w.get('evidence',(c or {}).get('reason_evidence',[]))})
@@ -168,6 +170,7 @@ def report(data):
    'Active jobs/controller: '+json.dumps([r['active_jobs'],r['controller']]),
    'Exact configuration/runtime: '+json.dumps([r['configuration'],r['runtime']]),
    'Native/demo/replay/acceptance: '+json.dumps([r['native'],r['demo'],r['replay'],r['acceptance']]),'']
+  lines += ['Reference comparison / causal diagnosis: '+json.dumps(r.get('diagnosis',{})), '']
  return '\n'.join(lines)+'\n'
 
 def main():
