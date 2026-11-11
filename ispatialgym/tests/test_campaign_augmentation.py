@@ -116,9 +116,10 @@ def test_skybox_properties_open_their_own_usd_edit_context():
 
 def test_scene_removals_protect_bound_and_structural_objects():
     stable = {"objects_info": {"init_info": {name: {"args": {"category": cat, "in_rooms": ["room"]}}
-               for name, cat in [("table", "coffee_table"), ("wall", "walls"), ("clutter", "chair")]}}}
+               for name, cat in [("table", "coffee_table"), ("wall", "walls"),
+                                 ("door", "door"), ("window", "fixed_window"), ("clutter", "chair")]}}}
     assert aug.checked_removals(stable, ["clutter"], ["table"]) == ["clutter"]
-    for name in ["table", "wall", "unknown"]:
+    for name in ["table", "wall", "door", "window", "unknown"]:
         with pytest.raises(ContractError):
             aug.checked_removals(stable, [name], ["table"])
     for seed in range(30):

@@ -12,9 +12,9 @@ import math
 import random
 
 from scripts.campaign_20261110.contracts import canonical_json, require
+from scripts.campaign_20261110.training_scene_policy import STRUCTURAL
 
 
-STRUCTURAL = frozenset(("walls", "floors", "ceilings", "roof", "baseboard", "downlight", "room_light", "electric_switch"))
 LIGHT_SCHEMA = "isg-lighting-v1"
 
 
@@ -66,6 +66,7 @@ def checked_removals(stable, names, protected):
         require(name in init, f"unknown campaign scene removal: {name}")
         require(name not in protected, f"cannot park task-relevant object: {name}")
         require(init[name]["args"].get("category") not in STRUCTURAL, f"cannot park structural object: {name}")
+        require(not init[name]['args'].get('type', '').endswith('Robot'), f"cannot park a robot: {name}")
     return sorted(set(names))
 
 

@@ -201,6 +201,8 @@ def check_environment(root, environment, *, kind='collection', start=None, count
                     return {**result, 'reason': 'evaluation quota exhausted; cannot produce training by relabeling'}
             return {**result, 'allowed': True, 'category': split, 'reason': 'evaluation purpose; acceptance quota remains mandatory'}
         if split != 'train': raise ValueError('unknown campaign split')
+        from scripts.campaign_20261110.training_scene_policy import validate_removal_scope
+        result['scene_removal_scope'] = validate_removal_scope(root, config)
         result.update(category='standalone_training', reason='standalone training production blocked')
         if policy is None: return result
         # Reopening is intentionally unsupported until the required complete
