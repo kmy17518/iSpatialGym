@@ -451,6 +451,14 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["schema"] = ATTACHMENT_SCHEMA
         plan.pop("magnitude_range")
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
+        if template.class_id in {'configuration_matching-attachment_03', 'configuration_matching-attachment_04'}:
+            proof = anchor['sources']['summary']
+            require(file_digest(proof['path']) == proof['sha256'], 'attachment source summary changed after audit')
+            stance = anchor['summary'].get('stances', {}).get('manipulation')
+            require(isinstance(stance, dict), 'attachment source lacks recorded manipulation stance')
+            plan['anchor_manipulation_stance'] = {
+                **{k: stance[k] for k in ('base_pose2d', 'focus', 'translate', 'tilt')},
+                'source_summary_sha256': proof['sha256']}
         validate_attachment_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room], activated_at=now, now=now)
     elif joint_task:
         targets = [ref for ref in template.objects if ref.role == "target"]
@@ -519,6 +527,14 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                 'tilt_deg': anchor['summary']['release_tilt_deg'],
                 'level_quat': anchor['summary']['release_level_quat'],
                 'source_summary_sha256': proof['sha256']}
+        from ispatialgym.sampling.campaign_release_clearance import settings as release_clearance
+        if release_clearance(template) is not None:
+            proof = anchor['sources']['summary']
+            require(file_digest(proof['path']) == proof['sha256'], 'clearance source summary changed after audit')
+            require(isinstance(anchor['summary'].get('raised_release'), dict),
+                    'clearance source lacks measured native raised release')
+            plan['release_policy'] = 'native_ontop_clearance'
+            plan['clearance_recovery_class'] = template.class_id
         if relation == "inside" and scale == "small":
             plan["release_policy"] = "native_grasp_height"
         if relation == 'nextto' and scale == 'small' and template.class_id in {

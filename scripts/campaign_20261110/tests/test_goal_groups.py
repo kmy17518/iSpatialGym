@@ -594,3 +594,56 @@ def test_nextto_marker_group_preserves_native_raised_release_and_source_view(tmp
     summary_path.write_text('changed')
     with __import__('pytest').raises(c.ContractError,match='summary changed'):
         g.prepare_group(output=tmp_path/'groups/changed',**kwargs)
+
+
+@__import__('pytest').mark.parametrize('suffix', ['03', '04'])
+def test_attachment_refill_preserves_checked_source_stance(tmp_path, suffix):
+    import pytest
+    job, ledger, _, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    partner = c.ObjectRef('partner.n.01_1', 'partner', 'bottle', 'p', c.digest('partner'), ready=True, readiness_source='fixture')
+    template = replace(template, task='configuration_matching-attachment',
+        class_id='configuration_matching-attachment_'+suffix, objects=template.objects+(partner,))
+    anchor['tro']['ispatialgym']['object_bindings'][partner.instance] = {'category':partner.category,'model':partner.model}
+    anchor['planned_start_poses'] = {partner.instance:[[1,2,.8],[0,0,0,1]]}
+    stance = {'base_pose2d':[1,1,0], 'focus':[1,2,.8], 'translate':.25,'tilt':-.53}
+    anchor['summary']['stances'] = {'manipulation':stance}
+    path=Path(anchor['sources']['summary']['path']);c.write_json_atomic(path,anchor['summary'])
+    anchor['sources']['summary']['sha256']=c.file_digest(path)
+    kwargs=dict(anchor=anchor,template=template,campaign_id='new',group_id='attachment',
+        code_sha256=c.file_digest(code/'.snapshot_commit'),physics_sha256=c.digest('physics'),
+        data_sha256=c.digest('maps'),magnitude_range=[0,1],reuse_anchor_goal=True)
+    output=tmp_path/'groups/attachment';g.prepare_group(output=output,**kwargs)
+    plan=g.read_json(output/'goal_plan.json')
+    assert plan['anchor_manipulation_stance']==dict(stance,source_summary_sha256=c.file_digest(path))
+    assert plan['source_instance_is_member'] is False
+    path.write_text('changed')
+    with pytest.raises(c.ContractError,match='source summary changed'):
+        g.prepare_group(output=tmp_path/'groups/changed',**kwargs)
+
+
+def test_ontop_clearance_refill_preserves_native_policy(tmp_path):
+    import pytest
+    job, ledger, _, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    partner = c.ObjectRef('partner.n.01_1', 'partner', 'plate', 'p', c.digest('partner'), ready=True, readiness_source='fixture')
+    template = replace(template, task='inter_object_relation_satisfaction-ontop_small_scale',
+        class_id='inter_object_relation_satisfaction-ontop_small_scale_01', objects=template.objects+(partner,),
+        scene_setup={**template.scene_setup,'recovery_options':{'native_ontop_release_clearance':True}})
+    anchor['template_meta']['bindings']=[{'name':'apple.n.01_1','role':'target'},{'name':partner.instance,'role':'partner'}]
+    anchor['tro']['ispatialgym']['object_bindings']['apple.n.01_1']['scene_object_name']='target'
+    anchor['tro']['ispatialgym']['object_bindings'][partner.instance]={'category':partner.category,'model':partner.model}
+    anchor['planned_start_poses']={partner.instance:[[1,2,.8],[0,0,0,1]]}
+    settled=[[1,2,.86],[0,0,0,1]]
+    anchor['summary'].update(goal_check={'settled_poses':{'target':settled}},raised_release={'raise_m':.015})
+    path=Path(anchor['sources']['summary']['path']);c.write_json_atomic(path,anchor['summary']);anchor['sources']['summary']['sha256']=c.file_digest(path)
+    kwargs=dict(anchor=anchor,template=template,campaign_id='new',group_id='ontop',
+        code_sha256=c.file_digest(code/'.snapshot_commit'),physics_sha256=c.digest('physics'),
+        data_sha256=c.digest('maps'),magnitude_range=[0,1],reuse_anchor_goal=True)
+    output=tmp_path/'groups/ontop';g.prepare_group(output=output,**kwargs)
+    plan=g.read_json(output/'goal_plan.json')
+    assert plan['release_policy']=='native_ontop_clearance'
+    assert plan['goal_pose']=={'position':settled[0],'orientation':settled[1]}
+    del anchor['summary']['raised_release'];c.write_json_atomic(path,anchor['summary']);anchor['sources']['summary']['sha256']=c.file_digest(path)
+    with pytest.raises(c.ContractError,match='measured native raised release'):
+        g.prepare_group(output=tmp_path/'groups/missing',**kwargs)
