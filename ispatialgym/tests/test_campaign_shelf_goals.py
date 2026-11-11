@@ -78,6 +78,10 @@ def test_refill_preserves_fixed_partner_depth_after_target_start_draw():
     assert context['source_target_start'] == parent['source_target_start']
     assert context['source_target_start']['position'] != a['planned_start_poses']['target'][0]
     assert context['inherited_group_plan_sha256'] == 'c'*64
+    # Actual native summaries serialize the parsed pose as a two-element list.
+    parent['source_target_start'] = [parent['source_target_start']['position'], parent['source_target_start']['orientation']]
+    native_context = author_context(a,target_name='target',support_name='bookcase')
+    assert native_context['source_target_start'] == context['source_target_start']
     # A geometry reference cannot be inherited for a different release.
     a['planned_goal_poses']['target'] = ([.1, -.10, .6], release['orientation'])
     with pytest.raises(GoalPlanError, match='source release'):

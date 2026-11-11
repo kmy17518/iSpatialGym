@@ -79,6 +79,10 @@ def author_context(anchor, *, target_name, support_name):
             source_summary_sha256=anchor['sources']['summary']['sha256'],
             source_sidecar_sha256=anchor['sources']['sidecar']['sha256'],
             inherited_group_plan_sha256=parent_sha)
+        inherited_start = result.get('source_target_start')
+        if isinstance(inherited_start, (list, tuple)) and len(inherited_start) == 2:
+            # Native summaries serialize the parsed pose as [position, quaternion].
+            result['source_target_start'] = {'position': inherited_start[0], 'orientation': inherited_start[1]}
         checked = checked_context({'class_id': CLASS, 'anchor_sources': anchor['sources'],
                                    'shelf_tip_context': result}, relation='touching', scale='small',
                                   release=release, place=pose(group.get('requested_place'), 'shelf parent place'))
