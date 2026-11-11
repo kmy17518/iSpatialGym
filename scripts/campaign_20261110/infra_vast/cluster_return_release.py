@@ -4,12 +4,13 @@ Account clients publish durable no-submission or cancelled-never-started evidenc
 Only the coordinator releases the owner. Ambiguous submissions remain claimed.
 """
 import json
+import os
 from pathlib import Path
 import subprocess
 import time
 
 from scripts.campaign_20261110 import overflow_readiness
-from scripts.campaign_20261110.replay_migration import scheduler_proof, never_started
+from scripts.campaign_20261110.replay_migration import scheduler_proof as base_scheduler_proof, never_started
 from scripts.campaign_20261110.infra_vast import cluster_return as protocol
 
 
@@ -33,10 +34,34 @@ def empty(unit):
             'map unit already has execution evidence')
 
 
-def identity(proof, ack, receipt):
+def scheduler_proof(job_id):
+    proof = base_scheduler_proof(job_id)
+    # Slurm may replace ArrayTaskId with its NO_VAL sentinel after cancelling
+    # an unexpanded array parent. Accounting retains the exact singleton set.
+    raw = subprocess.check_output(['sacct', '-X', '-n', '-P', '-j', str(job_id),
+        '--format=JobIDRaw,JobID%120,State,Start,ElapsedRaw,AllocTRES'], text=True, timeout=30,
+        env=dict(os.environ, TZ='UTC', SLURM_TIME_FORMAT='standard'))
+    rows = [line.split('|') for line in raw.splitlines() if line.split('|')[0] == str(job_id)]
+    require(len(rows) == 1 and len(rows[0]) >= 6, 'ambiguous exact array accounting row')
+    row = rows[0]
+    proof['accounting'] = {'array_job_id': row[1], 'state': row[2].split()[0].rstrip('+'),
+        'start': row[3], 'elapsed_seconds': int(row[4]), 'allocated_tres': row[5]}
+    return proof
+
+
+def identity(proof, ack, receipt, prior=None):
     s = proof['scheduler']
     require(proof['job_id'] == receipt['job_id'] == s['ArrayJobId'], 'scheduler reservation differs')
-    require(s['ArrayTaskId'] == str(ack['unit_index']), 'scheduler unit differs')
+    if s['ArrayTaskId'] != str(ack['unit_index']):
+        require(s['ArrayTaskId'] == '4294967294' and prior is not None,
+                'scheduler unit differs')
+        identity(prior, ack, receipt)  # Must have the exact real index before cancellation.
+        require(never_started(prior, 'PENDING') and never_started(proof, 'CANCELLED')
+                and s['JobState'] == 'CANCELLED', 'array sentinel lacks never-started boundary')
+        expected = receipt['job_id']+'_'+str(ack['unit_index'])
+        bracketed = receipt['job_id']+'_['+str(ack['unit_index'])+']'
+        require(proof['accounting'].get('array_job_id') in (expected, bracketed),
+                'array sentinel lacks exact singleton accounting identity')
     require(s['UserId'].split('(')[0] == ack['account'], 'scheduler account differs')
     require(s['JobName'] == 'isg261110_map_return' and s['Command'] == ack['wrapper']['path'],
             'scheduler command differs from exact acknowledged wrapper')
@@ -80,12 +105,12 @@ def recover_pending(root, ack_path, ack, receipt_path):
     empty(ack['unit'])
     proposal_path = receipt_path.with_name(ack_path.stem+'_cancel_intent.json')
     before = scheduler_proof(receipt['job_id'])
-    identity(before, ack, receipt)
     if proposal_path.exists():
         proposal = json.loads(proposal_path.read_text())
         require(proposal['receipt'] == ref(receipt_path) and proposal['acknowledgement'] == ref(ack_path),
                 'cancellation intent differs')
     else:
+        identity(before, ack, receipt)
         if before['scheduler']['JobState'] != 'PENDING' or not never_started(before, 'PENDING'):
             return {'status': 'preserved_execution', 'proof': before}
         # No age threshold. Dependency and unfunded work cannot enter this path.
@@ -93,13 +118,14 @@ def recover_pending(root, ack_path, ack, receipt_path):
         proposal = {'acknowledgement': ref(ack_path), 'receipt': ref(receipt_path),
                     'before': before, 'funded': funded, 'observed_at': time.time()}
         protocol.write(proposal_path, proposal)
+    identity(before, ack, receipt, proposal['before'])
     if not never_started(before, 'CANCELLED'):
         if before['scheduler']['JobState'] != 'PENDING' or not never_started(before, 'PENDING'):
             return {'status': 'preserved_execution', 'proof': before}
         empty(ack['unit'])
         subprocess.run(['scancel', '--state=PENDING', receipt['job_id']], check=True, timeout=30)
     after = scheduler_proof(receipt['job_id'])
-    identity(after, ack, receipt)
+    identity(after, ack, receipt, proposal['before'])
     if not never_started(after, 'CANCELLED'):
         return {'status': 'awaiting_exact_cancellation', 'proof': after}
     empty(ack['unit'])
@@ -146,7 +172,7 @@ def validate(root, path, value, job, active_staging, heartbeat_jobs, remote_jobs
         require(intent['receipt'] == value['receipt'] and intent['acknowledgement'] == value['acknowledgement'],
                 'cancellation intent identity differs')
         for proof in (value['after'], scheduler_proof(receipt['job_id'])):
-            identity(proof, ack, receipt)
+            identity(proof, ack, receipt, intent['before'])
             require(never_started(proof, 'CANCELLED'), 'cancellation does not prove never started')
     else:
         raise ValueError('unknown release boundary')

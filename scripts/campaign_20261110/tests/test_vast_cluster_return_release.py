@@ -183,6 +183,35 @@ def test_live_capacity_never_double_counts_shared_node_or_uses_planned_slots():
     assert cap.assess(observation(), now=1061)['status'] == 'unavailable_or_stale'
 
 
+def test_cancelled_array_parent_requires_exact_before_and_singleton_accounting(tmp_path):
+    _, _, _, _, path, ack, output = claimed(tmp_path)
+    receipt = json.loads(submitted(path, ack, output).read_text())
+    before = scheduler(ack)
+    after = scheduler(ack, 'CANCELLED')
+    after['scheduler']['ArrayTaskId'] = '4294967294'
+    after['accounting']['array_job_id'] = '12345_[0]'
+    rel.identity(after, ack, receipt, before)
+    with pytest.raises(ValueError, match='unit differs'):
+        rel.identity(after, ack, receipt)
+    for wrong in ('12345_[1]', '12345_[0-2]', '12345_[0,1]', '54321_[0]', '12345'):
+        after['accounting']['array_job_id'] = wrong
+        with pytest.raises(ValueError, match='singleton'):
+            rel.identity(after, ack, receipt, before)
+    after['accounting']['array_job_id'] = '12345_[0]'
+    before['accounting']['elapsed_seconds'] = 1
+    with pytest.raises(ValueError, match='never-started'):
+        rel.identity(after, ack, receipt, before)
+
+
+def test_accounting_probe_keeps_exact_array_set_and_resource_evidence(tmp_path, monkeypatch):
+    _, _, _, _, _, ack, _ = claimed(tmp_path)
+    monkeypatch.setattr(rel, 'base_scheduler_proof', lambda _: scheduler(ack, 'CANCELLED'))
+    monkeypatch.setattr(rel.subprocess, 'check_output', lambda *a, **k: '12345|12345_[0]|CANCELLED by 25282|None|0|\n')
+    proof = rel.scheduler_proof('12345')
+    assert proof['accounting']['array_job_id'] == '12345_[0]'
+    assert rel.never_started(proof, 'CANCELLED')
+
+
 def test_both_accounts_resource_pending_prevents_returns_but_dependencies_do_not():
     obs = observation()
     obs['jobs'] = [[u, 'svl,viscam', 'PENDING', 'gres/gpu:titanrtx:1', 'normal', '(Priority)', '100']
