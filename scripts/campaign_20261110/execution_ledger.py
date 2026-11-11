@@ -67,10 +67,18 @@ def worker_activity(observation, now):
     age = None if timestamp is None else now - timestamp
     state = ('timestamp_missing' if age is None else 'future_timestamp' if age < -30
              else 'stale' if age > 600 else 'current_worker_report')
-    return {'active_work': reported if state == 'current_worker_report' else [],
+    # Recovery workers retain completed source jobs for provenance. In particular,
+    # a fresh report of a synced collection artifact is not an active allocation.
+    active_states = {'running', 'pending', 'queued', 'submitted', 'configuring',
+                     'completing', 'assigned', 'staging', 'native_running',
+                     'demo_running', 'replay_running', 'replay_queued'}
+    current = [job for job in reported if isinstance(job, dict)
+               and str(job.get('status', job.get('scheduler_state', job.get('state', '')))).lower() in active_states]
+    return {'active_work': current if state == 'current_worker_report' else [],
             'reported_work': reported,
             'activity_observation': {'observed_at': observed, 'age_seconds': age, 'state': state,
-                'semantics': 'Dated worker ownership report; execution requires separate fresh scheduler or worker evidence.'}}
+                'nonactive_or_unverified_reports': len(reported) - len(current),
+                'semantics': 'Dated worker ownership report with an explicit active phase. Terminal and unknown job states remain reported history; execution requires separate fresh scheduler or worker evidence.'}}
 
 
 def row(identifier, kind, owner, reference, **fields):

@@ -76,15 +76,30 @@ class ExecutionLedgerTests(unittest.TestCase):
 
     def test_worker_activity_needs_its_own_plausible_timestamp(self):
         self.put('canonical', {'classes': [{'class_id': 'jar'}]})
+        owned = {'job_id': 'owned-job', 'status': 'running'}
         for timestamp, expected in ((None, 'timestamp_missing'), (2000, 'future_timestamp'),
                                     (1000, 'current_worker_report')):
             with self.subTest(timestamp=timestamp):
                 self.put('standard', {'classes': [{'class_id': 'jar',
-                    'worker_observed_at': timestamp, 'active_jobs': ['owned-job']}]})
+                    'worker_observed_at': timestamp, 'active_jobs': [owned]}]})
                 r = build(self.root, 1001)['rows'][0]
                 self.assertEqual(r['activity_observation']['state'], expected)
-                self.assertEqual(r['active_work'], ['owned-job'] if expected == 'current_worker_report' else [])
-                self.assertEqual(r['reported_work'], ['owned-job'])
+                self.assertEqual(r['active_work'], [owned] if expected == 'current_worker_report' else [])
+                self.assertEqual(r['reported_work'], [owned])
+
+    def test_fresh_worker_preserves_terminal_sources_without_active_claims(self):
+        self.put('canonical', {'classes': [{'class_id': 'covered'}]})
+        history = [{'job_id': str(i), 'status': status} for i, status in enumerate(
+            ['synced', 'validated', 'complete', 'failed', 'cluster_state_not_observed', 'diagnostic_terminal'])]
+        history += ['unclassified-id', {'job_id': 'missing-state'}]
+        pending = {'job_id': 'new-replay', 'status': 'replay_queued'}
+        self.put('standard', {'classes': [{'class_id': 'covered', 'worker_observed_at': 1000,
+            'active_jobs': history + [pending], 'acceptance': {'accepted_standard': 1}}]})
+        r = build(self.root, 1001)['rows'][0]
+        self.assertEqual(r['active_work'], [pending])
+        self.assertEqual(r['reported_work'], history + [pending])
+        self.assertEqual(r['activity_observation']['nonactive_or_unverified_reports'], len(history))
+        self.assertEqual(r['acceptance']['accepted_standard'], 1)
 
 
 if __name__=='__main__':unittest.main()
