@@ -11,6 +11,20 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def verify_object_identity(obj, job):
+    """Use the native library scale identity, retaining the input representation."""
+    from ispatialgym.grasping.schema import canonical_scale
+
+    for key in ('category', 'model'):
+        assert obj[key] == job[key], f'contact {key} differs: {obj[key]!r} != {job[key]!r}'
+    actual, required = canonical_scale(obj['scale']), canonical_scale(job['scale'])
+    assert len(actual) == len(required) == 3, 'contact scale must have three axes'
+    assert all(np.isfinite(actual)) and all(np.isfinite(required)), 'contact scale is not finite'
+    assert actual == required, f'contact scale differs: {actual!r} != {required!r}'
+    return dict(library_scale=obj['scale'], requested_scale=job['scale'],
+                canonical_scale=list(actual), convention='native-schema-round-1e-4')
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     for name in ('root', 'profiles', 'contacts', 'output'):
@@ -45,7 +59,7 @@ def main():
                 assert map_log.is_file() and 'GB_CONTACT_MAPS_DONE' in map_log.read_text(), 'native contact map computation not complete'
                 lib = CL.load_library(str(library)); obj = lib['object']
                 assert lib['digest'] == CL._library_digest(lib), 'contact library identity changed'
-                assert (obj['category'], obj['model'], obj['scale']) == (job['category'], job['model'], job['scale'])
+                row['object_identity'] = verify_object_identity(obj, job)
                 selected = CM.select_entries(lib, kind, ('valid',), arm=CM.KINDS[kind]['arm'])
                 assert selected, 'zero physically validated contacts'
                 pose_digest = CM.pose_set(kind, selected, ('valid',))['digest']
