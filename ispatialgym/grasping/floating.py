@@ -99,6 +99,20 @@ class FloatingConfig:
     nms_rot_deg: float = 30.0
     max_representatives: int = 10
     gate_dump: bool = field(default_factory=lambda: os.environ.get("ISG_GLIB_GATE_DUMP", "") == "1")
+    # Default-off recovery for multipart objects whose internal collision-piece
+    # faces make centre-origin rays report a pinch narrower than the outer body.
+    # The closing pads encounter the outside faces first. All subsequent sweep,
+    # hand/object, approach, blade and native physics checks remain unchanged.
+    outer_pinch: bool = False
+
+
+def contact_measurement(union, poses, cfg: FloatingConfig):
+    if type(cfg.outer_pinch) is not bool:
+        raise ValueError("floating outer_pinch must be boolean")
+    if cfg.outer_pinch and cfg.open_q != CA.FINGER_OPEN:
+        raise ValueError("floating outer_pinch requires the held sampler's full opening")
+    return CA.contact_features(union, poses, CA.CONTACT_Z,
+                               outer_half=CA.PAD_OPEN_HALF if cfg.outer_pinch else None)
 
 
 def load_graspgen(model_dir: str) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
@@ -204,7 +218,7 @@ def generate(job: Dict[str, Any], model_dir: str, cfg: Optional[FloatingConfig] 
         return keep
 
     # width / antipodal cone at the pad centre (candidates.contact_features, the tabletop modes' first gate)
-    _, width, antip, cov = CA.contact_features(union, T, CA.CONTACT_Z)
+    _, width, antip, cov = contact_measurement(union, T, cfg)
     ok_w = np.isfinite(width) & (width >= cfg.min_width_m) & (width <= cfg.aperture_m)
     keep = ok_w & (antip >= math.cos(math.radians(cfg.cone_deg)))
     why = np.where(~np.isfinite(width), "no_width", np.where(~ok_w, "width_range", "antipodal"))

@@ -50,6 +50,33 @@ def test_panda_to_eef_puts_the_pad_centre_on_the_panda_tcp_and_closes_along_pand
     assert np.allclose(FL.T_PANDA_TO_EEF[:3, 3], [0, 0, FL.PANDA_DEPTH - C.CONTACT_CENTER_Z])  # the legacy T_CONV
 
 
+def test_opt_in_outer_contact_ignores_internal_collision_piece_faces():
+    outer = trimesh.creation.box(extents=[.04, .04, .06])
+    inner = trimesh.creation.box(extents=[.01, .01, .04])
+    union = trimesh.util.concatenate([outer, inner])
+    pose = _eef([0, 0, -1], [0, 1, 0], [0, 0, 0])[None]
+    default = FL.contact_measurement(union, pose, FL.FloatingConfig())
+    outside = FL.contact_measurement(union, pose, FL.FloatingConfig(outer_pinch=True))
+    assert np.allclose(default[1], [.01])
+    assert np.allclose(outside[1], [.04])
+    touch = CA.pad_sweep(union, pose)
+    assert not (touch <= default[1] / 2 + .008).any()
+    assert (touch <= outside[1] / 2 + .008).all()
+    with pytest.raises(ValueError, match="boolean"):
+        FL.contact_measurement(union, pose, FL.FloatingConfig(outer_pinch="yes"))
+
+
+def test_outer_contact_library_identity_survives_candidate_file_separation():
+    job = dict(category="cup", model="abc", scale=[1, 1, 1], dataset="assets")
+    old = VF.build_library(job, {"candidates": [], "config": {}}, [], ["object_scaling"], CP.DEFAULT, {})
+    new = VF.build_library(job, {"candidates": [], "config": {"outer_pinch": True}}, [], ["object_scaling"], CP.DEFAULT, {})
+    assert "candidate_switches" not in old
+    old_lib = S.ModelLibrary(path="", data=old, rests={})
+    new_lib = S.ModelLibrary(path="", data=new, rests={})
+    assert old_lib.identity_key() != new_lib.identity_key()
+    assert new_lib.identity()["candidate_switches"]["outer_pinch"] is True
+
+
 # ------------------------------------------------------------------------------------------------ identity and jobs
 
 

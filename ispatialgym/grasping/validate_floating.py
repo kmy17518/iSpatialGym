@@ -557,5 +557,7 @@ def build_library(job, cand_doc, trials, tasks: Sequence[str], policy: CP.Contac
             "dataset": job.get("dataset"), "constraint": "floating", "legacy_key": job.get("legacy_key"), "arm": arm,
             "policy_key": policy.key(arm), "policy": policy.meta(arm), "physics_profile": physics_profile, "rests": {}, "families": {},
             "grasps": grasps, "held_tasks": list(tasks), "floating_mode": cand_doc.get("floating_mode"),
+            **({"candidate_switches": S.candidate_switches(cand_doc.get("config"))}
+               if cand_doc.get("config", {}).get("outer_pinch") is True else {}),
             "twins": "finger-swapped twins (eef turned pi about +z) are NOT stored",
             "provenance": {"candidates": cand_doc.get("pipeline"), "validator": VALIDATOR_VERSION, "graspgen": cand_doc.get("graspgen"), "created": S.now()}}
