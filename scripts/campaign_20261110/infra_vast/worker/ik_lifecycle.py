@@ -123,8 +123,10 @@ class ExactIKLifecycle:
         finally:
             if handle is not None: handle.close()
             self.lock.release()
-        try: self.s5('cp', str(self.job_root/'lifecycle.json'), self.remote+'/ik_exchange/status/'+self.instance+'/'+self.job+'.json', timeout=15)
-        except Exception: pass
+            # An empty postjob/drain delta still closes the lifecycle scan. Keep
+            # its evidence visible even when the branch above returns early.
+            try: self.s5('cp', str(self.job_root/'lifecycle.json'), self.remote+'/ik_exchange/status/'+self.instance+'/'+self.job+'.json', timeout=15)
+            except Exception: pass
 
     def periodic(self):
         while not self.stop.wait(180): self.flush('periodic')

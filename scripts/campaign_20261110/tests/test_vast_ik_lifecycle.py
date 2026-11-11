@@ -54,6 +54,18 @@ def test_durable_payload_and_descriptor_commit_enriched_cursor(tmp_path):
     descriptor=json.loads(calls[1][1]['inp']);assert descriptor['branch_count']==3 and descriptor['reason']=='normal_drain'
 
 
+def test_empty_terminal_flush_publishes_status_without_uploading_a_bundle(tmp_path):
+    root,spec=fixture(tmp_path);calls=[]
+    c=ExactIKLifecycle(spec,lambda *a,**k:calls.append((a,k)),'s3://private/p','3',local_root=root/'local');c.prepare()
+    c.call=lambda *a,**k:{'entry_count':0,'scan_complete':True,'failures':[]}
+    c.flush('postjob')
+    assert len(calls)==1
+    assert calls[0][0]==('cp',str(c.job_root/'lifecycle.json'),'s3://private/p/ik_exchange/status/3/900001.json')
+    event=json.loads((c.job_root/'lifecycle.json').read_text())['events'][-1]
+    assert event['reason']=='postjob' and event['entries']==0 and event['scan_complete']
+    assert not(c.job_root/'cursor.json').exists()
+
+
 def test_no_optin_does_not_read_or_upload_cache(tmp_path):
     assert ik_transport.prepare(tmp_path,tmp_path,{},None,None,None,tmp_path) is None
 
