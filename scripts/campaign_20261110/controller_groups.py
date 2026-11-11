@@ -151,6 +151,9 @@ def audit_authored_source_context(prepared, anchor, template, root):
     The native sampler still checks all proposals. This CPU audit makes a
     refill author regression actionable without burning an unchanged group.
     """
+    from ispatialgym.sampling.campaign_shelf_goals import CLASS as SHELF_CLASS
+    if template.class_id == SHELF_CLASS:
+        return audit_shelf_source_context(prepared, anchor, template, root)
     from ispatialgym.sampling.campaign_floor_push_proposals import CLASS_ID, FIELD, author_hint, checked_hint
     if template.class_id != CLASS_ID:
         return None
@@ -171,6 +174,37 @@ def audit_authored_source_context(prepared, anchor, template, root):
                 'field': FIELD, 'source_summary': anchor['sources']['summary'],
                 'expected_context_sha256': digest(expected), 'plans': plans,
                 'scope': 'Author propagation only; native feasibility and acceptance remain required.'}
+    path = Path(prepared['queue']).parent / 'source_context_audit.json'
+    write_json_atomic(path, evidence)
+    return {'path': str(path), 'sha256': file_digest(path)}
+
+
+def audit_shelf_source_context(prepared, anchor, template, root):
+    """Keep the original shelf release reference across grouped-source refill."""
+    from ispatialgym.sampling.campaign_shelf_goals import author_context
+    for key in ('summary', 'sidecar'):
+        proof = anchor['sources'][key]
+        require(file_digest(proof['path']) == proof['sha256'], 'shelf source '+key+' changed')
+    bindings = anchor['template_meta']['bindings']
+    targets = [b['name'] for b in bindings if b.get('role') == 'target']
+    supports = [b['scene_object_name'] for b in bindings if b.get('role') == 'support' and b.get('category') == 'bookcase']
+    require(len(targets) == len(supports) == 1, 'shelf source role binding is ambiguous')
+    expected = author_context(anchor, target_name=targets[0], support_name=supports[0])
+    queue = read(prepared['queue'])
+    require(queue.get('entries'), 'shelf queue has no source-bound plans')
+    plans = []
+    for entry in queue['entries']:
+        path = Path(entry['path']).resolve()
+        require(path.is_relative_to(Path(root).resolve() / 'groups') and file_digest(path) == entry['sha256'],
+                'shelf authored plan identity changed')
+        plan = read(path)
+        require(plan.get('shelf_tip_context') == expected and plan.get('goal_selection') == 'fresh_anchor',
+                'shelf refill lost its audited fixed geometry reference')
+        plans.append({'path': str(path), 'sha256': entry['sha256']})
+    evidence = {'schema': 'isg-authored-source-context-v1', 'class_id': template.class_id,
+        'field': 'shelf_tip_context', 'source_summary': anchor['sources']['summary'],
+        'expected_context_sha256': digest(expected), 'plans': plans,
+        'scope': 'Exact fixed release reference and partner geometry; native distinct starts and all physical checks remain required.'}
     path = Path(prepared['queue']).parent / 'source_context_audit.json'
     write_json_atomic(path, evidence)
     return {'path': str(path), 'sha256': file_digest(path)}

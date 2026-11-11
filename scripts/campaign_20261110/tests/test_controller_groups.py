@@ -35,6 +35,47 @@ def test_briefcase_refill_audits_source_context_before_dispatch(tmp_path):
     assert audit_authored_source_context({}, {}, SimpleNamespace(class_id='unrelated'), tmp_path) is None
 
 
+def test_shelf_refill_rejects_drawn_start_as_fixed_release_reference(tmp_path):
+    import copy
+    import pytest
+    from scripts.campaign_20261110 import contracts as c
+    from scripts.campaign_20261110.controller_groups import audit_authored_source_context
+    from ispatialgym.sampling.campaign_shelf_goals import author_context, CLASS
+    parent = {'mode':'native_shelf_tip','support_name':'bookcase','grasp_key':'book@lean_left','edge_name':'+u',
+        'target_board':'left','arm':'left','row_z':.45,'bay_m':0.,'target_lean_deg':20.,'partner_lean_deg':15.,
+        'spine_behind_edge_m':.06,'source_target_start':{'position':[0.,0.,.6],'orientation':[0.,0.,0.,1.]},
+        'source_summary_sha256':'a'*64,'source_sidecar_sha256':'b'*64}
+    release = {'position':[.1,-.122109,.6],'orientation':[0.,0.,0.,1.]}
+    summary = {'shelf_start':{'board_draw':{},'spine_behind_edge_m':.0443,'target_depth_proposal':{
+        'source_depth_m':.06,'target_depth_m':.044274,'partner_depth_unchanged':True,'goal_unchanged':True}},
+        'touching':{'tip_release':True},'campaign_goal_group':{'phase':'settled_goal_verified','relation':'touching',
+        'target_name':'target','plan_sha256':'c'*64,'shelf_tip_context':parent,'requested_release':release,'requested_place':release}}
+    source = tmp_path/'summary.json'; sidecar = tmp_path/'sidecar.json'
+    c.write_json_atomic(source,summary); c.write_json_atomic(sidecar,{'place_kind':'shelf_tip'})
+    anchor = {'summary':summary,'sources':{k:{'path':str(p),'sha256':c.file_digest(p)}for k,p in [('summary',source),('sidecar',sidecar)]},
+        'planned_start_poses':{'target':[[0.,.015726,.6],[0.,0.,0.,1.]]},
+        'planned_goal_poses':{'target':[release['position'],release['orientation']]},
+        'template_meta':{'bindings':[{'role':'target','name':'target'},{'role':'support','category':'bookcase','scene_object_name':'bookcase'}]}}
+    plan = {'goal_selection':'fresh_anchor','shelf_tip_context':author_context(anchor,target_name='target',support_name='bookcase')}
+    path = tmp_path/'groups/g/goal_plan.json'; queue = tmp_path/'queues/g/queue.json'
+    def publish(value):
+        c.write_json_atomic(path,value); c.write_json_atomic(queue,{'entries':[{'path':str(path),'sha256':c.file_digest(path)}]})
+    publish(plan)
+    result = audit_authored_source_context({'queue':str(queue)},anchor,SimpleNamespace(class_id=CLASS),tmp_path)
+    assert c.file_digest(result['path']) == result['sha256']
+    for mutation in ('drawn_start','partner_depth','missing'):
+        bad = copy.deepcopy(plan)
+        if mutation == 'drawn_start': bad['shelf_tip_context']['source_target_start']['position'] = [0.,.015726,.6]
+        elif mutation == 'partner_depth': bad['shelf_tip_context']['spine_behind_edge_m'] = .044274
+        else: bad.pop('shelf_tip_context')
+        publish(bad)
+        with pytest.raises(c.ContractError,match='fixed geometry reference'):
+            audit_authored_source_context({'queue':str(queue)},anchor,SimpleNamespace(class_id=CLASS),tmp_path)
+    source.write_text('{}')
+    with pytest.raises(c.ContractError,match='summary changed'):
+        audit_authored_source_context({'queue':str(queue)},anchor,SimpleNamespace(class_id=CLASS),tmp_path)
+
+
 def counts(**kwargs):
     return {"evaluation": {}, "train_buckets": {}, "class_remaining": 1000, "task_remaining": 4000, **kwargs}
 
