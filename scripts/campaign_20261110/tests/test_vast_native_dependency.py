@@ -1,0 +1,71 @@
+import json
+from pathlib import Path
+
+import pytest
+
+from scripts.campaign_20261110 import vast_native_dependency as native
+
+
+def fixture(root,monkeypatch):
+    runtime=root/'code/native';runtime.mkdir(parents=True);(runtime/'.snapshot_commit').write_text('same native runtime')
+    helper=root/'code/helper/scripts/campaign_20261110';helper.mkdir(parents=True)
+    for name in ('vast_native_dependency.py','job_native_dependency.sh'):(helper/name).write_text(name)
+    wrapper=root/'tools/original.sh';wrapper.parent.mkdir();wrapper.write_text('original native wrapper')
+    source=root/'candidate';source.mkdir();bddl=source/'bddl';bddl.mkdir();(bddl/'problem.bddl').write_text('native problem')
+    handles=root/'proofs/handles.json';handles.parent.mkdir();handles.write_text('{"native_handle":true}')
+    customs=source/'customs.json';customs.write_text(json.dumps({'handle_file':str(handles)}))
+    scenes=root/'scenes';scenes.mkdir();(scenes/'scene.json').write_text('{}')
+    anchor=root/'shared/anchors.json';anchor.parent.mkdir();anchor.write_text('{}')
+    monkeypatch.setattr(native,'BASE_ENV',{'ISPATIALGYM_REACH_MAP_ANCHORS':str(anchor),'ISPATIALGYM_V2_ONLY':'1'})
+    entry={'production_released':False,'class_id':'wardrobe_open','scene':'office_cubicles_right',
+        'environment':{'ISPATIALGYM_STABLE_SCENE_DIR':str(scenes)},
+        'sample_argv':['python','-m','ispatialgym.sampling.sample_isg','--variant','wardrobe_open','--customs',str(customs),
+            '--bddl-root',str(bddl),'--no-write-back','--out','${CAMPAIGN_OUT}/validation/left']}
+    manifest=source/'validation_jobs.json';manifest.write_text(json.dumps({'jobs':[entry]}))
+    output=root/'materialized_runs/wardrobe/validation/left'
+    return manifest,runtime,helper.parents[1],wrapper,output
+
+
+def test_native_source_and_reserved_index_are_preserved_and_queue_stays_inactive(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    before={str(p):p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
+    assert all(Path(name).read_bytes()==body for name,body in before.items())
+    value=native.verify(job,tmp_path)
+    assert value['argv'][-4:]==['--start-index','50108200','--time-budget-s','1800']
+    assert str(tmp_path/'proofs/handles.json') in value['files']
+    jid=native.enqueue(job,tmp_path);assert native.enqueue(job,tmp_path)==jid
+    record=json.loads((tmp_path/'vast/queue'/f'{jid}.json').read_text())
+    assert record['job_kind']=='native_dependency' and not (tmp_path/'vast/config.json').exists()
+    assert not out.exists()
+
+
+def test_changed_native_handle_or_runtime_prevents_dispatch(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
+    (tmp_path/'proofs/handles.json').write_text('changed geometry')
+    with pytest.raises(ValueError,match='bytes changed'):native.enqueue(job,tmp_path)
+    assert not (tmp_path/'vast/queue').exists()
+
+
+def test_existing_native_output_or_wrong_entrypoint_cannot_be_replaced(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    out.mkdir(parents=True);(out/'sample.log').write_text('native started')
+    with pytest.raises(ValueError,match='already has evidence'):
+        native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
+    (out/'sample.log').unlink();out.rmdir()
+    value=json.loads(manifest.read_text());value['jobs'][0]['sample_argv'][2]='unapproved.module';manifest.write_text(json.dumps(value))
+    with pytest.raises(ValueError,match='unsupported native'):
+        native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
+
+
+def test_native_completion_requires_real_tro_and_retains_failed_sampler_result(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
+    for key in native.verify(job)['environment']:
+        monkeypatch.setenv(key,native.os.environ.get(key,''))
+    class Result:returncode=0
+    monkeypatch.setattr(native.subprocess,'run',lambda *args,**kwargs:Result())
+    assert native.run(job)==2  # A zero process exit without a native instance is insufficient.
+    result=json.loads((job/'result/sampling_gate.json').read_text())
+    assert result['tro_count']==0 and result['validation_only'] is True

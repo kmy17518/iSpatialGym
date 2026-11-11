@@ -306,6 +306,8 @@ def git_full(d):
 def stage(s3, rec, state):
     """Upload the job's inputs: jobs/<id>/jobdata.tar.zst (the job dir + every input path job_fast.sh reads: job.env's paths, the eval
     index's instances, the prebuild candidates, camera relocalization's earlier train instances) and the code archives. -> spec."""
+    if rec.get('job_kind') == 'native_dependency':
+        return stage_native_dependency(s3, rec, state)
     jd = rec["job_dir"]
     env = read_env(jd)
     replay = rec.get('job_kind') == 'physics_replay'
@@ -339,7 +341,9 @@ def stage(s3, rec, state):
             L.add_tree(path, skip_runs=True)
     for path in pool_inputs:
         L.add_file(path)
-    customs_inputs = template_customs_inputs(env, OFH)
+    # These metadata customs are sampler inputs. Replay uses the pinned TRO
+    # and the original native snapshot's own customs/tolerance definitions.
+    customs_inputs = [] if replay else template_customs_inputs(env, OFH)
     camera_inputs = camera_context_inputs(env, OFH)
     for dependency in customs_inputs + camera_inputs:
         L.add_file(dependency['path'])
@@ -404,6 +408,35 @@ def stage(s3, rec, state):
                  "git_roots": roots, "staged": now(), "inputs": {"entries": len(L.items), "bytes": L.bytes, "prebuild_candidates": n_pre,
                  "template_customs": customs_inputs, "camera_context": camera_inputs}})
     log(f"STAGED {rec['id']} {rec['name']} {len(L.items)} entries {L.bytes / 2**20:.1f} MB, {n_pre} prebuild candidates ({now() - t:.0f} s)")
+    return spec
+
+
+def stage_native_dependency(s3, rec, state):
+    """Use the existing private worker transport for an exact native canary."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from scripts.campaign_20261110 import vast_native_dependency as native
+    jd=rec['job_dir'];value=native.verify(jd,OFH)
+    if native.sha(Path(jd)/'native_inputs.json') != rec['native_inputs_sha256']:
+        raise ValueError('native dependency manifest changed after enqueue')
+    code=value['snapshot'];b1k=os.path.dirname(os.path.realpath(os.path.join(code,'Behavior-1K','OmniGibson')))
+    code_keys=['bundle/tools/rsync.tar.zst',ensure_code(s3,code,state)]
+    if not under(b1k,[code]):code_keys.append(ensure_code(s3,b1k,state))
+    listing=Lister([code,b1k]+list(STORES)+list(CACHES)+list(NOT_SHIPPED));listing.add_tree(jd)
+    for name in value['files']:listing.add_file(name)
+    for name in native.BASE_ENV.values():
+        if name.startswith('/vision/') and os.path.exists(name):listing.add_tree(name,skip_runs=True)
+    path=os.path.join(VJ,'bundle',f"jobdata_{rec['id']}.txt");listing.write(path)
+    tar_put(path,f"jobs/{rec['id']}/jobdata.tar.zst")
+    commit=git_full(os.path.join(code,'Behavior-1K'));roots=[]
+    if commit:
+        patches=os.path.join(b1k,'.snapshot_patches')
+        roots=[{'dir':os.path.join(code,'Behavior-1K'),'sha':commit,'porcelain':patches if os.path.exists(patches) else '-'},
+               {'dir':b1k,'sha':commit,'porcelain':patches if os.path.exists(patches) else '-'}]
+    spec={key:rec[key] for key in ('id','name','job_dir','script','time_s','cpus','mem','log','cwd','acct','part')}
+    spec.update(code=[{'key':key} for key in code_keys],jobdata=f"jobs/{rec['id']}/jobdata.tar.zst",
+                scenes=value['scenes'],git_roots=roots,staged=now(),
+                inputs={'entries':len(listing.items),'bytes':listing.bytes,'native_manifest_sha256':rec['native_inputs_sha256']})
+    log(f"STAGED_NATIVE {rec['id']} {listing.bytes / 2**20:.1f} MB; original runtime {os.path.basename(code)}")
     return spec
 
 
@@ -867,7 +900,7 @@ def tick(c, s3, state):
             # Replay has no sampling-attempt denominator. Its genuine native
             # gate (including a failed replay) must be synced without guessing
             # that a missing sampler counter means a launch failure.
-            host_fail = (s.get('job_kind') != 'physics_replay' and not d.get("attempts")) and not s.get("zero_retried") and s["tries"] < C["retries"]
+            host_fail = (s.get('job_kind') not in ('physics_replay','native_dependency') and not d.get("attempts")) and not s.get("zero_retried") and s["tries"] < C["retries"]
             if host_fail:
                 s["history"].append({"instance": s.get("instance"), "rc": d.get("rc"), "error": d.get("error"), "time": t, "zero_attempts": True,
                                      'attempt_evidence':attempt_evidence,'assigned_unix':s.get('assigned'),'done':d})
