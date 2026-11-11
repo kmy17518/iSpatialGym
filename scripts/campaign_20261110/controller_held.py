@@ -386,6 +386,27 @@ def retired_class(cfg, class_id):
     return class_id in values
 
 
+def check_pending_record(record, state, cfg, root, queue, save, *, reconcile_only):
+    """A saved-only queue must prepare its exact continuation before cancellation.
+
+    The ordinary producer may author a new queue after migration. Retired scopes
+    deliberately cannot, so use the existing restartable queue migration path.
+    """
+    if not reconcile_only:
+        from scripts.campaign_20261110.controller_migration import controller_check
+        return controller_check(root,record,state,cfg,queue,save,family='held')
+    age=cfg.get('migrate_pending_seconds')
+    if age is None or cfg.get('_migration_checks_remaining',0)<=0:return
+    if record.get('status')=='complete' and not record.get('migration_replacement'):return
+    cfg['_migration_checks_remaining']-=1
+    try:
+        from scripts.campaign_20261110.controller_queue_migration import migrate_pending_queue
+        migrate_pending_queue(root,record,save,queue,minimum_age=age)
+    except Exception as exc:
+        record['migration_error']={'at':time.time(),'type':type(exc).__name__,'reason':str(exc)}
+        save()
+
+
 def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=None):
     require(file_digest(spec["seed_config"]) == spec["seed_config_sha256"], "held seed config changed")
     seed_config = read(spec["seed_config"])
@@ -409,8 +430,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
                         **({"decision": submission["decision"], "command": submission['command']}
                            if adapter is not None else {})})
     for record in records:
-        from scripts.campaign_20261110.controller_migration import controller_check
-        controller_check(root,record,state,cfg,queue,save,family='held')
+        check_pending_record(record,state,cfg,root,queue,save,
+                             reconcile_only=retired_class(cfg,spec['class_id']))
         if record["status"] == "complete":
             record_runtime_failure(record, state)
             continue
