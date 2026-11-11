@@ -445,8 +445,11 @@ def stage_native_dependency(s3, rec, state):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     typed=json.loads((Path(rec['job_dir'])/'native_inputs.json').read_text())
     diagnostic=typed.get('schema')=='isg-vast-ik-native-probe-v1'
+    prebuild=typed.get('schema')=='isg-vast-library-prebuild-v1'
     if diagnostic:
         from scripts.campaign_20261110 import vast_ik_probe as native
+    elif prebuild:
+        from scripts.campaign_20261110 import vast_prebuild as native
     else:
         from scripts.campaign_20261110 import vast_native_dependency as native
     jd=rec['job_dir'];value=native.verify(jd,OFH)
@@ -455,9 +458,10 @@ def stage_native_dependency(s3, rec, state):
     code=value['snapshot'];b1k=os.path.dirname(os.path.realpath(os.path.join(code,'Behavior-1K','OmniGibson')))
     code_keys=['bundle/tools/rsync.tar.zst',ensure_code(s3,code,state)]
     exact_ik=None
-    if diagnostic:
+    if diagnostic or prebuild:
         helper_code=value['helper_snapshot']
         code_keys.append(ensure_code(s3,helper_code,state))
+    if diagnostic:
         exact_ik=ik_transport.prepare(OFH,jd,read_env(jd),s3,BUCKET,PREFIX,helper_code)
         if not exact_ik:raise ValueError('native cache probe requires typed exchange context')
     if not under(b1k,[code]):code_keys.append(ensure_code(s3,b1k,state))
