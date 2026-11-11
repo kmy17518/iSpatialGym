@@ -2042,7 +2042,11 @@ class ArticulationSmall(SamplerV2):
                 return None
             return PC.fingertips_in_frame(self, st, "push", segment_targets(st, q_from, q_to))
 
-        brace_on = bool(self.gen("close_push_brace", False))
+        # The held jar's upper-bucket first push tipped its unbraced root in
+        # both measured demos. Reuse the existing checked second-arm brace;
+        # native construction must find it or reject the candidate.
+        from ispatialgym.sampling import campaign_runtime as CR
+        brace_on = CR.contact_recovery('held_jar_close_brace') or bool(self.gen("close_push_brace", False))
         brace_arm = "left" if arm == "right" else "right"
 
         def find_brace(st: Stance, pair, q_from: float):

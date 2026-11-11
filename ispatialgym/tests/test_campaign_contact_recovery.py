@@ -82,6 +82,28 @@ def test_tray_joint_margin_is_bound_to_the_audited_cellulose_tape_class(monkeypa
         CR.contact_recovery('tray_grasp_joint_margin')
 
 
+def test_held_jar_brace_is_exact_category_model_and_default_scale_only(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    assert not CR.contact_recovery('held_jar_close_brace')
+    template = bind(monkeypatch, 'configuration_matching-articulation_close_small_scale-hinged_jar',
+                    'configuration_matching-articulation_close_small_scale', {'held_jar_close_brace': True})
+    target = NS(role='target', category='hinged_jar', model='jnjtrl', default_scale=(1., 1., 1.))
+    template.split, template.objects = 'eval_category', [target]
+    assert CR.contact_recovery('held_jar_close_brace')
+    for field, invalid in [('split', 'eval_standard'), ('class_id', 'configuration_matching-articulation_close_small_scale_01')]:
+        old = getattr(template, field)
+        setattr(template, field, invalid)
+        with pytest.raises(ContractError): CR.contact_recovery('held_jar_close_brace')
+        setattr(template, field, old)
+    for field, invalid in [('model', 'other'), ('default_scale', (.9, .9, .9))]:
+        old = getattr(target, field)
+        setattr(target, field, invalid)
+        with pytest.raises(ContractError): CR.contact_recovery('held_jar_close_brace')
+        setattr(target, field, old)
+    template.scene_setup['recovery_options']['held_jar_close_brace'] = 'true'
+    with pytest.raises(ContractError, match='boolean'): CR.contact_recovery('held_jar_close_brace')
+
+
 def test_touching_strokes_are_hash_bound_and_cannot_be_overridden(monkeypatch):
     from ispatialgym.sampling.v2.tasks import iors_small as IS
     monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)

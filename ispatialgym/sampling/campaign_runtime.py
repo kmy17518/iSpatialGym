@@ -88,6 +88,8 @@ def contact_recovery(option: str) -> bool:
                                       'inter_object_relation_satisfaction-ontop_small_scale'),
         'carton_press_slide_envelope': ('configuration_matching-articulation_open_small_scale_02',
                                        'configuration_matching-articulation_open_small_scale'),
+        'held_jar_close_brace': ('configuration_matching-articulation_close_small_scale-hinged_jar',
+                                 'configuration_matching-articulation_close_small_scale'),
         'milk_clutter_approach': ('disembedding_04', 'disembedding'),
         'tray_grasp_joint_margin': ('disembedding_07', 'disembedding'),
         'axial_spoon_slow_pad': ('alignment-axial_05', 'alignment-axial'),
@@ -115,6 +117,11 @@ def contact_recovery(option: str) -> bool:
     if value:
         require((template.class_id, template.task) == classes[option],
                 'contact recovery belongs to another audited class')
+        if option == 'held_jar_close_brace':
+            require(template.split == 'eval_category' and
+                    [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
+                    [('hinged_jar', 'jnjtrl', (1.0, 1.0, 1.0))],
+                    'held jar brace belongs to its exact ready default-scale category model')
     return value
 
 
