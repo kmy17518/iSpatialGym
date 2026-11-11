@@ -571,12 +571,18 @@ class InstanceLoader:
         # the whole scene as the template file loads it, for attach(): load_tro_instance rewrites only the task objects and
         # the robot, and restore()'s update_initial_file would carry whatever a demo moved into the next instance's start
         self._scene_state0 = copy.deepcopy(self.env.scene.dump_state(serialized=False))
+        from ispatialgym.oracle.campaign_restore import capture_pristine_mass, mass_constraint_objects
+
+        campaign = self.tro.meta.raw.get("campaign") or {}
+        self._pristine_mass0 = capture_pristine_mass(campaign, mass_constraint_objects(
+            campaign, self.task.object_scope, (self.tro.meta.extras or {}).get("constraints") or []))
         return self.env
 
     def share(self, shared: Dict[str, Any]) -> None:
         """``--queue``: hand this loader's world to the next instances of the template."""
         shared.update({"env": self.env, "task": self.task, "robot": self.robot, "cam_key": self.cam_key, "cfg": self.cfg,
                        "template_dir": self.template_dir, "template_key": (template_key(self.template_dir, self.tmeta) if fast_on("COLLECTOR_PREBUILD") else None), "floor_map": self._floor_map_template, "scene_state0": self._scene_state0,
+                       "pristine_mass0": getattr(self, "_pristine_mass0", None),
                        "build_report": {k: v for k, v in self.report.items() if k != "trav_cells_blocked"}})
 
     def attach(self, shared: Dict[str, Any]):
@@ -620,6 +626,7 @@ class InstanceLoader:
         # only the TRO decides where this instance starts - as in a fresh process
         self.env.scene.load_state(copy.deepcopy(shared["scene_state0"]), serialized=False)
         self._scene_state0 = shared["scene_state0"]
+        self._pristine_mass0 = shared.get("pristine_mass0")
         self.env.scene.trav_map.floor_map[0] = _copy_map(shared["floor_map"])
         self._floor_map_template = shared["floor_map"]
         self.report.update(shared["build_report"])
@@ -640,8 +647,14 @@ class InstanceLoader:
             pass
         self.report["floor_collision_filter"] = self._apply_floor_filters()
         if self.tro.meta.raw.get("campaign"):
-            from ispatialgym.oracle.campaign_restore import restore_serialized_mass_before_reset
+            from ispatialgym.oracle.campaign_restore import mass_constraint_objects, restore_pristine_mass, restore_serialized_mass_before_reset
 
+            campaign = self.tro.meta.raw["campaign"]
+            pristine_mass = restore_pristine_mass(campaign, mass_constraint_objects(
+                campaign, task.object_scope, (self.tro.meta.extras or {}).get("constraints") or []),
+                getattr(self, "_pristine_mass0", None))
+            if pristine_mass is not None:
+                self.report["pre_reset_pristine_mass"] = pristine_mass
             early_mass = restore_serialized_mass_before_reset(
                 self.tro.meta.raw["campaign"], task.object_scope, self.tro.meta.object_bindings or {},
                 (self.tro.meta.extras or {}).get("constraints") or [])

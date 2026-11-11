@@ -4,6 +4,107 @@ import math
 from scripts.campaign_20261110.contracts import require
 
 
+def pristine_mass_enabled(meta):
+    options = meta.get('scene_setup', {}).get('restoration_options', {})
+    enabled = options.get('pristine_mass_before_reset_v1')
+    if enabled is None or enabled is False:
+        return False
+    require(enabled is True and not options.get('serialized_mass_before_reset_v1')
+            and meta.get('campaign_id') == 'campaign_20261110' and meta.get('split') == 'train'
+            and meta.get('class_id') == 'disembedding_07' and meta.get('task') == 'disembedding'
+            and meta.get('runtime', {}).get('purpose') == 'training_pipeline_canary',
+            'pristine mass restoration requires its exact bounded canary scope')
+    return True
+
+
+def _mass_state(link):
+    view = getattr(link, '_rigid_prim_view', None)
+    require(view is not None and view.is_physics_handle_valid(), 'native mass actor unavailable')
+    attr = link.prim.GetAttribute('physics:mass')
+    authored = bool(attr and attr.HasAuthoredValueOpinion())
+    return {'mass_kg': float(link.mass), 'inertia': view.get_inertias().tolist(),
+            'usd_mass_authored': authored, 'usd_mass': attr.Get() if authored else None}
+
+
+def mass_constraint_objects(meta, scope, records):
+    if not pristine_mass_enabled(meta):
+        return []
+    names = sorted({r['object'] for r in records if r.get('type') == 'mass'})
+    require(names and all(scope.get(name) is not None and hasattr(scope[name], 'links') for name in names),
+            'pristine mass constraint actor missing at world construction')
+    return [scope[name] for name in names]
+
+
+def capture_pristine_mass(meta, objects, *, read_state=None):
+    """Capture once in build_env, before any episode constraints can mutate actors."""
+    if not pristine_mass_enabled(meta):
+        return None
+    read_state = read_state or _mass_state
+    rows = {}
+    for obj in objects:
+        if obj is None or getattr(obj, 'kinematic_only', False):
+            continue
+        for link in obj.links.values():
+            state = read_state(link)
+            require(math.isfinite(state['mass_kg']) and state['mass_kg'] > 0, 'invalid pristine native mass')
+            key = str(link.prim_path)
+            require(key not in rows, 'duplicate pristine actor')
+            rows[key] = {'object': obj.name, **state}
+    require(rows, 'pristine native actors missing at world construction')
+    return {'revision': 'pristine_mass_before_reset_v1', 'captured_at': 'build_env_before_first_restore',
+            'actors': rows}
+
+
+def _write_mass_state(link, state):
+    import torch
+    import omnigibson as og
+    from pxr import UsdPhysics
+    view = link._rigid_prim_view
+    with og.sim.editing_usd():
+        attr = link.prim.GetAttribute('physics:mass')
+        if state['usd_mass_authored']:
+            if not attr:
+                attr = UsdPhysics.MassAPI.Apply(link.prim).CreateMassAttr()
+            attr.Set(state['usd_mass'])
+        elif attr:
+            attr.Clear()
+    # Restore captured inertia directly. Scaling it back by a mass ratio would
+    # accumulate rounding and would not preserve the original actor state.
+    view.set_masses(torch.as_tensor([state['mass_kg']], dtype=view.get_masses().dtype,
+                                    device=view.get_masses().device))
+    existing = view.get_inertias()
+    view.set_inertias(torch.as_tensor(state['inertia'], dtype=existing.dtype, device=existing.device))
+
+
+def restore_pristine_mass(meta, objects, baseline, *, read_state=None, write_state=None):
+    """Undo previous episode mass overrides; retain the original cold-load order."""
+    if not pristine_mass_enabled(meta):
+        return None
+    require(isinstance(baseline, dict) and baseline.get('captured_at') == 'build_env_before_first_restore'
+            and baseline.get('revision') == 'pristine_mass_before_reset_v1',
+            'pristine mass baseline missing; cannot recapture a reused world')
+    read_state = read_state or _mass_state; write_state = write_state or _write_mass_state
+    pending = []; actual_keys = set()
+    for obj in objects:
+        if obj is None or getattr(obj, 'kinematic_only', False):
+            continue
+        for link in obj.links.values():
+            key = str(link.prim_path); actual_keys.add(key); saved = baseline['actors'].get(key)
+            require(saved is not None and saved['object'] == obj.name, 'pristine actor identity differs')
+            state = {k: v for k, v in saved.items() if k != 'object'}
+            pending.append((link, state, read_state(link)))
+    require(actual_keys == set(baseline['actors']), 'pristine actor inventory differs')
+    changed = []
+    for link, state, before in pending:
+        # Cold A is a literal no-op, including its USD mass authorship.
+        if before != state:
+            write_state(link, state); changed.append(str(link.prim_path))
+        require(read_state(link) == state, 'pristine mass/inertia readback differs')
+    return {'revision': 'pristine_mass_before_reset_v1', 'captured_at': baseline['captured_at'],
+            'actors_checked': len(pending), 'actors_restored': changed,
+            'physics_steps_added': 0, 'later_serialized_mass_application_unchanged': True}
+
+
 def vector(value, label):
     require(isinstance(value,(list,tuple)) and len(value)==3 and
             all(type(v) in (float,int) and math.isfinite(v) for v in value),
