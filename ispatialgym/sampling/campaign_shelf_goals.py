@@ -61,3 +61,20 @@ def same_start_grasp(first_pose, first_grasp, second_pose, second_grasp):
     """
     dp, dq = pose_error(first_pose, second_pose)
     return first_grasp == second_grasp and dp < .01 and dq < math.radians(5)
+
+
+def positive_rest_arms(context, states, row, *, other_arm):
+    """Retain native mapped arm choices without moving the fixed compartment.
+
+    The source arm proves its original rest is available; it is not a goal
+    constraint. The optional other arm remains subject to the native flag,
+    positive row map, idle-arm collision, grasp, carry and release checks.
+    """
+    mapped = [s for s in states if row in s['rows']]
+    _require(any(s['key'] == context['grasp_key']
+                 and context['arm'] in s.get('arms', {}).get(row, []) for s in mapped),
+             'source shelf rest/arm lacks a positive native row map')
+    options = [(s, arm) for s in mapped for arm in s.get('arms', {}).get(row, [])
+               if arm == context['target_board'] or other_arm]
+    _require(bool(options), 'fixed shelf compartment has no permitted mapped arm')
+    return options

@@ -5,7 +5,7 @@ import pytest
 import torch as th
 
 from ispatialgym.sampling.campaign_held_goals import GoalPlanError
-from ispatialgym.sampling.campaign_shelf_goals import checked_context, author_context, same_start_grasp, CLASS
+from ispatialgym.sampling.campaign_shelf_goals import checked_context, author_context, same_start_grasp, positive_rest_arms, CLASS
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.v2.tasks import iors_small as I
@@ -55,6 +55,25 @@ def test_diversity_filter_distinguishes_pose_and_grasp():
     assert same_start_grasp(p,'side1',p,'side1')
     assert not same_start_grasp(p,'side1',p,'side2')
     assert not same_start_grasp(p,'side1',((.02,0,.8),p[1]),'side1')
+
+
+def test_positive_arms_keep_native_opt_in_and_exact_row():
+    c = context()
+    source = {'key': c['grasp_key'], 'rows': [.45], 'arms': {.45: ['left', 'right']}}
+    different_rest = {'key': 'book@lean15', 'rows': [.45], 'arms': {.45: ['right']}}
+    different_row = {'key': 'book@upper', 'rows': [.8], 'arms': {.8: ['left', 'right']}}
+    pool = [source, different_rest, different_row]
+    assert positive_rest_arms(c, pool, .45, other_arm=False) == [(source, 'left')]
+    assert positive_rest_arms(c, pool, .45, other_arm=True) == [
+        (source, 'left'), (source, 'right'), (different_rest, 'right')]
+    with pytest.raises(GoalPlanError, match='source shelf'):
+        positive_rest_arms(c, [different_rest], .45, other_arm=True)
+
+
+def test_other_arm_never_implies_an_unmapped_grasp():
+    c = context()
+    source = {'key': c['grasp_key'], 'rows': [.45], 'arms': {.45: ['left']}}
+    assert positive_rest_arms(c, [source], .45, other_arm=True) == [(source, 'left')]
 
 
 def test_tip_place_uses_release_not_generic_push_gap():

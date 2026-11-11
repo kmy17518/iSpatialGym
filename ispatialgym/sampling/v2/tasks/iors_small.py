@@ -4186,24 +4186,27 @@ class IORSSmall(SamplerV2):
             layouts += [(b, sd, self.shelf_row_key(h)) for h, rows in spec.get('rows', []) for b, sd in rows]
             if not any(abs(b-ctx['bay_m']) < 1e-6 and sd == side and h == z for b, sd, h in layouts):
                 raise Reject('campaign_shelf_context', 'source compartment is outside native shelf layouts')
-            states = [st for st in (getattr(self, '_board_keys', None) or {}).get(side, [])
-                      if z in st['rows'] and ctx['arm'] in st.get('arms', {}).get(z, [])]
-            if not states or not any(st['key'] == ctx['grasp_key'] for st in states):
-                raise Reject('campaign_shelf_context', 'source shelf rest/arm lacks a positive native row map')
-            st = states[int(rng.integers(len(states)))]
+            from ispatialgym.sampling.campaign_shelf_goals import positive_rest_arms
+            try:
+                options = positive_rest_arms(ctx, (getattr(self, '_board_keys', None) or {}).get(side, []),
+                                             z, other_arm=shelf_other_arm_on(self))
+            except CPG.GoalPlanError as exc:
+                raise Reject('campaign_shelf_context', str(exc)) from exc
+            st, arm = options[int(rng.integers(len(options)))]
             self.apply_board_key(st, z)
-            self._shelf_arm_override = None if ctx['arm'] == ctx['target_board'] else ctx['arm']
+            self._shelf_arm_override = None if arm == ctx['target_board'] else arm
             base = self._shelf_template
             self.shelf_start = {'key': base['key'], 'lean_side': side, 'lean_deg': base['lean_deg'],
                                 'partner_lean_deg': ctx['partner_lean_deg'], 'context': base.get('context')}
             self.rest['target'], self.rest['partner'] = self.shelf_rests(side, base['lean_deg'], ctx['partner_lean_deg'])
-            self.shelf_use_arm(ctx['arm'])
+            self.shelf_use_arm(arm)
             self.shelf_pose = self.shelf_partner_pose = None
             self._shelf_side_layouts = [(ctx['bay_m'], side)]
             self._shelf_draw = {'layout': [ctx['bay_m'], ctx['target_board']], 'n_layouts': 1,
                                 'restricted': 'immutable campaign shelf compartment',
                                 'board_draw': {'grasp_key': st['key'], 'lean_deg': base['lean_deg'], 'row_z': z,
-                                               'n_rests': len(states), 'arm': ctx['arm']}}
+                                               'n_rests': len({s['key'] for s, _ in options}), 'arm': arm,
+                                               'far_arm': arm != ctx['target_board'], 'n_mapped_rest_arms': len(options)}}
             return
         layouts, why = list(spec["layouts"]), None
         assigned = self.gen("partner_side")
