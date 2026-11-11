@@ -21,11 +21,6 @@ from scripts.campaign_20261110.contracts import ObjectRef, Template, digest, req
 from scripts.campaign_20261110.binding_pools import BindingPool, PoolCandidate, bind_variant, write_pool
 from scripts.campaign_20261110.group_lane import check_reservations
 from scripts.campaign_20261110.readiness_catalog import ReadinessCatalog
-from ispatialgym.grasping.schema import entry_id
-from ispatialgym.sampling.bddl_from_iddl import RoleGrounding, render
-from ispatialgym.sampling.iddl import parse_file
-from ispatialgym.sampling.knowledge import synset_of_category
-from ispatialgym.sampling.v2.problem import GroundedProblem, iter_template_choices
 
 
 def sha(path):
@@ -37,7 +32,17 @@ def main():
     for name in ('inventory', 'defaults', 'visual-review', 'tray-defaults', 'tray-visual-review', 'support-scene-probe',
                  'reservations', 'reserved-asset-hashes', 'out'):
         p.add_argument('--' + name, type=Path, required=True)
+    p.add_argument('--snapshot', type=Path, default=ROOT)
+    p.add_argument('--destination-side', choices=('left', 'right'))
     a = p.parse_args()
+    snapshot = a.snapshot.resolve(); b1k = snapshot / 'Behavior-1K'
+    sys.path[:0] = [str(snapshot), str(b1k / 'bddl3')]
+    from ispatialgym.grasping.schema import entry_id
+    from ispatialgym.sampling.bddl_from_iddl import RoleGrounding, render
+    from ispatialgym.sampling.bddl_writer import Bindings
+    from ispatialgym.sampling.iddl import parse_file
+    from ispatialgym.sampling.knowledge import synset_of_category
+    from ispatialgym.sampling.v2.problem import GroundedProblem, iter_template_choices
     require(not a.out.exists(), 'new immutable output required')
     policy, hashes = [json.loads(path.read_text()) for path in (a.reservations, a.reserved_asset_hashes)]
     require(hashes['reservation_sha256'] == sha(a.reservations), 'reservation hash companion differs')
@@ -63,18 +68,21 @@ def main():
     support = init[support_proof['object_name']]['args']
     require(support['scale'] == support_proof['default_scale'], 'private table scale mismatch')
     floor = next(x['args'] for x in init.values() if x['args'].get('category') == 'floors' and room in x['args'].get('in_rooms', []))
-    ready = ReadinessCatalog(B1K / 'bddl3/bddl/generated_data')
+    ready = ReadinessCatalog(b1k / 'bddl3/bddl/generated_data')
     role_rows = {'target': measured['rubber_eraser/cungod'], 'distractors': measured['crayon/coapeh'],
         'source': measured['tray/hjxczh'], 'destination': measured['tray/thkphg']}
     for role, obj in [('floor', floor), ('support', support)]:
         status = ready.status(obj['category'], obj['model']); require(status['ready'], 'unready scene role')
-        asset = B1K / 'datasets/behavior-1k-assets/objects' / obj['category'] / obj['model'] / 'usd' / (obj['model'] + '.encrypted.usd')
+        asset = b1k / 'datasets/behavior-1k-assets/objects' / obj['category'] / obj['model'] / 'usd' / (obj['model'] + '.encrypted.usd')
         role_rows[role] = dict(category=obj['category'], model=obj['model'], default_scale=obj['scale'], asset_sha256=sha(asset),
             ready=True, readiness_source=status['readiness_source'], scene_object_name=obj['name'])
     source = a.inventory / 'frozen_customs_f24ea424.json'; originals = json.loads(source.read_text())
     record = next(x for x in json.loads((a.inventory / 'cluster_templates_with_scales.json').read_text())['records'] if x['key'] == 'disembedding_02')
     entry = copy.deepcopy(originals[record['row']['alias']]); source_definition = digest(entry)
-    iddl = parse_file(str(ROOT / 'ispatialgym/assets/iddl' / entry['iddl']))
+    original_side = entry['generation'].get('destination_side')
+    if a.destination_side:
+        entry['generation']['destination_side'] = a.destination_side
+    iddl = parse_file(str(snapshot / 'ispatialgym/assets/iddl' / entry['iddl']))
     for role in ('target', 'source', 'destination', 'distractors'):
         row = role_rows[role]; key = row['category'] + '/' + row['model']
         entry['roles'][role].update(category=[row['category']] if role == 'distractors' else row['category'],
@@ -130,9 +138,14 @@ def main():
             'support_scene_probe_sha256': sha(a.support_scene_probe), 'capacity_note': '40 is a finite admission cap, not a claim of physical fit or crowdedness coverage'})
     pool_path = write_pool(a.out / 'binding_pool.json', pool)
     proof = dict(native_evidence=provenance, support_scene_probe_sha256=sha(a.support_scene_probe), native_scene_sha256=sha(scene_path),
-        source_customs_sha256=sha(source), reservation_sha256=sha(a.reservations), production_released=False)
+        source_customs_sha256=sha(source), reservation_sha256=sha(a.reservations), production_released=False,
+        runtime_role_order=list(entry['roles']))
+    if a.destination_side:
+        proof['tray_side_adaptation'] = dict(original_destination_side=original_side, destination_side=a.destination_side,
+            reason='Fresh permitted left/right tray layout; native geometry, demo and replay checks unchanged')
     entry['campaign_provenance'] = proof
-    template = Template('held_category__stationery_count3', 'disembedding', cls, 'eval_category', scene, room, tuple(refs), digest(dict(entry=entry, bddl_sha256=sha(bddl))),
+    candidate_id = 'held_category__stationery_count3' + ('__destination_' + a.destination_side if a.destination_side else '')
+    template = Template(candidate_id, 'disembedding', cls, 'eval_category', scene, room, tuple(refs), digest(dict(entry=entry, bddl_sha256=sha(bddl))),
         {**proof, 'task_rooms': [room], 'inst_to_name': names, 'runtime_bddl_sha256': sha(bddl), 'customs_alias': alias,
          'fresh_geometry': 'pending', 'fresh_demo': 'pending', 'fresh_replay': 'pending', 'coverage': 'requires native profile before additional count variants', 'perturbations': False})
     template = bind_variant(template, pool_path, {x.instance: 'eraser_cungod' if x.role == 'target' else 'crayon_coapeh' for x in refs if x.role != 'support'})
@@ -143,6 +156,19 @@ def main():
     choices = list(iter_template_choices(native, scene, np.random.default_rng(20261110), max_templates=1))
     require(len(choices) == 1 and [(x.category, x.model) for x in choices[0].groups['distractors']] == [('crayon', 'coapeh')] * 3,
         'native repeated-model category enumeration differs')
+    bindings = Bindings()
+    for role in dict.fromkeys(['floor', *native.scene_roles()]):
+        actual = bindings.add(role, synset_of_category(role_rows[role]['category']))
+        require(actual.name == rendered.instances[role], 'native scene-role BDDL allocation differs: ' + role)
+    for role in native.sampleable_roles():
+        actual = bindings.add(role, choices[0].models[role].synset)
+        require(actual.name == rendered.instances[role], 'native sampleable-role BDDL allocation differs: ' + role)
+    for role in native.group_roles():
+        actual = [bindings.add(role, member.synset).name for member in choices[0].groups[role]]
+        require(actual == rendered.instances[role + '.members'], 'native group-role BDDL allocation differs: ' + role)
+    (a.out / 'native_binding_order_check.json').write_text(json.dumps(dict(runtime_role_order=list(native.roles),
+        customs_sha256=sha(custom), bddl_sha256=sha(bddl), bindings=[asdict(row) for row in bindings.all()],
+        native_allocation_matches_rendered_bddl=True), indent=2) + '\n')
     job = dict(candidate_id=template.template_id, class_id=cls, task='disembedding', alias=alias, scene=scene, room=room, split='eval_category',
         template_fingerprint=template.fingerprint, source_manifest=str((a.out / 'validation_jobs.json').resolve()), required_new_grasp_key=gkey,
         environment={'ISPATIALGYM_STABLE_SCENE_DIR': str(scene_path.parent)}, production_released=False, required_tray_floor_height_key='native measurement pending',
