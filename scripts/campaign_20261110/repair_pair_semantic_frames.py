@@ -41,6 +41,8 @@ def main():
             require((image['path'], image['sha256']) in measured and file_digest(Path(image['path'])) == image['sha256'], 'review image changed')
     contracts = {r['class_id']: load_contract(r) for r in json.loads((a.source / 'contract_candidates.json').read_text())['templates']}
     original = json.loads((a.source / 'candidate_customs.json').read_text())
+    from ispatialgym.sampling.iddl import parse_file
+    from ispatialgym.sampling.v2.problem import DEFAULT_IDDL_ROOT
     customs, jobs, templates = {}, [], []
     for old in json.loads((a.source / 'validation_jobs.json').read_text())['jobs']:
         if old['class_id'] not in a.class_id:
@@ -49,21 +51,28 @@ def main():
         check_reservations(template, policy, hashes)
         entry = copy.deepcopy(original[old['alias']]); spec = entry['generation'].get('pair_goal_align')
         require(isinstance(spec, dict), 'source lacks pair alignment semantics')
+        role_order = list(parse_file(str(Path(DEFAULT_IDDL_ROOT) / entry['iddl'])).roles)
+        require(set(entry['roles']) <= set(role_order), 'runtime role absent from IDDL')
+        entry['roles'] = {role: entry['roles'][role] for role in role_order if role in entry['roles']}
         keys = {o.model_key for o in template.objects if o.role in ('target', 'partner')}
         require(keys <= review['objects'].keys(), 'pair lacks direct front review')
         spec['front'] = {key: review['objects'][key]['front'] for key in sorted(keys)}
-        proof = dict(path=str(a.review), sha256=file_digest(a.review), source_customs_sha256=file_digest(a.source / 'candidate_customs.json'))
+        proof = dict(path=str(a.review), sha256=file_digest(a.review), source_customs_sha256=file_digest(a.source / 'candidate_customs.json'),
+                     runtime_role_order=list(entry['roles']))
         entry.setdefault('campaign_provenance', {})['semantic_front_review'] = proof
-        updated = replace(template, template_id=template.template_id + '__reviewed_fronts_v1',
+        updated = replace(template, template_id=template.template_id + '__reviewed_fronts_ordered_v2',
             definition_sha256=digest(dict(source_definition=template.definition_sha256, entry=entry, review=proof)),
             scene_setup={**template.scene_setup, 'semantic_front_review': proof})
         customs[old['alias']] = entry
-        job = copy.deepcopy(old);job.update(candidate_id=updated.template_id, template_fingerprint=updated.fingerprint)
+        job = copy.deepcopy(old);job.update(candidate_id=updated.template_id, template_fingerprint=updated.fingerprint,
+                                           source_manifest=str((a.out / 'validation_jobs.json').resolve()))
         job['sample_argv'] = [x.replace(str(a.source), '${MATERIALIZED}') for x in job['sample_argv']]
         jobs.append(job);templates.append({**asdict(updated), 'fingerprint': updated.fingerprint})
     require(len(jobs) == len(set(a.class_id)), 'requested class missing or duplicated')
     a.out.mkdir(parents=True);shutil.copytree(a.source / 'bddl', a.out / 'bddl')
-    write_json_atomic(a.out / 'candidate_customs.json', customs)
+    with (a.out / 'candidate_customs.json').open('x') as stream:
+        json.dump(customs, stream, indent=2); stream.write('\n')
+    from ispatialgym.sampling.bddl_writer import Bindings
     from ispatialgym.sampling.v2.problem import GroundedProblem, iter_template_choices
     import numpy as np
     for job in jobs:
@@ -73,6 +82,19 @@ def main():
         for role in ('target', 'partner'):
             model = choices[0].models[role]
             require(gp.gen('pair_goal_align')['front'][model.category + '/' + model.model] in ('+x', '-x', '+y', '-y'), 'native front absent')
+        template = contracts[job['class_id']]
+        bindings = Bindings()
+        for obj in template.objects:
+            if obj.role == 'support':
+                synset, number = obj.instance.rsplit('_', 1)
+                bindings._counters[synset] = max(bindings._counters.get(synset, 0), int(number))
+        for role in gp.sampleable_roles():
+            actual = bindings.add(role, choices[0].models[role].synset)
+            expected = [obj.instance for obj in template.objects if obj.role == role]
+            require(expected == [actual.name], 'native pair-role BDDL allocation differs: ' + role)
+        write_json_atomic(a.out / (job['class_id'] + '_native_binding_order_check.json'), dict(
+            runtime_role_order=list(gp.roles), customs_sha256=file_digest(a.out / 'candidate_customs.json'),
+            bindings=[asdict(row) for row in bindings.all()], native_pair_allocation_matches_bddl=True))
     write_json_atomic(a.out / 'validation_jobs.json', dict(jobs=jobs, production_released=False))
     write_json_atomic(a.out / 'contract_candidates.json', dict(templates=templates))
     print(json.dumps(dict(candidates=len(jobs), manifest=str(a.out / 'validation_jobs.json'), sha256=file_digest(a.out / 'validation_jobs.json'))))

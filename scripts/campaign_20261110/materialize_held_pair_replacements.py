@@ -46,18 +46,22 @@ def main():
                 obj=replace(obj,model=row['model'],asset_sha256=row['asset_sha256'],default_scale=tuple(row['default_scale']),ready=True,readiness_source=row['readiness_source'])
             objects.append(obj)
         require(count==1,'replacement role ambiguous')
-        proof=dict(path=str(a.extension_audit),sha256=file_digest(a.extension_audit),source_customs_sha256=file_digest(source_customs),change=change)
+        proof=dict(path=str(a.extension_audit),sha256=file_digest(a.extension_audit),source_customs_sha256=file_digest(source_customs),change=change,
+                   runtime_role_order=list(entry['roles']))
         entry.setdefault('campaign_provenance',{})['ready_pair_replacement']=proof
         setup={**template.scene_setup,'reservation_sha256':pointer['reservations']['sha256'],'ready_pair_replacement':proof}
         updated=replace(template,template_id=template.template_id+'__ready_pair_replacement_v1',objects=tuple(objects),
             definition_sha256=digest(dict(source_definition=template.definition_sha256,entry=entry,proof=proof)),scene_setup=setup)
         check_reservations(updated,policy,hashes)
-        job=copy.deepcopy(job0);job.update(candidate_id=updated.template_id,template_fingerprint=updated.fingerprint)
+        job=copy.deepcopy(job0);job.update(candidate_id=updated.template_id,template_fingerprint=updated.fingerprint,
+                                         source_manifest=str((a.out/'validation_jobs.json').resolve()))
         job['sample_argv']=[x.replace(str(a.source),'${MATERIALIZED}') for x in job['sample_argv']]
         job['blockers']=['Fresh exact replacement maps/contact dependencies and native task geometry are required.']
         customs[job['alias']]=entry;templates.append({**asdict(updated),'fingerprint':updated.fingerprint});jobs.append(job)
     require(len(jobs)==4,'four audited classes required');a.out.mkdir();shutil.copytree(a.source/'bddl',a.out/'bddl')
-    write_json_atomic(a.out/'candidate_customs.json',customs)
+    with (a.out/'candidate_customs.json').open('x') as stream:
+        json.dump(customs,stream,indent=2);stream.write('\n')
+    from ispatialgym.sampling.bddl_writer import Bindings
     from ispatialgym.sampling.v2.problem import GroundedProblem,iter_template_choices
     import numpy as np
     for job in jobs:
@@ -66,6 +70,18 @@ def main():
         require(len(choices)==1,'native uniqueness/lookalike preflight failed')
         change=changes[job['class_id']];model=choices[0].models[change['role']]
         require(model.category+'/'+model.model==change['new'] and list(model.scale)==measured[change['new']]['default_scale'],'native chosen model/default scale differs')
+        template=contracts[job['class_id']];bindings=Bindings()
+        for obj in template.objects:
+            if obj.role=='support':
+                synset,number=obj.instance.rsplit('_',1)
+                bindings._counters[synset]=max(bindings._counters.get(synset,0),int(number))
+        for role in gp.sampleable_roles():
+            actual=bindings.add(role,choices[0].models[role].synset)
+            require([obj.instance for obj in template.objects if obj.role==role]==[actual.name],
+                    'native pair-role BDDL allocation differs: '+role)
+        write_json_atomic(a.out/(job['class_id']+'_native_binding_order_check.json'),dict(
+            runtime_role_order=list(gp.roles),customs_sha256=file_digest(a.out/'candidate_customs.json'),
+            bindings=[asdict(row) for row in bindings.all()],native_pair_allocation_matches_bddl=True))
     write_json_atomic(a.out/'validation_jobs.json',dict(jobs=jobs,production_released=False))
     write_json_atomic(a.out/'contract_candidates.json',dict(templates=templates))
     print(json.dumps(dict(candidates=4,manifest=str(a.out/'validation_jobs.json'),sha256=file_digest(a.out/'validation_jobs.json'))))
