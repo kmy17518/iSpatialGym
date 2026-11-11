@@ -37,14 +37,26 @@ def write(path,value):
     temp.write_text(json.dumps(value,indent=2)+'\n');temp.replace(path)
 
 
-def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,start_index,token):
+def library_environment(root,v2_root=None):
+    environment=dict(BASE_ENV)
+    if v2_root is not None:
+        release=Path(v2_root).resolve()
+        require(release.is_relative_to(Path(root).resolve()),'native library release outside campaign')
+        environment.update(ISPATIALGYM_GRASP_LIBRARY_V2=str(release/'glib'),
+                           ISPATIALGYM_REACH_MAPS=str(release/'maps'),
+                           ISPATIALGYM_REACH_MAP_ANCHORS=str(release/'anchors.json'))
+    return environment
+
+
+def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,start_index,token,
+            v2_root=None,v2_manifest_sha256=None):
     root,manifest,native,helper,wrapper=map(lambda p:Path(p).resolve(),(root,manifest,native,helper,original_wrapper))
     require(re.fullmatch(r'[A-Za-z0-9_-]+',token),'unsafe dependency token')
     require(all(p.is_relative_to(root) for p in (manifest,native,helper,wrapper)),'native dependency source outside campaign')
     require(native.is_relative_to(root/'code') and helper.is_relative_to(root/'code'),'native dependency requires frozen runtimes')
     entry=json.loads(manifest.read_text())['jobs'][index]
     require(not entry.get('blockers') and entry.get('production_released') is False,'native candidate is blocked or already production')
-    argv=list(entry['sample_argv'])
+    argv=[item.replace('${MATERIALIZED}',str(manifest.parent)) for item in entry['sample_argv']]
     require(argv[:3]==['python','-m','ispatialgym.sampling.sample_isg'],'unsupported native prerequisite entry point')
     require('--no-write-back' in argv and '--out' in argv and '--customs' in argv and '--bddl-root' in argv,
             'native prerequisite lacks immutable explicit inputs')
@@ -90,7 +102,19 @@ def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,
         if path.suffix=='.json':pending.extend(referenced_files(json.loads(path.read_text())))
     argv[argv.index('--out')+1]=str(job/'result')
     argv += ['--start-index',str(start_index),'--time-budget-s','1800']
-    environment.update(BASE_ENV)
+    library_files={}
+    if v2_root is not None:
+        release=Path(v2_root).resolve();release_manifest=release/'release_manifest.json'
+        require(release.is_relative_to(root) and v2_manifest_sha256 and sha(release_manifest)==v2_manifest_sha256,
+                'native library release manifest identity differs')
+        library_files[str(release_manifest)]=v2_manifest_sha256
+        for relative,expected in json.loads(release_manifest.read_text())['files'].items():
+            path=release/relative
+            require(path.resolve().is_relative_to(release) and path.is_file() and sha(path)==expected,
+                    'native library release file differs: '+relative)
+            library_files[str(path)]=expected
+        require(str(release/'anchors.json') in library_files,'native library release lacks pinned anchors')
+    environment.update(library_environment(root,v2_root))
     environment.update(ISG_VEC_ASSET_CACHE_DIR=str(root/'asset_cache'),ISG_VEC_ASSET_CACHE_MODE='rw',
                        ISPATIALGYM_SAMPLING_CACHE=str(job/'sampling_cache'))
     env={'ISGE_CODE':str(native),'ISGF_ROOT':str(root),'ISGF_NATIVE_HELPER':str(helper)}
@@ -100,7 +124,8 @@ def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,
            'snapshot':str(native),'helper_snapshot':str(helper),'source_manifest':str(manifest),'entry_index':index,
            'original_wrapper':str(wrapper),'original_entry':entry,'canonical_output':str(output),'argv':argv,
            'fresh_start_index':start_index,'environment':environment,'files':files,'scenes':[entry['scene']],
-           'shared_anchor_sha256':sha(BASE_ENV['ISPATIALGYM_REACH_MAP_ANCHORS']),
+           'v2_release_root':str(Path(v2_root).resolve()) if v2_root else None,'library_files':library_files,
+           'shared_anchor_sha256':sha(environment['ISPATIALGYM_REACH_MAP_ANCHORS']),
            'prepared_at_unix':time.time(),'runtime_adjustments':['image_native_apps','private_warm_kit_cache','worker_cpu_affinity','owned_output_relocation']}
     write(job/'native_inputs.json',value)
     return job
@@ -112,8 +137,12 @@ def verify(job,root=None):
     require(job.is_relative_to(owned/'out/vast_native_dependency') and value['job_dir']==str(job),'native dependency job ownership differs')
     for name,expected in value['files'].items():
         path=Path(name);require(path.resolve().is_relative_to(owned) and path.is_file() and sha(path)==expected,'native dependency input bytes changed: '+name)
-    require(all(value['environment'].get(key)==expected for key,expected in BASE_ENV.items()),'native shared library identity differs')
-    require(sha(BASE_ENV['ISPATIALGYM_REACH_MAP_ANCHORS'])==value['shared_anchor_sha256'],'native shared anchor bytes changed')
+    expected_environment=library_environment(owned,value.get('v2_release_root'))
+    require(all(value['environment'].get(key)==expected for key,expected in expected_environment.items()),'native shared library identity differs')
+    for name,expected in value.get('library_files',{}).items():
+        path=Path(name);require(path.resolve().is_relative_to(owned) and path.is_file() and sha(path)==expected,
+                                'native library bytes changed: '+name)
+    require(sha(value['environment']['ISPATIALGYM_REACH_MAP_ANCHORS'])==value['shared_anchor_sha256'],'native shared anchor bytes changed')
     return value
 
 

@@ -423,7 +423,9 @@ def stage_native_dependency(s3, rec, state):
     if not under(b1k,[code]):code_keys.append(ensure_code(s3,b1k,state))
     listing=Lister([code,b1k]+list(STORES)+list(CACHES)+list(NOT_SHIPPED));listing.add_tree(jd)
     for name in value['files']:listing.add_file(name)
-    for name in native.BASE_ENV.values():
+    for name in value.get('library_files',{}):listing.add_file(name)
+    for name in native.library_environment(OFH,value.get('v2_release_root')).values():
+        if value.get('v2_release_root') and name.startswith(value['v2_release_root']+'/'):continue
         if name.startswith('/vision/') and os.path.exists(name):listing.add_tree(name,skip_runs=True)
     path=os.path.join(VJ,'bundle',f"jobdata_{rec['id']}.txt");listing.write(path)
     tar_put(path,f"jobs/{rec['id']}/jobdata.tar.zst")

@@ -69,3 +69,22 @@ def test_native_completion_requires_real_tro_and_retains_failed_sampler_result(t
     assert native.run(job)==2  # A zero process exit without a native instance is insufficient.
     result=json.loads((job/'result/sampling_gate.json').read_text())
     assert result['tro_count']==0 and result['validation_only'] is True
+
+
+def test_exact_campaign_library_release_and_materialized_placeholder_are_preserved(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    entry=json.loads(manifest.read_text());entry['jobs'][0]['sample_argv'][6]='${MATERIALIZED}/customs.json'
+    manifest.write_text(json.dumps(entry))
+    release=tmp_path/'release';(release/'glib').mkdir(parents=True);(release/'maps').mkdir()
+    (release/'anchors.json').write_text('{"native":"anchors"}')
+    library=release/'glib/library.json';library.write_text('{"native":"grasps"}')
+    release_manifest=release/'release_manifest.json'
+    release_manifest.write_text(json.dumps({'files':{str(p.relative_to(release)):native.sha(p)
+        for p in [release/'anchors.json',library]}}))
+    job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left',
+                       v2_root=release,v2_manifest_sha256=native.sha(release_manifest))
+    value=native.verify(job,tmp_path)
+    assert value['argv'][6]==str(manifest.parent/'customs.json')
+    assert value['environment']['ISPATIALGYM_GRASP_LIBRARY_V2']==str(release/'glib')
+    library.write_text('changed native grasps')
+    with pytest.raises(ValueError,match='library bytes changed'):native.enqueue(job,tmp_path)
