@@ -120,6 +120,29 @@ EXTRA_REQUIREMENTS = [
 ]
 
 
+
+def compact_facts(value):
+    """Counts and short labels only; full provenance stays in hashed source files."""
+    allowed=('status','validated','total','state_counts','counts','summary','totals','eligible_accepted',
+             'excluded','unverified','coverage_complete','review_inventory_complete','attempts_observed',
+             'benchmark_credit','mode','standalone_training_allowed','owner_clarification')
+    def small(item,depth=0):
+        if item is None or isinstance(item,(bool,int,float)):return item
+        if isinstance(item,str):return item[:300]
+        if isinstance(item,dict)and depth<3:
+            return {str(k):small(v,depth+1)for k,v in list(item.items())[:40]
+                    if isinstance(v,(str,bool,int,float,type(None),dict))}
+        return None
+    return {key:small(value[key])for key in allowed if key in value}
+
+
+def compact_family(family):
+    return {key:family.get(key)for key in ('task','standard_classes','native_attempts_observed','native_written',
+        'exact_configurations_with_demo_physics_export','required_configuration_denominator','denominator_status')}|{
+        'exact_validation_status':family.get('exact_validation',{}).get('status'),
+        'aba_status':{key:value.get('status')for key,value in family.get('aba_restoration',{}).items()},
+        'model_pool_status':family.get('model_pool_switch_active_only_export',{}).get('status')}
+
 def executed_audit(code_root, campaign_root, sources):
     """Join authoritative observations without treating checklist placeholders as failures."""
     code_root,campaign_root=Path(code_root),Path(campaign_root)
@@ -171,7 +194,7 @@ def executed_audit(code_root, campaign_root, sources):
         row['exit_criteria']='Executed evidence covers the stated scope; exact configuration proof never substitutes for full selected coverage.'
         if task and task in families:
             family=families[task]
-            row['evidence']=[evidence('pipeline',task,'scoped_pipeline',family)]
+            row['evidence']=[evidence('pipeline',task,'scoped_pipeline',compact_family(family))]
             if family['exact_configurations_with_demo_physics_export']:row['status']='partial'
             row['next_action']='Advance the next dependency-ready configuration of '+task+' through its own native/demo/physics/render gates; retain full selected denominator.'
         mapping={'G01':('gate','dispatch_policy'),'G02':('eligibility','historical_and_current_acceptance'),
@@ -186,10 +209,7 @@ def executed_audit(code_root, campaign_root, sources):
             label,stage=mapping[key]
             if label in observations:
                 value=observations[label]['value']
-                facts=({k:value[k]for k in ('validated','total','state_counts')if k in value}if label=='canonical'else
-                       {k:value[k]for k in ('counts','coverage','coverage_complete','review_inventory_complete','eligible_accepted','excluded','unverified')if k in value}if label in ('eligibility','training_eligibility')else
-                       {k:value[k]for k in ('attempts_observed','counts','family_paths','batch_stages','benchmark_credit')if k in value}if label=='pipeline'else
-                       {k:v for k,v in value.items()if k not in ('allowed_canaries','allowed_existing_canary_reviews','records','jobs')})
+                facts=compact_facts(value)
                 row['evidence'].append(evidence(label,'only the explicitly enumerated observations',stage,facts));row['status']='partial'
         if key=='G16':
             row['next_action']='Root is implementing model-pool preload/activation/active-only export; execute different active model selections and hash-audit their exports.'

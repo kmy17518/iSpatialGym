@@ -30,3 +30,12 @@ def test_explicit_untested_family_observation_is_not_partial_success(tmp_path):
     rows=[r for r in value['requirements'] if r.get('tasks')==['configuration_matching-attachment']]
     assert len(rows)==5
     assert all(r['status']=='untested' and r['scope_status']=='unknown_no_executed_evidence' for r in rows)
+
+
+def test_large_source_records_stay_in_source_not_requirement_payload(tmp_path):
+    from scripts.campaign_20261110.training_spec import compact_facts,compact_family
+    huge={'status':'partial','records':[{'blob':'x'*10000}]*1000,'summary':{'required':13712},'artifact_requests':[{}]*1000}
+    assert compact_facts(huge)=={'status':'partial','summary':{'required':13712}}
+    family={'task':'disembedding','aba_restoration':{'physics':{'status':'failed','attempts':[huge]*100}},'exact_validation':{'status':'partial','evidence':[huge]*100}}
+    import json
+    assert len(json.dumps(compact_family(family)))<1000
