@@ -484,3 +484,36 @@ def test_large_opening_anchor_reuse_preserves_verified_goal_and_strict_bucket(tm
     with pytest.raises(c.ContractError, match='outside the requested strict bucket'):
         g.prepare_group(**kwargs, group_id='wrong_bucket', output=tmp_path / 'groups/wrong_bucket',
                         magnitude_range=[.5, 1.])
+
+
+def test_nextto_marker_group_preserves_native_raised_release_and_source_view(tmp_path):
+    """A new grasp may need a new release z; its settled goal stays fixed."""
+    job, ledger, _, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    partner = c.ObjectRef('partner.n.01_1', 'partner', 'colored_pencil', 'p', c.digest('partner'), ready=True, readiness_source='fixture')
+    template = replace(template, task='inter_object_relation_satisfaction-nextto_small_scale',
+        class_id='inter_object_relation_satisfaction-nextto_01', objects=template.objects+(partner,))
+    anchor['template_meta']['bindings'] = [{'name':'apple.n.01_1','role':'target'}, {'name':partner.instance,'role':'partner'}]
+    anchor['tro']['ispatialgym']['object_bindings']['apple.n.01_1']['scene_object_name'] = 'target_marker'
+    anchor['tro']['ispatialgym']['object_bindings'][partner.instance] = {'category':partner.category,'model':partner.model}
+    anchor['planned_start_poses'] = {partner.instance:[[5.9486,3.4677,.815],[0,0,0,1]]}
+    stance = {'base_pose2d':[6.2146,2.5701,1.5682], 'focus':[6.2169,3.4801,.8197], 'translate':.5,'tilt':-.4542}
+    settled = [[5.9684,3.4834,.8187],[0,0,0,1]]
+    release = {'position':[5.9684,3.4834,.8388],'orientation':[0,0,0,1]}
+    anchor['summary'].update(goal_realised=release, goal_check={'settled_poses':{'target_marker':settled}},
+        raised_release={'raise_m':.02,'partner_clearance_m':.005,'max_raise_m':.03}, manipulation_stance=stance)
+    summary_path=Path(anchor['sources']['summary']['path']);c.write_json_atomic(summary_path,anchor['summary'])
+    anchor['sources']['summary']['sha256']=c.file_digest(summary_path)
+    out=tmp_path/'groups/marker'
+    kwargs=dict(anchor=anchor,template=template,campaign_id='new',group_id='marker',code_sha256=c.file_digest(code/'.snapshot_commit'),
+        physics_sha256=c.digest('physics'),data_sha256=c.digest('maps'),magnitude_range=[0,1],reuse_anchor_goal=True)
+    g.prepare_group(output=out,**kwargs)
+    plan=g.read_json(out/'goal_plan.json')
+    assert plan['release_policy']=='native_raised_height'
+    assert plan['goal_pose']=={'position':settled[0],'orientation':settled[1]}
+    assert plan['release_pose']==release
+    assert plan['anchor_manipulation_stance']==dict(stance,source_summary_sha256=c.file_digest(summary_path))
+    assert not plan['source_instance_is_member']
+    summary_path.write_text('changed')
+    with __import__('pytest').raises(c.ContractError,match='summary changed'):
+        g.prepare_group(output=tmp_path/'groups/changed',**kwargs)

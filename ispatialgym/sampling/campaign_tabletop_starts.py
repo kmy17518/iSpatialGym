@@ -10,7 +10,8 @@ from ispatialgym.sampling.campaign_held_goals import _require
 def source_stance_hint_enabled(relation, scale, class_id):
     """Scope source candidate ranking to the measured pair recoveries."""
     recovered_pairs = {
-        'nextto': {'inter_object_relation_satisfaction-nextto_02',
+        'nextto': {'inter_object_relation_satisfaction-nextto_01',
+                   'inter_object_relation_satisfaction-nextto_02',
                    'inter_object_relation_satisfaction-nextto_03'},
         'touching': {'inter_object_relation_satisfaction-touching_01'},
         'ontop': {'inter_object_relation_satisfaction-ontop_small_scale_'+suffix
