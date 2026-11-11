@@ -4,6 +4,35 @@ from ispatialgym.sampling import campaign_runtime as runtime
 from ispatialgym.sampling.campaign_large_recovery import pillow_grasp_margin
 
 
+def test_heel_path_screen_catches_interior_limit_approach(monkeypatch):
+    from ispatialgym.sampling.campaign_large_recovery import heel_carry_path_screen, heel_carry_path_failure
+    monkeypatch.setattr(runtime, 'active', lambda: True)
+    template = SimpleNamespace(scene_setup={'recovery_options': {'heel_carry_path_screen': True}},
+        class_id='inter_object_relation_satisfaction-under_large_scale_01',
+        task='inter_object_relation_satisfaction-under_large_scale')
+    monkeypatch.setattr(runtime, 'configuration', lambda: (None, template, None, None))
+    robot = SimpleNamespace(arm_control_idx={'left': [0, 1, 2, 3]}, joint_lower_limits=[-3, -3, -3, -2.0944])
+    sampler = SimpleNamespace(kit=SimpleNamespace(robot=robot), push_heel_tight=lambda: 5.,
+        ikc=SimpleNamespace(last_track_traj=[[0, 0, 0, -1.98], [0, 0, 0, -2.082752], [0, 0, 0, -1.98]]))
+    assert 'configuration 1' in heel_carry_path_failure(sampler, 'left', .03)
+    assert heel_carry_path_failure(sampler, 'right', .03) is None
+    sampler.ikc.last_track_traj[1][3] = -2.05
+    assert heel_carry_path_failure(sampler, 'left', .03) is None
+    sampler.ikc.last_track_traj = None
+    with pytest.raises(ValueError, match='no tracked configurations'):
+        heel_carry_path_failure(sampler, 'left', .03)
+    sampler.push_heel_tight = lambda: None
+    assert heel_carry_path_failure(sampler, 'left', .03) is None
+    template.class_id = 'another_class'
+    with pytest.raises(ValueError, match='audited sandal class'):
+        heel_carry_path_screen()
+    template.scene_setup['recovery_options']['heel_carry_path_screen'] = 'true'
+    with pytest.raises(ValueError, match='must be boolean'):
+        heel_carry_path_screen()
+    monkeypatch.setattr(runtime, 'active', lambda: False)
+    assert heel_carry_path_screen() is False
+
+
 def test_soap_carry_screen_reuses_final_program_bounds(monkeypatch):
     from ispatialgym.sampling.v2.tasks.iors_large import IORSLarge
     from ispatialgym.sampling.campaign_large_recovery import soap_carry_oracle_screen

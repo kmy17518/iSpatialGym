@@ -5989,6 +5989,12 @@ class IORSLarge(SamplerV2):
                     continue
                 q_end, why_t = self.ikc.track_chain(q_c, chain, arm, ignore=[self.obj("floor")], soft_stall_m=float(self.num("carry_soft_stall_m", 0.02)),
                                                     **self._carry_track_kw())
+                if q_end is not None:
+                    from ispatialgym.sampling.campaign_large_recovery import heel_carry_path_failure
+                    path_failure = heel_carry_path_failure(self, arm, PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD)
+                    if path_failure is not None:
+                        TT._count(self, "push_heel_tight.carry_path_rejected")
+                        q_end, why_t = None, path_failure
                 r2b = None
                 if q_end is not None:
                     r2b = self.ikc.exact([pre_place, place_eef], place, arm, ignore_for_last=ignore_place, cache=False, q_seed=q_end)
@@ -6020,8 +6026,8 @@ class IORSLarge(SamplerV2):
         pose 9/45 (11.1 mm) was finished 1.12 rad away and the program check rejected the place after 1468 s (block design's re-posed
         carries take the same bound). ``{}`` when off: the tracking as before."""
         kw: Dict[str, Any] = {}
-        from ispatialgym.sampling.campaign_large_recovery import soap_carry_oracle_screen
-        if bool(self.gp.gen("carry_track_oracle") or False) or soap_carry_oracle_screen():
+        from ispatialgym.sampling.campaign_large_recovery import soap_carry_oracle_screen, heel_carry_path_screen
+        if bool(self.gp.gen("carry_track_oracle") or False) or soap_carry_oracle_screen() or heel_carry_path_screen():
             kw = {"finish_max_excursion": self.ikc.FINISH_MAX_EXCURSION, "soft_pos_tol": self.ikc.ORACLE_SOFT_POS_TOL,
                   "soft_rot_tol": self.ikc.ORACLE_SOFT_ROT_TOL, "max_iters": self.ikc.ORACLE_DIFF_IK_MAX_ITERS}
         rem = self.gp.gen("carry_finish_max_remaining_m")
@@ -7972,7 +7978,9 @@ class IORSLarge(SamplerV2):
                 # oracle-fix 2026-11-05 (with generation.carry_track_oracle): the carry leg at C is tracked per carry option, so a carry
                 # configuration whose branch cannot reach the pre-place (hb16_desk_s1 / hb18_desk_s1: stalled at 9-10 of 45, finish 1.12-1.21
                 # rad away) gives way to the next option instead of the whole C candidate
-                track_in_loop, carry_c, track_fails = bool(self.gp.gen("carry_track_oracle") or False), None, 0
+                from ispatialgym.sampling.campaign_large_recovery import heel_carry_path_screen
+                track_in_loop = bool(self.gp.gen("carry_track_oracle") or False) or heel_carry_path_screen()
+                carry_c, track_fails = None, 0
                 heights = [float(v) for v in (self.gp.gen("carry_heights_m") or (grasp.carry_height, 0.25))]
                 lift_extra = self.carry_lift_extra()
                 if lift_extra > 0:  # oracle-fix 2026-11-04 (owner item 4, opt-in generation.carry_lift_by_extent_m): each lift + the object's height + margin
