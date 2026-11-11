@@ -139,12 +139,101 @@ def standard_group_proof(root, class_id, validation_key):
     return None
 
 
+def coverage_facts(row, raw, template=None):
+    """Observed accepted provenance, with absent evidence distinct from zero.
+
+    A scene's original furniture removal is not a randomized training removal.
+    Model/scale values come from native bindings and restored observations; role
+    labels are used only from the matching hash-bound campaign contract.
+    """
+    block = raw.get('campaign', {})
+    scene = raw.get('scene', {})
+    bindings = raw.get('object_bindings', {})
+    runtime = block.get('runtime', {})
+    perturb = block.get('perturbations', {})
+    roles = {}
+    if template is not None:
+        if digest(template) != row['validation_key']['template_sha256']:
+            raise ValueError('coverage contract differs from accepted template')
+        roles = {obj['instance']: obj for obj in template['objects']}
+        for name, obj in roles.items():
+            native = bindings.get(name, {})
+            if native.get('model') != obj['model']:
+                raise ValueError('coverage contract/native model mismatch')
+    models, supports, scales = [], [], []
+    for name, native in bindings.items():
+        category, model = native.get('category'), native.get('model')
+        if not category or not model: continue
+        obj = roles.get(name, {})
+        if obj.get('semantic_kind') in ('floor', 'wall') or category in ('floors', 'walls'): continue
+        models.append(category+'/'+model)
+        if obj.get('role') == 'support':
+            supports.append('/'.join((str(scene.get('model')), category, model, str(native.get('scene_object_name')))))
+        default = perturb.get('scales', {}).get(name, {}).get('default')
+        observed = runtime.get('observed_scales', {}).get(name)
+        if default and observed and len(default) == len(observed) == 3 and all(float(x)>0 for x in default):
+            ratios = [round(float(a)/float(b), 6) for a,b in zip(observed,default)]
+            scales.append({'model': category+'/'+model, 'ratio': ratios,
+                           'nondefault': any(abs(v-1)>1e-5 for v in ratios)})
+    original_removed = scene.get('scene_variant') or block.get('scene_setup', {}).get('scene_variant') or {}
+    original_removed = original_removed.get('removed_objects', [])
+    requested_removed = perturb.get('removed_objects')
+    moved = runtime.get('augmentation', {}).get('moved_objects')
+    lighting = runtime.get('augmentation', {}).get('lighting')
+    return {'scene': scene.get('model'), 'room': row.get('room'), 'models': sorted(set(models)),
+        'supports': sorted(set(supports)) if template is not None else None,
+        'scales': scales, 'scale_objects_without_observation': len(models)-len(scales),
+        'lighting': lighting, 'lighting_requested': perturb.get('lighting'),
+        'original_scene_removed_objects': sorted(original_removed),
+        'augmentation_removed_objects': sorted(requested_removed) if isinstance(requested_removed, list) else None,
+        'augmentation_moved_objects': sorted(moved) if isinstance(moved, dict) else None}
+
+
+def coverage_summary(facts):
+    counts = {name: Counter() for name in ('scenes', 'rooms', 'models', 'supports', 'scale_ratios', 'lighting_states')}
+    missing = Counter()
+    measures = Counter()
+    for fact in facts:
+        if fact.get('error'):
+            missing['record'] += 1
+            continue
+        for name, field in (('scenes','scene'), ('rooms','room')):
+            if fact.get(field): counts[name][fact[field]] += 1
+            else: missing[name] += 1
+        for name in ('models', 'supports'):
+            if fact.get(name) is None: missing[name] += 1
+            else: counts[name].update(set(fact[name]))
+        missing['scale_objects'] += fact.get('scale_objects_without_observation', 0)
+        for scale in fact['scales']:
+            counts['scale_ratios'][json.dumps(scale['ratio'], separators=(',', ':'))] += 1
+        measures['instances_with_nondefault_scale'] += any(s['nondefault'] for s in fact['scales'])
+        lighting = fact.get('lighting')
+        if lighting is None: missing['lighting'] += 1
+        else:
+            counts['lighting_states'][digest(lighting)] += 1
+            measures['instances_with_lighting_augmentation'] += bool(lighting)
+            measures['instances_with_no_lighting_augmentation'] += not lighting
+        measures['instances_with_original_scene_removal'] += bool(fact['original_scene_removed_objects'])
+        removed, moved = fact.get('augmentation_removed_objects'), fact.get('augmentation_moved_objects')
+        if removed is None or moved is None: missing['augmentation_removal'] += 1
+        else:
+            measures['instances_with_verified_augmentation_removal'] += bool(removed) and set(removed).issubset(moved)
+            measures['instances_with_no_augmentation_removal'] += not removed
+            if removed and not set(removed).issubset(moved): missing['augmentation_removal_restoration'] += 1
+    return {'basis': 'eligible accepted instances only; native observations and hash-bound object roles',
+        'eligible_instances': len(facts), 'coverage_evidence_complete': not any(missing.values()),
+        'missing_evidence': dict(missing), 'measures': dict(measures),
+        **{name: {'distinct': len(values), 'counts': dict(sorted(values.items()))} for name,values in counts.items()},
+        'note': 'Counts measure observed coverage, not distribution compliance. Original scene removal is separate from training augmentation; {} lighting means no recorded augmentation.'}
+
+
 def build_projection(root):
     from scripts.campaign_20261110.export_release import snapshot_allocations
     root = Path(root)
     rows, groups, inputs = snapshot_allocations(root)
     now = datetime.now(timezone.utc).isoformat()
     cohorts, records, checked = {}, {}, set()
+    coverage, templates = [], {}
     tasks, classes, totals = Counter(), Counter(), Counter()
     for row in rows:
         if row['split'] != 'train': continue
@@ -158,6 +247,17 @@ def build_projection(root):
         if decision['status'] == 'eligible':
             tasks[row['task']] += 1
             classes[row.get('class_id', row['task'])] += 1
+            try:
+                gid = row.get('group_id')
+                if gid not in templates:
+                    path = root/'groups'/gid/'campaign_config.json'
+                    templates[gid] = json.loads(path.read_text())['template'] if path.is_file() else None
+                native = json.loads(Path(row['tro']).read_text())['ispatialgym']
+                fact = coverage_facts(row, native, templates[gid])
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                fact = {'error': str(exc)}
+            coverage.append(fact)
+            proof['coverage'] = fact
         key = (row['task'], row.get('class_id', row['task']), decision['status'], decision['category'], tuple(decision['reasons']))
         cohort_id = digest(key)[:20]
         cohort = cohorts.setdefault(cohort_id, {'cohort_id': cohort_id, 'task': key[0], 'class_id': key[1],
@@ -178,6 +278,8 @@ def build_projection(root):
         'remaining': 100000-totals['eligible'], 'replacement_links': [], 'inputs': inputs,
         'tasks': [{'task': task, 'eligible_accepted': n} for task,n in sorted(tasks.items())],
         'classes': [{'class_id': cls, 'eligible_accepted': n} for cls,n in sorted(classes.items())],
+        'coverage': {**coverage_summary(coverage), 'excluded_historical_instances_not_counted': totals['excluded'],
+                     'unverified_instances_not_counted': totals['unverified']},
         'cohorts': list(cohorts.values()), 'records': records,
         'raw_generated': None, 'raw_generated_note': 'not inferred from accepted totals; see native attempt accounting',
         'policy': 'standalone blocked; preserve historical acceptance; eligible standard siblings/singletons only'}

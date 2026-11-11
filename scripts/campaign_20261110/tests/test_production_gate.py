@@ -178,3 +178,27 @@ def test_exact_group_proof_requires_real_sibling_and_preserves_runtime_identity(
     shutil.copyfile(tmp_path/'dataset/quotas.sqlite3',tmp_path/'dataset/allocations.sqlite')
     assert standard_group_proof(tmp_path,f.template.class_id,review['validation_key'])['group_id']==review['group_id']
     assert standard_group_proof(tmp_path,f.template.class_id,{**review['validation_key'],'code_sha256':'a'*64}) is None
+
+
+def test_native_coverage_separates_original_removal_and_actual_augmentation():
+    from scripts.campaign_20261110.training_eligibility import coverage_facts, coverage_summary
+    template={'objects':[{'instance':'table','category':'table','model':'t','role':'support','semantic_kind':'object'},
+                         {'instance':'ball','category':'ball','model':'b','role':'target','semantic_kind':'object'}]}
+    row={'room':'house/room','validation_key':{'template_sha256':digest(template)}}
+    raw={'scene':{'model':'house','scene_variant':{'removed_objects':['chair']}},
+         'object_bindings':{'table':{'category':'table','model':'t','scene_object_name':'table_1'},
+                            'ball':{'category':'ball','model':'b','scene_object_name':'ball_1'}},
+         'campaign':{'perturbations':{'scales':{'table':{'default':[1,1,1]},'ball':{'default':[1,1,1]}},'removed_objects':[],'lighting':{}},
+                     'runtime':{'observed_scales':{'table':[1,1,1],'ball':[1.2,1.2,1.2]},'augmentation':{'moved_objects':{},'lighting':{}}}}}
+    fact=coverage_facts(row,raw,template);coverage=coverage_summary([fact])
+    assert coverage['supports']['distinct']==1 and coverage['models']['distinct']==2
+    assert coverage['measures']['instances_with_original_scene_removal']==1
+    assert coverage['measures']['instances_with_verified_augmentation_removal']==0
+    assert coverage['measures']['instances_with_nondefault_scale']==1
+    assert coverage['measures']['instances_with_lighting_augmentation']==0
+    assert coverage['coverage_evidence_complete']
+    unknown=coverage_summary([coverage_facts(row,raw)])
+    assert unknown['missing_evidence']['supports']==1 and not unknown['coverage_evidence_complete']
+    import pytest
+    with pytest.raises(ValueError,match='contract differs'):
+        coverage_facts(row,raw,{'objects':[]})
