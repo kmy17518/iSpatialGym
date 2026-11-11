@@ -207,6 +207,71 @@ def render_review_association(root, row, rendering):
 
 
 _BATCH_OBSERVATION_CACHE = {}
+_HISTORICAL_RENDER_CACHE = {}
+
+
+def _historical_render_stamps(root, reference, policy_reference):
+    """Watch referenced evidence files, without scanning unrelated code/history."""
+    root=Path(root).resolve();watched={};seen=set()
+    def visit(value):
+        if isinstance(value,dict):
+            for child in value.values():visit(child)
+        elif isinstance(value,list):
+            for child in value:visit(child)
+        elif isinstance(value,str) and value.startswith(str(root)+'/'):
+            path=Path(value)
+            if path in seen:return
+            seen.add(path)
+            if path.is_dir():return
+            watched[str(path)]=_stamp(path)
+            if path.is_file() and path.suffix=='.json':visit(read(path))
+    visit(reference)
+    # The policy file is immutable evidence. Other canaries registered in it
+    # are unrelated to this review and must not trigger global history scans.
+    watched[policy_reference['path']]=_stamp(policy_reference['path'])
+    return watched
+
+
+def historical_render_association(root, row, rendering, *, auditor=None):
+    """Validate a finished render against its original policy, not current permission."""
+    root=Path(root).resolve();original=rendering['review']
+    exact_row={**row,'validated_evidence':{'review':original}}
+    render_review_association(root,exact_row,rendering)
+    proof=read(original['path']);policy_reference,_=policy_snapshot(root,proof['gate_policy_sha256'])
+    key=(str(root),original['path'],original['sha256'],policy_reference['sha256'])
+    cached=_HISTORICAL_RENDER_CACHE.get(key)
+    if cached and all(_stamp(path)==stamp for path,stamp in cached['stamps'].items()):
+        verification={**cached['verification'],'verification_cached':True}
+    else:
+        if auditor is None:
+            from scripts.campaign_20261110.training_canaries import audit_historical_canary
+            auditor=audit_historical_canary
+        before=_historical_render_stamps(root,original,policy_reference)
+        actual=auditor(proof['source_job'],proof['source_proof']['source_gate']['path'],
+                       root=root,started_at=1794321600,policy_reference=policy_reference)
+        require(digest(actual)==digest(proof),'historical canary physical or authorization evidence changed')
+        require(all(_stamp(path)==stamp for path,stamp in before.items()),
+                'historical canary evidence changed during audit')
+        verification={'verification_observed_at':datetime.now(timezone.utc).isoformat(),
+                      'verification_cached':False,'full_review_payload_sha256':digest(actual)}
+        _HISTORICAL_RENDER_CACHE[key]={'verification':verification,'stamps':before}
+    current=(row.get('validated_evidence')or{}).get('review')
+    result={'status':'historical_review_reaudited','render_review':original,
+            'historical_policy':policy_reference,'current_review':current,
+            'authorization_equivalence_asserted':False,'current_permission_from_this_evidence':False,
+            'scope':'Completed render evidence under its exact original policy; current authorization is separate.',
+            **verification}
+    if current:
+        path=Path(current['path']).resolve()
+        require(path.is_relative_to(root/'validation/training_canaries/reviews')
+                and file_digest(path)==current['sha256'],'current canary review bytes changed')
+        current_proof=read(path)
+        require({k:v for k,v in proof.items()if k!='gate_policy_sha256'}==
+                {k:v for k,v in current_proof.items()if k!='gate_policy_sha256'},
+                'current canary source or validation evidence differs from completed render')
+        result['current_review_has_identical_immutable_evidence']=True
+        result['current_policy_sha256']=current_proof['gate_policy_sha256']
+    return result
 
 
 def _evidence_stamps(root, probe):
@@ -477,11 +542,13 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                                 row['sampler_sequence']['evidence_identity_verified']=True
                     if scoped_key in renders:
                         rendering=renders[scoped_key]
-                        association=render_review_association(root,row,rendering)
+                        association=historical_render_association(root,row,rendering)
                         row['template_rendering']={**rendering,'review_association':association}
                         if rendering['status']=='verified':
-                            row['validated_evidence']['rendering']=True
-                            row['validated_evidence']['rendering_result']=rendering['result']
+                            target='validated_evidence' if row.get('validated_evidence') else 'historical_validated_evidence'
+                            row.setdefault(target,{'review':rendering['review'],'scope':'Historical exact canary; no current permission'})
+                            row[target]['rendering']=True
+                            row[target]['rendering_result']=rendering['result']
                     row['last_observed_at'] = datetime.now(timezone.utc).isoformat()
                     result['records'].append(row)
                 except Exception as error:

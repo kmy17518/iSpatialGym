@@ -136,3 +136,46 @@ def test_bad_render_record_does_not_hide_other_exact_templates(tmp_path):
     errors=[];rows=status.template_render_observations(tmp_path,p,errors=errors)
     assert list(rows)==[('candidate',12)] and rows[('candidate',12)]['status']=='verified'
     assert len(errors)==1 and errors[0]['candidate_id']=='bad'
+
+
+def historical_fixture(root):
+    row,rendering,policies,reviews=policy_review_fixture(root)
+    gate=root/'source_gate.json';write_json_atomic(gate,{'physical':'unchanged'})
+    for p in (reviews/'old.json',reviews/'new.json'):
+        value=status.read(p);value['source_job']=str(root/'source_job')
+        value['source_proof']['source_gate']=status.ref(gate);write_json_atomic(p,value)
+    rendering['review']=status.ref(reviews/'old.json');row['validated_evidence']['review']=status.ref(reviews/'new.json')
+    return row,rendering,policies,reviews,gate
+
+
+def test_historical_render_reaudits_original_policy_and_keeps_current_permission_separate(tmp_path):
+    row,rendering,policies,reviews,gate=historical_fixture(tmp_path)
+    policy=status.read(policies/'after_previous_policy.json');policy['allowed_canaries']=[]
+    write_json_atomic(policies/'after_previous_policy.json',policy)
+    current=status.read(reviews/'new.json');current['gate_policy_sha256']=status.file_digest(policies/'after_previous_policy.json')
+    write_json_atomic(reviews/'new.json',current);row['validated_evidence']['review']=status.ref(reviews/'new.json')
+    calls=[]
+    def audit(job,source,**kwargs):
+        assert kwargs['policy_reference']==status.ref(policies/'before_previous_policy.json')
+        assert source==str(gate);calls.append(job);return status.read(reviews/'old.json')
+    observed=status.historical_render_association(tmp_path,row,rendering,auditor=audit)
+    assert observed['status']=='historical_review_reaudited'
+    assert observed['current_policy_sha256']==current['gate_policy_sha256']
+    assert not observed['authorization_equivalence_asserted'] and not observed['current_permission_from_this_evidence']
+    assert len(calls)==1
+    assert status.historical_render_association(tmp_path,row,rendering,auditor=audit)['verification_cached']
+    assert len(calls)==1
+    write_json_atomic(gate,{'physical':'changed'})
+    def changed(*args,**kwargs):raise ValueError('source gate changed')
+    with pytest.raises(ValueError,match='source gate changed'):
+        status.historical_render_association(tmp_path,row,rendering,auditor=changed)
+
+
+def test_historical_render_does_not_need_current_permission_but_rejects_changed_audit(tmp_path):
+    row,rendering,policies,reviews,gate=historical_fixture(tmp_path)
+    row.pop('validated_evidence')
+    bad={**status.read(reviews/'old.json'),'scale_provenance':{'changed':True}}
+    with pytest.raises(ValueError,match='physical or authorization evidence changed'):
+        status.historical_render_association(tmp_path,row,rendering,auditor=lambda *a,**k:bad)
+    observed=status.historical_render_association(tmp_path,row,rendering,auditor=lambda *a,**k:status.read(reviews/'old.json'))
+    assert observed['current_review'] is None and not observed['current_permission_from_this_evidence']

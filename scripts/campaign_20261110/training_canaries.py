@@ -56,6 +56,30 @@ def verify_scale_provenance(template, perturbations, raw, reports):
 def audit_canary(job, gate_path, *, root, started_at):
     root,job=Path(root).resolve(),Path(job).resolve()
     policy,policy_sha=read_policy(root)
+    return _audit_canary(job,gate_path,root=root,started_at=started_at,
+                         policy=policy,policy_sha=policy_sha)
+
+
+def audit_historical_canary(job, gate_path, *, root, started_at, policy_reference):
+    """Re-audit completed evidence under its exact original policy bytes.
+
+    This function cannot publish, authorize execution or release production.
+    The ordinary publication path always reads the current policy.
+    """
+    root=Path(root).resolve();path=Path(policy_reference['path']).resolve()
+    history=root/'infra/training_production_gate'
+    require(path.is_relative_to(history) and path.is_file()
+            and file_digest(path)==policy_reference['sha256'],
+            'historical canary policy bytes missing or changed')
+    policy=read(path)
+    require(policy.get('schema')=='isg-training-production-gate-v1'
+            and policy.get('campaign_id')=='campaign_20261110',
+            'historical canary policy identity differs')
+    return _audit_canary(Path(job).resolve(),gate_path,root=root,started_at=started_at,
+                         policy=policy,policy_sha=policy_reference['sha256'])
+
+
+def _audit_canary(job, gate_path, *, root, started_at, policy, policy_sha):
     env=read_environment(artifact(job/'job.env',root,started_at))
     config_path=artifact(env['ISPATIALGYM_CAMPAIGN_CONFIG'],root,started_at)
     config=read(config_path);config_sha=file_digest(config_path)

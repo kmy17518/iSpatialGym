@@ -143,3 +143,26 @@ def test_reobservation_reaudits_but_does_not_contend_with_unrelated_writer(tmp_p
     value['qa']['hard_triggered']=['unsafe'];c.write_json_atomic(replay,value)
     with pytest.raises(c.ContractError,match='QA'):
         canary.publish_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
+
+
+def test_historical_audit_preserves_original_policy_without_authorizing_current_publish(tmp_path,monkeypatch):
+    f,_=setup(tmp_path,monkeypatch)
+    expected=canary.audit_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
+    current=tmp_path/'controllers/training_production_gate.json'
+    previous=tmp_path/'infra/training_production_gate/history/policy.json'
+    previous.parent.mkdir(parents=True);previous.write_bytes(current.read_bytes())
+    reference={'path':str(previous),'sha256':c.file_digest(previous)}
+    policy=json.loads(current.read_text());policy['allowed_canaries']=[]
+    c.write_json_atomic(current,policy)
+    result=canary.audit_historical_canary(f.job,f.gate,root=tmp_path,started_at=f.since,policy_reference=reference)
+    assert result==expected and not result['accepted'] and result['quota_consumed']==0
+    assert not (tmp_path/'validation/training_canaries/ledger.json').exists()
+    with pytest.raises(c.ContractError,match='one exact explicit authorization'):
+        canary.publish_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
+    replay=next(f.gate.parent.glob('replay/*/meta.json'));value=json.loads(replay.read_text())
+    value['qa']['hard_triggered']=['unsafe'];c.write_json_atomic(replay,value)
+    with pytest.raises(c.ContractError,match='QA'):
+        canary.audit_historical_canary(f.job,f.gate,root=tmp_path,started_at=f.since,policy_reference=reference)
+    previous.write_text('{}')
+    with pytest.raises(c.ContractError,match='policy bytes missing or changed'):
+        canary.audit_historical_canary(f.job,f.gate,root=tmp_path,started_at=f.since,policy_reference=reference)
