@@ -3,7 +3,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.campaign_20261110.ik_native_probe import CAMPAIGN, SCHEMA, sha, validate_spec, compatibility_difference
+from scripts.campaign_20261110.ik_native_probe import (CAMPAIGN, SCHEMA, sha, validate_spec,
+    compatibility_difference, write_observation_environment)
 
 
 class ProbeBoundaryTests(unittest.TestCase):
@@ -60,6 +61,17 @@ class ProbeBoundaryTests(unittest.TestCase):
         actual = {'modules': {'ik.py': 'new'}, 'settings': {'ISPATIALGYM_FAST': '1'},
                   'objects': [{'applied_scale': (1., 1., 1.)}]}
         self.assertEqual(compatibility_difference(expected, actual), {'modules': ['ik.py']})
+
+    def test_environment_evidence_excludes_credentials_and_never_overwrites(self):
+        self.output.mkdir(parents=True)
+        result = write_observation_environment(self.output, self.spec['snapshot'],
+            {'ISPATIALGYM_EXACT_IK_PRODUCER': 'primary:diagnostic', 'API_KEY': 'do-not-record'})
+        text = Path(result['path']).read_text()
+        self.assertIn('ISPATIALGYM_EXACT_IK_PRODUCER=primary:diagnostic', text)
+        self.assertNotIn('API_KEY', text)
+        self.assertNotIn('do-not-record', text)
+        with self.assertRaises(FileExistsError):
+            write_observation_environment(self.output, self.spec['snapshot'], {})
 
 
 if __name__ == '__main__':

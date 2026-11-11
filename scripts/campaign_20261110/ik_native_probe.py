@@ -13,15 +13,32 @@ import importlib
 import json
 import os
 from pathlib import Path
+import shlex
 import sys
 import time
 
 CAMPAIGN = 'campaign_20261110'
 SCHEMA = 'isg-exact-ik-native-probe-v1'
+OBSERVATION_ENV_KEYS = ('ISGE_CODE', 'ISPATIALGYM_EXACT_IK_MANIFEST',
+    'ISPATIALGYM_EXACT_IK_LOCAL_CACHE', 'ISPATIALGYM_EXACT_IK_METRICS',
+    'ISPATIALGYM_EXACT_IK_PRODUCER', 'ISGF_SAMPLING_CACHE',
+    'ISPATIALGYM_GRASP_LIBRARY_V2', 'ISPATIALGYM_REACH_MAPS',
+    'ISGF_ASSET_CACHE', 'KIT_TPL_NFS_ROOT', 'KIT_TEX_STORE')
 
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def write_observation_environment(output, snapshot, env):
+    values = {k: env[k] for k in OBSERVATION_ENV_KEYS if k in env}
+    values['ISGE_CODE'] = str(snapshot)
+    path = Path(output) / 'job.env'
+    with path.open('x') as stream:
+        stream.write(''.join(k + '=' + shlex.quote(v) + '\n' for k, v in sorted(values.items())))
+    return {'path': str(path), 'sha256': sha(path), 'keys': sorted(values),
+            'kind': 'allowlisted_process_start_environment',
+            'runtime_sharing_requires_metrics_verification': True}
 
 
 def compatibility_difference(expected, actual):
@@ -117,6 +134,7 @@ def main():
         temporary.write_text(json.dumps(report, indent=2) + '\n')
         temporary.replace(output / 'probe_report.json')
 
+    report['environment_observation'] = write_observation_environment(output, paths['snapshot'], os.environ)
     save()
     # Build with the actual native interpreter and effective worker environment.
     # ast.dump fingerprints differ between Python versions: a manifest prepared
