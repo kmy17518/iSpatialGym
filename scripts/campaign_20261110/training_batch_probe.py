@@ -116,7 +116,24 @@ def observe_reset_boundary(scene, sim, load, observe):
     return result, observations[0]
 
 
-def install_reset_boundary_probe(runner, *, final_pre_action=False, observer=None):
+def observe_next_native_step(sim, observe, destination):
+    """Observe one already-requested native step; never add or replace physics."""
+    step=sim.step_physics;raw_step=vars(sim).get('step_physics');had_step='step_physics' in vars(sim)
+    def observed(*args, **kwargs):
+        before=observe()
+        try:
+            result=step(*args, **kwargs)
+            after=observe()
+            destination.update(phase='first_native_physics_step_after_completed_loader',
+                before=before,after=after,physics_steps_added=0,diagnostic_only=True)
+            return result
+        finally:
+            if had_step:sim.step_physics=raw_step
+            else:del sim.step_physics
+    sim.step_physics=observed
+
+
+def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_step=False, observer=None):
     """Instrument only this diagnostic process; the ordinary loader is unchanged."""
     restore=runner.InstanceLoader.restore
     def observed_restore(loader, *args, **kwargs):
@@ -156,6 +173,11 @@ def install_reset_boundary_probe(runner, *, final_pre_action=False, observer=Non
                 'physics_steps_added':0,
                 'observation':restoration_observation(loader.tro.meta.raw['campaign'],
                                                        loader.env.scene, runner.og.sim)}
+        if next_native_step:
+            destination={}
+            loader.report['campaign_restoration']['next_native_physics_step_observation']=destination
+            observe_next_native_step(runner.og.sim,
+                lambda:restoration_observation(loader.tro.meta.raw['campaign'],loader.env.scene,runner.og.sim),destination)
         return result
     runner.InstanceLoader.restore=observed_restore
     return restore
@@ -199,7 +221,8 @@ def run(root,request,output,kind):
         require(fast_on('COLLECTOR_PREBUILD'),'production template compatibility is disabled')
         if value.get('observe_reset_boundary') is True:
             install_reset_boundary_probe(run_isg,
-                final_pre_action=value.get('observe_final_pre_action') is True)
+                final_pre_action=value.get('observe_final_pre_action') is True,
+                next_native_step=value.get('observe_next_native_physics_step') is True)
             common['reset_boundary_diagnostic']=True
             common['final_pre_action_diagnostic']=value.get('observe_final_pre_action') is True
         world=shared_world_proof(run_isg,records)
