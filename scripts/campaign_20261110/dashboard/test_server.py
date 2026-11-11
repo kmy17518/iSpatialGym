@@ -122,6 +122,33 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(raw), [{'cpu_affinity': '1-9'}])
 
+    def test_training_eligibility_preserves_history_without_fallback_and_is_read_only(self):
+        data=snapshot(self.root,self.root/'inventory')
+        self.assertEqual(data['training_eligibility'],{})
+        self.assertEqual(data['evidence']['counts']['train'],31)
+        self.assertFalse(data['sources']['training_eligibility']['available'])
+        value={'campaign_id':'campaign_20261110','historically_accepted':31,
+               'eligible_accepted':7,'excluded':24,'unverified':0,'api_key':'HIDDEN'}
+        self.write('dashboard/training_eligibility.json',value)
+        before=self.hashes();code,raw=self.request('GET','/reports/training-eligibility')
+        self.assertEqual(code,200);self.assertNotIn(b'HIDDEN',raw)
+        data=json.loads(self.request('GET','/api/status')[1])
+        self.assertEqual(data['training_eligibility']['eligible_accepted'],7)
+        self.assertEqual(data['evidence']['counts']['train'],31)
+        self.assertEqual(before,self.hashes())
+        self.write('dashboard/training_eligibility.json',{'campaign_id':'older','eligible_accepted':99999})
+        self.assertEqual(self.request('GET','/reports/training-eligibility')[0],404)
+        self.assertEqual(snapshot(self.root,self.root/'inventory')['training_eligibility'],{})
+
+    def test_training_gate_and_requirements_routes_are_scoped_and_never_write(self):
+        for name,route in [('training_production_gate','training-production-gate'),('training_requirements','training-requirements')]:
+            self.write('dashboard/'+name+'.json',{'campaign_id':'campaign_20261110','status':'closed','command':'DO NOT EXECUTE'})
+            before=self.hashes();code,raw=self.request('GET','/reports/'+route)
+            self.assertEqual(code,200);self.assertNotIn(b'DO NOT EXECUTE',raw)
+            self.assertEqual(before,self.hashes())
+            self.write('dashboard/'+name+'.json',{'campaign_id':'older'})
+            self.assertEqual(self.request('GET','/reports/'+route)[0],404)
+
     def test_new_quality_and_denominator_reports_are_scoped_sanitized_and_read_only(self):
         for route,name in [('/reports/replay-quality','gate_quality_audit.json'),
                            ('/reports/gpu-denominator-coverage','cohort_rental_denominator_coverage.json')]:

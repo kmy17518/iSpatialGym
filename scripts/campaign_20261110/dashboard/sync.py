@@ -14,6 +14,9 @@ FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group
 FLEET_FILE = 'vast_fleet_gpu_time.json'
 CLUSTER_FLEET_FILE = 'cluster_fleet_gpu_time.json'
 AUDIT_FILES = {'gate_quality_audit.json': 'validation/gate_quality_audit.json',
+               'training_eligibility.json': 'accounting/training_eligibility.json',
+               'training_production_gate.json': 'controllers/training_production_gate.json',
+               'training_requirements.json': 'manifests/training_requirements.json',
                'standard_recovery.json': 'infra/standard_recovery/ledger.json',
                'cohort_rental_denominator_coverage.json': 'accounting/cohort_rental_denominator_coverage.json'}
 
@@ -76,7 +79,19 @@ def return_report(output):
         'eval_category': 'Category/room holdout', 'train': 'Training'}
     for key, title in names.items():
         value, target = evidence['counts'][key], evidence['targets'][key]
+        if key == 'train':
+            eligibility_path=output/'training_eligibility.json'
+            eligibility=json.loads(eligibility_path.read_text()) if eligibility_path.exists() else {}
+            eligible=eligibility.get('eligible_accepted') if eligibility.get('campaign_id')=='campaign_20261110' else None
+            lines.append(f'Training historically accepted: {value:,}; eligible goal count: '+(f'{eligible:,} / {target:,}; {max(0,target-eligible):,} remaining' if isinstance(eligible,int) else 'UNAVAILABLE — eligibility audit pending; historical totals do not count toward completion.'))
+            lines.append('Training excluded/flagged: '+str(eligibility.get('excluded','unavailable'))+'; unverified: '+str(eligibility.get('unverified','unavailable'))+'; replacements: '+str(eligibility.get('replacement_count','unavailable')))
+            continue
         lines.append(f'{title}: {value:,} / {target:,}; {max(0, target-value):,} remaining')
+    gate_path=output/'training_production_gate.json'
+    gate=json.loads(gate_path.read_text()) if gate_path.exists() else {}
+    lines += ['','STANDALONE TRAINING PRODUCTION GATE',json.dumps(gate) if gate else 'Gate observation unavailable; training remains ineligible without proof.',
+        'Requirements and evidence: http://127.0.0.1:8765/#training-production',
+        'Historical acceptance and artifacts are preserved. Goal progress and replacement capacity use eligibility evidence.']
     recovery_path=output/'standard_recovery.json'
     if recovery_path.exists():
         recovery=json.loads(recovery_path.read_text())
