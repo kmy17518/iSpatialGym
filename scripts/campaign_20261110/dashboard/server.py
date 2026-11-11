@@ -54,6 +54,7 @@ def snapshot(root, inventory):
     containment, cts = read_source(root / 'dashboard/training_containment.json')
     requirements, reqs = read_source(root / 'dashboard/training_requirements.json')
     training_stream, tss = read_source(root / 'dashboard/training_stream.json')
+    existing_reviews, ers = read_source(root / 'dashboard/existing_native_reviews.json')
     change_impact, cis = read_source(root / 'dashboard/change_impact.json')
     current_eligibility, ces = read_source(root / 'dashboard/current_eligibility.json')
     fleet, fs = read_source(root / 'dashboard/vast_fleet_gpu_time.json')
@@ -91,6 +92,8 @@ def snapshot(root, inventory):
         change_impact = {}; cis = {'available': False, 'error': 'Campaign identity mismatch'}
     if training_stream and training_stream.get('campaign_id') != 'campaign_20261110':
         training_stream = {}; tss = {'available': False, 'error': 'Campaign identity mismatch'}
+    if existing_reviews and existing_reviews.get('campaign_id') != 'campaign_20261110':
+        existing_reviews = {}; ers = {'available': False, 'error': 'Campaign identity mismatch'}
     if fleet and fleet.get('campaign_id') != 'campaign_20261110':
         fleet = {}; fs = {'available': False, 'error': 'Campaign identity mismatch'}
     if cluster_fleet and cluster_fleet.get('campaign_id') != 'campaign_20261110':
@@ -128,6 +131,8 @@ def snapshot(root, inventory):
         'training_containment': containment,
         'training_requirements': requirements,
         'training_stream': training_stream,
+        'existing_native_reviews': existing_reviews,
+        'existing_native_reviews_source': ers,
         'current_eligibility': {k:v for k,v in current_eligibility.items() if k not in ('records','groups','decisions')},
         'change_impact': {k:v for k,v in change_impact.items() if k not in ('decisions','inventory')},
         'heldout_recovery': heldout,
@@ -166,6 +171,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/training-containment': 'training_containment.json',
             '/reports/training-requirements': 'training_requirements.json',
             '/reports/training-stream': 'training_stream.json',
+            '/reports/existing-native-reviews': 'existing_native_reviews.json',
             '/reports/change-impact': 'change_impact.json',
             '/reports/current-eligibility': 'current_eligibility.json',
             '/reports/standard-recovery': 'standard_recovery.json',
@@ -178,7 +184,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
+            if path in ('/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,

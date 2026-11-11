@@ -18,6 +18,7 @@ AUDIT_FILES = {'capacity_recovery.json': 'infra/capacity_recovery/ledger.json', 
                'training_production_gate.json': 'controllers/training_production_gate.json',
                'training_containment.json': 'infra/training_production_gate/containment_status.json',
                'training_requirements.json': 'manifests/training_requirements.json',
+               'existing_native_reviews.json': 'training_pipeline_canaries/height_r2/existing_native_reviews.json',
                'training_stream.json': 'training_pipeline_canaries/height_r2/stream/state.json',
                'change_impact.json': 'validation/change_impact/ledger.json',
                'current_eligibility.json': 'accounting/current_eligibility.json',
@@ -123,6 +124,13 @@ def return_report(output):
             lines += ['','INDEPENDENT TRAINING VALIDATION STREAM', 'Observed: '+chicago(stream.get('observed_at')),
                 'Bulk standalone production remains held until100/100 canonical validation plus shared pipeline, applicable path and exact proof. Bounded end-to-end canaries, augmentation/batched replay/render restoration and exact dependency preparation may proceed independently. Canonical and held-out eval retain priority; canaries must not become production.',
                 *[key+': '+str(row.get('annotated_status',row.get('status')))+'; '+str(row.get('annotated_error',row.get('reason',''))) for key,row in stream.get('records',{}).items()]]
+    review_path=output/'existing_native_reviews.json'
+    if review_path.exists():
+        review=json.loads(review_path.read_text())
+        if review.get('campaign_id')=='campaign_20261110':
+            lines += ['','BOUNDED EXISTING-NATIVE PIPELINE REVIEWS', 'Observed: '+chicago(review.get('observed_at')),
+                'These canaries earn zero benchmark credit. Original native states are retained; each collection, replay and restoration stage requires its own evidence.',
+                *[key+': '+str(row.get('status'))+'; job '+str(row.get('allocation',{}).get('jobid',row.get('job_id','unobserved')))+'; '+str(row.get('error',row.get('reason',''))) for key,row in review.get('records',{}).items()]]
     canonical_path=output/'canonical_validation.json'
     if canonical_path.exists():
         canonical=json.loads(canonical_path.read_text())
