@@ -47,3 +47,19 @@ def test_submission_does_not_imply_running_or_success(tmp_path):
     value = status.observe(tmp_path)['batch_stages'][0]['stages']
     assert value[0]['status'] == 'submitted' and value[0]['scheduler_state'] == 'unavailable'
     assert value[1]['status'] == 'not_observed'
+
+
+def test_authorization_refresh_preserves_one_native_attempt(tmp_path):
+    folder, row = request(tmp_path, 'candidate', 1)
+    original = status.ref(folder/'requests.json')
+    current = folder/'requests_refresh_r2.json'
+    write_json_atomic(current, {'campaign_id': 'campaign_20261110',
+        'records': [{**row, 'authorization_sha256': 'b'*64}]})
+    write_json_atomic(folder/'current_request.json', {'previous': original, 'current': status.ref(current)})
+    value = status.observe(tmp_path)
+    assert value['attempts_observed'] == 1 and value['records'][0]['original_request'] == original
+    changed = status.read(current); changed['records'][0]['start'] = 2
+    write_json_atomic(current, changed)
+    write_json_atomic(folder/'current_request.json', {'previous': original, 'current': status.ref(current)})
+    value = status.observe(tmp_path)
+    assert value['attempts_observed'] == 0 and 'changed native attempt identity' in value['errors'][0]['error']

@@ -37,12 +37,29 @@ def observe(root, *, now=None):
         try:
             value = read(path)
             require(value['campaign_id'] == result['campaign_id'], 'foreign canary request')
+            original_request = ref(path)
+            current_request = original_request
+            pointer_path = path.parent/'current_request.json'
+            if pointer_path.exists():
+                pointer = read(pointer_path)
+                require(pointer['previous'] == original_request, 'request revision original differs')
+                current_path = Path(pointer['current']['path']).resolve()
+                require(current_path.parent == path.parent.resolve() and
+                        file_digest(current_path) == pointer['current']['sha256'], 'request revision changed')
+                revised = read(current_path)
+                mutable = {'authorization_path', 'authorization_sha256', 'expires_at', 'status'}
+                require(revised['campaign_id'] == value['campaign_id'] and
+                        [{k:v for k,v in r.items() if k not in mutable} for r in revised['records']] ==
+                        [{k:v for k,v in r.items() if k not in mutable} for r in value['records']],
+                        'authorization refresh changed native attempt identity')
+                value, current_request = revised, pointer['current']
             for request in value['records']:
                 key = (request['candidate_id'], int(request['start']))
                 row = {'candidate_id': key[0], 'start': key[1], 'count': request['count'],
                     'class_id': request['class_id'], 'configuration_sha256': request['config_sha256'],
                     'native_runtime': request['native_runtime'], 'batch': path.parent.name,
-                    'request': ref(path), 'status': 'native_not_observed', 'native': None,
+                    'request': current_request, 'original_request': original_request,
+                    'status': 'native_not_observed', 'native': None,
                     'review': None, 'benchmark_credit': 0, 'quota_consumed': 0}
                 output = Path(request['output']).resolve()
                 require(output.is_relative_to(base), 'native output outside pipeline scope')
@@ -78,6 +95,18 @@ def observe(root, *, now=None):
         elif (request.parent/'preflight.json').exists(): batch['status'] = 'ready_for_bounded_probe'
         submission_path = request.parent/'submission.json'
         submissions = {}
+        submission_pointer = request.parent/'submission_current.json'
+        if submission_pointer.exists():
+            try:
+                pointer = read(submission_pointer)
+                selected = Path(pointer['current']['path']).resolve()
+                require(selected.parent == request.parent.resolve() and
+                        file_digest(selected) == pointer['current']['sha256'], 'submission revision changed')
+                submission_path = selected
+                batch['prior_attempts'] = pointer['prior_attempts']
+                batch['submission_pointer'] = ref(submission_pointer)
+            except Exception as error:
+                batch.update(status='submission_observation_failed', error=f'{type(error).__name__}: {error}')
         if submission_path.exists():
             try:
                 submitted = read(submission_path)
