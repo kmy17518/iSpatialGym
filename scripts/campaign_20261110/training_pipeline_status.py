@@ -76,9 +76,21 @@ def observe(root, *, now=None):
         failure = request.parent/'preflight_failure.json'
         if failure.exists(): batch.update(status='preflight_failed', failure={**ref(failure), **read(failure)})
         elif (request.parent/'preflight.json').exists(): batch['status'] = 'ready_for_bounded_probe'
+        submission_path = request.parent/'submission.json'
+        submissions = {}
+        if submission_path.exists():
+            try:
+                submitted = read(submission_path)
+                require(submitted['request'] == ref(request), 'batch submission request differs')
+                submissions = {job['kind']: job for job in submitted['jobs']}
+                batch['submission'] = ref(submission_path)
+            except Exception as error:
+                batch.update(status='submission_observation_failed', error=f'{type(error).__name__}: {error}')
         for name, kind in [('physics', 'physics_action_open_loop'), ('render', 'kinematic_observation_rendering')]:
             probe = request.parent/name/'probe.json'
             stage = {'kind': kind, 'status': 'not_observed'}
+            if kind in submissions:
+                stage.update(status='submitted', allocation=submissions[kind], scheduler_state='unavailable')
             if probe.exists():
                 stage.update(evidence=ref(probe), observed_at=timestamp(probe), status='incomplete')
                 try:

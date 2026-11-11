@@ -37,3 +37,13 @@ def test_batch_request_is_not_batch_success(tmp_path):
     value = status.observe(tmp_path)
     assert value['batch_stages'][0]['status'] == 'preflight_failed'
     assert all(s['status'] == 'not_observed' for s in value['batch_stages'][0]['stages'])
+
+
+def test_submission_does_not_imply_running_or_success(tmp_path):
+    path = tmp_path/'training_pipeline_canaries/batch/batch_restoration_r2'
+    write_json_atomic(path/'request.json', {'canaries': []})
+    write_json_atomic(path/'submission.json', {'request': status.ref(path/'request.json'),
+        'jobs': [{'kind': 'physics_action_open_loop', 'job_id': '123'}]})
+    value = status.observe(tmp_path)['batch_stages'][0]['stages']
+    assert value[0]['status'] == 'submitted' and value[0]['scheduler_state'] == 'unavailable'
+    assert value[1]['status'] == 'not_observed'
