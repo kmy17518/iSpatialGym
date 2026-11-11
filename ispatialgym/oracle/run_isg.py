@@ -639,6 +639,14 @@ class InstanceLoader:
         except Exception:  # noqa: BLE001
             pass
         self.report["floor_collision_filter"] = self._apply_floor_filters()
+        if self.tro.meta.raw.get("campaign"):
+            from ispatialgym.oracle.campaign_restore import restore_serialized_mass_before_reset
+
+            early_mass = restore_serialized_mass_before_reset(
+                self.tro.meta.raw["campaign"], task.object_scope, self.tro.meta.object_bindings or {},
+                (self.tro.meta.extras or {}).get("constraints") or [])
+            if early_mass is not None:
+                self.report["pre_reset_serialized_mass"] = early_mass
         task.load_tro_instance(env, tro=self.tro, settle_steps=0)
         self.physical = {k: v for k, v in task.object_scope.items() if v is not None and not isinstance(v, GroupEntity)}
         if self.tro.meta.raw.get("campaign"):
