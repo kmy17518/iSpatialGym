@@ -77,3 +77,32 @@ def test_block_train_difficulty_is_soft_while_eval_requires_flips():
         s.campaign_verify_goal(d)
     s._campaign_block_active = replace(p, split="train")
     s.campaign_verify_goal(d)
+
+
+@pytest.mark.parametrize('up_faces,expected', [
+    (['+z','-x','+y','+x'], {1,2,3}),
+    (['-x','-y','+y','+x'], {0,1,2,3}),
+])
+def test_fixed_profile_screens_all_required_flips_before_selecting_cells(up_faces, expected):
+    s=object.__new__(BlockDesign)
+    s._campaign_block_active=NS(initial_up_faces=up_faces,pattern=['red','blue','blue','red'])
+    s.faces={'+z':'red','-z':'blue','+x':'white','-x':'yellow','+y':'blue|yellow','-y':'red|white'}
+    s.gen=lambda key,default=None: default
+    s.g=lambda key: {'rbbr':['red','blue','blue','red']} if key=='patterns' else None
+    s._has_board=lambda: True
+    cells=[th.tensor([.3*i,0.]) for i in range(4)]
+    stance=NS(world_to_base=lambda cell: cell)
+    goals_=['+z','-z','-z','+z']
+    assert s._n_flips()==len(expected)
+    assert s._flips_expected()
+    s._flip_cell_ok=lambda cell,*args: float(cell[0])<.8
+    assert s._flip_plan(cells,lambda c:float(c[0]),goals_,stance,stance,'right',True) is None
+    s._flip_cell_ok=lambda *args: True
+    assert s._flip_plan(cells,lambda c:float(c[0]),goals_,stance,stance,'right',True)==expected
+    # A nearby block on the approach side still rejects the whole candidate.
+    blocked=list(cells);blocked[3]=th.tensor([.01,.1])
+    assert s._flip_plan(blocked,lambda c:float(c[0]),goals_,stance,stance,'right',True) is None
+    # Ordinary sampling keeps its original repeated-color assignment.
+    s._campaign_block_active=None
+    assert s._n_flips()==2
+    assert s._flip_plan(cells,lambda c:float(c[0]),goals_,stance,stance,'right',True)=={0,1}

@@ -397,12 +397,18 @@ class BlockDesign(SamplerV2):
     def _n_flips(self) -> int:
         """Blocks that must flip for the configured pattern(s): the up faces are distinct, so of the blocks sharing a goal
         colour only one shows it up (``block_no_flip`` makes that preference certain) - ``n - distinct colours`` at least."""
+        plan = getattr(self, "_campaign_block_active", None)
+        if plan is not None:
+            faces = self.color_to_face()
+            return sum(up != faces[color] for up, color in zip(plan.initial_up_faces, plan.pattern))
         patterns = self.g("patterns") or {}
         if not patterns:
             return 0
         return max(len(p) - len(set(p)) for p in patterns.values())
 
     def _flips_expected(self) -> bool:
+        if getattr(self, "_campaign_block_active", None) is not None:
+            return self._n_flips() > 0
         return self._n_flips() > 0 and (bool(self.gen("block_no_flip", False)) or float(self.gen("goal_face_up_prob", 0.5)) > 0.0)
 
     def _flip_cell_ok(self, c: th.Tensor, manip: Stance, init: Stance, primary_dir: str) -> bool:
@@ -425,30 +431,40 @@ class BlockDesign(SamplerV2):
         oi = sorted(range(len(cs)), key=lambda i: sc[i])
         gf = {bi: slot_faces[si] for si, bi in enumerate(oi)}
         anchor_bi = oi[0]
-        groups: Dict[str, List[int]] = {}
-        for bi, f in gf.items():
-            groups.setdefault(f, []).append(bi)
-        flips: set = set()
-        for f, members in groups.items():
-            if len(members) == 1:
-                continue
-            if not flip_mode:
-                flips.update(members[1:])  # image order: the first shows the face, the rest flip
-                continue
-            elig = [bi for bi in members if self._flip_cell_ok(cs[bi], manip, init, primary_dir)]
-            non = [bi for bi in members if bi not in elig]
-            if len(non) > 1:
-                return None  # two blocks of one colour that cannot flip
-            if non:
-                up = non[0]
-            elif anchor_bi in elig and not self._has_board():
-                # the anchor's slot IS its cell: its flip is placed where it was picked (the one flip the exact chain passes
-                # broadly), so the anchor flips and the other block of its colour shows the face
-                up = next(bi for bi in elig if bi != anchor_bi)
-            else:
-                # the FARTHEST one shows its face (the flip zone lies at depth 0.55-0.65 of the near stand-offs)
-                up = max(elig, key=lambda bi: float(manip.world_to_base(cs[bi])[0]))
-            flips.update(bi for bi in members if bi != up)
+        plan = getattr(self, "_campaign_block_active", None)
+        if plan is not None:
+            # Fixed campaign profiles may require more flips than duplicate
+            # goal colors alone. Screen their actual image-ordered flip set
+            # before choosing cells or a board placement, using the same reach
+            # and approach-clearance rules as the final sample check.
+            flips = {bi for si, bi in enumerate(oi) if plan.initial_up_faces[si] != slot_faces[si]}
+            if flip_mode and any(not self._flip_cell_ok(cs[bi], manip, init, primary_dir) for bi in flips):
+                return None
+        else:
+            groups: Dict[str, List[int]] = {}
+            for bi, f in gf.items():
+                groups.setdefault(f, []).append(bi)
+            flips: set = set()
+            for f, members in groups.items():
+                if len(members) == 1:
+                    continue
+                if not flip_mode:
+                    flips.update(members[1:])  # image order: the first shows the face, the rest flip
+                    continue
+                elig = [bi for bi in members if self._flip_cell_ok(cs[bi], manip, init, primary_dir)]
+                non = [bi for bi in members if bi not in elig]
+                if len(non) > 1:
+                    return None  # two blocks of one colour that cannot flip
+                if non:
+                    up = non[0]
+                elif anchor_bi in elig and not self._has_board():
+                    # the anchor's slot IS its cell: its flip is placed where it was picked (the one flip the exact chain passes
+                    # broadly), so the anchor flips and the other block of its colour shows the face
+                    up = next(bi for bi in elig if bi != anchor_bi)
+                else:
+                    # the FARTHEST one shows its face (the flip zone lies at depth 0.55-0.65 of the near stand-offs)
+                    up = max(elig, key=lambda bi: float(manip.world_to_base(cs[bi])[0]))
+                flips.update(bi for bi in members if bi != up)
         # the flip class approaches from the block's right (the side the goal face shows), low over the table: no other
         # block may stand on that side within the approach's sweep (probe run 2026-09-19 03:1x: 'collides with
         # targets_toy_dice_isgblk_2' along the approach of a flipping block with a neighbour 10 cm to its right)
