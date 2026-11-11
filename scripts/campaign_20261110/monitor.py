@@ -24,10 +24,10 @@ def atomic(path, content):
 def now():
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
-def refresh(output, host):
+def refresh(output, host, ssh_options=()):
     infra=output/'infra'
     error=None
-    command=['python3','-'] if host=='local' else ['ssh','-o','BatchMode=yes','-o','ConnectTimeout=12',host,'python3','-']
+    command=['python3','-'] if host=='local' else ['ssh','-o','BatchMode=yes','-o','ConnectTimeout=12',*ssh_options,host,'python3','-']
     try:
         result=subprocess.run(command,input=(HERE/'capacity_probe.py').read_text(),text=True,capture_output=True,timeout=75)
         if result.returncode:
@@ -130,9 +130,14 @@ def main():
     parser.add_argument('--host',default='minyeong@svl11')
     parser.add_argument('--watch',action='store_true')
     parser.add_argument('--interval',type=float,default=45)
+    parser.add_argument('--ssh-hostname')
+    parser.add_argument('--ssh-hostkey-alias')
     args=parser.parse_args()
+    if bool(args.ssh_hostname) != bool(args.ssh_hostkey_alias):
+        parser.error('An explicit SSH hostname requires its existing trusted host-key alias')
+    ssh_options=['-o','HostName='+args.ssh_hostname,'-o','HostKeyAlias='+args.ssh_hostkey_alias] if args.ssh_hostname else []
     while True:
-        refresh(args.output,args.host)
+        refresh(args.output,args.host,ssh_options)
         if not args.watch:break
         time.sleep(max(15,args.interval))
 if __name__=='__main__':main()

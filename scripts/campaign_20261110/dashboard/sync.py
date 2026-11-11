@@ -23,14 +23,14 @@ def atomic(path, data):
     temp.replace(path)
 
 
-def sync(output):
+def sync(output, ssh_options=()):
     remote = "import json,pathlib; p=pathlib.Path(%r); names=%r; data={n:json.loads((p/n).read_text()) for n in names if (p/n).exists()}; report=p/'GOAL_GROUP_YIELD.md'; data['goal_yield_report']=report.read_text() if report.exists() else None; data.update({n:json.loads((p.parent/'accounting'/n).read_text()) for n in %r if (p.parent/'accounting'/n).exists()}); print(json.dumps(data))" % (REMOTE, FILES, (FLEET_FILE, CLUSTER_FLEET_FILE))
     remote = remote.replace('print(json.dumps(data))',
         "data.update({n:json.loads((p.parent/relative).read_text()) for n,relative in %r.items() if (p.parent/relative).exists()}); print(json.dumps(data))" % AUDIT_FILES)
     # The fixed remote program reads only the allowlisted campaign audit files.
     command = "python3 - <<'PY'\n" + remote + "\nPY"
     result = subprocess.run(['ssh', '-oBatchMode=yes', '-oConnectTimeout=15',
-        'minyeong@svl11', command], text=True, capture_output=True, timeout=45, check=True)
+        *ssh_options, 'minyeong@svl11', command], text=True, capture_output=True, timeout=45, check=True)
     bundle = json.loads(result.stdout)
     evidence = bundle.get('dashboard_evidence.json')
     if not evidence or evidence.get('campaign_id') != 'campaign_20261110':
@@ -149,12 +149,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--once', action='store_true')
+    parser.add_argument('--ssh-hostname')
+    parser.add_argument('--ssh-hostkey-alias')
     args = parser.parse_args()
+    if bool(args.ssh_hostname) != bool(args.ssh_hostkey_alias):
+        parser.error('An explicit SSH hostname requires its existing trusted host-key alias')
+    ssh_options=['-o','HostName='+args.ssh_hostname,'-o','HostKeyAlias='+args.ssh_hostkey_alias] if args.ssh_hostname else []
     args.output.mkdir(parents=True, exist_ok=True)
     while True:
         status = {'checked_at': datetime.now(timezone.utc).isoformat(), 'campaign_id': 'campaign_20261110'}
         try:
-            status.update(ok=True, source_observed_at=sync(args.output))
+            status.update(ok=True, source_observed_at=sync(args.output,ssh_options))
         except (OSError, ValueError, subprocess.SubprocessError) as exc:
             status.update(ok=False, error=type(exc).__name__ + ': ' + str(exc), previous_evidence_preserved=True)
         atomic(args.output / 'sync_status.json', status)
