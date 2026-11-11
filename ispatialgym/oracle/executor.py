@@ -426,6 +426,7 @@ NOTE_KEYS = NOTE_KEYS + ("push_speed_m_s", "push_nudge_brace_hold", "push_nudge_
 NOTE_KEYS = NOTE_KEYS + ("preshape_set", "preshape_kept_from_transition_m")  # oracle-fix 2026-11-06: the shelf back-off's pre-shape (transition / grasp)
 NOTE_KEYS = NOTE_KEYS + ("push_gripper",)  # oracle-fix 2026-11-06: an open-hand push's opening (execute_push; touching's generation.push_gripper_open)
 NOTE_KEYS = NOTE_KEYS + ("overpath", "transit_book_clearance")  # i7-overpath 2026-11-08: the overhang pick's recorded transit / its book clearance
+NOTE_KEYS = NOTE_KEYS + ("carry_online", "carry_online_policy", "place_motion_stage")
 
 
 @dataclass

@@ -2835,9 +2835,13 @@ def _carry_online(action, motions: Motions, state, arm: str, targets, ctx, carry
 
     sc = ctx.get("sidecar")
     g = next((g for g in (getattr(sc, "grasps", None) or []) if getattr(g, "object", None) == action.object and getattr(g, "arm", None) in (None, arm)), None)
-    if not carry_online_wanted(g):
+    enabled = carry_online_wanted(g)
+    ctx["carry_online_policy"] = {"enabled": enabled, "arm": arm, "recorded_waypoints": len(carry)}
+    if not enabled:
         return None
     ok, why = _carry_dry_run(motions, arm, carry, check_collisions=False)
+    ctx["carry_online_policy"].update(recorded_tracks=ok, recorded_status=why)
+    log.info("place(%s): online carry policy enabled; recorded live dry run tracks=%s (%s)", arm, ok, why)
     if ok:
         ctx["carry_online"] = {"recorded": "tracks"}
         return None
@@ -3003,6 +3007,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
                                    "retreat_finish": "support present except the board pieces"}
         ctx["plan_ignored"] = _plan_ignored(on, split.links)
     carry = list(targets.get("carry") or ())
+    ctx["place_motion_stage"] = "carry"
     if cfg.carry_leg == "straight" and carry:
         online = _carry_online(action, motions, state, arm, targets, ctx, carry, on)
         if online is not None and online[0] == "repose":
@@ -3081,6 +3086,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         # end it at the hover pose above the seat - the contact hold keeps the part through the carry and the descent
         targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
         targets = attach_hover_targets(action, motions, state, targets, ctx, cfg)
+    ctx["place_motion_stage"] = "descent"
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
     if split is not None and split.links:
         finish.ignore_links = list(split.links)
@@ -3140,6 +3146,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
                 yield from lower_drop(action, motions, state, ctx, cfg)
             yield from motions.gripper(arm, close=False)
             yield from _release(motions, state, arm)
+    ctx["place_motion_stage"] = "retreat"
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
     # retreat straight back along -a (up for a top-down pose) before any lateral motion; a free-space leg after the
     # release: a differential-IK stall is finished by arm_to like the Retreat action's leg (touching 0917-203045: the
