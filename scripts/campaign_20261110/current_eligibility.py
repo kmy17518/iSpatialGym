@@ -134,7 +134,7 @@ def effective_group(root,row,group):
 def publish(root):
     from scripts.campaign_20261110.export_release import snapshot_allocations
     from scripts.campaign_20261110.training_eligibility import classify_record,audit_eligible
-    root=Path(root);rows,groups,inputs=snapshot_allocations(root);ledger,ref=read_ledger(root)
+    root=Path(root);began=time.monotonic();snapshot_started=datetime.now(timezone.utc).isoformat();rows,groups,inputs=snapshot_allocations(root);snapshot_finished=datetime.now(timezone.utc).isoformat();ledger,ref=read_ledger(root)
     outcomes,consequences=assess(root,rows,groups,ledger)
     counts={k:Counter()for k in ('historical','current_eligible','change_review_verified','under_review','excluded','scope_not_reconciled')}
     classes=defaultdict(Counter);tasks=defaultdict(Counter);records={};checked=set()
@@ -154,7 +154,7 @@ def publish(root):
         records[iid]={'accepted_record_sha256':digest(clean(row)),'status':status['status'],
                       'current_eligible':eligible,'reasons':reasons,'group_id':row.get('group_id'),'split':split}
     now=datetime.now(timezone.utc).isoformat();value={'schema':'isg-current-eligibility-v1','campaign_id':'campaign_20261110',
-        'observed_at':now,'ledger':ref,'status':'complete' if ledger else 'impact_inventory_unavailable',
+        'observed_at':snapshot_started,'published_at':now,'snapshot_finished_at':snapshot_finished,'audit_duration_seconds':time.monotonic()-began,'ledger':ref,'status':'complete' if ledger else 'impact_inventory_unavailable',
         'review_inventory_complete':bool(ledger and ledger.get('coverage',{}).get('complete')),
         'counts':{k:dict(v)for k,v in counts.items()},'classes':[{'class_id':k[0],'split':k[1],'task':k[2],**v}for k,v in sorted(classes.items())],
         'tasks':[{'task':k[0],'split':k[1],**v}for k,v in sorted(tasks.items())],
@@ -181,11 +181,12 @@ def pending_instance_blockers(root,instance_ids):
 if __name__=='__main__':
     import argparse
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--root',type=Path,required=True)
-    parser.add_argument('--watch',action='store_true');args=parser.parse_args()
+    parser.add_argument('--watch',action='store_true');parser.add_argument('--interval',type=float,default=30);args=parser.parse_args()
+    require(args.interval>0,'observer interval must be positive')
     while True:
         try:print(json.dumps(publish(args.root)),flush=True)
         except Exception as exc:
             write_json_atomic(args.root/'accounting/current_eligibility_error.json',{'observed_at':datetime.now(timezone.utc).isoformat(),'error':repr(exc)})
             if not args.watch:raise
         if not args.watch:break
-        time.sleep(120)
+        time.sleep(args.interval)

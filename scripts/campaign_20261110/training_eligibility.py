@@ -1,6 +1,7 @@
 """Evidence-backed training eligibility without rewriting historical acceptance."""
 from __future__ import annotations
 import argparse
+import hashlib
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 import json
@@ -86,14 +87,35 @@ def eligible_training_records(db, task=None, *, root=None, class_id=None):
     return result
 
 
+
+_EVIDENCE_CACHE = {}
+
+
+def immutable_evidence_json(path, expected):
+    """Rehash changed evidence, avoiding repeated NFS reads of immutable bytes."""
+    path=Path(path)
+    def signature():
+        st=path.stat()
+        return (st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns)
+    before=signature();key=(str(path),expected)
+    cached=_EVIDENCE_CACHE.get(key)
+    if cached is not None and cached[0]==before:
+        # Parse the retained bytes again so callers cannot mutate shared state.
+        return json.loads(cached[1])
+    payload=path.read_bytes();after=signature()
+    if before!=after:raise ValueError('accepted evidence changed during audit: '+str(path))
+    if hashlib.sha256(payload).hexdigest()!=expected:raise ValueError('accepted evidence hash changed: '+str(path))
+    if len(_EVIDENCE_CACHE)>=8192:_EVIDENCE_CACHE.clear()
+    _EVIDENCE_CACHE[key]=(after,payload)
+    return json.loads(payload)
+
+
 def audit_eligible(row, checked):
     from scripts.campaign_20261110.acceptance import report_passed
     def verify(path, expected):
-        key = (path, expected)
-        if key not in checked:
-            if file_digest(path) != expected: raise ValueError('accepted evidence hash changed: ' + path)
-            checked.add(key)
-        return json.loads(Path(path).read_text())
+        value=immutable_evidence_json(path,expected)
+        checked.add((path,expected))
+        return value
     raw = verify(row['tro'], row['tro_sha256'])['ispatialgym']
     block = raw['campaign']
     if raw['instance_id'] != row['instance_id'] or block['split'] != 'eval_standard' or block['validation_key'] != row['validation_key']:
