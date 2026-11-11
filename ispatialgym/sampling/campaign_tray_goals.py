@@ -53,7 +53,7 @@ def destination_side_at_anchor(source, destination, anchor):
 
 
 def reference_start_proposal(template):
-    """A hash-bound search hint for the audited embedded-figure recovery.
+    """A hash-bound search hint for the explicitly audited recovery scopes.
 
     The author verifies the reference files before embedding these coordinates.
     This does not import a goal, grasp, IK solution, or physical verdict.
@@ -61,10 +61,17 @@ def reference_start_proposal(template):
     hint = template.scene_setup.get('reference_start_proposal')
     if hint is None:
         return None
-    _require(template.task == 'disembedding' and template.class_id == 'disembedding_01'
-             and template.split == 'eval_standard', 'reference tray proposal has wrong scope')
+    standard_reference = template.class_id == 'disembedding_01' and template.split == 'eval_standard'
+    native_reference = template.class_id == 'disembedding_07' and template.split == 'eval_model'
+    _require(template.task == 'disembedding' and (standard_reference or native_reference),
+             'reference tray proposal has wrong scope')
     _require(isinstance(hint, dict), 'invalid reference tray proposal')
-    for key in ('sidecar_sha256', 'tro_sha256', 'report_sha256'):
+    if native_reference:
+        _require(hint.get('evidence_kind') == 'native_geometry_only',
+                 'model tray proposal must identify native-only evidence')
+    keys = ('sidecar_sha256', 'tro_sha256') + (
+        ('native_summary_sha256', 'template_meta_sha256') if native_reference else ('report_sha256',))
+    for key in keys:
         value = hint.get(key)
         _require(isinstance(value, str) and len(value) == 64 and all(c in '0123456789abcdef' for c in value),
                  'reference tray proposal lacks '+key)

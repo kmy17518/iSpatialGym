@@ -74,6 +74,24 @@ def test_reference_ranking_sees_original_checked_pool_before_random_focus(monkey
     assert sampler.kit.stats['campaign_reference.checked_pool_restored']==1
 
 
+def test_model07_reference_retains_native_only_provenance_and_exact_scope():
+    from ispatialgym.sampling.campaign_tray_goals import reference_start_proposal
+    from ispatialgym.sampling.campaign_held_goals import GoalPlanError
+    hint={'evidence_kind':'native_geometry_only','sidecar_sha256':'a'*64,'tro_sha256':'b'*64,
+          'native_summary_sha256':'c'*64,'template_meta_sha256':'d'*64,
+          'initial_base_pose2d':[1,2,.3],
+          'manipulation':{'base_pose2d':[1,2,.3],'focus':[2,3,.8],'translate':0.,'tilt':-.61}}
+    t=SimpleNamespace(task='disembedding',class_id='disembedding_07',split='eval_model',
+                      scene_setup={'reference_start_proposal':hint})
+    assert reference_start_proposal(t)['initial_base_pose2d']==(1.,2.,.3)
+    t.split='train'
+    with pytest.raises(GoalPlanError,match='wrong scope'):reference_start_proposal(t)
+    t.split='eval_model';hint.pop('evidence_kind')
+    with pytest.raises(GoalPlanError,match='native-only'):reference_start_proposal(t)
+    hint['evidence_kind']='native_geometry_only';hint.pop('template_meta_sha256')
+    with pytest.raises(GoalPlanError,match='template_meta_sha256'):reference_start_proposal(t)
+
+
 def plan():
     return TrayGoalPlan("fresh", "g1", "eval_standard", "template", "a" * 64, "target", "source", "dest",
                         ((1., 2., .8), (0., 0., 0., 1.)), ((0., 2., .7), (0., 0., 0., 1.)),
