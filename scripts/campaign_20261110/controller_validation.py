@@ -13,7 +13,7 @@ def vast_replay_states(root,gates):
     result={}
     ids={str(entry.get('replay_job_id','')) for entry in gates.values()}
     for jid in ids:
-        if not re.fullmatch(r'900000\d+',jid):continue
+        if not re.fullmatch(r'9\d{8,}',jid):continue
         value=read(root/'vast/state/jobs'/(jid+'.json'),{})
         if value.get('job_kind')=='physics_replay' and value.get('status') in ('queued','assigned'):
             result[jid]=value['status']

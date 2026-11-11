@@ -12,6 +12,7 @@ import time
 import uuid
 
 from scripts.campaign_20261110.infra_vast.fleet_accounting import snapshot as fleet_snapshot
+from scripts.campaign_20261110.backend_evidence import vast_job_ids
 
 
 def read(path):
@@ -78,7 +79,8 @@ def snapshot(root):
                         ledger_errors.append({'ledger':str(path),'job_id':jid,'error':'conflicting job directory'});continue
                     rows[jid]=row
         except (OSError,ValueError) as error:ledger_errors.append({'ledger':str(path),'error':str(error)})
-    cluster=[jid for jid in rows if not jid.startswith('900000')];accounting={};probes=[]
+    vast_ids=vast_job_ids(root)
+    cluster=[jid for jid in rows if jid not in vast_ids];accounting={};probes=[]
     for first in range(0,len(cluster),150):
         ids=cluster[first:first+150]
         command=['sacct','-X','-n','-P','-j',','.join(ids),
@@ -97,7 +99,7 @@ def snapshot(root):
         job=Path(row['job_dir']);record={'job_id':jid,'job_dir':str(job),'key':row.get('key'),
             'tag':row.get('tag'),'index':int(row['start']),'requested_candidates':int(row['n']),
             'code':row.get('code'),'native':native_evidence(job),'observed_at_unix':time.time()}
-        if jid.startswith('900000'):
+        if jid in vast_ids:
             state_path=root/'vast/state/jobs'/f'{jid}.json'
             try:
                 state=read(state_path);done=state.get('done') or {};elapsed=done.get('elapsed_s');fetch=done.get('fetch_s')

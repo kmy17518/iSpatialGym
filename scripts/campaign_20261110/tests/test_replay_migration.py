@@ -104,8 +104,8 @@ def test_watcher_reads_only_its_replay_records(tmp_path,monkeypatch):
     seen=[]
     def read(path,default):
         seen.append(path.name)
-        return {'id':'900000123','job_kind':'physics_replay','status':'assigned'}
+        return {'id':'900001234','job_kind':'physics_replay','status':'assigned'}
     monkeypatch.setattr(watcher,'read',read)
-    result=watcher.vast_replay_states(tmp_path,{'source':{'replay_job_id':'900000123'},
+    result=watcher.vast_replay_states(tmp_path,{'source':{'replay_job_id':'900001234'},
         'cluster':{'replay_job_id':'18420000'},'waiting':{}})
-    assert result=={'900000123':'assigned'} and seen==['900000123.json']
+    assert result=={'900001234':'assigned'} and seen==['900001234.json']

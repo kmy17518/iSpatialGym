@@ -20,6 +20,7 @@ from scripts.campaign_20261110.contracts import Perturbations, ScaleState, diges
 from scripts.campaign_20261110.controller_families import allocations
 from scripts.campaign_20261110.export_release import snapshot_allocations
 from scripts.campaign_20261110.goal_groups import read_env
+from scripts.campaign_20261110.backend_evidence import vast_job_ids
 
 CAMPAIGN = 'campaign_20261110'
 CONTROL = {'campaign_group_complete', 'campaign_group_timeout', 'campaign_queue_complete'}
@@ -187,6 +188,7 @@ def snapshot(root):
     accounting_path = root/'accounting/job_gpu_time.json'
     accounting = ev.read(accounting_path, 'gpu_accounting') if accounting_path.exists() else {}
     account = {r['job_id']: r for r in accounting.get('records', [])}
+    vast_ids = vast_job_ids(root) | {jid for jid,row in account.items() if row.get('backend')=='vast'}
     validation_path = root/'validation/controller.json'
     validation = ev.read(validation_path, 'validation_controller') if validation_path.exists() else {}
     gates_by_key = {}; gate_states = defaultdict(list)
@@ -226,7 +228,7 @@ def snapshot(root):
             queue_scope = 'executed'
             if queue_value:
                 if not queue_path.exists(): queue_path = Path(queue_value)
-                if not queue_path.exists() and jid.startswith('900000'):
+                if not queue_path.exists() and jid in vast_ids:
                     # A worker publishes its rewritten job.env before rsync has
                     # returned the staged queue. The immutable pre-cache env
                     # names the authored queue; it proves scheduled membership,
@@ -270,7 +272,7 @@ def snapshot(root):
             if not terminal and (job/'sampling.done').exists():
                 terminal = all((job/f'collect_c{i}.rc').exists() for i in range(1, int(row.get('kcollect') or 1)+1))
             j = {'job_id': jid, 'group_ids': gids, 'job_dir': str(job), 'runtime_revision': Path(row['code']).name.removeprefix('trunk_'),
-                'backend': a.get('backend', 'vast' if jid.startswith('900000') else 'slurm'), 'state': state or 'unavailable',
+                'backend': a.get('backend', 'vast' if jid in vast_ids else 'slurm'), 'state': state or 'unavailable',
                 'terminal': terminal, 'allocated_gpu_seconds': a.get('allocated_gpu_seconds'),
                 'queue_evidence_scope': queue_scope,
                 'missing_time_components': a.get('missing_time_components', []), 'activated_groups': [],
