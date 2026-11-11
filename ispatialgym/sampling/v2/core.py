@@ -1668,6 +1668,15 @@ class SamplerV2(TaskSampler):
                 self._count_withheld()
                 raise Reject("goal_occlusion_unavailable", str(exc)) from exc
             rep["required_by_campaign_configuration"] = True
+        proposal_rejection = CV.proposal_rejection(rep)
+        if proposal_rejection is not None:
+            remove_instance_files(tro_path)
+            self._count_withheld()
+            self.counters["goal_occlusion_margin"] = self.counters.get("goal_occlusion_margin", 0) + 1
+            raise Reject("goal_occlusion_margin",
+                         f"predicted goal hidden fraction {proposal_rejection['measured']:.4f} "
+                         f"does not leave the configured candidate margin < {proposal_rejection['limit']:.4f}; "
+                         "final QA threshold unchanged", **proposal_rejection)
         draft.summary["goal_occlusion"] = rep
         summary_path = instance_summary_path(tro_path)
         if rep["occluded"]:

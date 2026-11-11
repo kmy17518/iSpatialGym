@@ -126,3 +126,43 @@ def test_shelf_recovery_requires_both_books_visible_at_original_threshold():
                       'partner':{'status':'ok','occluded':.7064}},method='measured')
     C.verify_report(result)
     assert result['occluded'] and result['threshold']==.5 and result['worst']=='partner'
+
+
+def tape_template(limit=.4, **changes):
+    fields = dict(class_id='disembedding_07', task='disembedding', split='eval_model',
+                  scene_setup={'recovery_options': {C.PROPOSAL_OPTION: limit}})
+    fields.update(changes)
+    return SimpleNamespace(**fields)
+
+
+def test_tape_margin_rejects_observed_borderline_candidate_without_changing_qa():
+    from copy import deepcopy
+    from ispatialgym.eval import goal_occlusion as GO
+    t = tape_template()
+    assert C.required(t)
+    report = GO.report({'target': {'status': 'ok', 'occluded': .4507}}, method='measured')
+    original = deepcopy(report)
+    assert C.proposal_rejection(report, t) == {'limit': .4, 'measured': .4507}
+    assert report == original and report['threshold'] == .5 and not report['occluded']
+    report = GO.report({'target': {'status': 'ok', 'occluded': .39}}, method='measured')
+    assert C.proposal_rejection(report, t) is None
+    report = GO.report({'target': {'status': 'ok', 'occluded': .4}}, method='measured')
+    assert C.proposal_rejection(report, t) is not None
+
+
+@pytest.mark.parametrize('value', [True, None, '0.4', float('nan'), 0, -.1, .40001, .5])
+def test_tape_margin_cannot_be_untyped_or_weaker(value):
+    with pytest.raises(ValueError): C.required(tape_template(value))
+
+
+@pytest.mark.parametrize('changes', [{'split': 'eval_standard'}, {'split': 'train'},
+                                   {'class_id': 'disembedding_06'}, {'task': 'another_task'}])
+def test_tape_margin_cannot_leak_to_other_scopes(changes):
+    with pytest.raises(ValueError): C.required(tape_template(**changes))
+
+
+def test_tape_margin_is_default_off_and_requires_actual_measurement():
+    ordinary = tape_template(scene_setup={})
+    assert not C.required(ordinary)
+    assert C.proposal_rejection({}, ordinary) is None
+    with pytest.raises(ValueError): C.proposal_rejection({'skipped': 'no camera'}, tape_template())
