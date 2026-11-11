@@ -169,6 +169,7 @@ def register_exact_template_customs_inputs(env, root):
     """
     if not env.get('ISPATIALGYM_CAMPAIGN_CONFIG') or not env.get('TEMPLATE'):
         return None
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from scripts.campaign_20261110.contracts import ObjectRef, Template, write_json_atomic
     from scripts.campaign_20261110.storage import atomic_directory_lock
     root = Path(root).resolve()

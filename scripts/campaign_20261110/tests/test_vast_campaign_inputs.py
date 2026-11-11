@@ -424,3 +424,13 @@ def test_exact_customs_preflight_cannot_introduce_new_external_source(tmp_path):
     doc=json.loads(receipt.read_text());doc['sources']={};receipt.write_text(json.dumps(doc));before=receipt.read_bytes()
     with pytest.raises(ValueError,match='previously frozen'):register_exact_template_customs_inputs(env,root)
     assert receipt.read_bytes()==before
+
+
+def test_exact_customs_preflight_supports_direct_stage_entrypoint_from_other_cwd(tmp_path):
+    import subprocess, sys
+    from scripts.campaign_20261110.infra_vast import campaign_inputs
+    root,env,receipt,external=exact_customs_preflight_fixture(tmp_path)
+    command="import runpy,json; module=runpy.run_path("+repr(campaign_inputs.__file__)+"); module['register_exact_template_customs_inputs']("+repr(env)+","+repr(str(root))+")"
+    result=subprocess.run([sys.executable,'-I','-c',command],cwd=tmp_path,capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    assert json.loads(receipt.read_text())['automatic_exact_source_joins']
