@@ -120,6 +120,19 @@ function renderRecovery(d){
  }).join('')||'<tr><td colspan="6">No recovery rows match these filters.</td></tr>';
 }
 
+function trainingCoverageHTML(c){
+ if(!c||typeof c!=='object')return '<p>Executed room/support/model/scale/lighting coverage is unavailable. Candidate inventories do not establish coverage.</p>';
+ const dims=[['scenes','Scenes'],['rooms','Scene / room keys'],['supports','Support instances'],['models','Nonstructural models'],['scale_ratios','Scale ratios'],['lighting_states','Recorded lighting states']];
+ const measures=[['instances_with_nondefault_scale','Instances with nondefault scales'],['instances_with_lighting_augmentation','Instances with lighting augmentation'],['instances_with_verified_augmentation_removal','Instances with training scene-removal augmentation'],['instances_with_original_scene_removal','Instances using original furniture-removed scenes']];
+ const missing=Object.entries(c.missing_evidence??{}).filter(([,v])=>v>0).map(([k,v])=>`${n(v)} missing ${k.replaceAll('_',' ')} observations`).join(' · ');
+ let html=`<p>Measured from ${n(c.eligible_instances)} eligible accepted instances. ${n(c.excluded_historical_instances_not_counted)} excluded historical instances contribute nothing here.</p><div class="grid three">${dims.map(([key,label])=>`<div class="metric"><h3>${label}</h3><div class="value">${n(c[key]?.distinct)}</div></div>`).join('')}</div><div class="table-wrap"><table><thead><tr><th>Executed augmentation</th><th>Eligible instances</th></tr></thead><tbody>${measures.map(([key,label])=>`<tr><td>${label}</td><td>${n(c.measures?.[key])}</td></tr>`).join('')}</tbody></table></div><p class="caption">Original scene preparation is separate from randomized training removal. An empty lighting record means no recorded augmentation. Global room/support totals do not prove the required 10 shared rooms or 10 supports for each applicable task or class. Two sampled scales and two support heights, model expansion, and the requested perturbation probabilities still require distribution validation.</p><p class="${missing?'warn':'caption'}">${missing?esc(missing)+'. Missing evidence remains unavailable.':c.coverage_evidence_complete?'Executed coverage evidence is complete; dataset distribution compliance is a separate check.':'Coverage evidence completeness is unavailable.'}</p>`;
+ for(const [key,label] of [['by_task','task'],['by_class','class']]){
+  const groups=c[key];if(!groups)continue;
+  const rows=Array.isArray(groups)?groups.map(r=>[r.task??r.class_id,r]):Object.entries(groups);
+  html+=`<details><summary>Executed diversity by ${label}</summary><div class="table-wrap"><table><thead><tr><th>${label}</th><th>Eligible</th><th>Rooms</th><th>Supports</th><th>Models</th><th>Scale ratios</th><th>Lighting augmented</th><th>Removal augmented</th></tr></thead><tbody>${rows.map(([name,r])=>`<tr><td>${esc(name)}</td><td>${n(r.eligible_instances)}</td>${['rooms','supports','models','scale_ratios'].map(k=>`<td>${n(r[k]?.distinct)}</td>`).join('')}<td>${n(r.measures?.instances_with_lighting_augmentation)}</td><td>${n(r.measures?.instances_with_verified_augmentation_removal)}</td></tr>`).join('')}</tbody></table></div></details>`;
+ }
+ return html;
+}
 function renderTraining(d){
  const e=d.training_eligibility??{},g=d.training_production_gate??{},q=d.training_requirements??{},ct=d.training_containment??{};
  $('training-observation').innerHTML=observation('Eligibility audit',e.observed_at,!!d.sources.training_eligibility?.available,d.sources.training_eligibility?.error,300)+observation('Production gate',g.observed_at??g.updated_at,!!d.sources.training_production_gate?.available,d.sources.training_production_gate?.error,3600)+observation('Operational containment',ct.observed_at,!!d.sources.training_containment?.available,d.sources.training_containment?.error,600);
@@ -129,7 +142,7 @@ function renderTraining(d){
  $('training-counts').innerHTML=cards.map(([k,v])=>`<article class="metric"><h3>${esc(k)}</h3><div class="value">${n(v)}</div></article>`).join('');
  $('training-cohorts').innerHTML=(e.cohorts??[]).map(c=>`<tr><td>${esc(c.category??c.cohort??c.name??c.id)}</td><td>${n(c.count??c.historically_accepted)}</td><td>${n(c.eligible_accepted??(c.status==='eligible'?c.count:['excluded','unverified'].includes(c.status)?0:null))}</td><td>${esc(plain(c.reasons??c.reason))}</td><td>${esc(plain(c.remediation_status??c.remediation??c.status))}</td></tr>`).join('')||'<tr><td colspan="5">Cohort audit pending. No historical training is silently grandfathered into the goal count.</td></tr>';
  $('training-requirements').innerHTML=(q.requirements??[]).map(r=>`<tr><td>${esc(r.id)}<div class="small-label">${esc(plain(r.tasks??r.family))}</div></td><td>${esc(r.requirement)}</td><td>${esc(r.status??'unverified')}</td><td>${esc(plain(r.implementation??[]))}</td><td>${esc(plain(r.evidence??[]))}<p>${esc(r.next_action??'')}</p></td></tr>`).join('')||'<tr><td colspan="5">Requirement-to-implementation evidence checklist is being audited against the original prompt.</td></tr>';
- $('training-coverage').textContent=plain(e.coverage??'Accepted room/support/model/scale/lighting/scene coverage is unavailable until eligibility and executed provenance are reconciled. Candidate inventories do not establish coverage.');
+ $('training-coverage').innerHTML=trainingCoverageHTML(e.coverage);
 }
 
 function render(d){renderTraining(d);renderRecovery(d);renderTop(d);renderThroughput(d);renderCoverage(d);renderYield(d);renderCompute(d);renderActivity(d);}

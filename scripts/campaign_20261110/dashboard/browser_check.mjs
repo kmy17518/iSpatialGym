@@ -34,6 +34,12 @@ const canonical=await evaluate(`({validated:current.canonical_validation.validat
 assert.equal(canonical.total,100);assert.equal(canonical.parked,5);assert.ok(canonical.text.includes(String(canonical.validated)));
 
 assert.ok(training.text.includes('Flagged / excluded')&&training.text.includes('Compliant replacements'));
+const diversity=await evaluate(`({text:document.querySelector('#training-coverage').innerText,cards:[...document.querySelectorAll('#training-coverage .metric')].map(x=>x.innerText),missing:trainingCoverageHTML(null),escaped:trainingCoverageHTML({eligible_instances:0,missing_evidence:{'<script>':1}})})`);
+assert.equal(diversity.cards.length,6,'Observed diversity dimensions are rendered as readable counts');
+assert.ok(diversity.text.includes('Global room/support totals do not prove'),'Global counts are not distribution-compliance claims');
+assert.ok(diversity.text.includes('Original scene preparation is separate'),'Scene preparation is not relabeled as training augmentation');
+assert.ok(diversity.missing.includes('unavailable'));
+assert.ok(!diversity.escaped.includes('<script>'),'Missing-provenance keys are escaped');
 const recovery=await evaluate(`({rows:document.querySelectorAll('#recovery-rows tr').length,records:current.standard_recovery.classes.length,summary:current.standard_recovery.summary,text:document.querySelector('#recovery-summary').innerText})`);
 assert.equal(recovery.rows,recovery.records,'Every recovery class is rendered');
 assert.ok(recovery.rows>=59,'The complete recovery baseline remains visible');
