@@ -61,3 +61,13 @@ def test_required_screen_cannot_publish_without_camera(monkeypatch):
     with pytest.raises(Reject,match='camera'):
         sampler.check_goal_occlusion(SimpleNamespace(summary={}),'/candidate/tro.json')
     assert removed==['/candidate/tro.json'] and withheld==[True]
+
+
+def test_under02_requires_measured_goal_without_releasing_other_large_classes():
+    task='inter_object_relation_satisfaction-under_large_scale'
+    assert C.required(template(True, class_id='inter_object_relation_satisfaction-under_large_scale_02',task=task))
+    for suffix in ['01','03']:
+        with pytest.raises(ValueError):
+            C.required(template(True,class_id='inter_object_relation_satisfaction-under_large_scale_'+suffix,task=task))
+    with pytest.raises(ValueError):
+        C.required(template(True,class_id='inter_object_relation_satisfaction-under_large_scale_02',task=C.TASK))

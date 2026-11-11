@@ -5,6 +5,9 @@ import math
 CLASS_ID = 'inter_object_relation_satisfaction-under_small_scale_04'
 TASK = 'inter_object_relation_satisfaction-under_small_scale'
 OPTION = 'native_goal_occlusion_screen'
+AUDITED = {CLASS_ID: TASK,
+    'inter_object_relation_satisfaction-under_large_scale_02':
+        'inter_object_relation_satisfaction-under_large_scale'}
 
 
 def required(template=None):
@@ -16,8 +19,8 @@ def required(template=None):
     value = template.scene_setup.get('recovery_options', {}).get(OPTION, False)
     if type(value) is not bool:
         raise ValueError('native goal occlusion requirement must be boolean')
-    if value and (template.class_id != CLASS_ID or template.task != TASK):
-        raise ValueError('native goal occlusion recovery belongs to the audited spatula class')
+    if value and AUDITED.get(template.class_id) != template.task:
+        raise ValueError('native goal occlusion recovery belongs to an audited under-object class')
     return value
 
 
