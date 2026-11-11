@@ -754,6 +754,19 @@ class InsideMode:
 
     # ------------------------------------------------------------------ partner geometry for C
 
+    def campaign_shelf_goal(self) -> bool:
+        """Shelf goals are native transformed poses, not the source raster cells."""
+        return (getattr(self, "_campaign_pair_active", None) is not None
+                and getattr(self, "relation", None) == "inside"
+                and _shelf_spec(self, checked=True) is not None)
+
+    def campaign_shelf_cell(self, native_cell) -> bool:
+        """The unchanged shelf construction must reproduce the fixed group goal."""
+        if not self.campaign_shelf_goal():
+            return True
+        goal = self._campaign_pair_active.goal_cell
+        return math.dist([float(v) for v in native_cell], goal) <= .001
+
     def inside_surface_spec(self) -> Dict[str, float]:
         z = self.gp.gen("inside_surface_z_m")
         if z is None:
@@ -1001,6 +1014,9 @@ class InsideMode:
                             stats["shelf_place_failed"] = stats.get("shelf_place_failed", 0) + 1
                             continue
                         gc = th.tensor(sp["xy"])
+                        if not self.campaign_shelf_cell(gc):
+                            stats["campaign_shelf_goal_mismatch"] = stats.get("campaign_shelf_goal_mismatch", 0) + 1
+                            continue
                         st.extras["shelf_place"] = sp
                     st.extras["goal_cell"] = [float(gc[0]), float(gc[1])]
                     if rb is None:

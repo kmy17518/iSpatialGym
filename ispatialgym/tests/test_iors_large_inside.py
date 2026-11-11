@@ -1496,3 +1496,33 @@ def test_goal_region_keeps_bays_l_and_m_of_the_desk_alias():
         assert (spec["spine_behind_edge_m"], spec["wall_gap_m"], spec["side"], spec["release_lean_deg"]) == (0.03, 0.04, "near", 9.0)
         assert all(f"_{k}_note" in g for k in ("release_roll_axis", "inside_spine_out", "inside_shelf_place", "drop_height_m"))
         assert ("inside_goal_region" in g) == (alias == "desk")
+
+
+def test_campaign_shelf_goal_keeps_native_raster_and_checks_transformed_pose():
+    from types import MethodType
+    sampler = SimpleNamespace(relation="inside", gp=_GP(inside_shelf_place=True, inside_spine_out=15),
+        _campaign_pair_active=SimpleNamespace(goal_cell=(.015, .025)),
+        campaign_shelf_goal=None)
+    sampler.campaign_shelf_goal = MethodType(IN.InsideMode.campaign_shelf_goal, sampler)
+    assert sampler.campaign_shelf_goal()
+    assert IN.InsideMode.campaign_shelf_cell(sampler, [.015, .025])
+    assert not IN.InsideMode.campaign_shelf_cell(sampler, [.02, .02])
+    sampler.gp = _GP()
+    assert not sampler.campaign_shelf_goal()
+    assert IN.InsideMode.campaign_shelf_cell(sampler, [.02, .02])
+
+
+def test_campaign_pin_preserves_shelf_raster_but_rejects_non_native_plain_goal():
+    from types import MethodType
+    pose = (th.zeros(3), th.tensor([0., 0., 0., 1.]))
+    plan = SimpleNamespace(partner=pose, goal=pose, goal_cell=(.015, .025),
+        base_push=None, placement_mode=None, group_id="fixed")
+    original = th.tensor([[.02, .02], [.04, .04]])
+    sampler = SimpleNamespace(partner=SimpleNamespace(get_position_orientation=lambda:pose),
+        campaign_pair_plan=lambda:plan, num=lambda k,d:d, tol=lambda k,d:d,
+        campaign_shelf_goal=lambda:True, place={"cells":original}, tname="target", pname="partner")
+    IL.IORSLarge.campaign_pin_goal(sampler)
+    assert sampler.place["cells"] is original
+    sampler.campaign_shelf_goal=lambda:False
+    with pytest.raises(Reject,match="campaign_goal_cell"):
+        IL.IORSLarge.campaign_pin_goal(sampler)

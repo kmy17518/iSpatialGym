@@ -5058,7 +5058,8 @@ class IORSLarge(SamplerV2):
             raise Reject("campaign_partner_drift", f"large partner changed before starts: {dp:.6f} m / {dq:.6f} rad")
         # The anchor cell must still belong to this template's geometric candidate
         # set. Install it before B starts are drawn; C can then vary around it.
-        if plan.base_push is None and plan.placement_mode != "drop_push":
+        if (plan.base_push is None and plan.placement_mode != "drop_push"
+                and not getattr(self, "campaign_shelf_goal", lambda: False)()):
             cells = self.place["cells"]
             if not len(cells) or float(th.linalg.norm(G.t(cells) - G.t(plan.goal_cell), dim=1).min()) > .001:
                 raise Reject("campaign_goal_cell", "fixed goal cell no longer belongs to the supported placement region")
@@ -7126,7 +7127,10 @@ class IORSLarge(SamplerV2):
             F_goal = [(y - d_yaw, g) for y, g in F_goal]
             # owner 2026-10-12 ~22:35 (inside): tilted releases as alternatives to the level one; per pair the tilts (deg, 0 = level) it passed
             tilts_of: Dict[Tuple[int, Any], List[float]] = {}
-            if not push and campaign_plan is None:
+            if not push and (campaign_plan is None or campaign_plan.inside_release_attitude is not None
+                             or getattr(self, "campaign_shelf_goal", lambda: False)()):
+                # A campaign goal fixes the result, not the native tilt/roll proof.
+                # Rebuild the same per-grasp screen needed to reconstruct it.
                 F_goal, tilts_of = self.screen_release_tilts(F_goal, release_xy, yaws, d_yaw, place, arm, ignore_place, yaw_step)
             F = intersect_feasible(F_live, F_goal, yaw_step=yaw_step)
             if push:
