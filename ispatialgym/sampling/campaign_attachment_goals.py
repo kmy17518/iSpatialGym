@@ -78,12 +78,12 @@ def validate_attachment_plan(raw, *, template_id, scene, rooms, activated_at, no
 
 
 def order_source_stances(plan, class_id, order, candidates):
-    """Try the proven cork torso among the existing, fully checked pool.
+    """Try the proven cork/cap stance among the existing, fully checked pool.
 
     Four ordinary proposals remain ahead of two source-near proposals. No
     stance is synthesized, discarded, or exempted from native checks.
     """
-    if class_id != 'configuration_matching-attachment_03' or plan.anchor_manipulation_stance is None:
+    if class_id not in {'configuration_matching-attachment_03', 'configuration_matching-attachment_04'} or plan.anchor_manipulation_stance is None:
         return order
     from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
     return prioritize_written_stances(order, candidates, [plan.anchor_manipulation_stance])

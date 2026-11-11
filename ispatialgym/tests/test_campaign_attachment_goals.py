@@ -114,7 +114,17 @@ def test_cork_hint_only_reorders_existing_candidates_with_four_exploratory_slots
     ranked = goals.order_source_stances(p, 'configuration_matching-attachment_03', original, candidates)
     assert ranked[:4] == original[:4] and ranked[4] == 8
     assert sorted(ranked) == original and len(set(ranked)) == len(original)
-    for cls in ('configuration_matching-attachment_01', 'configuration_matching-attachment_02',
-                'configuration_matching-attachment_04'):
+    for cls in ('configuration_matching-attachment_01', 'configuration_matching-attachment_02'):
         assert goals.order_source_stances(p, cls, original, candidates) is original
     assert goals.order_source_stances(plan(), 'configuration_matching-attachment_03', original, candidates) is original
+
+
+def test_cap_source_focus_is_tried_without_waiving_fixed_partner_separation():
+    hint = {'base_pose2d': [15.741, -9.18787, 1.5708], 'focus': [15.74, -8.35, .8],
+            'translate': .5, 'tilt': -.4542}
+    p = replace(plan(), anchor_manipulation_stance=hint)
+    candidates = [NS(**{**hint, 'focus': [15.94, -8.35, .8]}) for _ in range(8)] + [NS(**hint)]
+    order = list(range(9))
+    ranked = goals.order_source_stances(p, 'configuration_matching-attachment_04', order, candidates)
+    assert ranked[:4] == order[:4] and ranked[4] == 8
+    assert sorted(ranked) == order
