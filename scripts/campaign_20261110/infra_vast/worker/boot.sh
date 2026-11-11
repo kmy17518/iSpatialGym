@@ -33,6 +33,11 @@ heartbeat() {
 }
 self_destroy() {
   [ -n "${HB_PID:-}" ] && kill $HB_PID 2>/dev/null
+  # Periodic and postjob uploads are primary; this is only the bounded final
+  # chance for compatible witness updates before normal retirement/maintenance.
+  if [[ -f "$RUN/ik_lifecycle.py" ]]; then
+    timeout 60 python3 "$RUN/ik_lifecycle.py" >> "$LOG/exact_ik_final_flush.log" 2>&1 || true
+  fi
   log "SELF_DESTROY $*"
   heartbeat destroyed "$*"
   upload_logs

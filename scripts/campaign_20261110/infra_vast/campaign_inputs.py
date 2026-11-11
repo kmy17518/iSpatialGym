@@ -57,6 +57,8 @@ def uncovered_jobs(queued, live, heartbeats, created, assigned_to, timestamp):
         slots = max(0,int(hb.get('slots') or event.get('slots') or 1)-len(assigned_to.get(iid,[])))
         for job in list(remaining):
             if not slots: break
+            if job.get('exact_ik_exchange_required') and hb.get('phase') != 'boot' and int(hb.get('exact_ik_exchange_version',0)) < 1:
+                continue
             if worker_can_run(job, iid, worker, event, timestamp):
                 remaining.remove(job);slots-=1
     return remaining
@@ -83,6 +85,8 @@ def assignment_plan(queued, live, heartbeats, created, assigned_to, timestamp):
         for job in list(remaining):
             if free <= 0:
                 break
+            if job.get('exact_ik_exchange_required') and int(heartbeat.get('exact_ik_exchange_version',0)) < 1:
+                continue
             if not worker_can_run(job, instance, worker, creation, timestamp):
                 continue
             planned.append((instance, worker, job))

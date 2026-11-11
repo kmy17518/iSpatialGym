@@ -22,6 +22,7 @@ import sys
 import threading
 import time
 from resource_policy import select_cpus
+from ik_lifecycle import ExactIKLifecycle
 
 S3 = os.environ["ISG_S3"].rstrip("/")
 EP = os.environ["S3_ENDPOINT_URL"]
@@ -35,6 +36,21 @@ CACHES = []  # the asset-geometry cache stays on the instance (derived from decr
 SECRET_ENV = ("AWS_", "CONTAINER_API_KEY", "VAST_", "GHCR_", "ISG_", "S3_", "REPLAY_S3", "RUNPOD_")
 LOCK = threading.Lock()
 STATE = {"running": {}, "done": 0, "failed": 0, "started": time.time(), "last_work": time.time(), "phase": "ready"}
+IK_CONTEXTS = {}
+
+
+def flush_exact_ik(reason):
+    """Bound total retirement delay; normal periodic/postjob uploads run first."""
+    deadline = time.monotonic() + 60
+    with LOCK:
+        contexts = list(IK_CONTEXTS.values())[-8:]
+    for context in contexts:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        thread = threading.Thread(target=context.flush, args=(reason,), daemon=True)
+        thread.start()
+        thread.join(remaining)
 
 
 def log(*a):
@@ -137,6 +153,7 @@ def heartbeat():
                    **{name:v.get(name) for name in ('phase','fetch_started_unix','runtime_started_unix','upload_started_unix')}}
                for k, v in STATE["running"].items()}
         hb = {"instance": INST, "phase": STATE["phase"], "time": int(time.time()), "slots": SLOTS, "running": run, "done": STATE["done"],
+              "exact_ik_exchange_version": 1,
               "failed": STATE["failed"], "free_cpus": len(FREE_CPUS), **GPU, "cpus": len(CPUS), "ram_gb": round(RAM, 1),
               "disk_free_gb": round(shutil.disk_usage("/work").free / 2**30, 1), "up_s": int(time.time() - STATE["started"])}
     # Read-only infrastructure telemetry; simulator settings stay unchanged.
@@ -293,6 +310,12 @@ def run_job(spec, replay_s3):
     open(marker, "w").close()
     if err is None:
         env, start = job_env(spec, cpus)
+        exact_ik = ExactIKLifecycle(spec, s5, S3, INST)
+        env.update(exact_ik.prepare())
+        if exact_ik.enabled:
+            with LOCK:
+                IK_CONTEXTS[jid] = exact_ik
+            exact_ik.begin()
         cpus_str = ",".join(map(str, cpus))
         with LOCK:
             STATE["running"][jid]["phase"] = "run"
@@ -323,6 +346,7 @@ def run_job(spec, replay_s3):
             os.killpg(p.pid, 9)
         except OSError:
             pass
+        exact_ik.finish()
     t_end = time.time()
     with LOCK:
         STATE['running'][jid]['phase'] = 'upload'
@@ -417,6 +441,7 @@ def main():
         if stop:
             STATE["phase"] = "draining"
             if n_run == 0:
+                flush_exact_ik('normal_drain')
                 log("STOP")
                 STATE["phase"] = "stopped"
                 heartbeat()
@@ -448,6 +473,7 @@ def main():
             if not STATE["running"] and STATE["phase"] == "run":
                 STATE["phase"] = "ready"
         if idle:
+            flush_exact_ik('idle_retirement')
             log(f"IDLE for {IDLE_S} s")
             STATE["phase"] = "idle_exit"
             heartbeat()

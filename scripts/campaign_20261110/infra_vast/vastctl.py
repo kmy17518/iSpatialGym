@@ -48,6 +48,7 @@ try:
     from .cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
     from .fleet_accounting import observe as observe_rentals
+    from . import ik_transport
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision, preserved_instances
     from bounded_process import run_bounded
@@ -58,6 +59,7 @@ except ImportError:
     from cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from funding import read_snapshot as read_credit_snapshot, remaining_credit
     from fleet_accounting import observe as observe_rentals
+    import ik_transport
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -91,6 +93,7 @@ SKIP_KEYS = {"ISGE_CODE", "ISGF_SCRIPTS", "ISGF_ROOT", "COUNTED_RUN", "COUNTED_S
              "ISGF_ASSET_CACHE", "ISGF_JB_NFS", "KIT_TPL_NFS_ROOT", "KIT_TEX_STORE", "ISGF_EXP_PATH", "EXP_PATH",
              "ISGF_REPLAY_SOURCE_JOB", "ISGF_REPLAY_SOURCE_SNAPSHOT", "ISGF_REPLAY_HELPER_SNAPSHOT",
              "ISPATIALGYM_SAMPLING_CACHE", "ISPATIALGYM_CACHE_DIR", "ISPATIALGYM_HELD_HOLD_CACHE"}
+SKIP_KEYS.update({'ISPATIALGYM_EXACT_IK_LOCAL_CACHE', 'ISPATIALGYM_EXACT_IK_METRICS'})
 PATH_MAX_BYTES = 3 * 2**30
 DEFAULT_CONFIG = {"gpus": ["RTX 4090"], "default_gpu": "RTX 4090", "max_instances": 1, "budget_usd": 300.0, "max_dph_gpu": 1.5,
                   "disk_gb": 280, "idle_destroy_s": 420, "boot_max_s": 3300, "launch_per_tick": 3, "min_inet_down": 500,
@@ -338,11 +341,26 @@ def stage(s3, rec, state):
     b1k = os.path.dirname(os.path.realpath(os.path.join(code, "Behavior-1K", "OmniGibson")))
     # tools the job scripts call that the image lacks (rsync: kit_appdata.sh, job_fast.sh's collector app-data copies and prebuild dir)
     code_keys = ["bundle/tools/rsync.tar.zst", ensure_code(s3, code, state)]
+    exact_ik = None
+    if not replay and env.get('ISPATIALGYM_EXACT_IK_MANIFEST'):
+        try:
+            helper_code = str(Path(__file__).resolve().parents[3])
+            exact_ik = ik_transport.prepare(OFH, jd, env, s3, BUCKET, PREFIX, helper_code)
+            helper_key = ensure_code(s3, helper_code, state)
+            if helper_key not in code_keys:
+                code_keys.append(helper_key)
+        except Exception as exc:
+            # Ordinary native solving is always available when sharing fails.
+            log('EXACT_IK_SEED_UNAVAILABLE ' + str(rec['id']) + ' ' + type(exc).__name__)
     if not under(b1k, [code]):
         code_keys.append(ensure_code(s3, b1k, state))
     shipped = [code, b1k] + list(STORES) + list(CACHES) + list(NOT_SHIPPED)
     L = Lister(shipped)
     L.add_tree(jd)
+    if exact_ik:
+        manifest = json.loads(Path(exact_ik['manifest_path']).read_text())
+        for reference in manifest['provenance']['robot_refs'].values():
+            L.add_file(reference['path'])
     if replay:
         sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
         from scripts.campaign_20261110.vast_replay import transport_inputs, sha as replay_sha
@@ -420,6 +438,8 @@ def stage(s3, rec, state):
     spec.update({"code": [{"key": k} for k in code_keys], "jobdata": f"jobs/{rec['id']}/jobdata.tar.zst", "scenes": runtime_scenes(env, OFH),
                  "git_roots": roots, "staged": now(), "inputs": {"entries": len(L.items), "bytes": L.bytes, "prebuild_candidates": n_pre,
                  "template_customs": customs_inputs, "camera_context": camera_inputs}})
+    if exact_ik:
+        spec['exact_ik_exchange'] = exact_ik
     log(f"STAGED {rec['id']} {rec['name']} {len(L.items)} entries {L.bytes / 2**20:.1f} MB, {n_pre} prebuild candidates ({now() - t:.0f} s)")
     return spec
 
@@ -865,6 +885,11 @@ def tick(c, s3, state):
     global STAGER
     C = cfg()
     protected = preserved_instances(F)
+    if os.path.isdir(os.path.join(F, 'ik_exchange', 'manifests')):
+        try:
+            ik_transport.reconcile(F, s3, BUCKET, PREFIX, max_descriptors=4, deadline_seconds=10)
+        except Exception as exc:
+            log('EXACT_IK_MERGE_DEFERRED ' + type(exc).__name__)
     states = load_states()
     ingest(states, C)
     presence_started = now()
@@ -1014,6 +1039,7 @@ def tick(c, s3, state):
     queued = dispatch_order(states.values(), C)
     for job in queued:
         job['compatible_gpus'] = compatible_gpus(job.get('gpu') or C['default_gpu'], C)
+        job['exact_ik_exchange_required'] = bool(read_env(job['job_dir']).get('ISPATIALGYM_EXACT_IK_MANIFEST'))
     assigned_to = {}
     for s in states.values():
         if s["status"] == "assigned":
@@ -1057,7 +1083,9 @@ def tick(c, s3, state):
         up = t - float(i.get("start_date") or t)
         st = i.get("actual_status")
         busy = bool(reserved_to.get(iid))
-        model_pending = any(worker_can_run(job, iid, i, created.get(iid) or {}, t) for job in queued)
+        model_pending = any(worker_can_run(job, iid, i, created.get(iid) or {}, t)
+                            and (not job.get('exact_ik_exchange_required') or int(hb.get('exact_ik_exchange_version',0)) >= 1)
+                            for job in queued)
         reason = None
         if drained_worker_finished(iid, draining, reserved_to, hb):
             reason = 'account funding drain; worker has no active or reserved jobs'
