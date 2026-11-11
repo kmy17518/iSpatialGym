@@ -31,8 +31,8 @@ def source(tmp_path, monkeypatch):
     row = {'directory': str(queue.parent), 'queue': str(queue), 'validation_key': key, 'command': cmd,
            'index': 50000100, 'count': 3, 'groups': {}, 'status': 'external_submission', 'dry_run_passed': True,
            'prepared': {'queue': str(queue), 'config': str(cfg), 'group_ids': ['old_0000']},
-           'allocation': {'jobid': '123', 'job_dir': str(root/'out/old')}}
-    intent=write(root/'dispatch/ready/old.json', {'backends':['minyeong_svl','vast_4090']})
+           'allocation': {'jobid': '123', 'job_dir': str(root/'out/old'), 'key':'class', 'start':50000100, 'n':3, 'code':str(root/'code/native123')}}
+    intent=write(root/'dispatch/ready/old.json', {'backends':['minyeong_svl','vast_4090'], 'identity':{k:row['allocation'][k] for k in ('key','start','n','code')}})
     row['dispatch_intent']=str(intent)
     monkeypatch.setattr(q, 'read_queue', lambda path, config: json.loads(Path(path).read_text()))
     monkeypatch.setattr(m, 'reserve_indices', lambda root, token, count: 50000200)
@@ -108,7 +108,7 @@ def test_cancelled_boundary_is_durable_before_new_enqueue_and_dryrun(tmp_path, m
 def test_restart_after_publication_boundary_only_retries_idempotent_enqueue(tmp_path, monkeypatch):
     row, *_ = source(tmp_path, monkeypatch)
     row = m.prepare_replacement(tmp_path, row)
-    proof = write(tmp_path/'proof.json', {'never_started': True})
+    proof = write(tmp_path/'proof.json', {'never_started': True, 'original_allocation':json.loads(Path(row['pending_migration_source']['record']).read_text())['allocation'], 'after':{'accounting':{'state':'CANCELLED','start':'Unknown'}},'final_execution_proof':{'nonempty_execution_artifacts':[]}})
     row['pending_migration_source']['proof'] = {'path': str(proof), 'sha256': file_digest(proof)}
     calls = []
     monkeypatch.setattr(m, 'enqueue_record', lambda *a, **kw: calls.append(a[1]['index']))
@@ -121,7 +121,7 @@ def test_old_prepared_replacement_recovers_original_routes_before_enqueue(tmp_pa
     row, *_ = source(tmp_path, monkeypatch)
     row = m.prepare_replacement(tmp_path, row)
     row.pop('migration_routing');row['dispatch_backends']=['vast_4090','vast_5090']
-    proof = write(tmp_path/'proof.json', {'never_started': True})
+    proof = write(tmp_path/'proof.json', {'never_started': True, 'original_allocation':json.loads(Path(row['pending_migration_source']['record']).read_text())['allocation'], 'after':{'accounting':{'state':'CANCELLED','start':'Unknown'}},'final_execution_proof':{'nonempty_execution_artifacts':[]}})
     row['pending_migration_source']['proof']={'path':str(proof),'sha256':file_digest(proof)}
     calls=[]
     monkeypatch.setattr(m,'enqueue_record',lambda *args,**kwargs:calls.append(kwargs['backends']))

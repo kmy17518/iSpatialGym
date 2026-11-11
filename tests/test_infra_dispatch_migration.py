@@ -31,7 +31,8 @@ class MigrationTests(unittest.TestCase):
                            'EVAL_INDEX':self.group/'empty_eval_index.json','ISGF_COLLECT_EXTRA':'--no-goal-override'}.items():
             command.extend(['--extra-env',key+'='+str(value)])
         self.payload = M.read(D.enqueue(self.root,'old',command,backends=['vast_5090']))
-        self.allocation = {'jobid':'123','n':'3','job_dir':str(self.root/'out/old'),'start':'50000000'}
+        self.allocation = {'jobid':'123','n':'3','job_dir':str(self.root/'out/old'),'start':'50000000',
+                           'key':'test-key','code':str(self.code)}
         self.receipt = self.root/'dispatch/receipts/old.json'
         D.shared_json(self.receipt, {'status':'submitted','allocation':self.allocation})
 

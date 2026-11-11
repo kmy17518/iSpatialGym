@@ -90,7 +90,7 @@ def funded_context(monkeypatch):
 
 
 def test_zero_age_preserves_pending_and_started_boundaries():
-    p=proof();now=time.time();p['scheduler']['SubmitTime']=datetime.datetime.fromtimestamp(now,datetime.timezone.utc).isoformat()
+    p=proof();now=float(int(time.time()));p['scheduler']['SubmitTime']=datetime.datetime.fromtimestamp(now,datetime.timezone.utc).isoformat()
     assert migration.eligible(p,owner='owner',minimum_age=0,now=now)
     assert not migration.eligible(p,owner='owner',minimum_age=1,now=now)
     p['accounting']['start']='2026-11-11T00:00:00'

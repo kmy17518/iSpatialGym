@@ -51,7 +51,9 @@ def prepare_intent_ledger(root, token):
     if alias.is_symlink():
         require(alias.resolve() == ledger.resolve(), 'intent ledger alias differs')
     elif alias.exists():
-        raise ValueError('intent ledger alias is not a symlink')
+        # Another dispatcher can publish the symlink between these two reads.
+        require(alias.is_symlink(), 'intent ledger alias is not a symlink')
+        require(alias.resolve() == ledger.resolve(), 'intent ledger alias differs')
     else:
         try:
             alias.symlink_to(ledger)
