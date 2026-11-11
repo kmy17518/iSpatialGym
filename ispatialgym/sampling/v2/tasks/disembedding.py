@@ -898,13 +898,15 @@ class Disembedding(SamplerV2):
         H_max = float(margins["H_max"])
         if os.environ.get(CTG.ENV):
             self._campaign_tray_active = self.campaign_tray_plan()
+        from ispatialgym.sampling import campaign_tabletop_starts as CTS
+        anchor = getattr(getattr(self, "_campaign_tray_active", None), "anchor_base_pose2d", None)
         # §4.2 has no preference among the edges and §4.4 checks floor + collision per lateral position (Phase 1c), so
         # every edge with a free-floor run in front of it is tried (a third of its 10 cm lateral raster at s = 0.45 on
         # free floor, as the IORS reference task does) instead of ``edge_candidates``, which drops an edge when its
         # *midpoint* stance alone is blocked: on breakfast_table_rhjoby_0 that is the 2.9 m edge — the only one long
         # enough for the two-sided disembedding margins of the time (m_R + m_L ≈ 2.26 m) — whose midpoint sits on a 0.4 m patch the scene
         # variant leaves blocked in the traversability map (baked chair footprint wider than the freed bbox)
-        for edge, st in TT.edge_frames(self, self.top, rng):
+        for edge, st in CTS.ordered_edges(TT.edge_frames(self, self.top, rng), anchor):
             lats = th.linspace(-edge.length / 2 + 0.1, edge.length / 2 - 0.1, max(2, int(edge.length / 0.1))).tolist()
             n_free = sum(1 for lat in lats if self.kit.trav_free(edge.base_xy(st.stand_off, lat)))
             if n_free < max(1, len(lats) // 3):
@@ -921,7 +923,11 @@ class Disembedding(SamplerV2):
                 try:
                     bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
                     init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top)
-                    init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
+                    lateral = None
+                    if anchor is not None:
+                        bounds, _, _ = TT.phase1c_bounds(self, init, margins, top=self.top, strict=True)
+                        lateral = CTS.near_lateral(rng, float(bounds[0]), float(bounds[1]), CTS.edge_lateral(edge, anchor))
+                    init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands, lateral=lateral)
                     init.name = "init"
                     # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm's
                     # band is its own or this band mirrored
@@ -963,7 +969,13 @@ class Disembedding(SamplerV2):
         """Owner 2026-10-12 (A2a): the destination tray's side, chosen before the Phase-1c margins - ``generation.destination_side``
         ("left" / "right", the eval variants' assignment), else drawn from the template's ``rng`` (train)."""
         want = self.g("destination_side")
-        if want is None:
+        plan = self.campaign_tray_plan() if os.environ.get(CTG.ENV) else None
+        fixed = getattr(plan, "destination_side", None)
+        if fixed is not None:
+            if want is not None and str(want).lower() != fixed:
+                raise Reject("campaign_tray_side", "fixed anchor side differs from the explicit template side")
+            side, source = fixed, "campaign_fixed_tray_anchor"
+        elif want is None:
             side, source = ("left" if rng.random() < 0.5 else "right"), "drawn"
         elif str(want).lower() in ("left", "right"):
             side, source = str(want).lower(), "generation.destination_side"

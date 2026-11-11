@@ -36,6 +36,35 @@ def test_disabled_plan_never_accesses_runtime_context(monkeypatch):
     assert Disembedding.campaign_tray_plan(SimpleNamespace()) is None
 
 
+def test_fixed_side_uses_proven_viewpoint_and_does_not_redraw(monkeypatch):
+    import math
+    from dataclasses import replace
+    from ispatialgym.sampling.campaign_tray_goals import destination_side_at_anchor
+    p = plan()
+    assert destination_side_at_anchor(p.source, p.destination, (0., 0., -math.pi/2)) == "left"
+    assert destination_side_at_anchor(p.source, p.destination, (0., 0., math.pi/2)) == "right"
+    assert destination_side_at_anchor(p.source, p.destination, None) is None
+    monkeypatch.setenv(ENV, "/immutable/plan.json")
+    s = Disembedding.__new__(Disembedding)
+    s.campaign_tray_plan = lambda: replace(p, destination_side="right")
+    s.g = lambda name: None
+    s.template_facts = {}
+    rng = SimpleNamespace(random=lambda: pytest.fail("fixed world trays must not redraw their template side"))
+    assert s._destination_side(rng) == "right"
+    assert s.template_facts["destination_side"]["source"] == "campaign_fixed_tray_anchor"
+    s.g = lambda name: "left"
+    with pytest.raises(Reject, match="explicit template side"):
+        s._destination_side(rng)
+
+
+def test_ambiguous_fixed_side_is_rejected():
+    from ispatialgym.sampling.campaign_tray_goals import destination_side_at_anchor
+    from ispatialgym.sampling.campaign_held_goals import GoalPlanError
+    p = plan()
+    with pytest.raises(GoalPlanError, match="lateral separation"):
+        destination_side_at_anchor(p.source, p.destination, (0., 0., 0.))
+
+
 def test_settled_target_keeps_exact_requested_goal_and_destination_identity():
     s, d = fixture()
     s.campaign_verify_goal(d, settled=True)

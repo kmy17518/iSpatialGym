@@ -10,6 +10,7 @@ import time
 from dataclasses import dataclass
 
 from ispatialgym.sampling.campaign_held_goals import ENV, GoalGroupTimeout, GoalPlanError, _require, _vector
+from ispatialgym.sampling.campaign_tabletop_starts import anchor_base
 
 SCHEMA = "isg-tray-goal-plan-v1"
 
@@ -41,6 +42,16 @@ def polygon_area(points):
                    for a, b in zip(points, points[1:] + points[:1]))) / 2
 
 
+def destination_side_at_anchor(source, destination, anchor):
+    """The side of the fixed world trays from the already proven viewpoint."""
+    if anchor is None:
+        return None
+    dx, dy = (destination[0][i] - source[0][i] for i in range(2))
+    lateral = -math.sin(anchor[2]) * dx + math.cos(anchor[2]) * dy
+    _require(abs(lateral) > 1e-4, "fixed trays have no lateral separation at the anchor")
+    return "left" if lateral > 0 else "right"
+
+
 @dataclass(frozen=True)
 class TrayGoalPlan:
     campaign_id: str
@@ -58,6 +69,8 @@ class TrayGoalPlan:
     deadline_at: float
     max_members: int
     sha256: str
+    anchor_base_pose2d: tuple | None = None
+    destination_side: str | None = None
 
     def summary(self):
         as_pose = lambda x: {"position": list(x[0]), "orientation": list(x[1])}
@@ -67,6 +80,7 @@ class TrayGoalPlan:
                 "target_name": self.target_name, "destination_name": self.destination_name,
                 "plan_sha256": self.sha256, "crowdedness_range": list(self.crowdedness_range),
                 "bucket_strict": self.split != "train", "deadline_at": self.deadline_at,
+                "destination_side": self.destination_side,
                 "max_members": self.max_members, "phase": "planned_before_start"}
 
     def accepts_coverage(self, value):
@@ -98,9 +112,11 @@ def validate_tray_plan(raw, *, template_id, scene, rooms, activated_at, now=None
     count = raw.get("max_members", 3)
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid group size")
     fingerprint = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    anchor = anchor_base(raw)
     return TrayGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, raw["target_name"],
                         raw["source_name"], raw["destination_name"], goal, source, destination, (lo, hi),
-                        activated_at + budget, count, fingerprint)
+                        activated_at + budget, count, fingerprint, anchor,
+                        destination_side_at_anchor(source, destination, anchor))
 
 
 def load_tray_plan(*, template_id, scene, rooms, activated_at, expected_sha256=None):

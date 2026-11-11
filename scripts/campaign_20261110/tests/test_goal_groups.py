@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import tempfile
 import time
@@ -124,6 +125,7 @@ class GoalGroupControllerTests(unittest.TestCase):
                 {"name": source.instance, "role": "source"}, {"name": dest.instance, "role": "destination"}]
             anchor["tro"]["ispatialgym"]["object_bindings"].update({x.instance: {"category": x.category, "model": x.model} for x in (source, dest)})
             anchor["planned_start_poses"] = {source.instance: [[0, 2, .7], [0, 0, 0, 1]], dest.instance: [[1, 2, .7], [0, 0, 0, 1]]}
+            anchor["summary"]["base_pose2d"] = [0., 1., math.pi / 2]
             region = [{"position": [1.02, 2.01, .8], "orientation": [0, 0, 0, 1]}]
             anchor["summary"]["campaign_goal_space"] = {"target_poses": region}
             out = root / "groups/tray"
