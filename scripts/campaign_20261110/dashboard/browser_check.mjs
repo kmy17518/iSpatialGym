@@ -30,6 +30,8 @@ assert.equal(training.onlyEligible,7,'Only eligible training reaches goal progre
 assert.equal(training.historyRates,null,'Raw historical training growth never becomes eligible throughput');
 const eligibleRates=await evaluate(`rateRows({...current,training_eligibility:{observed_at:'2026-11-11T01:00:00Z',eligible_accepted:120,history:[{observed_at:'2026-11-11T00:00:00Z',eligible_counts:{train:100}}]}}).rates.train`);
 assert.equal(eligibleRates,20,'Eligible throughput uses only audited eligibility history');
+const stream=await evaluate(`({available:current.sources.training_stream.available,records:Object.keys(current.training_stream.records??{}).length,rows:document.querySelectorAll('#training-stream-rows tr').length,text:document.querySelector('#training-stream-rows').innerText})`);
+assert.ok(stream.available);assert.equal(stream.rows,stream.records);assert.ok(stream.records>=8,'Every independent native configuration is visible');
 const canonical=await evaluate(`({validated:current.canonical_validation.validated,total:current.canonical_validation.total,parked:current.canonical_validation.classes.filter(x=>x.status==='parked_owner_artifact').length,text:document.querySelector('#recovery-summary').innerText})`);
 assert.equal(canonical.total,100);assert.equal(canonical.parked,1);assert.ok(canonical.text.includes(String(canonical.validated)));
 
@@ -85,5 +87,5 @@ const mobile=await evaluate('({viewport:innerWidth,width:document.documentElemen
 const mobileShot=await call('Page.captureScreenshot',{format:'png'});await writeFile(output+'/mobile.png',Buffer.from(mobileShot.data,'base64'));
 await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});await evaluate(`document.querySelector('#compute').scrollIntoView({behavior:'instant'})`);await delay(200);const computeShot=await call('Page.captureScreenshot',{format:'png'});await writeFile(output+'/compute.png',Buffer.from(computeShot.data,'base64'));await evaluate(`document.querySelector('#activity').scrollIntoView({behavior:'instant'})`);await delay(200);const activityShot=await call('Page.captureScreenshot',{format:'png'});await writeFile(output+'/activity.png',Buffer.from(activityShot.data,'base64'));await evaluate('scrollTo(0,0)');
 assert.equal(errors.length,0,'No JavaScript runtime exceptions');assert.ok(requests.filter(r=>r.url.startsWith('http://127.0.0.1:8765')).every(r=>r.method==='GET'),'Browser sent GET only');
-const result={passed:true,observed_at:new Date().toISOString(),first,recovery,canonical,eligibleRates,goalYield,training,fleetTime,clusterTime,refreshed,filtered,states,mobile,request_count:requests.length,errors};
+const result={passed:true,observed_at:new Date().toISOString(),first,recovery,canonical,stream,eligibleRates,goalYield,training,fleetTime,clusterTime,refreshed,filtered,states,mobile,request_count:requests.length,errors};
 await writeFile(output+'/browser_check.json',JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));ws.close();

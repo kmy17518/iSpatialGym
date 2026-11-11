@@ -18,6 +18,7 @@ AUDIT_FILES = {'canonical_validation.json': 'infra/standard_recovery/canonical_v
                'training_production_gate.json': 'controllers/training_production_gate.json',
                'training_containment.json': 'infra/training_production_gate/containment_status.json',
                'training_requirements.json': 'manifests/training_requirements.json',
+               'training_stream.json': 'training_pipeline_canaries/height_r2/stream/state.json',
                'standard_recovery.json': 'infra/standard_recovery/ledger.json',
                'cohort_rental_denominator_coverage.json': 'accounting/cohort_rental_denominator_coverage.json'}
 
@@ -93,13 +94,20 @@ def return_report(output):
     lines += ['','STANDALONE TRAINING PRODUCTION GATE',json.dumps(gate) if gate else 'Gate observation unavailable; training remains ineligible without proof.',
         'Requirements and evidence: http://127.0.0.1:8765/#training-production',
         'Historical acceptance and artifacts are preserved. Goal progress and replacement capacity use eligibility evidence.']
+    stream_path=output/'training_stream.json'
+    if stream_path.exists():
+        stream=json.loads(stream_path.read_text())
+        if stream.get('campaign_id')=='campaign_20261110':
+            lines += ['','INDEPENDENT TRAINING VALIDATION STREAM', 'Observed: '+chicago(stream.get('observed_at')),
+                'Each configuration advances after its own prerequisites. Production also requires shared pipeline, applicable path, exact proof and diversity capacity.',
+                *[key+': '+str(row.get('annotated_status',row.get('status')))+'; '+str(row.get('annotated_error',row.get('reason',''))) for key,row in stream.get('records',{}).items()]]
     canonical_path=output/'canonical_validation.json'
     if canonical_path.exists():
         canonical=json.loads(canonical_path.read_text())
         if canonical.get('campaign_id')=='campaign_20261110':
             lines += ['','CANONICAL TEMPLATE VALIDATION', 'Observed: '+chicago(canonical.get('observed_at')),
                 str(canonical.get('validated'))+' / 100 exact canonical classes verified; states: '+json.dumps(canonical.get('state_counts')),
-                'This artifact audit is distinct from historical accepted class coverage. Five owner-artifact holds are excluded.',
+                'This artifact audit is distinct from historical accepted class coverage. Only under_large_01 remains held for an owner artifact; available updates still need exact validation.',
                 'Proof: http://127.0.0.1:8765/reports/canonical-validation']
     recovery_path=output/'standard_recovery.json'
     if recovery_path.exists():
