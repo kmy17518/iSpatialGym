@@ -118,3 +118,16 @@ def test_shelf_options_are_bound_to_exact_released_class(monkeypatch, option):
     assert CR.contact_recovery(option)
     template.class_id='inter_object_relation_satisfaction-touching_04'
     with pytest.raises(ContractError):CR.contact_recovery(option)
+
+
+def test_touching_inhand_reaim_requires_the_exact_configuration(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    monkeypatch.setattr(EX, 'variant_generation', lambda ctx: {})
+    cfg=NS(place_inhand_reaim=False)
+    assert not EX.place_inhand_reaim_wanted({},cfg)
+    template=bind(monkeypatch,'inter_object_relation_satisfaction-touching_04',
+        'inter_object_relation_satisfaction-touching_small_scale',{'touching_place_inhand_reaim':True})
+    assert EX.place_inhand_reaim_wanted({},cfg)
+    template.class_id='inter_object_relation_satisfaction-touching_02'
+    with pytest.raises(ContractError,match='another audited class'):
+        EX.place_inhand_reaim_wanted({},cfg)

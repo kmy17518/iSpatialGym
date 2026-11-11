@@ -3610,7 +3610,12 @@ def place_inhand_reaim_wanted(ctx: Dict[str, Any], cfg: ExecuteConfig) -> bool:
     (``ISPATIALGYM_PLACE_INHAND_REAIM=1``) or, oracle-fix 2026-11-06, ``generation.place_inhand_reaim`` true for the variant (survey1
     disembedding_10: the table fork turned 7.2 / 10.0 / 14.6 deg about z under the closing fingers, the place set it down with that turn,
     3 of 4 demos symbolic_only at 0.13 / 0.17 / 0.26 rad over the 0.1 rad tolerance with 1-3 mm position error)."""
-    return bool(cfg.place_inhand_reaim or variant_generation(ctx).get("place_inhand_reaim"))
+    from ispatialgym.sampling import campaign_runtime
+    # The failed touching04 grasp can shift its subsequent place by 17mm and
+    # .124rad. Use the existing collision-checked physical correction only for
+    # the exact opted-in configuration; goal poses and tolerances are unchanged.
+    return bool(cfg.place_inhand_reaim or variant_generation(ctx).get("place_inhand_reaim")
+                or campaign_runtime.contact_recovery('touching_place_inhand_reaim'))
 
 
 def place_touch_stop_check(state, obj: str, partner: str, partner_p0, cfg: ExecuteConfig, rec: Dict[str, Any]) -> Callable[[], bool]:
