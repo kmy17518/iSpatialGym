@@ -62,10 +62,16 @@ def audit_canary(job, gate_path, *, root, started_at):
     require(config['campaign_id']==policy['campaign_id'] and config['split']=='train'
             and config['template']['split']=='train','canary is not campaign training validation')
     start,count=int(env['START']),int(env['N'])
-    matches=[a for a in policy.get('allowed_canaries',[]) if a.get('purpose')=='training_pipeline_canary'
+    authorizations=policy.get('allowed_canaries',[])+[a for a in policy.get('allowed_existing_canary_reviews',[])
+        if Path(a['job_dir']).resolve()==job]
+    matches=[a for a in authorizations if a.get('purpose')=='training_pipeline_canary'
              and a.get('config_sha256')==config_sha and (a.get('start'),a.get('count'))==(start,count)]
     require(len(matches)==1,'canary lacks one exact explicit authorization')
     authorization=matches[0]
+    if authorization.get('review_manifest'):
+        from scripts.campaign_20261110.training_existing_canaries import check_existing_review
+        require(check_existing_review(root,job,env,policy,kind='source_validation') is not None,
+                'existing native canary review not authorized')
     require(0<count<=min(24,int(authorization['max_instances'])),'canary exceeds authorized bound')
     authorization_path=artifact(authorization['authorization_path'],root,started_at)
     require(file_digest(authorization_path)==authorization['authorization_sha256'],'canary authorization changed')

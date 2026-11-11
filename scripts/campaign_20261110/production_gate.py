@@ -251,7 +251,7 @@ def check_dispatch(root, command, *, kind='collection'):
         return {'allowed': False, 'category': 'unverified', 'reason': 'invalid dispatch command: ' + str(exc)}
 
 
-def check_job(root, job_dir, *, kind='collection'):
+def check_job(root, job_dir, *, kind='collection', submission_script=None):
     try:
         if kind == 'native_dependency':
             value = json.loads((Path(job_dir) / 'native_inputs.json').read_text())
@@ -267,6 +267,12 @@ def check_job(root, job_dir, *, kind='collection'):
             result = check_job(root, source, kind='source_validation')
             return {**result, 'source_job': str(source), 'replay_source_checked': True}
         environment = read_environment(Path(job_dir) / 'job.env')
+        if kind in ('collection','source_validation'):
+            try:policy,_=read_policy(root)
+            except (OSError,ValueError,TypeError):policy={}
+            from scripts.campaign_20261110.training_existing_canaries import check_existing_review
+            existing=check_existing_review(root,job_dir,environment,policy,kind=kind,submission_script=submission_script)
+            if existing is not None:return existing
         return check_environment(root, environment, kind=kind,
             start=int(environment['START']) if environment.get('START') else None,
             count=int(environment['N']) if environment.get('N') else None)
