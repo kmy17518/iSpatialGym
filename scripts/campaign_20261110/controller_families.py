@@ -27,6 +27,7 @@ if __package__ in (None, ""):
 
 from scripts.campaign_20261110.contracts import digest, file_digest, require, write_json_atomic
 from scripts.campaign_20261110.storage import atomic_directory_lock
+from scripts.campaign_20261110.replay_gate_quality import assess as assess_replay_gate
 
 
 TERMINAL = {"COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "OUT_OF_MEMORY", "NODE_FAIL", "PREEMPTED"}
@@ -203,6 +204,8 @@ def restore_recovered_cycle(spec, state, root):
         job = Path(row['job_dir']).resolve()
         require(job.is_relative_to(root / 'out') and Path(gate.get('source_job', '')).resolve() == job,
                 'recovered gate source differs from the owned allocation')
+        if not assess_replay_gate(gate, gate_file)['passed']:
+            continue
         restored = copy.deepcopy(cycle)
         restored_stage = restored.get('group') or restored['anchor']
         restored_stage['status'] = 'waiting'
@@ -250,6 +253,8 @@ def reusable_anchor_record(spec, state, root):
         job=Path(row['job_dir']).resolve()
         require(job.is_relative_to(root/'out') and Path(gate.get('source_job','')).resolve()==job,
                 'reusable anchor gate names another job')
+        if not assess_replay_gate(gate, gate_path(root,row))['passed']:
+            continue
         record=copy.deepcopy(anchor)
         record.update(status='waiting',reused_from_cycle=cycle['name'],
             reuse_gate={'path':str(gate_path(root,row)),'sha256':file_digest(gate_path(root,row))})
@@ -313,7 +318,8 @@ def reusable_group_gate(record, anchor, cfg, root, *, job_ended):
     current_gate = read(gate_path(root, row), {})
     # An observed failed current replay is a diagnosis requirement, not an
     # excuse to select a different successful replay.
-    if current_gate.get("success") is False:
+    if current_gate.get("success") is False or (current_gate.get("success") is True
+            and not assess_replay_gate(current_gate, gate_path(root,row))['passed']):
         return None
     pinned = record.get("release_gate")
     prior_review = read(Path(record["directory"]) / "release_review.json", {})
@@ -330,6 +336,8 @@ def reusable_group_gate(record, anchor, cfg, root, *, job_ended):
         candidate = gate_path(root, anchor["allocation"])
     gate = read(candidate, {})
     if gate.get("success") is not True or gate.get("replay_mode") != "physics_action_open_loop":
+        return None
+    if not assess_replay_gate(gate, candidate)['passed']:
         return None
     source = read(gate["instance"])["ispatialgym"].get("campaign", {})
     config = read(Path(record["directory"]) / "campaign_config.json")
@@ -451,12 +459,18 @@ def advance(spec, state, cfg, root, queue, allowance, save):
         save()
     row = stage["allocation"]
     ended = job_terminal(row, root, queue)
-    gate = read(gate_path(root, row))
+    observed_gate_path = gate_path(root, row)
+    gate = read(observed_gate_path)
     if group and ended:
         reused = reusable_group_gate(group, cycle.get("anchor"), cfg, root, job_ended=ended)
         if reused is not None:
             gate = read(reused)
-    if gate and gate.get("success") is True:
+            observed_gate_path = reused
+    quality = assess_replay_gate(gate, observed_gate_path) if gate and gate.get('success') is True else None
+    if quality is not None and not quality['passed']:
+        stage['replay_quality_failure'] = {**quality, 'gate': str(observed_gate_path),
+                                         'gate_sha256': file_digest(observed_gate_path)}
+    if gate and gate.get("success") is True and quality['passed']:
         if group:
             if not ended:
                 return 0  # Final membership cannot be allocated while collectors are writing.
@@ -475,7 +489,7 @@ def advance(spec, state, cfg, root, queue, allowance, save):
         return 0
     if ended:
         watcher = read(root / "validation/controller.json", {}).get("gates", {}).get(row["jobid"], {})
-        if (gate and gate.get("success") is False) or watcher.get("status") in ("demo_missing", "demo_failed", "replay_failed", "replay_missing", "submit_failed"):
+        if (gate and gate.get("success") is False) or (quality is not None and not quality['passed']) or watcher.get("status") in ("demo_missing", "demo_failed", "replay_failed", "replay_missing", "submit_failed"):
             stage.update(status="failed", watcher=watcher.get("status"), closed_at=time.time())
             state.setdefault("history", []).append(cycle)
             state.pop("current")

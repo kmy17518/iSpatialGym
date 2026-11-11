@@ -23,6 +23,7 @@ class FamilyControllerTests(unittest.TestCase):
             import shutil
             shutil.copytree(source.gate.parent/'replay',gate.parent/'replay')
             gate.write_bytes(source.gate.read_bytes())
+            data=json.loads(gate.read_text());data['replay_rc']=0;c.write_json_atomic(gate,data)
             row={'key':'target','jobid':'2','job_dir':str(target.job)}
             record={'allocation':row,'directory':str(directory),'group_id':'target_group'}
             anchor={'allocation':source_row};cfg={'started_at':source.since}
@@ -127,8 +128,39 @@ class FamilyControllerTests(unittest.TestCase):
         state = {'history': [{'name': 'g', 'group' if group else 'anchor': stage}], 'consecutive_failures': 3}
         path = c.gate_path(root, row)
         path.parent.mkdir(parents=True)
-        path.write_text(json.dumps({'success': True, 'replay_mode': mode, 'source_job': str(job)}))
+        tro=job/'tro.json';tro.write_text(json.dumps({'ispatialgym':{'instance_id':'native_1'}}))
+        report=path.parent/'replay/native_1/meta.json'
+        c.write_json_atomic(report,{'instance_id':'native_1','mode':'replay','status':'success','success':True,
+                                   'qa':{'enabled':True,'hard_triggered':[],'metrics':{}}})
+        path.write_text(json.dumps({'success': True, 'replay_mode': mode, 'source_job': str(job),
+                                  'replay_rc':0,'instance':str(tro),'tro_sha256':c.file_digest(tro)}))
         return state, path
+
+    def test_summary_success_with_native_hard_qa_cannot_recover_or_reuse(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);state,path=self.recovered_fixture(root)
+            row=state['history'][0]['anchor']['allocation'];row['code']='/snapshot'
+            report=path.parent/'replay/native_1/meta.json';data=json.loads(report.read_text())
+            data['qa']['hard_triggered']=['goal_occlusion'];c.write_json_atomic(report,data)
+            before=path.read_bytes()
+            spec={'class_id':'a','anchor_snapshot':'/snapshot','reuse_successful_anchor':True}
+            self.assertFalse(c.restore_recovered_cycle(spec,state,root))
+            self.assertIsNone(c.reusable_anchor_record(spec,state,root))
+            self.assertEqual(path.read_bytes(),before)
+
+    def test_completed_bad_replay_is_retired_without_claim_or_same_gate_recovery(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);state,path=self.recovered_fixture(root,group=True)
+            cycle=state['history'].pop();stage=cycle['group'];stage.update(status='waiting',group_id='g')
+            state['current']=cycle;state['consecutive_failures']=0
+            report=path.parent/'replay/native_1/meta.json';data=json.loads(report.read_text())
+            data['qa']['metrics']={'goal_occlusion':{'mode':'hard','triggered':True}};c.write_json_atomic(report,data)
+            with patch.object(c,'accepted_counts',return_value={}),patch('scripts.campaign_20261110.controller_held.job_terminal',return_value=True),patch.object(c,'claim') as claim:
+                c.advance({'class_id':'a','eval_quotas':[1]},state,{'started_at':1},root,{},0,lambda:None)
+            claim.assert_not_called();self.assertNotIn('current',state)
+            self.assertEqual(state['consecutive_failures'],1)
+            self.assertIn('native_hard_qa:goal_occlusion',state['history'][0]['group']['replay_quality_failure']['reasons'])
+            self.assertFalse(c.restore_recovered_cycle({'class_id':'a'},state,root))
 
     def test_late_physics_recovery_resumes_without_overwriting_failed_history(self):
         with tempfile.TemporaryDirectory() as tmp:
