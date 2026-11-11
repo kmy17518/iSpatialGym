@@ -120,6 +120,16 @@ def publish_canary(job, gate, *, root, started_at):
     root=Path(root).resolve();review=audit_canary(job,gate,root=root,started_at=started_at)
     key=digest(review);directory=root/'validation/training_canaries';directory.mkdir(parents=True,exist_ok=True)
     path=directory/'reviews'/(key+'.json')
+    ledger_path=directory/'ledger.json'
+    # Re-observation has already re-audited physical evidence above. Returning
+    # an identical committed record needs no writer lock or ledger rewrite.
+    if path.exists() and ledger_path.exists():
+        require(digest(read(path))==key,'immutable canary review changed')
+        previous=read(ledger_path).get('records',{}).get(review['instance_id'])
+        expected={'review':str(path),'sha256':file_digest(path),'instance_id':review['instance_id'],
+                  'task':review['task'],'class_id':review['class_id'],'validation_passed':True,
+                  'eligible_for_benchmark':False,'quota_consumed':0}
+        if previous==expected:return expected
     with atomic_directory_lock(directory/'ledger.lockdir'):
         if path.exists():require(digest(read(path))==key,'immutable canary review changed')
         else:write_json_atomic(path,review)

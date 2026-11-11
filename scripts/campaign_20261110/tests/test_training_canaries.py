@@ -114,3 +114,17 @@ def test_existing_collector_requires_its_exact_scope_with_active_native_approval
     c.write_json_atomic(policy_path,policy)
     with pytest.raises(c.ContractError,match='one exact explicit authorization'):
         canary.audit_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
+
+
+def test_reobservation_reaudits_but_does_not_contend_with_unrelated_writer(tmp_path,monkeypatch):
+    f,_=setup(tmp_path,monkeypatch)
+    first=canary.publish_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
+    ledger=tmp_path/'validation/training_canaries/ledger.json'
+    original=ledger.read_bytes();stat=ledger.stat()
+    (ledger.parent/'ledger.lockdir').mkdir()
+    assert canary.publish_canary(f.job,f.gate,root=tmp_path,started_at=f.since)==first
+    assert ledger.read_bytes()==original and ledger.stat().st_mtime_ns==stat.st_mtime_ns
+    replay=next(f.gate.parent.glob('replay/*/meta.json'));value=json.loads(replay.read_text())
+    value['qa']['hard_triggered']=['unsafe'];c.write_json_atomic(replay,value)
+    with pytest.raises(c.ContractError,match='QA'):
+        canary.publish_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
