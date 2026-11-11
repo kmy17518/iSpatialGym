@@ -186,3 +186,14 @@ def test_bddl_only_relocation_rejects_unlisted_or_changed_sources(tmp_path, muta
     write(path, proof)
     with pytest.raises(ValueError):
         bind_one(*args)
+
+
+def test_private_scene_scale_accepts_only_exact_native_float32_roundtrip():
+    import struct
+    from scripts.campaign_20261110.bind_fresh_candidates import native_scene_binding_equal
+    before={'category':'booth','model':'xzrpar','scale':[1.,1.,1.00713496]}
+    native={**before,'scale':[1.,1.,struct.unpack('f',struct.pack('f',1.00713496))[0]]}
+    assert native_scene_binding_equal(before,native)
+    assert not native_scene_binding_equal(before,{**native,'model':'other'})
+    assert not native_scene_binding_equal(before,{**native,'scale':[1.,1.,native['scale'][2]+1e-8]})
+    assert not native_scene_binding_equal(before,{**native,'scale':[1.,1.]})

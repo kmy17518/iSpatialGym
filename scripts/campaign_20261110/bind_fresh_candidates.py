@@ -9,6 +9,7 @@ from collections import Counter
 from dataclasses import asdict
 import hashlib
 import json
+import struct
 from pathlib import Path
 import sys
 
@@ -43,6 +44,19 @@ def asset_path(code, init):
     dataset = init.get('dataset_name') or 'behavior-1k-assets'
     root = code / 'ispatialgym/assets/datasets' / dataset if dataset == 'ispatialgym-assets' else code / 'Behavior-1K/datasets' / dataset
     return root / 'objects' / category / model / 'usd' / (model + ('.encrypted.usd' if dataset == 'behavior-1k-assets' else '.usd'))
+
+
+def native_scene_binding_equal(before, after):
+    """Native tensors serialize float32 scales; accept only that exact roundtrip.
+
+    This is a representation check, never a tolerance for changing geometry.
+    """
+    if any(before.get(k) != after.get(k) for k in ('category', 'model')):
+        return False
+    a,b=before.get('scale'),after.get('scale')
+    if a==b:return True
+    if not isinstance(a,list) or not isinstance(b,list) or len(a)!=3 or len(b)!=3:return False
+    return all(x==y or struct.unpack('f',struct.pack('f',x))[0]==y for x,y in zip(a,b))
 
 
 def bind_one(template, job, metadata_path, code, reservations, hashes, policy_pointer):
@@ -156,8 +170,12 @@ def bind_one(template, job, metadata_path, code, reservations, hashes, policy_po
         for name in names.values():
             if name in private_info:
                 before, after = private_info[name]['args'], init_info[name]['args']
-                require(all(before.get(k) == after.get(k) for k in ('category', 'model', 'scale')),
+                require(native_scene_binding_equal(before, after),
                         'native scene binding differs from private source')
+                if before.get('scale') != after.get('scale'):
+                    setup.setdefault('private_scene_native_scale_roundtrips', {})[name] = {
+                        'private_scale': before['scale'], 'native_scale': after['scale'],
+                        'rule': 'exact_float32_serialization'}
         setup['private_scene'] = dict(schema='isg-native-private-scene-v1', path=str(private), sha256=sha(private))
     result = Template(template_id=template.template_id, task=template.task, class_id=template.class_id, split=template.split,
         scene=template.scene, room=template.room, objects=tuple(refs),
