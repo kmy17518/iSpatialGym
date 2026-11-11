@@ -76,3 +76,25 @@ def test_exact_historical_offer_recovers_count_but_not_unknown_timing_or_attribu
     assert value['rentals'][0]['creation_request_started_unix'] is None
     market.write_text(market.read_text()+' ')
     with pytest.raises(ValueError,match='source changed'):fa.snapshot(tmp_path,200)
+
+
+def test_verified_stopped_disk_time_excluded_but_recovery_restart_included(tmp_path):
+    write_rows(tmp_path/'vast/ledger/events.jsonl',[{'ev':'create','instance':'1','time':10,'num_gpus':1}])
+    protected=tmp_path/'infra/training_production_gate/preserved_instances.json';protected.parent.mkdir(parents=True)
+    protected.write_text(json.dumps({'campaign_id':'campaign_20261110','created_at':30,'instances':{'1':{}}}))
+    for at,status in [(20,'running'),(40,'exited'),(60,'exited'),(80,'running'),(100,'running')]:
+        fa.observe(tmp_path/'vast',[{'id':'1','num_gpus':1,'actual_status':status}],True,at-1,at)
+    attempt(tmp_path,'failed','1',20,30,0);attempt(tmp_path,'recovery','1',81,90,0)
+    value=fa.snapshot(tmp_path,100)
+    assert value['recorded_fleet_estimated_gpu_seconds']==50  #90 wall seconds minus40 retained disk seconds.
+    assert value['fleet_window_estimated_gpu_seconds']==40
+    assert value['recorded_fleet_measured_attributed_worker_gpu_seconds']==19
+    assert value['disk_only_observed_seconds']==40
+    assert value['rentals'][0]['disk_only_observation_intervals']==[(40,80)]
+    assert value['stopped_disk_accounting']['sha256']==hashlib.sha256(protected.read_bytes()).hexdigest()
+
+
+def test_unapproved_stopped_status_does_not_silently_change_historical_denominator(tmp_path):
+    write_rows(tmp_path/'vast/ledger/events.jsonl',[{'ev':'create','instance':'1','time':10,'num_gpus':1}])
+    for at in (20,100):fa.observe(tmp_path/'vast',[{'id':'1','num_gpus':1,'actual_status':'exited'}],True,at-1,at)
+    assert fa.snapshot(tmp_path,100)['recorded_fleet_estimated_gpu_seconds']==90

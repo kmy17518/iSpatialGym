@@ -29,6 +29,44 @@ def union_seconds(intervals):
     return total + (previous[1] - previous[0] if previous else 0)
 
 
+def exclude_intervals(intervals, exclusions):
+    result = list(intervals)
+    for left, right in exclusions:
+        remaining = []
+        for start, end in result:
+            if right <= start or left >= end:
+                remaining.append((start, end))
+            else:
+                if start < left: remaining.append((start, left))
+                if right < end: remaining.append((right, end))
+        result = remaining
+    return result
+
+
+def stopped_disk_intervals(root, observations, timestamp):
+    """Only owner-stopped, evidence-preserved disks have non-GPU intervals."""
+    path = Path(root)/'infra/training_production_gate/preserved_instances.json'
+    if not path.exists(): return {}, None
+    body = path.read_bytes(); value = json.loads(body)
+    if value.get('campaign_id') != 'campaign_20261110':
+        raise ValueError('stopped-disk accounting campaign differs')
+    targets = set(value['instances']); opened = {}; intervals = {iid:[] for iid in targets}
+    for observation in observations:
+        if not observation['complete']: continue
+        at = observation['observed_at_unix']
+        if at < value.get('created_at', 0): continue
+        for row in observation['instances']:
+            iid = str(row['instance'])
+            if iid not in targets: continue
+            if row['status'] in ('exited', 'stopped'):
+                opened.setdefault(iid, at)
+            elif row['status'] is not None and iid in opened:
+                intervals[iid].append((opened.pop(iid), at))
+    for iid, start in opened.items(): intervals[iid].append((start, timestamp))
+    return intervals, {'path':str(path),'sha256':hashlib.sha256(body).hexdigest(),
+                       'boundary':'First complete stopped observation to first resumed observation; exact transition remains bounded by polling.'}
+
+
 def historical_counts(root, created):
     """Recover counts only from pinned exact offers preceding their rental."""
     root=Path(root).resolve();path=root/'accounting/vast_rental_gpu_count_sources.json'
@@ -63,6 +101,7 @@ def snapshot(root, timestamp=None):
     complete = [row for row in observations if row['complete']]
     epoch = complete[0]['observed_at_unix'] if complete else None
     observed = complete[-1]['observed_at_unix'] if complete else None
+    stopped, stopped_source = stopped_disk_intervals(root, observations, observed or timestamp)
     created, ended, counts = {}, {}, {}
     for row in events:
         iid = str(row.get('instance'))
@@ -97,14 +136,18 @@ def snapshot(root, timestamp=None):
     for iid, event in created.items():
         end = min(timestamp, observed if observed is not None else timestamp,
                   ended.get(iid, {}).get('time', timestamp)); start = event['time']; count = counts.get(iid)
+        gpu_intervals = exclude_intervals([(start,end)], stopped.get(iid, [])) if end > start else []
+        gpu_seconds = union_seconds(gpu_intervals)
         record = {'instance': iid, 'gpu_count': count, 'created_observation_unix': start,
                   'destroyed_observation_unix': ended.get(iid, {}).get('time'),
-                  'rental_observation_gpu_seconds': max(0, end-start)*count if count else None,
+                  'rental_observation_gpu_seconds': gpu_seconds*count if count else None,
+                  'disk_only_observed_seconds': max(0,end-start)-gpu_seconds,
+                  'disk_only_observation_intervals': stopped.get(iid, []),
                   'creation_request_started_unix': event.get('request_started_unix'),
                   'creation_response_completed_unix': event.get('response_completed_unix')}
         if count is not None:
-            total=max(0,end-start)*count
-            attributed=union_seconds([(max(a,start),min(b,end)) for a,b in attempts.get(iid,[]) if min(b,end)>max(a,start)])*count
+            total=gpu_seconds*count
+            attributed=union_seconds(exclude_intervals([(max(a,start),min(b,end)) for a,b in attempts.get(iid,[]) if min(b,end)>max(a,start)], stopped.get(iid, [])))*count
             recorded_total+=total;recorded_attributed+=attributed
             record.update(recorded_attributed_gpu_seconds=attributed,recorded_unattributed_gpu_seconds=total-attributed)
         if epoch is not None and end > epoch:
@@ -112,9 +155,9 @@ def snapshot(root, timestamp=None):
             if last > first:
                 if count is None: window_unknown.append(iid)
                 else:
-                    total = (last-first)*count
+                    total = union_seconds(exclude_intervals([(first,last)], stopped.get(iid, [])))*count
                     intervals = [(max(a,first),min(b,last)) for a,b in attempts.get(iid,[]) if min(b,last)>max(a,first)]
-                    attributed = union_seconds(intervals)*count
+                    attributed = union_seconds(exclude_intervals(intervals, stopped.get(iid, [])))*count
                     record.update(window_gpu_seconds=total, window_attributed_gpu_seconds=attributed,
                                   window_unattributed_gpu_seconds=total-attributed)
                     window_total += total; window_attributed += attributed
@@ -133,10 +176,12 @@ def snapshot(root, timestamp=None):
             'recorded_fleet_measured_attributed_worker_gpu_seconds':recorded_attributed,
             'recorded_fleet_unattributed_gpu_seconds':None if recorded_unavailable else recorded_total-recorded_attributed,
             'historical_count_recovery':count_source,
+            'stopped_disk_accounting':stopped_source,
+            'disk_only_observed_seconds':sum(row['disk_only_observed_seconds'] for row in records),
             'window_unknown_gpu_count_instances':window_unknown,'provider_instances_without_creation':orphan_presence,
             'historical_unknown_gpu_count_instances':historical_unknown,
             'attempts_missing_complete_intervals':missing,'rentals':records,
             'sources':[{'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
                        for path in (events_path,presence_path) if path.exists()],
             'boundary_precision':'Provider observations, not exact billing boundaries. Creation request/response times are retained prospectively; disappearance is bounded by polling. Legacy absent timing is not reconstructed.',
-            'scope':'All recorded campaign Vast rentals, including boot, startup, failed attempts, retries, transfers, replay and idle. The fleet_window fields retain the prospective observation epoch; recorded_fleet fields additionally cover historical rentals only when their exact GPU counts are proven. Attributed time is the union of retained worker fetch-to-upload intervals; remaining time is deliberately unattributed.'}
+            'scope':'All recorded campaign Vast GPU rentals, including boot, startup, failed attempts, retries, transfers, replay and idle. Verified owner-stopped disk-retention intervals are excluded using provider observations; recovery restart time is included again. The fleet_window fields retain the prospective observation epoch; recorded_fleet fields additionally cover historical rentals only when their exact GPU counts are proven. Attributed time is the union of retained worker fetch-to-upload intervals; remaining time is deliberately unattributed.'}
