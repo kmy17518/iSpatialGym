@@ -2646,6 +2646,16 @@ def _pick_overhang_push(action) -> bool:
     return getattr(action, "name", "") == "push" and str((getattr(getattr(action, "contact", None), "extra", None) or {}).get("kind") or "") == "pick_overhang"
 
 
+def _campaign_axial_push(sampler, action) -> bool:
+    """Only a fixed-goal axial group's free-object arc push."""
+    plan = getattr(sampler, "_campaign_surface_active", None)
+    contact = getattr(action, "contact", None)
+    return (getattr(plan, "task", None) == "alignment-axial"
+            and getattr(action, "name", None) == "push"
+            and getattr(contact, "mid", None) is not None
+            and not (getattr(contact, "extra", None) or {}).get("articulation"))
+
+
 def _is_handover(sidecar) -> bool:
     """i7-cork: a hand-over sidecar (``grasps[*].attach_route == "handover"``; the sampler's draft records ``extras``, the F6 sidecar ``extra``)."""
     for g in getattr(sidecar, "grasps", None) or []:
@@ -2840,7 +2850,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             q_seed[sampler.kit.robot.arm_control_idx[arm]] = th.tensor(pq, dtype=th.float32)
     end_q_raw: Optional[th.Tensor] = None
     end_key = _END_KEY.get(name)
-    if end_key is None and _pick_overhang_push(action):
+    if end_key is None and (_pick_overhang_push(action) or _campaign_axial_push(sampler, action)):
         end_key = "waypoints"  # oracle-fix 2026-11-05: the retreat after the overhang push leaves from where the push leaves the arm
     if name == "retreat" and after_name == "base_follow" and isinstance(targets, dict) and targets.get("retreat"):
         # the retreat after a hybrid / sequential follow: the search recorded the retreat configuration it found at the final
@@ -2867,13 +2877,16 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 log.info("program check: retreat after the follow verified from the search's witness (residual %.1f mm, margin %.3f rad at %s)", residual * 1000, margin, jn)
                 return 1, witnesses
             log.info("program check: the search's retreat witness fails (residual %.1f mm, free %s, margin %.3f at %s): re-solving the retreat", residual * 1000, free, margin, jn)
-    if name == "retreat" and _pick_overhang_push(getattr(action, "after", None)):
+    axial_escape = name == "retreat" and _campaign_axial_push(sampler, getattr(action, "after", None))
+    if name == "retreat" and (_pick_overhang_push(getattr(action, "after", None)) or axial_escape):
         # oracle-fix 2026-11-05 (hardback inside_large#01, hb14_desk_s3 attempt 0 after 3480 s of sampling: 'retreat: ik_joint_limit:
         # left_arm_joint7 within 3 mrad of its limit at the pose (every solution found ...) (... after push)'): the oracle never runs the
         # recorded leg after the overhang push (10 cm along -a: toward the torso for the open hand that drew the object to the edge) -
         # execute_retreat's contact escape leaves radially off the object (over its far rim, back where the push came from) and up off
         # the support, from where the push left the arm. That leg is replayed here (replay_contact_escape, the arc pushes' escape) from
-        # the push's tracked end configuration; only in this situation
+        # the push's tracked end configuration. Fixed-goal axial pushes use the
+        # same oracle escape. Their old generic retreat check re-solved a different
+        # approach-axis leg after the arc replay had already passed this escape.
         c_ = action.after.contact
         goal_ = c_.goal
         goal_t = (th.as_tensor(goal_.position if hasattr(goal_, "position") else goal_[0], dtype=th.float32),
@@ -2884,12 +2897,14 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         where_ = _where_of(action, name, stance_name, arm, carried, locked)
         q_from = None
         if q_end_prev is not None:
-            q_from = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+            q_from = (q_seed if axial_escape and q_seed is not None else sampler.ikc.q_locked(stance, fingers=fingers)).clone()
             idx_ = sampler.kit.robot.arm_control_idx[arm]
             q_from[idx_] = th.as_tensor(q_end_prev, dtype=th.float32)[idx_]
             if not sampler.ikc.reaches(q_from, goal_t, arm):
                 q_from = None
         src_ = "the push's tracked end configuration"
+        if q_from is None and axial_escape:
+            raise Reject("program_check_failed", "axial retreat lacks the push's checked end configuration", action=name)
         if q_from is None:
             src_ = "a fresh IK of the push's end pose"
             _count("n_ik_single")
@@ -2899,7 +2914,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             q_from = r_.q
         from ispatialgym.oracle.actions import RETREAT_DIST
 
-        if overhang_escape_backoff_on():
+        if not axial_escape and overhang_escape_backoff_on():
             # i7-startdraw2 r3 (lead #73): execute_push backs the pad off push_backoff_m along the reversed push (the init -> goal line) before
             # this retreat; the escape is replayed from there, tracked from the push's end as the oracle's arm_along runs it
             from ispatialgym.oracle.execute import CONFIG as _ECFG
@@ -2917,13 +2932,14 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                     _kit(sampler, "overhang_escape_backoff.program_check_tracked")
                 else:
                     _kit(sampler, "overhang_escape_backoff.program_check_failed")
+        push_kind = "fixed-goal axial" if axial_escape else "overhang"
         status_, why_, rep_, q_end_ = replay_contact_escape(sampler, arm, q_from, obj_, sup_, ign_, float(getattr(action, "distance", None) or RETREAT_DIST),
-                                                            start="the overhang push's end", escape_up_m=getattr(action, "escape_up_m", None))
+                                                            start=f"the {push_kind} push's end", escape_up_m=getattr(action, "escape_up_m", None))
         if status_ == "failed":
             raise Reject("approach_untrackable", f"retreat: {why_} ({where_})", action=name)
         if status_ != "none":
-            log.info("program check: the retreat after the overhang push of %s replayed as the oracle's contact escape from %s: %s %s",
-                     c_.object, src_, status_, rep_)
+            log.info("program check: the retreat after the %s push of %s replayed as the oracle's contact escape from %s: %s %s",
+                     push_kind, c_.object, src_, status_, rep_)
             witnesses["__arm_end_q__"] = q_end_
             return 1, witnesses
     where = _where_of(action, name, stance_name, arm, carried, locked)
