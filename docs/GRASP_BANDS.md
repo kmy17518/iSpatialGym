@@ -3488,6 +3488,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 57 | i7-t03both r4 up to 1a4864b0 (lead #94b) | 0ec27af3 | SHELF_OTHER_ARM off; no layer |
 | 58 | i7-measure up to ceb99806 (lead #92f) | d90e3530 | DEFAULT PUSH_NUDGE_STALL_STOP 1 + PUSH_NUDGE_MIN_SPEED 1 (0.025 m/s); BRIEFCASE_LYING / SUCCESS_YAW_FREE_SYMMETRIC off, LYING_TILT_DEG unset (eval bundle held) |
 | 59 | i7-ul02guide 968fa99e..1f50c325 (lead #99f) | 0c57161d | DEFAULT PUSH_GUIDE_WALL 1 (under_large_02 only); not i7-ul02guide-ab |
+| 60 | i7-measure 491fc9b9 (owner #100) | 8a5f0137 | lying push integral yaw re-aim (lying-only; BRIEFCASE_LYING stays off) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
