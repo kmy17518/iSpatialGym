@@ -113,7 +113,7 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
     root = Path(root).resolve(); base = root/'training_pipeline_canaries'
     result = {'schema': 'isg-training-pipeline-status-v1', 'campaign_id': 'campaign_20261110',
         'observed_at': now or datetime.now(timezone.utc).isoformat(), 'records': [], 'batch_stages': [],
-        'sources': [], 'errors': [], 'benchmark_credit': 0, 'quota_consumed': 0,
+        'sources': [], 'errors': [], 'diagnostic_controls': [], 'benchmark_credit': 0, 'quota_consumed': 0,
         'production_released': False, 'status': 'observed'}
     result['cycle_started_at'] = result['observed_at']
     result['cycle_finished_at'] = None
@@ -188,10 +188,13 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                 submitted_path = path.parent/'submission.json'
                 if submitted_path.exists():
                     submitted = read(submitted_path)
-                    if all(k in submitted for k in ('job_id','start','native_runtime','request')):
+                    if all(k in submitted for k in ('job_id','native_runtime','request')) and ('start' in submitted or 'members' in submitted):
                         require(submitted['request'] in (current_request,original_request)
                                 and submitted['native_runtime']==request['native_runtime']
-                                and int(submitted['start'])==key[1]
+                                and (int(submitted['start'])==key[1] if 'start' in submitted else
+                                     sum(m.get('candidate_id')==key[0] and int(m.get('start',-1))==key[1]
+                                         and m.get('config_sha256')==request['config_sha256']
+                                         and m.get('count')==request['count'] for m in submitted['members'])==1)
                                 and submitted.get('returncode')==0,
                                 'native submission does not bind this exact request/runtime/index')
                         row['native_submission'] = {'evidence':ref(submitted_path),
@@ -232,10 +235,47 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                             'native': True, 'demo': True, 'physics_replay': True, 'hard_qa': True,
                             'export_provenance': True, 'benchmark_acceptance': False,
                             'perturbations': proof['export_record'].get('perturbations', {})}
+                if value.get('sequence') == ['A','B','A']:
+                    row['sampler_sequence']={'sequence':['A','B','A'],'request':current_request,
+                        'status':'prepared','scope':'Same loaded native SAMPLER world and active-only exports; each exact demo/replay/render remains separate.',
+                        'benchmark_credit':0,'release_eligible':False}
+                    sequence_path=path.parent/'sequence_result.json'
+                    if sequence_path.exists():
+                        sequence=read(sequence_path)
+                        require(sequence['request']==current_request and sequence['benchmark_credit']==0
+                                and sequence['production_released'] is False,'sampler sequence identity differs')
+                        stages=[x for x in sequence['stages'] if x['candidate_id']==key[0] and int(x['start'])==key[1]]
+                        require(len(stages)<=1,'duplicate sequence stage')
+                        row['sampler_sequence'].update(status=sequence['status'],evidence=ref(sequence_path),
+                            observed_at=sequence['observed_at'],stage=stages[0] if stages else None)
                 row['last_observed_at'] = datetime.now(timezone.utc).isoformat()
                 result['records'].append(row)
         except Exception as error:
             result['errors'].append({'path': str(path), 'error': f'{type(error).__name__}: {error}'})
+    for request in sorted(base.glob('*/restoration_control*/request.json')):
+        try:
+            control=read(request)
+            require(control.get('diagnostic_control')=='A_A' and control.get('diagnostic_only') is True
+                    and control.get('production_released') is False,'invalid reset control request')
+            row={'kind':'repeated_A_physics_control','request':ref(request),'status':'prepared',
+                 'observed_at':timestamp(request),'benchmark_credit':0,'release_eligible':False,
+                 'scope':'Diagnostic reset-variability baseline only; cannot satisfy an A/B/A release gate.'}
+            submission=request.parent/'submission.json'
+            if submission.exists():
+                submitted=read(submission);require(submitted['request']==ref(request),'control submission identity differs')
+                row.update(status='submitted',submission=ref(submission),allocations=submitted['jobs'],scheduler_state='unavailable')
+            probe=request.parent/'physics/probe.json'
+            if probe.exists():
+                observed=read(probe)
+                require(observed['schema']=='isg-training-restoration-control-v1' and observed['request']==ref(request),
+                        'control probe identity differs')
+                entries=observed['entries'];require(len(entries)<=2,'control episode bound exceeded')
+                row.update(status='episodes_recorded',probe=ref(probe),episodes_observed=len(entries),
+                           observed_at=timestamp(probe),successful_episodes=sum(e.get('returncode')==0 and
+                           e.get('result',{}).get('success') is True for e in entries))
+            result['diagnostic_controls'].append(row)
+        except Exception as error:
+            result['errors'].append({'path':str(request),'error':f'{type(error).__name__}: {error}'})
     # Publish freshly joined instance outcomes before any potentially slow full
     # batch proof. Prior batch observations keep their own dated evidence.
     checkpoint('batch_verification')

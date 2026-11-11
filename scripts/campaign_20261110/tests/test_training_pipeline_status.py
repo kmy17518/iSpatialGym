@@ -203,3 +203,29 @@ def test_slow_batch_worker_returns_pending_without_blocking_instance_polling(tmp
         assert result['verification_observed_at']=='2026-11-11T18:00:00Z'
     finally:
         finish.set();worker.executor.shutdown(wait=True)
+
+
+def test_sequence_submission_requires_exact_member_config_and_does_not_mean_success(tmp_path):
+    folder,row=request(tmp_path,'sequence',10)
+    document=status.read(folder/'requests.json');document['sequence']=['A','B','A']
+    write_json_atomic(folder/'requests.json',document)
+    submitted={'request':status.ref(folder/'requests.json'),'native_runtime':'/native','job_id':'123','returncode':0,
+        'members':[{'candidate_id':'sequence','start':10,'count':1,'config_sha256':row['config_sha256']}]}
+    write_json_atomic(folder/'submission.json',submitted)
+    record=status.observe(tmp_path)['records'][0]
+    assert record['native_submission']['job_id']=='123' and record['status']=='native_submitted'
+    assert record['sampler_sequence']['release_eligible'] is False and record['native'] is None
+    submitted['members'][0]['config_sha256']='b'*64;write_json_atomic(folder/'submission.json',submitted)
+    assert status.observe(tmp_path)['errors']
+
+
+def test_repeated_a_control_is_separate_from_restoration_release_evidence(tmp_path):
+    folder=tmp_path/'training_pipeline_canaries/tray/restoration_control_aa_r1'
+    write_json_atomic(folder/'request.json',{'diagnostic_control':'A_A','diagnostic_only':True,'production_released':False})
+    write_json_atomic(folder/'physics/probe.json',{'schema':'isg-training-restoration-control-v1',
+        'request':status.ref(folder/'request.json'),'entries':[{'returncode':0,'result':{'success':True}}]*2})
+    observed=status.observe(tmp_path)
+    assert observed['batch_stages']==[]
+    control=observed['diagnostic_controls'][0]
+    assert control['successful_episodes']==2 and control['release_eligible'] is False
+    assert observed['benchmark_credit']==0
