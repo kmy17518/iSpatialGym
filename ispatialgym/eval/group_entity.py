@@ -39,7 +39,7 @@ if os.environ.get("ISPATIALGYM_FAST_GEOMETRY") in ("1", "check"):
 FAST_ASSIGN = os.environ.get("ISPATIALGYM_FAST_ASSIGN", "")
 _ASSIGN_COUNTS = {"reused": 0, "mismatches": 0, "fresh_s": 0.0}
 
-#: ISPATIALGYM_GROUP_ASSIGN_POSE_TIEBREAK=1 (i7-blockdiag 2026-11-09, default off): the layout cost is invariant to a global
+#: ISPATIALGYM_GROUP_ASSIGN_POSE_TIEBREAK (i7-blockdiag 2026-11-09; default ON since lead #100, =0 off): the layout cost is invariant to a global
 #: rigid motion of the whole arrangement, so a target that is symmetric under one (block_design's 2 x 2 dice: a pi turn about
 #: the vertical or a pi flip about a horizontal axis maps the slot set onto itself) has two or more permutations whose layout
 #: costs differ only by the placement noise; the cheaper one wins at random and ``pose_reached`` (judged under the same shared
@@ -51,7 +51,8 @@ _POSE_TIEBREAK_COUNTS = {"evaluations": 0, "acted": 0, "last_acted": None}
 
 
 def pose_tiebreak_on() -> bool:
-    return os.environ.get("ISPATIALGYM_GROUP_ASSIGN_POSE_TIEBREAK", "0") not in ("", "0", "off", "false", "no")
+    # default ON since lead #100 (owner 2026-11-10: shipped with A4 as one eval-measure change); "0" / "off" restores the old choice
+    return os.environ.get("ISPATIALGYM_GROUP_ASSIGN_POSE_TIEBREAK", "1") not in ("", "0", "off", "false", "no")
 
 
 def pose_tiebreak_reset() -> None:
