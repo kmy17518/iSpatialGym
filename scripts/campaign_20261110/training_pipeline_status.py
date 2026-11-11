@@ -4,10 +4,11 @@ import argparse
 from collections import Counter
 from datetime import datetime, timezone
 import json
+import re
 from pathlib import Path
 import time
 from concurrent.futures import ThreadPoolExecutor
-from scripts.campaign_20261110.contracts import file_digest, require, write_json_atomic, task_quotas
+from scripts.campaign_20261110.contracts import file_digest, require, write_json_atomic, task_quotas, digest
 
 
 def read(path): return json.loads(Path(path).read_text())
@@ -46,7 +47,7 @@ def sequence_stage_references(root, sequence_path, stage):
     return result
 
 
-def template_render_observations(root, request_path):
+def template_render_observations(root, request_path, *, errors=None):
     """Join independently rendered exact exports, never a cross-model reuse claim."""
     root=Path(root).resolve(); request_path=Path(request_path)
     request=read(request_path); request_ref=ref(request_path)
@@ -56,65 +57,153 @@ def template_render_observations(root, request_path):
             and request.get('benchmark_credit')==0, 'invalid template render scope')
     results={}
     for record in request['records']:
-        key=(record['candidate_id'],int(record['start']))
-        require(key not in results,'duplicate exact template render request')
-        directory=Path(record['results']).resolve().parent
-        require(directory.is_relative_to(request_path.parent.resolve()),'render output escapes request')
-        for name in ('configuration','canary_review','source_environment','native_runtime_identity','manifest','demos'):
-            source=record[name]; path=Path(source['path']).resolve()
-            require(path.is_relative_to(root) and file_digest(path)==source['sha256'],
-                    'template render input changed: '+name)
-        row={'request':request_ref,'candidate_id':key[0],'start':key[1],
-             'configuration_sha256':record['configuration_sha256'],
-             'review':record['canary_review'],'native_runtime':record['native_runtime'],
-             'status':'prepared','scheduler_state':'unavailable','benchmark_credit':0,
-             'scope':'Independent rendering of this exact sampler export; no cross-model oracle-world reuse assertion.'}
-        launch=directory/'launch.json'
-        require(launch.is_file(),'template render launch identity missing')
-        plan=read(launch)
-        require(plan['instances']==[record['instance_id']] and plan['request']==request_ref
-                and plan['configuration']==record['configuration']
-                and plan['native_runtime_identity']==record['native_runtime_identity'],
-                'template render launch differs from request')
-        row['launch']=ref(launch)
-        submission=directory/'submission.json'
-        if submission.exists():
-            submitted=read(submission)
-            require(submitted.get('request')==request_ref
-                    and submitted.get('candidate_id')==key[0]
-                    and int(submitted.get('start',-1))==key[1]
-                    and submitted.get('native_runtime')==record['native_runtime']
-                    and submitted.get('launch')==ref(launch)
-                    and submitted.get('source_environment')==record['source_environment'],
-                    'template render submission identity differs')
-            row.update(status='submitted',submission=ref(submission),
-                       job_id=str(submitted['job_id']))
-        path=directory/'result.json'
-        if path.exists():
-            value=read(path)
-            require(value['schema']=='isg-render-result-v1'
-                    and value['launch_sha256']==file_digest(launch), 'render result launch identity differs')
-            iid=record['instance_id'];episodes=value.get('episodes',[])
-            passed=(value.get('success') is True and value.get('returncode')==0
-                    and value.get('expected_instances')==[iid]
-                    and value.get('rendered_instances')==[iid]
-                    and value.get('kept_instances')==[iid] and len(episodes)==1
-                    and Path(episodes[0].get('demo','')).name==iid
-                    and episodes[0].get('kept') is True
-                    and episodes[0].get('episode_index') is not None
-                    and (episodes[0].get('campaign_restoration')or{}).get('scale_verified') is True)
-            row.update(status='verified' if passed else 'failed_validation',
-                       result=ref(path),returncode=value.get('returncode'),
-                       verification_observed_at=timestamp(path))
-            if passed:
-                dataset=Path(episodes[0]['dataset']).resolve()
-                require(dataset.is_relative_to(Path(record['output']).resolve()),'rendered dataset escapes exact output')
-                files=sorted(p for p in dataset.rglob('*')if p.is_file())
-                require(any(p.suffix=='.parquet' for p in files)
-                        and any(p.suffix=='.mp4' for p in files), 'render result lacks saved observation data/video')
-                row['artifacts']=[ref(p) for p in files]
-        results[key]=row
+        try:
+            key=(record['candidate_id'],int(record['start']))
+            require(key not in results,'duplicate exact template render request')
+            directory=Path(record['results']).resolve().parent
+            require(directory.is_relative_to(request_path.parent.resolve()),'render output escapes request')
+            for name in ('configuration','canary_review','source_environment','native_runtime_identity','manifest','demos'):
+                source=record[name]; path=Path(source['path']).resolve()
+                require(path.is_relative_to(root) and file_digest(path)==source['sha256'],
+                        'template render input changed: '+name)
+            row={'request':request_ref,'candidate_id':key[0],'start':key[1],
+                 'configuration_sha256':record['configuration_sha256'],
+                 'review':record['canary_review'],'native_runtime':record['native_runtime'],
+                 'instance_id':record['instance_id'],
+                 'status':'prepared','scheduler_state':'unavailable','benchmark_credit':0,
+                 'scope':'Independent rendering of this exact sampler export; no cross-model oracle-world reuse assertion.'}
+            launch=directory/'launch.json'
+            require(launch.is_file(),'template render launch identity missing')
+            plan=read(launch)
+            require(plan['instances']==[record['instance_id']] and plan['request']==request_ref
+                    and plan['configuration']==record['configuration']
+                    and plan['native_runtime_identity']==record['native_runtime_identity'],
+                    'template render launch differs from request')
+            row['launch']=ref(launch)
+            submission=directory/'submission.json'
+            if submission.exists():
+                submitted=read(submission)
+                require(submitted.get('request')==request_ref
+                        and submitted.get('candidate_id')==key[0]
+                        and int(submitted.get('start',-1))==key[1]
+                        and submitted.get('native_runtime')==record['native_runtime']
+                        and submitted.get('launch')==ref(launch)
+                        and submitted.get('source_environment')==record['source_environment'],
+                        'template render submission identity differs')
+                row.update(status='submitted',submission=ref(submission),
+                           job_id=str(submitted['job_id']))
+            path=directory/'result.json'
+            if path.exists():
+                value=read(path)
+                require(value['schema']=='isg-render-result-v1'
+                        and value['launch_sha256']==file_digest(launch), 'render result launch identity differs')
+                iid=record['instance_id'];episodes=value.get('episodes',[])
+                passed=(value.get('success') is True and value.get('returncode')==0
+                        and value.get('expected_instances')==[iid]
+                        and value.get('rendered_instances')==[iid]
+                        and value.get('kept_instances')==[iid] and len(episodes)==1
+                        and Path(episodes[0].get('demo','')).name==iid
+                        and episodes[0].get('kept') is True
+                        and episodes[0].get('episode_index') is not None
+                        and (episodes[0].get('campaign_restoration')or{}).get('scale_verified') is True)
+                row.update(status='verified' if passed else 'failed_validation',
+                           result=ref(path),returncode=value.get('returncode'),
+                           verification_observed_at=timestamp(path))
+                if passed:
+                    dataset=Path(episodes[0]['dataset']).resolve()
+                    require(dataset.is_relative_to(Path(record['output']).resolve()),'rendered dataset escapes exact output')
+                    files=sorted(p for p in dataset.rglob('*')if p.is_file())
+                    require(any(p.suffix=='.parquet' for p in files)
+                            and any(p.suffix=='.mp4' for p in files), 'render result lacks saved observation data/video')
+                    row['artifacts']=[ref(p) for p in files]
+            results[key]=row
+        except Exception as error:
+            if errors is None:
+                raise
+            errors.append({'path':str(request_path), 'candidate_id':record.get('candidate_id'),
+                           'start':record.get('start'), 'error':f'{type(error).__name__}: {error}'})
     return results
+
+
+_POLICY_SNAPSHOT_CACHE = {}
+_POLICY_OBSERVATION_FIELDS = frozenset({'observed_at', 'current_evaluation', 'evaluation_policy_history'})
+
+
+def policy_snapshot(root, expected):
+    """Find hash-exact policy bytes; never reconstruct a historical policy."""
+    root=Path(root).resolve()
+    require(isinstance(expected,str) and re.fullmatch('[0-9a-f]{64}',expected),
+            'review lacks exact gate policy identity')
+    key=(str(root),expected)
+    cached=_POLICY_SNAPSHOT_CACHE.get(key)
+    if cached and _stamp(cached['path'])==cached['stamp']:
+        value=read(cached['path'])
+        require(_stamp(cached['path'])==cached['stamp'],'cached policy changed during identity check')
+        return cached['reference'],value
+    paths=[root/'controllers/training_production_gate.json']
+    paths.extend(sorted((root/'infra/training_production_gate/current_evaluations_r1').glob('*_previous_policy.json')))
+    for path in paths:
+        if not path.is_file():continue
+        before=_stamp(path)
+        if file_digest(path)!=expected:continue
+        value=read(path)
+        require(_stamp(path)==before,'policy changed during historical identity check')
+        reference={'path':str(path),'sha256':expected}
+        _POLICY_SNAPSHOT_CACHE[key]={'path':str(path),'stamp':before,'reference':reference}
+        return reference,value
+    raise ValueError('exact historical gate policy bytes unavailable: '+expected)
+
+
+def render_review_association(root, row, rendering):
+    """Reconcile only observation metadata revisions of identical canary proofs.
+
+    This is reporting evidence, not authorization. Both immutable reviews and
+    both exact policy snapshots remain linked. Any authorization/release field,
+    source artifact, configuration or runtime difference is rejected.
+    """
+    root=Path(root).resolve()
+    current=(row.get('validated_evidence')or{}).get('review')
+    require(rendering['configuration_sha256']==row['configuration_sha256']
+            and rendering['native_runtime']==row['native_runtime'] and current,
+            'rendering does not belong to this exact validated canary')
+    original=rendering['review']
+    proofs=[]
+    for reference in (original,current):
+        path=Path(reference['path']).resolve()
+        require(path.is_relative_to(root/'validation/training_canaries/reviews')
+                and file_digest(path)==reference['sha256'],'render canary review bytes changed')
+        proof=read(path)
+        require(proof.get('schema')=='isg-training-canary-review-v1'
+                and proof.get('campaign_id')=='campaign_20261110'
+                and proof.get('validation_passed') is True and proof.get('accepted') is False
+                and proof.get('eligible_for_benchmark') is False and proof.get('quota_consumed')==0,
+                'render review is not exact zero-credit evidence')
+        require(proof.get('instance_id')==rendering.get('instance_id')
+                and proof.get('source_proof',{}).get('config',{}).get('sha256')==row['configuration_sha256'],
+                'render review exact instance or configuration differs')
+        proofs.append(proof)
+    if original==current:return {'status':'exact_review','review':current}
+    payloads=[{k:v for k,v in proof.items()if k!='gate_policy_sha256'}for proof in proofs]
+    require(payloads[0]==payloads[1],'render review source or validation evidence differs')
+    policies=[policy_snapshot(root,proof['gate_policy_sha256'])for proof in proofs]
+    semantics=[]
+    for reference,policy in policies:
+        require(policy.get('schema')=='isg-training-production-gate-v1'
+                and policy.get('campaign_id')=='campaign_20261110','render gate policy identity differs')
+        if 'evaluation_policy_history'in policy:
+            require(policy['evaluation_policy_history'].get('authorization_change') is False,
+                    'policy evaluation declared an authorization change')
+        if 'current_evaluation'in policy:
+            evaluation=policy['current_evaluation'];path=Path(evaluation['path']).resolve()
+            require(path.is_relative_to(root/'infra/training_production_gate/current_evaluations_r1')
+                    and file_digest(path)==evaluation['sha256'],'policy observation evidence changed')
+        semantics.append({k:v for k,v in policy.items()if k not in _POLICY_OBSERVATION_FIELDS})
+    require(semantics[0]==semantics[1],'render gate authorization or release semantics differ')
+    return {'status':'identical_evidence_policy_observation_revision','render_review':original,
+            'current_review':current,'render_policy':policies[0][0],'current_policy':policies[1][0],
+            'excluded_policy_metadata':sorted(_POLICY_OBSERVATION_FIELDS),
+            'immutable_review_payload_sha256':digest(payloads[0]),
+            'policy_semantics_sha256':digest(semantics[0]),'scope':'read-only evidence association; no release authority'}
 
 
 _BATCH_OBSERVATION_CACHE = {}
@@ -232,9 +321,10 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
     renders = {}
     for path in sorted(base.glob('*/template_rendering*/request.json')):
         try:
-            observed=template_render_observations(root,path)
-            require(not(set(observed)&set(renders)), 'duplicate rendering attempt for exact canary')
-            renders.update(observed)
+            observed=template_render_observations(root,path,errors=result['errors'])
+            scoped={(str(path.parent.parent.resolve()), *key):row for key,row in observed.items()}
+            require(not(set(scoped)&set(renders)), 'duplicate rendering attempt for exact canary')
+            renders.update(scoped)
             result['sources'].append({**ref(path),'kind':'exact_template_rendering'})
         except Exception as error:
             result['errors'].append({'path':str(path),'error':f'{type(error).__name__}: {error}'})
@@ -247,7 +337,7 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                 allocation = row.get('allocation') or {}
                 start = allocation.get('start')
                 if start is not None:
-                    reviews[(candidate, int(start))] = (row, value.get('observed_at'), ref(path))
+                    reviews[(str(path.parent.resolve()), candidate, int(start))] = (row, value.get('observed_at'), ref(path))
         except Exception as error:
             result['errors'].append({'path': str(path), 'error': f'{type(error).__name__}: {error}'})
     for path in sorted(base.glob('*/requests.json')):
@@ -271,128 +361,137 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                         'authorization refresh changed native attempt identity')
                 value, current_request = revised, pointer['current']
             for request in value['records']:
-                key = (request['candidate_id'], int(request['start']))
-                row = {'candidate_id': key[0], 'start': key[1], 'count': request['count'],
-                    'class_id': request['class_id'], 'configuration_sha256': request['config_sha256'],
-                    'native_runtime': request['native_runtime'], 'batch': path.parent.name,
-                    'request': current_request, 'original_request': original_request,
-                    'status': 'native_not_observed', 'native': None,
-                    'review': None, 'benchmark_credit': 0, 'quota_consumed': 0, 'dependencies': []}
-                config_path = request.get('config_path')
-                if config_path:
-                    config_path = Path(config_path).resolve()
-                    require(config_path.is_relative_to(root) and file_digest(config_path)==request['config_sha256'],
-                            'native configuration evidence changed')
-                    row['task'] = read(config_path)['template']['task']
-                    row['configuration'] = ref(config_path)
-                for name,sha_name in [('config_path','config_sha256'),('input_manifest','input_manifest_sha256'),('authorization_path','authorization_sha256')]:
-                    if not request.get(name):continue
-                    artifact=Path(request[name]).resolve()
-                    require(artifact.is_relative_to(root) and file_digest(artifact)==request[sha_name],
-                            'canary prerequisite identity changed: '+name)
-                    row['dependencies'].append({'id':name+':'+request[sha_name],
-                        'required_for':['native_generation','collection','physics_replay'],
-                        'state':'verified','scope':'immutable input identity; physical runtime checks remain mandatory',
-                        'artifact':ref(artifact),'source_ref':current_request})
-                output = Path(request['output']).resolve()
-                require(output.is_relative_to(base), 'native output outside pipeline scope')
-                submitted_path = path.parent/'submission.json'
-                submitted_pointer = path.parent/'submission_current.json'
-                if submitted_pointer.exists():
-                    pointer = read(submitted_pointer)
-                    selected_ref = pointer.get('current', pointer)
-                    selected = Path(selected_ref['path']).resolve()
-                    require(selected.parent == path.parent.resolve() and
-                            file_digest(selected) == selected_ref['sha256'], 'native submission revision changed')
-                    row['native_submission_pointer'] = ref(submitted_pointer)
-                    if submitted_path.exists(): row['original_native_submission'] = ref(submitted_path)
-                    submitted_path = selected
-                if submitted_path.exists():
-                    submitted = read(submitted_path)
-                    if 'jobs' in submitted:
-                        require(submitted['request'] in (current_request,original_request),
-                                'native submission request differs')
-                        matches=[job for job in submitted['jobs'] if job.get('candidate_id')==key[0]]
-                        require(len(matches)<=1,'duplicate native member submission')
-                        submitted=matches[0] if matches else {}
-                        if submitted:
-                            require(submitted.get('config_sha256')==request['config_sha256'] and
-                                    submitted.get('count')==request['count'],
-                                    'native member configuration/count differs')
-                    if all(k in submitted for k in ('job_id','native_runtime','request')) and ('start' in submitted or 'members' in submitted):
-                        require(submitted['request'] in (current_request,original_request)
-                                and submitted['native_runtime']==request['native_runtime']
-                                and (int(submitted['start'])==key[1] if 'start' in submitted else
-                                     sum(m.get('candidate_id')==key[0] and int(m.get('start',-1))==key[1]
-                                         and m.get('config_sha256')==request['config_sha256']
-                                         and m.get('count')==request['count'] for m in submitted['members'])==1)
-                                and submitted.get('returncode')==0,
-                                'native submission does not bind this exact request/runtime/index')
-                        row['native_submission'] = {'evidence':ref(submitted_path),
-                            'job_id':str(submitted['job_id']),'observed_at':submitted.get('observed_at'),
-                            'status':'submitted','scheduler_state':'unavailable'}
-                        row['status'] = 'native_submitted'
-                gate_path = output/'sampling_gate.json'
-                if gate_path.exists():
-                    gate = read(gate_path)
-                    require(gate['candidate_id'] == key[0] and gate['config_sha256'] == request['config_sha256'],
-                            'native gate configuration differs')
-                    row['native'] = {**ref(gate_path), 'observed_at': timestamp(gate_path),
-                        'returncode': gate.get('returncode'), 'written': gate.get('tro_count'),
-                        'elapsed_seconds': gate.get('elapsed_seconds')}
-                    row['status'] = 'native_passed' if gate.get('returncode') == 0 and gate.get('tro_count') == 1 else 'native_failed'
-                    if row['status']=='native_passed':
-                        from scripts.campaign_20261110.training_stream import native_evidence
-                        row['native_proof']=native_evidence(request,root)
-                        row['dependencies'].append({'id':'native_gate:'+file_digest(gate_path),
-                            'required_for':['collection','physics_replay'],'state':'verified',
-                            'artifact':ref(gate_path),'source_ref':current_request,
-                            'scope':'this exact index/config/runtime and hash-checked native TRO only'})
-                if key in reviews:
-                    record, observed_at, source = reviews[key]
-                    row['review'] = {**record, 'observed_at': observed_at, 'observation_source': source}
-                    row['status'] = record['status']
-                    if record.get('validation_review'):
-                        validation = record['validation_review']; review_path = Path(validation['review']).resolve()
-                        require(review_path.is_relative_to(root) and file_digest(review_path) == validation['sha256'],
-                                'canary review changed')
-                        proof = read(review_path)
-                        require(proof['validation_passed'] is True and proof['accepted'] is False and
-                                proof['quota_consumed'] == 0, 'review is not zero-credit canary evidence')
-                        row['task'] = proof['export_record']['task']
-                        row['validated_evidence'] = {'review': ref(review_path),
-                            'validation_key': proof['export_record']['validation_key'],
-                            'scope': 'this exact configuration and instance only',
-                            'native': True, 'demo': True, 'physics_replay': True, 'hard_qa': True,
-                            'export_provenance': True, 'benchmark_acceptance': False,
-                            'perturbations': proof['export_record'].get('perturbations', {})}
-                if value.get('sequence') == ['A','B','A']:
-                    row['sampler_sequence']={'sequence':['A','B','A'],'request':current_request,
-                        'status':'prepared','scope':'Same loaded native SAMPLER world and active-only exports; each exact demo/replay/render remains separate.',
-                        'benchmark_credit':0,'release_eligible':False}
-                    sequence_path=path.parent/'sequence_result.json'
-                    if sequence_path.exists():
-                        sequence=read(sequence_path)
-                        require(sequence['request']==current_request and sequence['benchmark_credit']==0
-                                and sequence['production_released'] is False,'sampler sequence identity differs')
-                        stages=[x for x in sequence['stages'] if x['candidate_id']==key[0] and int(x['start'])==key[1]]
-                        require(len(stages)<=1,'duplicate sequence stage')
-                        row['sampler_sequence'].update(status=sequence['status'],evidence=ref(sequence_path),
-                            observed_at=sequence['observed_at'],stage=stages[0] if stages else None)
-                        if stages:
-                            row['sampler_sequence']['stage_references']=sequence_stage_references(root,sequence_path,stages[0])
-                            row['sampler_sequence']['evidence_identity_verified']=True
-                if key in renders:
-                    rendering=renders[key]
-                    require(rendering['configuration_sha256']==row['configuration_sha256']
-                            and rendering['review']==(row.get('validated_evidence')or{}).get('review'),
-                            'rendering does not belong to this exact validated canary')
-                    row['template_rendering']=rendering
-                    if rendering['status']=='verified':
-                        row['validated_evidence']['rendering']=True
-                        row['validated_evidence']['rendering_result']=rendering['result']
-                row['last_observed_at'] = datetime.now(timezone.utc).isoformat()
-                result['records'].append(row)
+                row = None
+                try:
+                    key = (request['candidate_id'], int(request['start']))
+                    row = {'candidate_id': key[0], 'start': key[1], 'count': request['count'],
+                        'class_id': request['class_id'], 'configuration_sha256': request['config_sha256'],
+                        'native_runtime': request['native_runtime'], 'batch': path.parent.name,
+                        'request': current_request, 'original_request': original_request,
+                        'status': 'native_not_observed', 'native': None,
+                        'review': None, 'benchmark_credit': 0, 'quota_consumed': 0, 'dependencies': []}
+                    config_path = request.get('config_path')
+                    if config_path:
+                        config_path = Path(config_path).resolve()
+                        require(config_path.is_relative_to(root) and file_digest(config_path)==request['config_sha256'],
+                                'native configuration evidence changed')
+                        row['task'] = read(config_path)['template']['task']
+                        row['configuration'] = ref(config_path)
+                    for name,sha_name in [('config_path','config_sha256'),('input_manifest','input_manifest_sha256'),('authorization_path','authorization_sha256')]:
+                        if not request.get(name):continue
+                        artifact=Path(request[name]).resolve()
+                        require(artifact.is_relative_to(root) and file_digest(artifact)==request[sha_name],
+                                'canary prerequisite identity changed: '+name)
+                        row['dependencies'].append({'id':name+':'+request[sha_name],
+                            'required_for':['native_generation','collection','physics_replay'],
+                            'state':'verified','scope':'immutable input identity; physical runtime checks remain mandatory',
+                            'artifact':ref(artifact),'source_ref':current_request})
+                    output = Path(request['output']).resolve()
+                    require(output.is_relative_to(base), 'native output outside pipeline scope')
+                    submitted_path = path.parent/'submission.json'
+                    submitted_pointer = path.parent/'submission_current.json'
+                    if submitted_pointer.exists():
+                        pointer = read(submitted_pointer)
+                        selected_ref = pointer.get('current', pointer)
+                        selected = Path(selected_ref['path']).resolve()
+                        require(selected.parent == path.parent.resolve() and
+                                file_digest(selected) == selected_ref['sha256'], 'native submission revision changed')
+                        row['native_submission_pointer'] = ref(submitted_pointer)
+                        if submitted_path.exists(): row['original_native_submission'] = ref(submitted_path)
+                        submitted_path = selected
+                    if submitted_path.exists():
+                        submitted = read(submitted_path)
+                        if 'jobs' in submitted:
+                            require(submitted['request'] in (current_request,original_request),
+                                    'native submission request differs')
+                            matches=[job for job in submitted['jobs'] if job.get('candidate_id')==key[0]]
+                            require(len(matches)<=1,'duplicate native member submission')
+                            submitted=matches[0] if matches else {}
+                            if submitted:
+                                require(submitted.get('config_sha256')==request['config_sha256'] and
+                                        submitted.get('count')==request['count'],
+                                        'native member configuration/count differs')
+                        if all(k in submitted for k in ('job_id','native_runtime','request')) and ('start' in submitted or 'members' in submitted):
+                            require(submitted['request'] in (current_request,original_request)
+                                    and submitted['native_runtime']==request['native_runtime']
+                                    and (int(submitted['start'])==key[1] if 'start' in submitted else
+                                         sum(m.get('candidate_id')==key[0] and int(m.get('start',-1))==key[1]
+                                             and m.get('config_sha256')==request['config_sha256']
+                                             and m.get('count')==request['count'] for m in submitted['members'])==1)
+                                    and submitted.get('returncode')==0,
+                                    'native submission does not bind this exact request/runtime/index')
+                            row['native_submission'] = {'evidence':ref(submitted_path),
+                                'job_id':str(submitted['job_id']),'observed_at':submitted.get('observed_at'),
+                                'status':'submitted','scheduler_state':'unavailable'}
+                            row['status'] = 'native_submitted'
+                    gate_path = output/'sampling_gate.json'
+                    if gate_path.exists():
+                        gate = read(gate_path)
+                        require(gate['candidate_id'] == key[0] and gate['config_sha256'] == request['config_sha256'],
+                                'native gate configuration differs')
+                        row['native'] = {**ref(gate_path), 'observed_at': timestamp(gate_path),
+                            'returncode': gate.get('returncode'), 'written': gate.get('tro_count'),
+                            'elapsed_seconds': gate.get('elapsed_seconds')}
+                        row['status'] = 'native_passed' if gate.get('returncode') == 0 and gate.get('tro_count') == 1 else 'native_failed'
+                        if row['status']=='native_passed':
+                            from scripts.campaign_20261110.training_stream import native_evidence
+                            row['native_proof']=native_evidence(request,root)
+                            row['dependencies'].append({'id':'native_gate:'+file_digest(gate_path),
+                                'required_for':['collection','physics_replay'],'state':'verified',
+                                'artifact':ref(gate_path),'source_ref':current_request,
+                                'scope':'this exact index/config/runtime and hash-checked native TRO only'})
+                    scoped_key=(str(path.parent.resolve()), *key)
+                    if scoped_key in reviews:
+                        record, observed_at, source = reviews[scoped_key]
+                        row['review'] = {**record, 'observed_at': observed_at, 'observation_source': source}
+                        row['status'] = record['status']
+                        if record.get('validation_review'):
+                            validation = record['validation_review']; review_path = Path(validation['review']).resolve()
+                            require(review_path.is_relative_to(root) and file_digest(review_path) == validation['sha256'],
+                                    'canary review changed')
+                            proof = read(review_path)
+                            require(proof['validation_passed'] is True and proof['accepted'] is False and
+                                    proof['quota_consumed'] == 0, 'review is not zero-credit canary evidence')
+                            row['task'] = proof['export_record']['task']
+                            row['validated_evidence'] = {'review': ref(review_path),
+                                'validation_key': proof['export_record']['validation_key'],
+                                'scope': 'this exact configuration and instance only',
+                                'native': True, 'demo': True, 'physics_replay': True, 'hard_qa': True,
+                                'export_provenance': True, 'benchmark_acceptance': False,
+                                'perturbations': proof['export_record'].get('perturbations', {})}
+                    if value.get('sequence') == ['A','B','A']:
+                        row['sampler_sequence']={'sequence':['A','B','A'],'request':current_request,
+                            'status':'prepared','scope':'Same loaded native SAMPLER world and active-only exports; each exact demo/replay/render remains separate.',
+                            'benchmark_credit':0,'release_eligible':False}
+                        sequence_path=path.parent/'sequence_result.json'
+                        if sequence_path.exists():
+                            sequence=read(sequence_path)
+                            require(sequence['request']==current_request and sequence['benchmark_credit']==0
+                                    and sequence['production_released'] is False,'sampler sequence identity differs')
+                            stages=[x for x in sequence['stages'] if x['candidate_id']==key[0] and int(x['start'])==key[1]]
+                            require(len(stages)<=1,'duplicate sequence stage')
+                            row['sampler_sequence'].update(status=sequence['status'],evidence=ref(sequence_path),
+                                observed_at=sequence['observed_at'],stage=stages[0] if stages else None)
+                            if stages:
+                                row['sampler_sequence']['stage_references']=sequence_stage_references(root,sequence_path,stages[0])
+                                row['sampler_sequence']['evidence_identity_verified']=True
+                    if scoped_key in renders:
+                        rendering=renders[scoped_key]
+                        association=render_review_association(root,row,rendering)
+                        row['template_rendering']={**rendering,'review_association':association}
+                        if rendering['status']=='verified':
+                            row['validated_evidence']['rendering']=True
+                            row['validated_evidence']['rendering_result']=rendering['result']
+                    row['last_observed_at'] = datetime.now(timezone.utc).isoformat()
+                    result['records'].append(row)
+                except Exception as error:
+                    detail={'path':str(path), 'candidate_id':request.get('candidate_id'),
+                            'start':request.get('start'), 'error':f'{type(error).__name__}: {error}'}
+                    result['errors'].append(detail)
+                    if row is not None:
+                        row.update(status='evidence_identity_failed', observation_error=detail,
+                                   last_observed_at=datetime.now(timezone.utc).isoformat())
+                        result['records'].append(row)
         except Exception as error:
             result['errors'].append({'path': str(path), 'error': f'{type(error).__name__}: {error}'})
     controls=set(base.glob('*/restoration_control*/request.json'))
@@ -531,7 +630,7 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
 
 
 def summarize(result):
-    keys = [(r['candidate_id'], r['start']) for r in result['records']]
+    keys = [(r['original_request']['path'], r['candidate_id'], r['start']) for r in result['records']]
     require(len(keys) == len(set(keys)), 'duplicate exact canary attempt in projection')
     result['counts'] = dict(Counter(r['status'] for r in result['records']))
     result['attempts_observed'] = len(result['records'])

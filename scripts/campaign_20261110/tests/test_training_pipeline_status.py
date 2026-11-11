@@ -68,7 +68,8 @@ def test_native_submission_binds_request_index_and_runtime_without_success(tmp_p
     assert value['benchmark_credit']==value['quota_consumed']==0
     write_json_atomic(folder/'submission.json',{**submitted,'start':11})
     invalid=status.observe(tmp_path)
-    assert not invalid['records'] and 'exact request/runtime/index' in invalid['errors'][0]['error']
+    assert invalid['records'][0]['status']=='evidence_identity_failed'
+    assert 'exact request/runtime/index' in invalid['errors'][0]['error']
 
 
 def test_batch_request_is_not_batch_success(tmp_path):
@@ -279,3 +280,29 @@ def test_stage_reconciliation_must_reproduce_original_recorded_hash(tmp_path):
     snapshot.write_text('wrong')
     with pytest.raises(ValueError,match='evidence changed'):
         status.sequence_stage_references(tmp_path,sequence,stage)
+
+
+def test_review_keys_are_scoped_to_their_request_batch(tmp_path):
+    one,row=request(tmp_path,'one',12)
+    two,_=request(tmp_path,'two',12)
+    other=status.read(two/'requests.json');other['records'][0]['candidate_id']='one'
+    write_json_atomic(two/'requests.json',other)
+    write_json_atomic(one/'existing_native_reviews.json',{'campaign_id':'campaign_20261110',
+        'records':{'one':{'allocation':{'start':'12'},'status':'awaiting_own_replay'}}})
+    value=status.observe(tmp_path)
+    assert len(value['records'])==2 and not value['errors']
+    by_batch={r['batch']:r for r in value['records']}
+    assert by_batch['one']['status']=='awaiting_own_replay'
+    assert by_batch['two']['review'] is None
+
+
+def test_one_bad_record_does_not_hide_later_records_in_same_batch(tmp_path):
+    folder,row=request(tmp_path,'bad',1)
+    good={**row,'candidate_id':'good','start':2,'output':str(folder/'good')}
+    write_json_atomic(folder/'requests.json',{'campaign_id':'campaign_20261110','records':[row,good]})
+    write_json_atomic(folder/'native/sampling_gate.json',{'candidate_id':'wrong','config_sha256':'a'*64})
+    value=status.observe(tmp_path)
+    assert [(r['candidate_id'],r['status'])for r in value['records']]==[
+        ('bad','evidence_identity_failed'),('good','native_not_observed')]
+    assert value['errors'][0]['candidate_id']=='bad'
+    assert value['benchmark_credit']==0
