@@ -862,6 +862,14 @@ def stage_bounded(rec, C):
 
 
 def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed, hourly, phase):
+    try:
+        try:
+            from .heartbeat_mirror import mirror_heartbeats
+        except ImportError:
+            from heartbeat_mirror import mirror_heartbeats
+        mirror_heartbeats(os.path.join(VJ, 'worker_heartbeats'), hbs, now())
+    except Exception as error:
+        log('HEARTBEAT_MIRROR_UNAVAILABLE ' + type(error).__name__)
     staging = STAGER.reservations() if STAGER else {}
     n = {k: sum(1 for s in states.values() if s["status"] == k) for k in ("queued", "assigned", "synced", "failed")}
     instance_metrics = [{**{k:i.get(k) for k in ("id","label","gpu_name","num_gpus","actual_status","dph_total")},
