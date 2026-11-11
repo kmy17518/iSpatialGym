@@ -245,6 +245,11 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                       group_closed=True, group_id=review["group_id"])
     require(digest(fresh) == digest(review), "release evidence changed after review")
     require(review["validation_key"]["template_sha256"] == template.fingerprint, "release contract differs from validated template")
+    from scripts.campaign_20261110.current_eligibility import pending_instance_blockers
+    impact_blocked=pending_instance_blockers(root,[m['instance_id'] for m in review['members']])
+    if impact_blocked:
+        return {'accepted':{},'deferred':[m['instance_id'] for m in review['members']],
+                'reason':'known generated cohort awaits change-impact review','impact_blocked':impact_blocked}
     pool = load_pool_for_template(template, root=root)
     check_reservations(template, reservations, reservation_hashes)
     conceptual = conceptual_template(template)
@@ -296,11 +301,13 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                     require(previous[0] == digest(review), "accepted group changed")
                     return json.loads(previous[1])
                 split, task = template.split, template.task
+                from scripts.campaign_20261110.current_eligibility import install_quota_view
+                install_quota_view(root,db)
                 if split == "train":
                     return {"accepted": {}, "deferred": [row["instance_id"] for row in rows],
                             "reason": "training production gate: standalone eligibility not validated"}
                 scope = task if split == "eval_category" else template.class_id
-                counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
+                counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM current_members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                                                   (split, task, scope))))
                 from scripts.campaign_20261110.training_eligibility import eligible_training_records
                 eligible_training = eligible_training_records(db, task, root=root)
@@ -344,7 +351,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                         continue
                     final = allocation[iid]
                     if final.startswith("eval_"):
-                        templates = {v[0] for v in db.execute("SELECT DISTINCT template FROM members WHERE split=? AND task=? AND class_id=?",
+                        templates = {v[0] for v in db.execute("SELECT DISTINCT template FROM current_members WHERE split=? AND task=? AND class_id=?",
                                                             (final, task, scope))}
                         require(not templates or templates == {conceptual}, "evaluation class changed its pinned conceptual template")
                     record = {**row, "split": final, "group_id": gid, "task": task, "class_id": template.class_id,

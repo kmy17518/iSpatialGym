@@ -78,6 +78,8 @@ def evaluation_exhausted(root, template):
         path = Path(root)/'dataset'/name
         if not path.exists(): return False
         state = json.loads(path.read_text())
+        from scripts.campaign_20261110.current_eligibility import filtered_camera
+        state['accepted']=filtered_camera(root,state['accepted'])
         return sum(row['split'] == split and (split == 'eval_category' or row.get('class_id', cls) == cls)
                    for row in state['accepted'].values()) >= limit
     source = Path(root)/'dataset/allocations.sqlite'
@@ -86,7 +88,9 @@ def evaluation_exhausted(root, template):
         local = Path(temporary)/'counts.sqlite'
         shutil.copyfile(source, local)
         with sqlite3.connect(f'file:{local}?mode=ro', uri=True) as db:
-            count = db.execute('SELECT COUNT(*) FROM members WHERE split=? AND task=? AND class_id=?',
+            from scripts.campaign_20261110.current_eligibility import install_quota_view
+            install_quota_view(root,db)
+            count = db.execute('SELECT COUNT(*) FROM current_members WHERE split=? AND task=? AND class_id=?',
                                (split, task, task if split == 'eval_category' else cls)).fetchone()[0]
     return count >= limit
 

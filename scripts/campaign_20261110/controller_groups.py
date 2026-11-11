@@ -62,16 +62,18 @@ def read_counts(root, template):
         local = Path(temporary) / "state.sqlite"
         shutil.copyfile(source, local)
         with sqlite3.connect(f"file:{local}?mode=ro", uri=True) as db:
+            from scripts.campaign_20261110.current_eligibility import install_quota_view
+            install_quota_view(root,db)
             scope = template.task if template.split == "eval_category" else template.class_id
             result["evaluation"] = Counter(dict(db.execute(
-                "SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
+                "SELECT bucket,COUNT(*) FROM current_members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                 (template.split, template.task, scope))))
             from scripts.campaign_20261110.training_eligibility import eligible_training_records
             eligible_training = eligible_training_records(db, template.task, root=root)
             result["train_buckets"] = Counter(row.get("bucket") for row in eligible_training if row["class_id"] == template.class_id)
             result["class_remaining"] -= sum(result["train_buckets"].values())
             result["task_remaining"] -= len(eligible_training)
-            standard = db.execute("SELECT COUNT(*) FROM members WHERE split='eval_standard' AND task=? AND class_id=?",
+            standard = db.execute("SELECT COUNT(*) FROM current_members WHERE split='eval_standard' AND task=? AND class_id=?",
                                   (template.task, template.class_id)).fetchone()[0]
             result["evaluation_sibling_reserve"] = max(0, 10 - standard)
     result["train_unbucketed"] = result["train_buckets"].pop(None, 0)

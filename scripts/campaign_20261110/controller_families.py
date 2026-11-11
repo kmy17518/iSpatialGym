@@ -92,7 +92,9 @@ def accepted_counts(root, class_id):
         local = Path(temporary) / "state.sqlite"
         shutil.copyfile(source, local)
         with sqlite3.connect(f"file:{local}?mode=ro", uri=True) as db:
-            rows = db.execute("SELECT split,bucket,COUNT(*) FROM members WHERE class_id=? GROUP BY split,bucket", (class_id,)).fetchall()
+            from scripts.campaign_20261110.current_eligibility import install_quota_view
+            install_quota_view(root,db)
+            rows = db.execute("SELECT split,bucket,COUNT(*) FROM current_members WHERE class_id=? GROUP BY split,bucket", (class_id,)).fetchall()
     return Counter({(split, bucket): count for split, bucket, count in rows})
 
 

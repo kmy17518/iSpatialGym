@@ -169,6 +169,12 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
     raw_template["objects"] = tuple(ObjectRef(**value) for value in raw_template["objects"])
     fresh = audit_camera(review["source_job"], review["gate"]["path"], root=root, started_at=started_at, template=Template(**raw_template))
     require(digest(fresh) == digest(review), "camera release evidence changed after review")
+    from scripts.campaign_20261110.current_eligibility import pending_instance_blockers
+    impact_blocked=pending_instance_blockers(root,[m['instance_id']for m in review['members']])
+    if impact_blocked:
+        return {'accepted':{},'deferred':[m['instance_id']for m in review['members']],
+                'reason':'known generated cohort awaits change-impact review','impact_blocked':impact_blocked}
+
     key = ValidationKey(**review["validation_key"])
     evidence = [ValidationEvidence(**{**row, "key": ValidationKey(**row["key"])}) for row in review["evidence"]]
     require_validation(key, evidence, campaign_started_at=started_at)
@@ -192,7 +198,9 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
             state["reservation_policy_sha256"]=active[0]["policy_sha256"]
         require(state["eval_quotas"] == EVAL_QUOTAS and state["training_room_caps"] == training_room_caps, "quota policy changed")
         accepted = state["accepted"]
-        eval_counts = Counter(row["bucket"] for row in accepted.values() if row["split"] == "eval_standard")
+        from scripts.campaign_20261110.current_eligibility import filtered_camera
+        current=filtered_camera(root,accepted)
+        eval_counts = Counter(row["bucket"] for row in current.values() if row["split"] == "eval_standard")
         # Cameras have no goal-group sibling exception. Historical rows remain
         # stored, but cannot consume compliant replacement capacity.
         train_counts = Counter()

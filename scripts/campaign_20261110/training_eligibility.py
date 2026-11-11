@@ -9,7 +9,7 @@ import time
 from scripts.campaign_20261110.contracts import digest, file_digest, write_json_atomic
 
 
-def classify_record(row, group=None):
+def classify_record(row, group=None, *, root=None):
     """Eligibility category from committed goal-group allocation, not volume."""
     if row.get('split') != 'train':
         return {'status': 'not_training', 'category': row.get('split'), 'reasons': []}
@@ -17,6 +17,9 @@ def classify_record(row, group=None):
     if source == 'train':
         return {'status': 'excluded', 'category': 'standalone_training',
                 'reasons': ['complete_training_pipeline_not_validated', 'distribution_compliance_not_established']}
+    if root is not None:
+        from scripts.campaign_20261110.current_eligibility import effective_group
+        group=effective_group(root,row,group)
     if source != 'eval_standard':
         return {'status': 'unverified', 'category': 'unverified', 'reasons': ['sampling_purpose_unverified']}
     if row.get('task', '').startswith('camera_relocalization'):
@@ -62,7 +65,10 @@ def eligible_training_records(db, task=None, *, root=None, class_id=None):
     """
     projection = projection_records(root) if root is not None else {}
     groups = {}
-    query = "SELECT record FROM members WHERE split='train'"
+    if root is not None:
+        from scripts.campaign_20261110.current_eligibility import install_quota_view
+        install_quota_view(root,db)
+    query = "SELECT record FROM "+('current_members' if root is not None else 'members')+" WHERE split='train'"
     parameters = []
     if task: query += ' AND task=?'; parameters.append(task)
     if class_id: query += ' AND class_id=?'; parameters.append(class_id)
@@ -76,7 +82,7 @@ def eligible_training_records(db, task=None, *, root=None, class_id=None):
         if gid not in groups:
             found = db.execute('SELECT record FROM groups WHERE id=?', (gid,)).fetchone()
             groups[gid] = json.loads(found[0]) if found else None
-        if classify_record(row, groups[gid])['status'] == 'eligible': result.append(row)
+        if classify_record(row, groups[gid], root=root)['status'] == 'eligible': result.append(row)
     return result
 
 
@@ -241,7 +247,7 @@ def build_projection(root):
     tasks, classes, totals = Counter(), Counter(), Counter()
     for row in rows:
         if row['split'] != 'train': continue
-        decision = classify_record(row, groups.get(row.get('group_id')))
+        decision = classify_record(row, groups.get(row.get('group_id')), root=root)
         proof = None
         if decision['status'] == 'eligible':
             try: proof = audit_eligible(row, checked)

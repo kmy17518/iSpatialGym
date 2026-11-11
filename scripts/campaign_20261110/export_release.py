@@ -288,8 +288,14 @@ def main():
     p.add_argument("--shard-size", type=int, default=32)
     a = p.parse_args()
     source, groups, inputs = snapshot_allocations(a.root)
+    from scripts.campaign_20261110.current_eligibility import assess
+    impact,_=assess(a.root,source,groups)
+    blocked=[r for r in source if not impact[r['instance_id']]['quota_eligible']]
+    source=[r for r in source if impact[r['instance_id']]['quota_eligible']]
+    inputs.append({'kind':'change_impact_filter','excluded_or_under_review':len(blocked),
+                   'record_sha256':digest(blocked),'history_preserved':True})
     from scripts.campaign_20261110.training_eligibility import classify_record
-    excluded = [row for row in source if row['split'] == 'train' and classify_record(row, groups.get(row.get('group_id')))['status'] != 'eligible']
+    excluded = [row for row in source if row['split'] == 'train' and classify_record(row, groups.get(row.get('group_id')), root=a.root)['status'] != 'eligible']
     source = [row for row in source if row not in excluded]
     included = {row['instance_id'] for row in source}
     groups = {gid: group for gid,group in groups.items() if any(iid in included for iid in group['accepted'])}

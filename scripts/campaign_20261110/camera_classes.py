@@ -17,10 +17,11 @@ EVAL_QUOTAS = {"eval_standard": {"3": 3, "5": 4, "10": 3},
                "eval_category": {"3": 3, "5": 3, "10": 3}}
 
 
-def allocate_members(accepted, members, *, class_id, training_room_caps, eval_quotas=EVAL_QUOTAS):
+def allocate_members(accepted, members, *, class_id, training_room_caps, eval_quotas=EVAL_QUOTAS, current_accepted=None):
     """Pure quota decision: held-out overflow can never become training."""
+    existing = accepted if current_accepted is None else current_accepted
     eval_counts = Counter((row["split"], "*" if row["split"] == "eval_category" else row["class_id"], row["bucket"])
-                          for row in accepted.values() if row["split"] != "train")
+                          for row in existing.values() if row["split"] != "train")
     room_counts = Counter()
     class_counts = Counter()
     added, deferred = {}, []
@@ -64,6 +65,12 @@ def claim_camera_classes(review, state_path, *, root, started_at, standard_class
     check_reservations(template, reservations, reservation_hashes)
     fresh = audit_camera(review["source_job"], review["gate"]["path"], root=root, started_at=started_at, template=template)
     require(digest(fresh) == digest(review), "camera release evidence changed after review")
+    from scripts.campaign_20261110.current_eligibility import pending_instance_blockers
+    impact_blocked=pending_instance_blockers(root,[m['instance_id']for m in review['members']])
+    if impact_blocked:
+        return {'accepted':{},'deferred':[m['instance_id']for m in review['members']],
+                'reason':'known generated cohort awaits change-impact review','impact_blocked':impact_blocked}
+
     reservation_policy = {key: reservations[key] for key in ("model_holdout_models", "category_holdout_models",
         "category_holdout_categories", "category_holdout_rooms", "train_exclude_models", "pending_custom_hard_reservations_not_ready")}
     quotas = {split:dict(zip(("3","5","10"),counts)) for split,counts in (
@@ -78,8 +85,9 @@ def claim_camera_classes(review, state_path, *, root, started_at, standard_class
             "task": task, "policy": policy, "accepted": {}}
         require(state["campaign_id"] == review["campaign_id"] and state["task"] == task, "camera state belongs to another campaign")
         require(state["policy"] == policy, "camera quota policy changed")
+        from scripts.campaign_20261110.current_eligibility import filtered_camera
         added, deferred = allocate_members(state["accepted"], review["members"], class_id=template.class_id,
-                                           training_room_caps=training_room_caps,eval_quotas=quotas)
+                                           training_room_caps=training_room_caps,eval_quotas=quotas,current_accepted=filtered_camera(root,state["accepted"]))
         for iid in added:
             state["accepted"][iid].update({"validation_key": review["validation_key"], "gate": review["gate"],
                 "evidence": review["evidence"], "release_review_sha256": digest(review), "contract": asdict(template)})

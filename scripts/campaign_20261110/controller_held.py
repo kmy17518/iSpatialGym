@@ -58,7 +58,9 @@ def read_counts(root, template, standards, room_plan):
             local = Path(temporary) / "state.sqlite"
             shutil.copyfile(path, local)
             with sqlite3.connect(f"file:{local}?mode=ro", uri=True) as db:
-                counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
+                from scripts.campaign_20261110.current_eligibility import install_quota_view
+                install_quota_view(root,db)
+                counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM current_members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                                                 (template.split, template.task, scope))))
                 from scripts.campaign_20261110.training_eligibility import eligible_training_records
                 records = eligible_training_records(db, template.task, root=root)
@@ -67,7 +69,7 @@ def read_counts(root, template, standards, room_plan):
                 room_used = sum(accepted_room(row) == room for row in records)
                 for standard in standards:
                     if standard["task"] == template.task and standard["scene"] + "/" + standard["room"] == room:
-                        n = db.execute("SELECT COUNT(*) FROM members WHERE split='eval_standard' AND class_id=?", (standard["class_id"],)).fetchone()[0]
+                        n = db.execute("SELECT COUNT(*) FROM current_members WHERE split='eval_standard' AND class_id=?", (standard["class_id"],)).fetchone()[0]
                         reserve += max(0, 10 - n)
     else:
         reserve = 10 * sum(t["task"] == template.task and t["scene"] + "/" + t["room"] == room for t in standards)

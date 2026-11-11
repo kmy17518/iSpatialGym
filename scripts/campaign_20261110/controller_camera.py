@@ -250,6 +250,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
               (("eval_standard", quota.standard_buckets), ("eval_model", quota.model_buckets), ("eval_category", quota.category_buckets))}
     with atomic_directory_lock(root/'controllers/camera_planning.lockdir'):
         accepted = read(authority(root, template), {"accepted": {}})["accepted"]
+        from scripts.campaign_20261110.current_eligibility import filtered_camera
+        accepted=filtered_camera(root,accepted)
         remaining = reserved_capacity(template, accepted, caps, quotas,pending_camera(root,accepted))
         from scripts.campaign_20261110.controller_spool import candidate_budget_used
         budget = spec["max_candidates"] - candidate_budget_used(records)
