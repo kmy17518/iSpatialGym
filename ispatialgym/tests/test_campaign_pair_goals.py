@@ -23,6 +23,24 @@ def test_disabled_pair_plan_never_accesses_runtime_context(monkeypatch):
     assert I.IORSSmall.campaign_pair_plan(SimpleNamespace()) is None
 
 
+def test_required_under_view_is_retained_only_after_measured_native_screen(monkeypatch):
+    from ispatialgym.sampling import campaign_visibility
+    s=I.IORSSmall.__new__(I.IORSSmall);s.relation='under';s._campaign_pair_active=plan('under')
+    d=Draft();d.summary={'manipulation_stance':{'base_pose2d':[1.,2.,0.],'translate':.25,'tilt':-.53}}
+    monkeypatch.setattr(campaign_visibility,'required',lambda:True)
+    def failed(*args):raise Reject('goal_occluded','measured over threshold')
+    monkeypatch.setattr(I.SamplerV2,'check_goal_occlusion',failed)
+    with pytest.raises(Reject):s.check_goal_occlusion(d,'unpublished')
+    assert not hasattr(s,'_campaign_written_inside_stances')
+    monkeypatch.setattr(I.SamplerV2,'check_goal_occlusion',lambda *args:None)
+    monkeypatch.setattr(campaign_visibility,'required',lambda:False)
+    s.check_goal_occlusion(d,'ordinary')
+    assert not hasattr(s,'_campaign_written_inside_stances')
+    monkeypatch.setattr(campaign_visibility,'required',lambda:True)
+    s.check_goal_occlusion(d,'screened')
+    assert s._campaign_written_inside_stances == {s._campaign_pair_active.sha256:[d.summary['manipulation_stance']]}
+
+
 def test_inside_stance_is_remembered_only_after_native_write_and_scoped_to_goal(monkeypatch):
     s=I.IORSSmall.__new__(I.IORSSmall)
     s._campaign_pair_active=plan('inside');s.relation='inside'

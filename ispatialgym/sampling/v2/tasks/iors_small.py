@@ -6421,6 +6421,20 @@ class IORSSmall(SamplerV2):
                     draft.summary["manipulation_stance"])
         return path
 
+    def check_goal_occlusion(self, draft: Draft, tro_path: str) -> None:
+        super().check_goal_occlusion(draft, tro_path)
+        plan = getattr(self, '_campaign_pair_active', None)
+        if self.relation == 'under' and plan is not None:
+            from ispatialgym.sampling.campaign_visibility import required
+            if required():
+                # This exact class requires a measured end-view screen. Only
+                # after that screen passes may its stance guide later siblings.
+                # The four exploratory proposals and every native check remain.
+                if not hasattr(self, '_campaign_written_inside_stances'):
+                    self._campaign_written_inside_stances = {}
+                self._campaign_written_inside_stances.setdefault(plan.sha256, []).append(
+                    draft.summary['manipulation_stance'])
+
     def _aabb_gap(self, tname: str, pname: str) -> float:
         """Norm of the per-axis separation vector between the two objects' hull AABBs at their current PhysX poses (0 when
         they overlap on every axis) — the distance OmniGibson's ``NextTo`` compares with g_NT = mean(dims_a + dims_b) / 6."""
