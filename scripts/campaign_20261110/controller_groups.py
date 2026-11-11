@@ -210,11 +210,38 @@ def audit_shelf_source_context(prepared, anchor, template, root):
     return {'path': str(path), 'sha256': file_digest(path)}
 
 
+def source_registry_context(environment, root):
+    """Preserve the audited measured interior selected by a successful source."""
+    value=environment.get('ISPATIALGYM_INTERIORS')
+    if not value:return None
+    from ispatialgym.sampling.interiors import load_registry
+    root=Path(root).resolve();path=Path(value).resolve()
+    require(path.is_relative_to(root) and path.is_file(), 'source interior registry outside campaign')
+    proof_path=path.with_name('registry_lookup_proof.json')
+    proof=read(proof_path)
+    require(proof.get('geometry_changed') is False and
+            Path(proof.get('runtime_registry','')).resolve()==path and
+            proof.get('runtime_registry_sha256')==file_digest(path),
+            'source interior registry differs from its measured lookup proof')
+    registry=load_registry(str(path));selected=registry.get(proof.get('selected_name'))
+    require(selected is not None and selected.digest()==proof.get('selected_digest')==proof.get('original_geometry_digest'),
+            'source interior geometry differs from measured proof')
+    return {'environment':{'ISPATIALGYM_INTERIORS':str(path)},
+            'registry':{'path':str(path),'sha256':file_digest(path)},
+            'lookup_proof':{'path':str(proof_path),'sha256':file_digest(proof_path)},
+            'selected_digest':selected.digest(),
+            'scope':'Unchanged measured source registry; native checks and own new group replay remain required.'}
+
+
 def prepare_source(spec, cfg, root):
     from scripts.campaign_20261110.planning_inputs import prepare_anchor
+    from scripts.campaign_20261110.goal_groups import read_env
+    registry=source_registry_context(read_env(Path(spec['anchor_job'])/'job.env'),root)
+    paths=[spec["seed_config"], Path(spec["snapshot"]) / ".snapshot_commit"]
+    if registry:paths += [registry['registry']['path'],registry['lookup_proof']['path']]
     return prepare_anchor(spec["anchor_job"], campaign_root=root, ledger=spec["anchor_ledger"],
         campaign_started_at=cfg["started_at"],
-        extra_paths=[spec["seed_config"], Path(spec["snapshot"]) / ".snapshot_commit"])
+        extra_paths=paths)
 
 
 def prepare_indices(spec, state, decision, root):
@@ -269,6 +296,8 @@ def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_
     names = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR",
              "ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY")
     extras = [name + "=" + original_env[name] for name in names if original_env.get(name)]
+    registry=source_registry_context(original_env,root)
+    if registry:extras += [name+'='+value for name,value in registry['environment'].items()]
     extras += ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"]
     command = submission_command(prepared["queue"], snapshot=snapshot, campaign_root=root, v2_root=spec["v2_root"],
         base_index=index, extra_env=extras)
@@ -281,6 +310,8 @@ def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_
         record['source_context_audit'] = context_audit
     if index_proof is not None:
         record['index_reservation']=index_proof
+    if registry is not None:
+        record['source_environment_audit']=registry
     if spec.get('dispatch_backends'):
         record['dispatch_backends'] = spec['dispatch_backends']
     elif template.task == 'alignment-world_vertical':
