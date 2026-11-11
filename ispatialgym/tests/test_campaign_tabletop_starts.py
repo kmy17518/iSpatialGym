@@ -42,3 +42,16 @@ def test_written_member_proposes_only_existing_checked_stances_and_keeps_explora
     assert ranked[:4] == order[:4]
     assert ranked[4] == 8 and len(ranked[:6]) == 6
     assert sorted(ranked) == order and len(set(ranked)) == len(order)
+
+
+def test_source_stance_requires_exact_summary_provenance_and_finite_pose():
+    from ispatialgym.sampling.campaign_tabletop_starts import anchor_manipulation
+    import copy
+    raw = {'anchor_sources': {'summary': {'sha256': 'a'*64}},
+           'anchor_manipulation_stance': {'base_pose2d':[9.09,3.30,3.14], 'focus':[8.18,3.46,.83],
+                                          'translate':0., 'tilt':-.61, 'source_summary_sha256':'a'*64}}
+    assert anchor_manipulation({}) is None
+    assert anchor_manipulation(raw)['tilt'] == -.61
+    for key, value in [('source_summary_sha256','b'*64), ('focus',[0.,float('nan'),0.]), ('translate',True)]:
+        changed=copy.deepcopy(raw);changed['anchor_manipulation_stance'][key]=value
+        with pytest.raises(GoalPlanError):anchor_manipulation(changed)

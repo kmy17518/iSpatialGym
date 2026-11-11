@@ -487,6 +487,13 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
         if relation == "inside" and scale == "small":
             plan["release_policy"] = "native_grasp_height"
+            source_stance = anchor['summary'].get('manipulation_stance')
+            if source_stance is not None:
+                proof = anchor['sources']['summary']
+                require(file_digest(proof['path']) == proof['sha256'], 'inside source summary changed after audit')
+                plan['anchor_manipulation_stance'] = {
+                    **{k: source_stance[k] for k in ('base_pose2d', 'focus', 'translate', 'tilt')},
+                    'source_summary_sha256': proof['sha256']}
         if relation == "touching" and scale == "small":
             from ispatialgym.sampling.campaign_pair_goals import object_pose_from_grasp
 

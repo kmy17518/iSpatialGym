@@ -17,6 +17,28 @@ def anchor_base(raw):
     return tuple(float(v) for v in value)
 
 
+def anchor_manipulation(raw):
+    """Read a proposal hint bound to the successful source's audited summary."""
+    value = raw.get('anchor_manipulation_stance')
+    if value is None:
+        return None
+    _require(isinstance(value, dict), 'invalid anchor manipulation stance')
+    sha = raw.get('anchor_sources', {}).get('summary', {}).get('sha256')
+    _require(isinstance(sha, str) and len(sha) == 64
+             and all(c in '0123456789abcdef' for c in sha)
+             and value.get('source_summary_sha256') == sha,
+             'anchor manipulation stance lacks matching summary provenance')
+    for key, size in [('base_pose2d', 3), ('focus', 3)]:
+        vector = value.get(key)
+        _require(isinstance(vector, (tuple, list)) and len(vector) == size
+                 and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in vector),
+                 'invalid anchor manipulation '+key)
+    _require(all(isinstance(value.get(k), (int, float)) and not isinstance(value[k], bool)
+                 and math.isfinite(value[k]) for k in ('translate', 'tilt')),
+             'invalid anchor manipulation torso')
+    return {k:value[k] for k in ('base_pose2d','focus','translate','tilt')}
+
+
 def edge_lateral(edge, anchor):
     return sum((anchor[i]-float(edge.mid[i]))*float(edge.tangent[i]) for i in range(2))
 

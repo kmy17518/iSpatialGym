@@ -2744,7 +2744,11 @@ class IORSSmall(SamplerV2):
         if plan is not None and self.relation == "inside":
             from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
             written = getattr(self, "_campaign_written_inside_stances", {}).get(plan.sha256, [])
-            order = prioritize_written_stances(order, cands, written)
+            source_stance = getattr(plan, 'anchor_manipulation_stance', None)
+            hints = written or ([source_stance] if source_stance is not None else [])
+            order = prioritize_written_stances(order, cands, hints)
+            if source_stance is not None and not written:
+                TT._count(self, 'campaign_inside.source_stance_ranked')
         for k in order[:6]:
             cand = cands[int(k)]
             pdc_c = pdc.get(id(cand))
