@@ -203,6 +203,9 @@ def test_c_dead_at_b_narrows_to_the_push_under_lock_kept_yaws():
         def push_yaw_lock(self):
             return self._lock
 
+        def guide_wall_active(self):
+            return False
+
         def push_contact_offset(self, q, d):
             return None if self.gp.gen("no_offset") else 0.12
 

@@ -521,6 +521,170 @@ def floorpush_switches(env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         out["yaw_gain"] = float(env.get("ISPATIALGYM_FLOORPUSH_YAW_GAIN", "") or FLOORPUSH_YAW_GAIN_M_PER_RAD)
         out["strokes_max"] = int(env.get("ISPATIALGYM_FLOORPUSH_STROKES_MAX", "") or FLOORPUSH_STROKES_MAX)
     return out
+
+
+# ---- i7-ul02guide (owner 2026-11-10, under_large_02): the desk's leg panel as a GUIDE WALL for the standing briefcase's floor push. The
+# briefcase (lwbctq, 0.33 x 0.12 footprint, 0.27 tall on its narrow end) pushed onto its 0.12 m end face turns (an unstable point push,
+# lever 0.165 m) and topples once the hand reaches the end face's corner. desk_mdhelw_0 (office_cubicles_right) stands on two full-depth
+# side panels, floor to top (its B4 under-clearance raster: 0.01 m clearance in the rows x 15.32-15.47 and 16.77-16.92 across every
+# column): a briefcase pushed ALONG such a panel with its broad face against it cannot turn about the vertical (the wall takes the torque)
+# and cannot topple toward it. ``ISPATIALGYM_PUSH_GUIDE_WALL`` (default ON since lead #99f; ``=0`` off; only the variants in :data:`PUSH_GUIDE_WALL_VARIANTS` -
+# under_large_02 - with a pitched floor push of an elongated footprint): (1) stance C's push lanes are the lanes beside a guide wall the
+# horizontal ray scan finds (:meth:`IORSLarge.guide_walls`, :func:`guide_faces_from_hits`) - the target's broad face
+# :data:`PUSH_GUIDE_GAP_M` off the wall - with the drop either just outside the edge or ALONGSIDE the panel (:data:`PUSH_GUIDE_DROP_OUTS_M`);
+# (2) the carried yaw puts the long axis exactly along the push (yaw lock ``"endwise"`` + the goal yaw snapped to the partner's axes, no
+# init-yaw jitter) - the goal orientation is the carried one, as today, now parallel to the wall; (3) the push record carries
+# ``guide_wall`` (wall side, lean, aim) and the oracle's strokes (``execute._push_strokes``) move the hand INTO the wall by
+# :data:`PUSH_GUIDE_LEAN_M_PER_M` per metre of travel (the lateral bias: the pusher's friction presses the briefcase to the wall) and aim
+# :data:`PUSH_GUIDE_AIM_AWAY_M` away from it (the push line's torque turns the front INTO the wall, which resists it). Statics of a box
+# flush on a wall pushed at lateral offset e (+ away from the wall) with a lateral force k x F into it: it translates without turning when
+# -k mu w / 2 <= e <= k (L - mu w / 2) (L 0.33, w 0.12, mu 0.5) - an aim toward the wall turns it away unless k is large, an aim at or
+# away from the centre line holds it once k > 0. Goal / success measure unchanged. Kit counters ``push_guide_wall.*``.
+PUSH_GUIDE_WALL_ENV = "ISPATIALGYM_PUSH_GUIDE_WALL"
+#: the variants the switch acts on (owner 2026-11-10: scoped to under_large_02)
+PUSH_GUIDE_WALL_VARIANTS = ("inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_pitched",)
+#: the target's broad face this far off the wall's face at the drop and the goal (closed by the lean)
+PUSH_GUIDE_GAP_M = 0.015
+#: the drop centre's distance outside the partner edge: ``None`` = the target's half extent + :data:`PUSH_GUIDE_DROP_FRONT_OUT_M` (its
+#: front 3 cm before the edge, the push nearly all along the wall), a number = that (0.03: ALONGSIDE, the front half beside the panel;
+#: ``_free_floor_cell`` keeps the centre >= 2 cm outside the partner's AABB). 2026-11-10 r2: (0.03, 0.06) - the front drop (``None``,
+#: 0.195 m out for the briefcase) makes a 0.49 m push that no frontal stance's pitched hand reaches (:data:`PUSH_GUIDE_HAND_AHEAD_M`:
+#: a 0.385 m window); ug_ul02_on: its 1363 chains all failed at the pre-pose, 77 % of the arm's unsolved chains)
+PUSH_GUIDE_DROP_OUTS_M: Tuple[Optional[float], ...] = (0.03, 0.06)
+PUSH_GUIDE_DROP_FRONT_OUT_M = 0.03
+#: the hand's lateral move into the wall per metre of push travel (5.7 deg) and its aim away from the target's centre line
+PUSH_GUIDE_LEAN_M_PER_M = 0.10
+PUSH_GUIDE_AIM_AWAY_M = 0.01
+#: the stand-offs of the guide lanes' stances (today's pitched 0.80-1.00 and nearer: the alongside drop lies ~0.17 m farther in)
+PUSH_GUIDE_STAND_OFFS = tuple(round(0.6 + 0.025 * k, 3) for k in range(17))
+#: the long axis within this of the push for the ``"endwise"`` lock (half the 16-yaw grid's step: the goal-yaw snap's reach)
+PUSH_GUIDE_YAW_TOL_DEG = 11.25
+#: the footprint's long / short ratio the guide needs (the briefcase 2.75; a round can has no broad face)
+PUSH_GUIDE_MIN_ASPECT = 1.5
+#: the wall scan: ray starts along the edge every this; hits of one face within this of the next, all of them within the spread (a slanted
+#: face - desk_mdhelw_0's right panel inside the knee space, 16.74 -> 16.68 over 0.55 m, the convex hull of its joint with the modesty
+#: panel - is no guide)
+PUSH_GUIDE_SCAN_STEP_M = 0.05
+PUSH_GUIDE_FACE_TOL_M = 0.01
+PUSH_GUIDE_FACE_SPREAD_M = 0.015
+#: the wall must stand flat from this far inside the edge (desk_mdhelw_0's panels end 2.5 cm inside its AABB with a 2 cm chamfer up to
+#: ~6 cm in) along the target's whole length: the guide lane's GOAL is the target's centre this + its long half extent inside the edge
+#: (both ends against the wall at the goal - with one end only the wall holds no turn; 0.265 m for the briefcase vs today's 0.07 m: the
+#: centre under the desk either way); the scan's heights start above the panels' recessed plinth (2-3 cm at 2 cm up)
+PUSH_GUIDE_WALL_FROM_M = 0.10
+PUSH_GUIDE_SCAN_Z0_M = 0.06
+#: the frontal stance's stand-off keeps the pitched hand's push within reach: its start (the target's back at the drop, 2 cm stand-off ~ the
+#: eef start) at least this far ahead of the base and its goal (the back at the goal ~ the eef goal - 1 cm) at most that far. 2026-11-10
+#: r2 (was (0.35, 0.90)): the pitched chains of r2_ul02_stand + ug_ul02_off + ug_ul02_on (eef start / goal in base): start < 0.47 m
+#: 0 / 1395 solved (every one 'exact IK failed at pose 1 of 4' - the pre-pose, back and up from the start, too near the body), 0.47-0.49
+#: 273 / 1036, 0.49-0.51 55-88 %; goal 0.89-0.91 5 / 726, >= 0.91 0 / 721 ('approach_untrackable')
+PUSH_GUIDE_HAND_AHEAD_M = (0.49, 0.875)
+
+
+def push_guide_wall_on() -> bool:
+    """:data:`PUSH_GUIDE_WALL_ENV` (default ON since lead #99f, 2026-11-10: ug2_ul02_on 22/8/6 at 0.89 GPU-h/ok, 0 topples, end yaw <= 3.9 deg
+    vs ug_ul02_off 0 ok in 6 demos, 2 topples; "0" / "off" restores today's push)."""
+    return os.environ.get(PUSH_GUIDE_WALL_ENV, "1").strip().lower() in _ON
+
+
+def guide_push_in_reach(stand_off: float, out: float, inside: float, half: float, window: Tuple[float, float] = PUSH_GUIDE_HAND_AHEAD_M) -> bool:
+    """A frontal guide-lane stance at ``stand_off`` from the edge pushes within the pitched hand's reach (:data:`PUSH_GUIDE_HAND_AHEAD_M`):
+    the target's back at the drop (``out`` outside the edge, ``half`` its half extent along the push, the hand 2 cm behind it) at least
+    ``window[0]`` ahead of the base, its back at the goal (``inside`` the edge) at most ``window[1]``."""
+    return (float(window[0]) - 1e-9 <= float(stand_off) - float(out) - float(half) - 0.02
+            and float(stand_off) + float(inside) - float(half) <= float(window[1]) + 1e-9)
+
+
+def guide_faces_from_hits(hits: Sequence[Tuple[int, float, int, Optional[float]]], n_cells: int, corridor_m: float,
+                          tol: float = PUSH_GUIDE_FACE_TOL_M, spread: float = PUSH_GUIDE_FACE_SPREAD_M) -> List[Dict[str, Any]]:
+    """The guide walls of one partner edge from a horizontal ray scan along it (:meth:`IORSLarge.guide_walls`): ``hits`` = ``(cell, tau0,
+    dir, tau_hit)`` per ray - ``cell`` the (depth inside the edge, height) sample it ran at (``0 .. n_cells - 1``), ``tau0`` its start along
+    the edge's tangent, ``dir`` +1 / -1 its direction along the tangent, ``tau_hit`` where it met the partner (None: nothing / something
+    else). A face is a cluster of hits (each within ``tol`` of the next, all within ``spread``: flat and parallel to the push) of one
+    direction met in EVERY cell by a ray that ran at least ``corridor_m`` through free space - the target's width + gap beside the face is
+    clear at every sampled depth / height. Returns ``[{"tau": the face (its most
+    protruding hit: a lane off it clears all), "free": its free side (-dir; +1 = toward +tangent), "spread_m", "cells"}]`` sorted by tau."""
+    out: List[Dict[str, Any]] = []
+    for d in (1, -1):
+        pts = sorted((float(t1), int(c)) for c, t0, dd, t1 in hits if t1 is not None and int(dd) == d and abs(float(t1) - float(t0)) >= corridor_m)
+        clusters: List[List[Tuple[float, int]]] = []
+        for p in pts:
+            if clusters and p[0] - clusters[-1][-1][0] <= tol:
+                clusters[-1].append(p)
+            else:
+                clusters.append([p])
+        for cl in clusters:
+            cells = {c for _, c in cl}
+            taus = [t for t, _ in cl]
+            if len(cells) < int(n_cells) or max(taus) - min(taus) > float(spread) + 1e-9:
+                continue
+            # a ray running +tangent meets a face that looks -tangent (free side -d); the lane clears the face's most protruding point
+            tau = min(taus) if d > 0 else max(taus)
+            out.append({"tau": round(tau, 4), "free": -d, "spread_m": round(max(taus) - min(taus), 4), "cells": len(cells)})
+    return sorted(out, key=lambda f: f["tau"])
+
+
+def guide_scan_rays(mid, inward, length: float, long_half: float, height: float, floor_z: float) -> Dict[str, Any]:
+    """The rays of :meth:`IORSLarge.guide_walls` at one partner edge (``mid`` / ``inward`` its xy midpoint / inward normal, ``length``):
+    ``{"starts", "ends"}`` (lists of world xyz), ``"meta"`` ``(cell, tau0, dir)`` per ray, ``"cells"`` the (depth, height) samples,
+    ``"mid"`` / ``"t"`` (the tangent: ``inward`` turned +90 deg)."""
+    d2 = th.as_tensor([float(inward[0]), float(inward[1])], dtype=th.float32)
+    d2 = d2 / max(float(th.linalg.norm(d2)), 1e-9)
+    t = th.tensor([-float(d2[1]), float(d2[0])])
+    mid = th.as_tensor([float(mid[0]), float(mid[1])], dtype=th.float32)
+    half_l = 0.5 * float(length)
+    w0 = PUSH_GUIDE_WALL_FROM_M
+    cells = [(s, z) for s in (w0, w0 + long_half, w0 + 2.0 * long_half - 0.01)
+             for z in (PUSH_GUIDE_SCAN_Z0_M, 0.5 * float(height), max(PUSH_GUIDE_SCAN_Z0_M + 0.01, float(height) - 0.03))]
+    taus0 = [-half_l + PUSH_GUIDE_SCAN_STEP_M * k for k in range(int(2.0 * half_l / PUSH_GUIDE_SCAN_STEP_M) + 1)]
+    starts, ends, meta = [], [], []
+    for c, (s, z) in enumerate(cells):
+        for tau0 in taus0:
+            for d in (1, -1):
+                p0, p1 = mid + t * tau0 + d2 * s, mid + t * (d * (half_l + 0.05)) + d2 * s
+                starts.append([float(p0[0]), float(p0[1]), float(floor_z) + z])
+                ends.append([float(p1[0]), float(p1[1]), float(floor_z) + z])
+                meta.append((c, tau0, d))
+    return {"starts": starts, "ends": ends, "meta": meta, "cells": cells, "mid": mid, "t": t}
+
+
+def guide_scan_rows(scan: Dict[str, Any], hits: Sequence[Dict[str, Any]], prims: Any) -> List[Tuple[int, float, int, Optional[float]]]:
+    """:func:`guide_faces_from_hits`'s rows from the raycast ``hits`` of ``scan`` (:func:`guide_scan_rays`): the hit's place along the
+    tangent when it met one of the partner's bodies ``prims``, else None."""
+    rows = []
+    for (c, tau0, d), h in zip(scan["meta"], hits):
+        t1 = None
+        if h.get("hit") and h.get("rigidBody") in prims:
+            pos = th.as_tensor([float(h["position"][0]), float(h["position"][1])], dtype=th.float32)
+            t1 = float((pos - scan["mid"]) @ scan["t"])
+        rows.append((c, tau0, d, t1))
+    return rows
+
+
+def guide_lanes(faces: Sequence[Dict[str, Any]], w_half: float, gap: float, half_run: float) -> List[Dict[str, Any]]:
+    """The push lanes beside the guide ``faces`` (:func:`guide_faces_from_hits`): the target's centre line ``w_half + gap`` off each face on
+    its free side, within ``half_run`` of the edge's middle. ``[{"lat": the lane along the tangent, "wall_left": +1 when the wall lies on the
+    target's +tangent side (= the inward push's left: the tangent is the inward normal turned +90 deg), "face_tau"}]``."""
+    out = []
+    for f in faces:
+        lat = float(f["tau"]) + float(f["free"]) * (float(w_half) + float(gap))
+        if abs(lat) > float(half_run) + 1e-9:
+            continue
+        out.append({"lat": round(lat, 4), "wall_left": -int(f["free"]), "face_tau": float(f["tau"])})
+    return out
+
+
+def guide_snap_yaw(yaw0: float, d_yaw: float, axis_phi0: float, partner_yaw: float, max_snap: float) -> Optional[float]:
+    """The init yaw nearest ``yaw0`` whose carried yaw (``+ d_yaw``) puts the target's long axis (world angle ``axis_phi0`` + that yaw) on
+    the partner's axes (``partner_yaw`` + k x 90 deg); None when it lies more than ``max_snap`` away (the touching mode's
+    ``end_aligned_yaw``, for the footprint's long axis instead of the root's x axis)."""
+    q = 0.5 * math.pi
+    off = (float(yaw0) + float(d_yaw) + float(axis_phi0) - float(partner_yaw) + 0.5 * q) % q - 0.5 * q
+    if abs(off) > float(max_snap) + 1e-9:
+        return None
+    return float(yaw0) - off
+
+
 #: trunks that reach the floor (B3 floor bands, A6 recompute: cells only at translate ≥ 0.75, tilt ≤ −0.9) + the ground half of the
 #: JoyLo curve (W1, owner 2026-09-20 22:15: (2.0, 0) puts the shoulder 8 cm lower than (0.95, -1.2) and reaches the floor blade
 #: 0.40-0.85 m ahead instead of 0.40-0.70; ``eef_reach_volume.GROUND_TRUNKS``)
@@ -2045,6 +2209,8 @@ class IORSLarge(SamplerV2):
     def push_yaw_lock(self) -> Optional[str]:
         """``generation.push_under_yaw`` (:data:`PUSH_UNDER_YAW_LOCKS`; default None or ``"none"`` = every carried yaw)."""
         v = self.gp.gen("push_under_yaw")
+        if v is None and push_guide_wall_on() and self.guide_wall_active():
+            return "endwise"  # i7-ul02guide: ISPATIALGYM_PUSH_GUIDE_WALL - the broad faces along the push, one against the guide wall
         if v is None and self.floorpush().get("broadside"):
             return "broadside"  # i7-floorpush r2 (lead #60 (i)): ISPATIALGYM_FLOORPUSH_BROADSIDE on the pitched push
         if v is None or str(v) == "none":
@@ -2088,6 +2254,8 @@ class IORSLarge(SamplerV2):
             return True
         if lock == "broadside":
             return self.push_broadside_kept(quat, d2)
+        if lock == "endwise":
+            return self.push_endwise_kept(quat, d2)
         h_local, heel, _ = self.push_heel()
         h = G.local_points_world(h_local.reshape(1, 3), (th.zeros(3), G.t(quat)))[0, :2]
         d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
@@ -2124,6 +2292,113 @@ class IORSLarge(SamplerV2):
         d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
         cos = abs(float(u @ d)) / max(float(th.linalg.norm(u)) * float(th.linalg.norm(d)), 1e-9)
         return cos <= math.sin(math.radians(FLOORPUSH_BROADSIDE_TOL_DEG)) + 1e-6
+
+    # ------------------------------------------------------------------ i7-ul02guide: the partner's leg panel as a guide wall
+
+    def guide_wall_active(self) -> bool:
+        """:data:`PUSH_GUIDE_WALL_ENV` acts here: the switch on, the variant in :data:`PUSH_GUIDE_WALL_VARIANTS` (under_large_02), the
+        pitched floor push of the under relation, and a footprint at least :data:`PUSH_GUIDE_MIN_ASPECT` long (a broad face to slide on)."""
+        if not push_guide_wall_on() or getattr(self, "relation", None) != "under" or str(getattr(self.gp, "variant", "")) not in PUSH_GUIDE_WALL_VARIANTS:
+            return False
+        if not self.push_under or self.push_hand != "pitched_far":
+            return False
+        return self.guide_footprint()[1] >= PUSH_GUIDE_MIN_ASPECT
+
+    def guide_footprint(self) -> Tuple[th.Tensor, float, float, float]:
+        """``(u_root, aspect, long_half, w_half)`` of the target's footprint at the rest orientation: its long axis in the root frame
+        (:func:`footprint_heel`; the yaw turns it with the target), long / short, and the half extents along / across it (memoised per
+        bound target)."""
+        name = getattr(self.target, "name", None)
+        memo = self.__dict__.get("_guide_footprint")
+        if memo is not None and memo[0] == name:
+            return memo[1]
+        pts = G.local_points_world(self.hull, (th.zeros(3), G.t(self.rest)))
+        u, ahead, behind = footprint_heel(pts)
+        xy = pts[:, :2] @ th.stack([-u[1], u[0]])
+        width = max(float(xy.max() - xy.min()), 1e-6)
+        u_root = G.local_points_world(th.tensor([float(u[0]), float(u[1]), 0.0]).reshape(1, 3), (th.zeros(3), G.qinv(G.t(self.rest))))[0]
+        out = (u_root, (ahead + behind) / width, 0.5 * (ahead + behind), 0.5 * width)
+        self.__dict__["_guide_footprint"] = (name, out)
+        return out
+
+    def guide_axis_phi0(self) -> float:
+        """The world angle of the target's long axis at yaw 0 (the yaw adds to it: the axis is horizontal at the rest)."""
+        u = G.local_points_world(self.guide_footprint()[0].reshape(1, 3), (th.zeros(3), G.t(self.rest)))[0]
+        return math.atan2(float(u[1]), float(u[0]))
+
+    def push_endwise_kept(self, quat, d2) -> bool:
+        """Yaw lock ``"endwise"`` (:data:`PUSH_GUIDE_WALL_ENV`): the target's long axis at ``quat`` within :data:`PUSH_GUIDE_YAW_TOL_DEG` of
+        the push ``d2`` (either end first) - the broad faces along the push, one of them against the guide wall."""
+        u = G.local_points_world(self.guide_footprint()[0].reshape(1, 3), (th.zeros(3), G.t(quat)))[0, :2]
+        d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
+        cos = abs(float(u @ d)) / max(float(th.linalg.norm(u)) * float(th.linalg.norm(d)), 1e-9)
+        return cos >= math.cos(math.radians(PUSH_GUIDE_YAW_TOL_DEG)) - 1e-6
+
+    def guide_walls(self, edge: EdgeFrame) -> List[Dict[str, Any]]:
+        """The guide walls the target can slide along at ``edge`` (memoised per partner edge): a horizontal ray scan of the partner along the
+        edge's tangent - rays from every :data:`PUSH_GUIDE_SCAN_STEP_M` along the edge both ways, at three depths inside the edge (the
+        target's back, middle and front, 1 cm in, at the guide goal: :data:`PUSH_GUIDE_WALL_FROM_M` + 0 / 1 / 2 long half extents) and
+        three heights (:data:`PUSH_GUIDE_SCAN_Z0_M`, half and 3 cm below the target's height) - reduced by :func:`guide_faces_from_hits`: faces met in every (depth, height) cell by a ray that
+        ran the target's width + :data:`PUSH_GUIDE_GAP_M` + 1 cm clear of the partner. One INFO line per edge; kit
+        ``push_guide_wall.scan`` / ``.walls``."""
+        memo = self.__dict__.setdefault("_guide_walls", {})
+        key = (getattr(self.partner, "name", None), edge.name)
+        if key in memo:
+            return memo[key]
+        partner = self.partner
+        _, _, long_half, w_half = self.guide_footprint()
+        scan = guide_scan_rays(edge.mid, edge.inward, float(edge.length), long_half, float(self.place["height"]), self.floor_z)
+        hits = self.world.raycast(th.tensor(scan["starts"]), th.tensor(scan["ends"]))
+        rows = guide_scan_rows(scan, hits, {link.prim_path for link in partner.links.values()})
+        faces = guide_faces_from_hits(rows, len(scan["cells"]), 2.0 * w_half + PUSH_GUIDE_GAP_M + 0.01)
+        cells = scan["cells"]
+        memo[key] = faces
+        TT._count(self, "push_guide_wall.scan")
+        TT._countn(self, "push_guide_wall.walls", len(faces))
+        log.info("%s: guide-wall scan of %s edge %s (%d rays, depths %s m, heights %s m): %d wall(s) %s", self.gp.variant, partner.name, edge.name, len(rows),
+                 sorted({round(s, 3) for s, _ in cells}), sorted({round(z, 3) for _, z in cells}), len(faces),
+                 [(f["tau"], "free +t" if f["free"] > 0 else "free -t", f["spread_m"]) for f in faces])
+        return faces
+
+    def guide_goal_clear(self, g, d2, tangent, need: float) -> bool:
+        """The target's footprint at the goal cell ``g`` on a guide lane is under clearance (``need``) where the partner's under-clearance
+        raster knows it: its centre line at both ends (1 cm in) and the middle, 3 cm in from each long side (the raster's 5 cm cells
+        next to the wall would else read the wall); cells the raster does not cover (outside the footprint) pass."""
+        _, _, long_half, w_half = self.guide_footprint()
+        g = th.as_tensor([float(g[0]), float(g[1])], dtype=th.float32)
+        for a in (-(long_half - 0.01), 0.0, long_half - 0.01):
+            for b in (-(w_half - 0.03), w_half - 0.03):
+                cl = self.clearance_at(g + d2 * a + tangent * b)
+                if cl is not None and cl < need:
+                    return False
+        return True
+
+    def guide_endwise_pairs(self, F_live: Sequence[Tuple[float, Any]], yaws: Sequence[float], d_yaw: float, drop_xy, place: Stance, arm: str,
+                            yaw_step: float) -> List[float]:
+        """The endwise init ``yaws`` (the push-under yaw lock's at this C) with a (yaw, grasp) pair of ``F_live`` whose release at the drop
+        ``drop_xy`` passes the screening IK from ``place`` (:meth:`release_feasible` at the carried yaws ``+ d_yaw``, the same screen as the
+        C's F_goal, which reuses it from the feasible-set cache) - :data:`PUSH_GUIDE_WALL_ENV` checks this before the push chain."""
+        if not yaws:
+            return []
+        F_goal = self.release_feasible(drop_xy, [float(y) + d_yaw for y in yaws], lambda xy, quat, eio=None: self.drop_pose_at(xy, quat), place, arm,
+                                       self.place_ignores())
+        buckets = {int(round(float(y) / yaw_step)) for y in yaws}
+        F_k = intersect_feasible([yg for yg in F_live if int(round(float(yg[0]) / yaw_step)) in buckets], [(y - d_yaw, g) for y, g in F_goal], yaw_step=yaw_step)
+        hit = {int(round(float(y) / yaw_step)) for y, _ in F_k}
+        keep = [y for y in yaws if int(round(float(y) / yaw_step)) in hit]
+        log.info("%s: guide-wall endwise pairs at C (d %.2f λ %+.2f): yaws %s, released at the drop %s, with a pair of F_init %s", self.gp.variant,
+                 place.stand_off or 0.0, place.lateral or 0.0, [round(float(y), 2) for y in yaws],
+                 sorted({(round((float(y) - d_yaw) % (2 * math.pi), 2), getattr(g, "name", g)) for y, g in F_goal}), [round(float(y), 2) for y in keep])
+        return keep
+
+    def guide_wall_record(self, place: Stance) -> Dict[str, Any]:
+        """The push record's ``guide_wall`` for a C on a guide lane (``extras["guide_wall"]``): the lane facts + the oracle's knobs
+        (``lean_m_per_m`` :data:`PUSH_GUIDE_LEAN_M_PER_M`, ``aim_away_m`` :data:`PUSH_GUIDE_AIM_AWAY_M`); ``{}`` elsewhere."""
+        gw = (getattr(place, "extras", None) or {}).get("guide_wall")
+        if not gw:
+            return {}
+        TT._count(self, "push_guide_wall.recorded")
+        return {"guide_wall": {**gw, "lean_m_per_m": PUSH_GUIDE_LEAN_M_PER_M, "aim_away_m": PUSH_GUIDE_AIM_AWAY_M}}
 
     def push_yaws_locked(self, yaws: Sequence[float], d_yaw: float, d2, offs: Dict[float, float], place: Stance) -> List[float]:
         """The init yaws of ``yaws`` (the target at ``yaw + d_yaw`` at C, ``offs`` their contact offsets) that :meth:`push_yaw_kept` keeps for the
@@ -3640,19 +3915,45 @@ class IORSLarge(SamplerV2):
         cands: List[Stance] = []
         lat_all = sorted({round(float(v), 4) for v in list(laterals) + list(laterals_side)})
         lat_frontal = {round(float(v), 4) for v in laterals}
-        for lat in lat_all:
-            g = mid + tangent * float(lat) + d2 * inside
+        # i7-ul02guide (ISPATIALGYM_PUSH_GUIDE_WALL): only the lanes beside a guide wall, each with its drops (just outside the edge /
+        # alongside the panel), the goal the target's length along the flat wall, the frontal stand-offs that keep the push in reach
+        lanes_g: Dict[float, Dict[str, Any]] = {}
+        if push_guide_wall_on() and self.guide_wall_active():
+            _, _, long_half, w_half = self.guide_footprint()
+            lanes_g = {round(float(ln["lat"]), 4): ln for ln in guide_lanes(self.guide_walls(edge), w_half, PUSH_GUIDE_GAP_M, edge.length / 2 - w_half)}
+            stats.update(guide_lanes=sorted(lanes_g), guide_goal_blocked=0)
+            if not lanes_g:
+                TT._count(self, "push_guide_wall.edge_without_wall")
+                self.template_facts["placement_stats"] = stats
+                log.info("%s: push-under stance C at %s edge %s: no guide wall (ISPATIALGYM_PUSH_GUIDE_WALL)", self.gp.variant, partner.name, edge.name)
+                return []
+            lat_all, lat_frontal = sorted(lanes_g), set(lanes_g)
+            stand_offs = list(PUSH_GUIDE_STAND_OFFS)
+            inside_g = PUSH_GUIDE_WALL_FROM_M + long_half
+            outs_g = [long_half + PUSH_GUIDE_DROP_FRONT_OUT_M if o is None else float(o) for o in PUSH_GUIDE_DROP_OUTS_M]
+            specs = [(lat, o, lanes_g[lat]) for lat in lat_all for o in outs_g]
+        else:
+            specs = [(lat, out, None) for lat in lat_all]
+        for lat, out, lane in specs:
+            inside_l = inside if lane is None else inside_g
+            g = mid + tangent * float(lat) + d2 * inside_l
             cl = self.clearance_at(g)
             clear = (cl is not None and cl >= need) or (cl is None and len(cells) > 0 and float(th.linalg.norm(cells - g, dim=1).min()) <= 0.03)
             if not clear:
+                continue
+            if lane is not None and not self.guide_goal_clear(g, d2, tangent, need):
+                stats["guide_goal_blocked"] += 1
                 continue
             stats["goal_clear"] += 1
             c_d = mid + tangent * float(lat) - d2 * out
             if not self._free_floor_cell(c_d, stats["drop_blocked"]):
                 continue
             stats["drop_free"] += 1
-            common = {"goal_cell": [float(g[0]), float(g[1])], "drop_cell": [float(c_d[0]), float(c_d[1])], "push_dir": [float(d2[0]), float(d2[1])], "inside_m": inside,
+            common = {"goal_cell": [float(g[0]), float(g[1])], "drop_cell": [float(c_d[0]), float(c_d[1])], "push_dir": [float(d2[0]), float(d2[1])], "inside_m": inside_l,
                       "edge": edge.name}
+            if lane is not None:
+                common["guide_wall"] = {"edge": edge.name, "lane_m": round(float(lat), 4), "face_tau_m": round(float(lane["face_tau"]), 4), "wall_left": int(lane["wall_left"]),
+                                        "gap_m": PUSH_GUIDE_GAP_M, "drop_out_m": round(float(out), 4), "inside_m": round(float(inside_l), 4)}
             # frontal stances: the lane to the robot's RIGHT of the base centre by ``frontal_lane_offset_m`` — B3's under-edge
             # probe (bed_rrcvaq_0, briefcase, s = 0.6) reaches the edge strip at lateral −0.40…−0.16 only (the right arm's
             # side), a centred lane at s = 0.45 / 0.6 has 0–1 cells; the left arm's lane to its LEFT
@@ -3661,6 +3962,9 @@ class IORSLarge(SamplerV2):
                     ahead = so - out
                     if ahead < lo_ahead or ahead > hi_ahead:
                         continue
+                    if lane is not None and not guide_push_in_reach(so, out, inside_l, half):
+                        stats["guide_out_of_reach"] = stats.get("guide_out_of_reach", 0) + 1
+                        continue  # the guide push's hand: its start (the back at the drop) / goal (the back at the goal) ahead of the base
                     lat_b = frontal_lane_lateral(float(lat), off, arm)
                     xy = edge.base_xy(so, lat_b)  # base beside the lane by ``off``, away from the arm's side (+tangent = the robot's left)
                     if not P0.base_ok(self, xy):
@@ -3685,6 +3989,8 @@ class IORSLarge(SamplerV2):
                         st.extras.update(common, drop_ahead_m=float(x_ahead), stance_kind="side", side_standoff_m=b)
                         cands.append(st)
                         stats["side_candidates"] += 1
+        if lanes_g and stats.get("guide_out_of_reach"):
+            TT._countn(self, "push_guide_wall.c_out_of_reach", int(stats["guide_out_of_reach"]))  # i7-ul02guide r2: stances the reach window drops
         self.template_facts["placement_stats"] = stats
         if not cands:
             log.info("%s: push-under stance C at %s edge %s: no candidate (%s)", self.gp.variant, partner.name, edge.name, stats)
@@ -4005,12 +4311,18 @@ class IORSLarge(SamplerV2):
         return [k * 2.0 * math.pi / n for k in range(n)]
 
     def init_yaw_jitter(self) -> float:
-        """The init yaw's draw around the screened yaw (± this, rad; the B exact IK's retries too): :data:`TARGET_JITTER`."""
-        return TARGET_JITTER
+        """The init yaw's draw around the screened yaw (± this, rad; the B exact IK's retries too): :data:`TARGET_JITTER`; none with the
+        guide wall (i7-ul02guide: the carried goal yaw is snapped onto the wall, :meth:`end_aligned_init_yaw`)."""
+        return 0.0 if push_guide_wall_on() and self.guide_wall_active() else TARGET_JITTER
 
     def end_aligned_init_yaw(self, yaw0: float, d_yaw: float):
         """The init yaw near the screened ``yaw0`` whose carried goal yaw (``+ d_yaw``) a mode aligns (the touching mode's
-        ``goal_align_partner``); None here (the drawn yaw as screened), False for a pair the alignment cannot use."""
+        ``goal_align_partner``); None here (the drawn yaw as screened), False for a pair the alignment cannot use. i7-ul02guide
+        (:data:`PUSH_GUIDE_WALL_ENV`): the target's long axis on the partner's axes (:func:`guide_snap_yaw`, within half a screening step) -
+        parallel to the guide wall, which is the goal orientation the carried yaw writes."""
+        if push_guide_wall_on() and self.guide_wall_active():
+            y = guide_snap_yaw(yaw0, d_yaw, self.guide_axis_phi0(), G.yaw_of(self.partner.get_position_orientation()[1]), math.pi / max(1, len(self.yaws())))
+            return False if y is None else y
         return None
 
     def alignable_draws(self, F: Sequence[Tuple[float, Any]], draw_order: Sequence[int], d_yaw: float) -> List[int]:
@@ -6717,6 +7029,19 @@ class IORSLarge(SamplerV2):
                         errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral or 0.0:+.2f}): skipped - every F_init pair at its {len(yaws_c)} push "
                                       f"yaws failed its exact IK at B (PUSH_CHAIN_LIVE_B)")
                         continue
+                if push_guide_wall_on() and self.guide_wall_active():
+                    # i7-ul02guide r2: the endwise yaws need a pair of F_init that also releases at the drop BEFORE their chain is solved
+                    # (ug_ul02_on: 76 of the 166 C with a solved chain then found none - 'the push-under yaw lock endwise keeps none of
+                    # F's yaws': at the endwise carried yaws one hand orientation releases, top_2 at 0 / top_0 at pi, often not the pair
+                    # B took)
+                    keep_e = self.guide_endwise_pairs(F_live, yaws_p, d_yaw, cd, place, arm, yaw_step)
+                    if not keep_e:
+                        TT._count(self, "push_guide_wall.c_no_endwise_pair")
+                        errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral or 0.0:+.2f}): no pair of F_init at the endwise yaws "
+                                      f"{[round(y, 2) for y in yaws_p]} releases at the drop (ISPATIALGYM_PUSH_GUIDE_WALL)")
+                        continue
+                    TT._count(self, "push_guide_wall.c_endwise_pair")
+                    yaws_p = [y for y in yaws_p if y in keep_e]
                 pst0 = push_st if push_st is not None else place
                 best = sorted(yaws_p, key=lambda y: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), offs[y]))[:2]
                 found = False
@@ -7261,7 +7586,7 @@ class IORSLarge(SamplerV2):
                                                              ground_ignored=bool(chain.get("ground_ignored", False)),
                                                              drop_cell=[float(v) for v in cd], goal_cell=[float(v) for v in gc], partner=pname,
                                                              **({"orient": chain["orient"]} if chain.get("orient") else {}), **push_under_palm_flags(chain),
-                                                             **chain.get("record", {}), **chain.get("seed", {})))
+                                                             **chain.get("record", {}), **chain.get("seed", {}), **self.guide_wall_record(place)))
                 if hit.get("overhang") is not None:
                     self.overhang_records(hit["overhang"], grasp)
                     self.overpath_record(hit["overhang"], grasp)  # i7-overpath (owner 3(a)): grasps[0].overpath when the switch planned one
@@ -7282,6 +7607,8 @@ class IORSLarge(SamplerV2):
                                   "path_length_m": place.extras["path_length_m"], "F_init": len(F_init), "F_goal": len(F_goal), "F": len(F),
                                   # the carried object's yaw follows the base: goal orientation = init orientation rotated by C.yaw - B.yaw
                                   "goal_quat": [float(v) for v in goal_quat], "carry_yaw_offset_rad": round(d_yaw, 4)})
+                if push and place.extras.get("guide_wall"):
+                    d.summary["push_guide_wall"] = dict(place.extras["guide_wall"])  # exact lane used by the push
                 if tilts_of:
                     d.summary.update({"release_tilt_deg": float(tilt), "release_level_quat": [float(v) for v in level_quat]})
                     log.info("%s: inside release tilt %g deg coupled (yaw %.2f, grasp %s, C d %.2f λ %+.2f)", self.gp.variant, tilt, yaw, g.name, place.stand_off or 0.0, place.lateral)
