@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.campaign_20261110.ik_observation import audit, CAMPAIGN
+from scripts.campaign_20261110.ik_observation import audit, CAMPAIGN, owned, PRIMARY_ROOT, SECONDARY_ROOT
 
 
 class IKObservationTests(unittest.TestCase):
@@ -60,6 +60,20 @@ class IKObservationTests(unittest.TestCase):
         self.reg.write_text(json.dumps(value))
         self.assertEqual(audit(self.root)['jobs'], [])
         self.assertTrue(audit(self.root)['errors'])
+
+    def test_only_exact_secondary_campaign_root_is_readable(self):
+        self.assertEqual(owned(SECONDARY_ROOT / 'metrics/1.json', PRIMARY_ROOT), SECONDARY_ROOT / 'metrics/1.json')
+        with self.assertRaises(ValueError):
+            owned(SECONDARY_ROOT.parent / 'previous_campaign/metrics.json', PRIMARY_ROOT)
+        with self.assertRaises(ValueError):
+            owned(SECONDARY_ROOT / 'metrics/1.json', self.root)
+
+    def test_metric_from_different_compatibility_is_not_counted(self):
+        (self.metrics / '31.json').write_text(json.dumps({'campaign_id': CAMPAIGN,
+            'producer': 'minyeong-test', 'compatibility_sha256': 'b' * 64,
+            'counters': {'exact_shared_verified_hit': 999}}))
+        row = audit(self.root)['jobs'][0]
+        self.assertIsNone(row['counters']); self.assertTrue(row['errors'])
 
 
 if __name__ == '__main__':

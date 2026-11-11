@@ -12,6 +12,8 @@ import time
 
 CAMPAIGN = 'campaign_20261110'
 ACCOUNTS = ('minyeong', 'shiyuc', 'vast')
+PRIMARY_ROOT = Path('/vision/u/minyeong/projects/isg_home/campaign_20261110')
+SECONDARY_ROOT = Path('/vision/u/shiyuc/minyeong/campaign_20261110')
 METRICS = ('exact_queries', 'exact_cache_eligible_queries', 'exact_cache_candidate_queries',
            'exact_verified_hit', 'exact_shared_verified_hit', 'exact_rejected_cache_queries',
            'exact_fresh_queries', 'exact_fresh_solver_calls')
@@ -28,7 +30,10 @@ def sha(path):
 def owned(path, root):
     path = Path(path).resolve()
     if not path.is_relative_to(root.resolve()):
-        raise ValueError('observation path outside campaign')
+        # Both exact campaign roots are owner-authorized. This reads existing
+        # observations only and never changes secondary-account permissions.
+        if root.resolve() != PRIMARY_ROOT or not path.is_relative_to(SECONDARY_ROOT):
+            raise ValueError('observation path outside campaign')
     return path
 
 
@@ -63,6 +68,8 @@ def audit(root):
             if reg.get('campaign_id') != CAMPAIGN or reg.get('account') not in ACCOUNTS:
                 raise ValueError('foreign job registration')
             job = owned(reg['job_dir'], root)
+            if job.is_relative_to(SECONDARY_ROOT) and reg['account'] != 'shiyuc':
+                raise ValueError('secondary job attributed to wrong account')
             env_path = job / 'job.env'
             env = env_values(env_path)
             row = {'job_id': str(reg['job_id']), 'account': reg['account'], 'job_dir': str(job),
@@ -82,6 +89,8 @@ def audit(root):
                         raise ValueError('foreign runtime metric')
                     if value.get('producer') != env.get('ISPATIALGYM_EXACT_IK_PRODUCER'):
                         raise ValueError('runtime producer differs from registered job')
+                    if value.get('compatibility_sha256') not in (None, row['declared_compatibility_id']):
+                        raise ValueError('runtime compatibility differs from registered manifest')
                     if str(path.resolve()) in seen_metrics:
                         raise ValueError('metric already attributed to another registered job')
                     counters = value.get('counters', {})
