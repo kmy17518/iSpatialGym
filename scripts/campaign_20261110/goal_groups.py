@@ -493,6 +493,15 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["release_pose"] = plan["goal_pose"]
         plan["goal_pose"] = {"position": target[0], "orientation": target[1]}
         plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
+        if template.class_id == 'inter_object_relation_satisfaction-inside_large_scale_03' and anchor['summary'].get('release_tilt_deg'):
+            proof = anchor['sources']['summary']
+            require(file_digest(proof['path']) == proof['sha256'], 'sink release source summary changed after audit')
+            require(anchor['summary'].get('release_level_quat') is not None, 'sink source lacks native level attitude')
+            plan['class_id'] = template.class_id
+            plan['inside_release_attitude'] = {
+                'tilt_deg': anchor['summary']['release_tilt_deg'],
+                'level_quat': anchor['summary']['release_level_quat'],
+                'source_summary_sha256': proof['sha256']}
         if relation == "inside" and scale == "small":
             plan["release_policy"] = "native_grasp_height"
         if relation == 'nextto' and scale == 'small' and template.class_id == 'inter_object_relation_satisfaction-nextto_03':

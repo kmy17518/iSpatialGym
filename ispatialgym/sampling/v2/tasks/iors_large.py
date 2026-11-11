@@ -7370,6 +7370,17 @@ class IORSLarge(SamplerV2):
                         seg.failed.setdefault(bk, "B: grasp outside the manipulation image (early frame)")
                         continue
                 c_opts = [(tilt, j, o) for tilt in (tilts_of.get(pair_key(yaw0, g_row, yaw_step)) or [0.0]) for j, o in enumerate(b_opts)]
+                fixed_attitude = campaign_plan.inside_release_attitude if campaign_plan is not None else None
+                if fixed_attitude is not None:
+                    # The source's tilted release lands in its level rest. A fixed
+                    # pose must keep these native facts, rather than label the
+                    # first fixed-pose IK success as a zero-degree release.
+                    c_opts = [(tilt, j, option) for tilt, j, option in c_opts
+                              if abs(float(tilt) - fixed_attitude['tilt_deg']) < 1e-6]
+                    if not c_opts:
+                        fails['fixed release tilt not in native screened candidates'] = 1
+                        continue
+                    level_quat = G.t(fixed_attitude['level_quat'])
                 c_fails: List[str] = []
                 lift_seeds: Dict[int, Optional[th.Tensor]] = {}
                 pp_ok: Optional[bool] = None
@@ -7378,6 +7389,10 @@ class IORSLarge(SamplerV2):
                         c_fails.append("B: grasp outside the manipulation image (early frame)")
                         continue
                     goal_quat = self.release_quat(level_quat, g_row, tilt)
+                    if fixed_attitude is not None and not CPG.release_attitude_matches(
+                            campaign_plan, [float(v) for v in goal_quat], float(self.ikc.WITNESS_ANG_TOL)):
+                        c_fails.append('grasp does not reconstruct the fixed native release attitude')
+                        continue
                     goal = release_pose(release_xy, goal_quat, g.pose)
                     if campaign_plan is not None:
                         goal_quat = goal[1]

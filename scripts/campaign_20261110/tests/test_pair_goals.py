@@ -172,3 +172,25 @@ def test_drop_push_pins_pre_push_place_and_contact_endpoint_separately():
     raw['goal_cell'] = [.02, 0]
     with pytest.raises(g.GoalPlanError, match='contact endpoint'):
         g.validate_pair_plan(raw, **kwargs)
+
+
+def test_fixed_sink_release_retains_original_level_reference():
+    import math
+    from dataclasses import replace
+    raw=PairPlanTests().fixture('inside')
+    raw.update(task='inter_object_relation_satisfaction-inside_large_scale',
+               class_id='inter_object_relation_satisfaction-inside_large_scale_03',goal_cell=[0.,0.],
+               inside_release_attitude={'tilt_deg':30.,'level_quat':[0.,0.,0.,1.],'source_summary_sha256':'b'*64})
+    raw['release_pose']['orientation']=[math.sin(math.pi/12),0.,0.,math.cos(math.pi/12)]
+    p=g.validate_pair_plan(raw,template_id='t',scene='s',rooms=['r'],relation='inside',scale='large',activated_at=999,now=1000)
+    assert p.inside_release_attitude['tilt_deg']==30
+    assert p.inside_release_attitude['level_quat']==[0,0,0,1]
+    assert g.release_attitude_matches(p,p.release[1],.01)
+    assert not g.release_attitude_matches(p,[0.,0.,0.,1.],.01)
+    p.verify_settled(p.goal,p.partner)
+    # Preserve the ordinary final-goal orientation check as well as uprightness.
+    import pytest
+    with pytest.raises(g.GoalPlanError):p.verify_settled((p.goal[0],p.release[1]),p.partner)
+    for key,value in [('class_id','inter_object_relation_satisfaction-inside_large_scale_01'),('inside_release_attitude',{'tilt_deg':0.,'level_quat':[0.,0.,0.,1.],'source_summary_sha256':'b'*64})]:
+        bad={**raw,key:value}
+        with pytest.raises(g.GoalPlanError):g.validate_pair_plan(bad,template_id='t',scene='s',rooms=['r'],relation='inside',scale='large',activated_at=999,now=1000)

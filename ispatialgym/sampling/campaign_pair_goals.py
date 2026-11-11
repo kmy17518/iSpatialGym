@@ -41,6 +41,7 @@ class PairGoalPlan:
     anchor_base_pose2d: tuple | None = None
     floor_push: dict | None = None
     anchor_manipulation_stance: dict | None = None
+    inside_release_attitude: dict | None = None
 
     @property
     def orientation_required(self):
@@ -64,6 +65,8 @@ class PairGoalPlan:
             result["placement_mode"] = self.placement_mode
         if self.floor_push is not None:
             result["floor_push"] = self.floor_push
+        if self.inside_release_attitude is not None:
+            result["inside_release_attitude"] = self.inside_release_attitude
         return result
 
     def verify_settled(self, target, partner, *, position_tol=.03, orientation_tol=.20, partner_position_tol=.005):
@@ -201,7 +204,33 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     _require(hint is None or (scale == 'small' and relation in ('inside', 'nextto', 'touching', 'ontop', 'under')),
              'source manipulation proposal requires a supported small pair relation')
     return PairGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, relation,
-                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push, placement_mode, release_policy, anchor_base(raw), floor_push, hint)
+                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push, placement_mode, release_policy, anchor_base(raw), floor_push, hint,
+                        checked_inside_release_attitude(raw, release, relation=relation, scale=scale))
+
+
+def checked_inside_release_attitude(raw, release, *, relation, scale):
+    value = raw.get('inside_release_attitude')
+    if value is None:
+        return None
+    _require(scale == 'large' and relation == 'inside'
+             and raw.get('class_id') == 'inter_object_relation_satisfaction-inside_large_scale_03',
+             'release attitude belongs to the audited sink class')
+    _require(isinstance(value, dict), 'invalid source release attitude')
+    tilt = value.get('tilt_deg')
+    _require(isinstance(tilt, (int, float)) and not isinstance(tilt, bool)
+             and math.isfinite(tilt) and 0 < tilt < 90, 'invalid native release tilt')
+    level = pose({'position': [0, 0, 0], 'orientation': value.get('level_quat')}, 'native level attitude')[1]
+    digest = value.get('source_summary_sha256', '')
+    _require(isinstance(digest, str) and len(digest) == 64 and all(c in '0123456789abcdef' for c in digest),
+             'source release attitude lacks exact summary hash')
+    angle = pose_error(((0, 0, 0), level), ((0, 0, 0), release[1]))[1]
+    _require(abs(angle - math.radians(tilt)) < 1e-4, 'source level and release tilt disagree')
+    return {'tilt_deg': float(tilt), 'level_quat': list(level), 'source_summary_sha256': digest}
+
+
+def release_attitude_matches(plan, reconstructed_quat, tolerance):
+    """A grasp must reproduce the source release, never inherit false tilt facts."""
+    return pose_error(((0, 0, 0), reconstructed_quat), ((0, 0, 0), plan.release[1]))[1] <= tolerance
 
 
 def load_pair_plan(*, template_id, scene, rooms, relation, activated_at, expected_sha256=None, scale="small"):
