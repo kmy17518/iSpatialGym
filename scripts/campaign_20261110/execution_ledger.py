@@ -124,7 +124,12 @@ def build(root, now=None):
             next_action=r.get('next_action') or 'Reconcile this held-out bucket with current artifacts and assign the next action.'))
     for i,r in enumerate(records(values['pipeline'].get('records'))):
         submission = r.get('native_submission')
-        work = [v for v in (r.get('allocation'), submission) if isinstance(v, dict) and v]
+        native = r.get('native')
+        native_terminal = isinstance(native, dict) and native.get('returncode') is not None
+        # A native submission stays in stage history after its terminal gate.
+        # Only the separately owned downstream allocation may still be active.
+        work = [v for v in (r.get('allocation'), None if native_terminal else submission)
+                if isinstance(v, dict) and v]
         result.append(row(f"pipeline:{r.get('candidate_id')}:{r.get('start',i)}", 'pipeline_canary', '/root/dataset_contract', refs['pipeline'],
             configuration_id=r.get('candidate_id'), class_id=r.get('class_id'), status=r.get('status'), runtime=r.get('native_runtime'),
             configuration_sha256=r.get('configuration_sha256'), start=r.get('start'), count=r.get('count'), dependencies=r.get('dependencies',[]), active_work=work,

@@ -48,5 +48,19 @@ class ExecutionLedgerTests(unittest.TestCase):
         self.put('pipeline',{'records':[{'candidate_id':'missing'}]})
         self.assertEqual(build(self.root,1001)['rows'][0]['active_work'],[])
 
+    def test_terminal_native_is_history_while_downstream_work_stays_owned(self):
+        receipt={'job_id':'native','scheduler_state':'unavailable'}
+        collector={'job_id':'collector','status':'submitted'}
+        for returncode, written in ((0, 1), (0, 0), (124, 0)):
+            with self.subTest(returncode=returncode, written=written):
+                self.put('pipeline',{'records':[{'candidate_id':'pool',
+                    'native_submission':receipt, 'allocation':collector,
+                    'native':{'returncode':returncode,'written':written}}]})
+                row=build(self.root,1001)['rows'][0]
+                self.assertEqual(row['active_work'],[collector])
+                self.assertEqual(row['stages']['submitted']['evidence'],receipt)
+                self.assertEqual(row['stages']['native']['evidence']['returncode'],returncode)
+                self.assertEqual(row['stages']['physics_replay']['status'],'unobserved')
+
 
 if __name__=='__main__':unittest.main()
