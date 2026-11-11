@@ -3045,7 +3045,7 @@ class BlockDesign(SamplerV2):
         before the travel and the exact probe; Reject ``board_placement`` (the same reasons) when no position passes them. ``count``
         False: no kit counter (the candidate order of BD_BOARD_SEARCH)."""
         kc = self._kc if count else (lambda key, n=1: None)
-        right, toward, _ = self._table_axes(manip)
+        right, toward, table_yaw = self._table_axes(manip)
         far = -toward
         geo = self._board_geometry()
         half = 0.5 * float(geo["plate_m"])
@@ -3064,6 +3064,12 @@ class BlockDesign(SamplerV2):
 
         why: List[str] = []
         plan = self._board_plan(manip, count=False)  # the plan's counters come from _place_board
+        campaign_plan = getattr(self, "_campaign_block_active", None)
+        if campaign_plan is not None:
+            if float(C.quat_angle(C.quat_from_yaw(table_yaw), th.tensor(campaign_plan.board[1]))) > .05:
+                raise Reject("campaign_board_direction", "stance table axes differ from the fixed board orientation")
+            xy_base = manip.world_to_base(th.tensor(campaign_plan.board[0][:2], dtype=th.float32))
+            plan = [(float(xy_base[0]), float(xy_base[1]), False)]
         positions = [(d, l) for d, l, _searched in plan]
         n_list = sum(1 for p in plan if not p[2])  # the plan puts the listed positions first
         for i, (depth, lateral) in enumerate(positions):
@@ -3091,19 +3097,24 @@ class BlockDesign(SamplerV2):
             kc("bd_board.precheck_pass")
             return
         kc("bd_board.precheck_reject")
-        raise Reject("board_placement", "no board position of generation.board_base_xy_candidates works (precheck): " + "; ".join(why))
+        scope = "the fixed group board pose" if campaign_plan is not None else "generation.board_base_xy_candidates"
+        raise Reject("board_placement", "no board position of " + scope + " works (precheck): " + "; ".join(why))
 
     def _board_feasible(self, k: int, init: Stance) -> bool:
         """BD_BOARD_SEARCH (1): whether candidate ``k``'s region has a board position passing the CPU tests for some configured pattern
-        (:meth:`_board_precheck`), kept per (candidate, base pose) for the process."""
+        (:meth:`_board_precheck`), kept per (candidate, base pose, fixed goal plan) for the process."""
         cand = self.manip_candidates[k]
         memo = self.__dict__.setdefault("_bd_feasible_memo", {})
         key = (k, tuple(round(float(v), 3) for v in cand.base_pose2d), round(float(cand.translate), 3), round(float(cand.tilt), 3),
                tuple(round(float(v), 3) for v in init.base_pose2d))
+        campaign_plan = getattr(self, "_campaign_block_active", None)
+        if campaign_plan is not None:
+            key += (campaign_plan.sha256,)
         if key not in memo:
             c2f = self.color_to_face()
             ok = False
-            for pat in (self.g("patterns") or {}).values():
+            patterns = [campaign_plan.pattern] if campaign_plan is not None else (self.g("patterns") or {}).values()
+            for pat in patterns:
                 if any(c not in c2f for c in pat):
                     continue
                 try:

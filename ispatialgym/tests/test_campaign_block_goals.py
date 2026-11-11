@@ -106,3 +106,48 @@ def test_fixed_profile_screens_all_required_flips_before_selecting_cells(up_face
     s._campaign_block_active=None
     assert s._n_flips()==2
     assert s._flip_plan(cells,lambda c:float(c[0]),goals_,stance,stance,'right',True)=={0,1}
+
+
+def test_board_precheck_uses_the_actual_fixed_pose_and_keeps_geometry_gates():
+    s=object.__new__(BlockDesign)
+    s._campaign_block_active=NS(board=([.8,.1,.7],[0.,0.,0.,1.]))
+    s._table_axes=lambda _: (th.tensor([1.,0.]),th.tensor([0.,1.]),0.)
+    s._board_geometry=lambda: {'plate_m':.1}
+    s.edge=.025;s.gen=lambda key,default=None: default
+    s.names=lambda: ['a','b','c','d'];s._n_flips=lambda: 0;s._flips_expected=lambda: False
+    s._flip_directions=lambda: ['right'];s.camera_pose_at=lambda _: None;s.top=NS(z=.7)
+    s._board_plan=lambda *args,**kwargs: [(2.,2.,False)]
+    cells=[th.tensor([.1*i,0.]) for i in range(4)]
+    stance=NS(extras={'focus_info':{'cells':cells}},world_to_base=lambda xy:xy,
+              base_xy=th.zeros(2),forward=th.tensor([1.,0.]),left=th.tensor([0.,1.]))
+    visited=[]
+    def on_top(_m,d,l,*args):
+        visited.append((d,l));return d<1
+    s._board_on_top=on_top
+    s._board_precheck(stance,stance,[],count=False)
+    assert len(visited)==1
+    assert visited[0]==pytest.approx((.8,.1))
+    # A valid alternative position cannot rescue an invalid fixed goal.
+    s._campaign_block_active=NS(board=([2.,2.,.7],[0.,0.,0.,1.]))
+    s._board_plan=lambda *args,**kwargs: [(.8,.1,False)]
+    with pytest.raises(Reject,match='fixed group board pose'):
+        s._board_precheck(stance,stance,[],count=False)
+    s._campaign_block_active=NS(board=([.8,.1,.7],[0.,0.,1.,0.]))
+    with pytest.raises(Reject,match='campaign_board_direction'):
+        s._board_precheck(stance,stance,[],count=False)
+
+
+def test_board_feasibility_cache_and_pattern_are_scoped_to_fixed_goal():
+    s=object.__new__(BlockDesign)
+    stance=NS(base_pose2d=(0.,0.,0.),translate=.5,tilt=-.45)
+    s.manip_candidates=[stance];s.color_to_face=lambda: {'red':'+z','blue':'-z'}
+    s.g=lambda _: {'legacy':['blue']}
+    seen=[];s._board_precheck=lambda _i,_c,faces,**kwargs: seen.append(faces)
+    s._campaign_block_active=NS(sha256='first',pattern=['red'])
+    assert s._board_feasible(0,stance);assert s._board_feasible(0,stance)
+    assert seen==[['+z']]
+    s._campaign_block_active=NS(sha256='second',pattern=['blue','red'])
+    assert s._board_feasible(0,stance);assert seen[-1]==['-z','+z']
+    s._campaign_block_active=None
+    assert s._board_feasible(0,stance);assert seen[-1]==['-z']
+    assert len(seen)==3
