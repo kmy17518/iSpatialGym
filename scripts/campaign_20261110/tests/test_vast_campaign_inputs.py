@@ -369,3 +369,58 @@ def test_standard_recovery_precedes_training_without_enabling_parked_jobs(monkey
     # An explicitly reviewed prerequisite can advance without guessing its split.
     config['standard_recovery_priority_job_ids']=['6']
     assert [r['id'] for r in dispatch_order(rows,config)]==['3','6','2','4','1']
+
+
+def exact_customs_preflight_fixture(tmp_path):
+    from dataclasses import asdict
+    from scripts.campaign_20261110.contracts import ObjectRef, Template
+    root=tmp_path/'campaign';template=root/'templates/task';template.mkdir(parents=True)
+    external=tmp_path/'frozen_customs.json';external.write_text('{"task":{"roles":{}}}')
+    (template/'template.json').write_text('{"exact":"source"}')
+    bddl=template/'task.bddl';bddl.write_text('exact original definition')
+    meta=template/'template_meta.json';meta.write_text(json.dumps({'variant':'task','customs':str(external),
+        'activity_definition':'task.bddl','bddl_sha256':sha(bddl)}))
+    obj=ObjectRef('target','target','cube','ready','a'*64,ready=True,readiness_source='native proof')
+    t=Template('task','mental_rotation','mental_rotation-toy_figure','eval_standard','house_single_floor','room',(obj,),
+               'b'*64,{'source_template':str(template),'source_template_sha256':sha(template/'template.json'),
+                        'source_bddl_sha256':sha(bddl)})
+    cfg=root/'config.json';cfg.write_text(json.dumps({'campaign_id':'campaign_20261110','purpose':'validation',
+        'split':'eval_standard','template':asdict(t),'validation_key':{'code_sha256':'c'*64}}))
+    receipt=root/'manifests/external_template_customs_inputs.json';receipt.parent.mkdir()
+    receipt.write_text(json.dumps({'schema':'isg-exact-external-template-customs-v1','campaign_id':'campaign_20261110',
+        'sources':{str(external):{'sha256':sha(external),'templates':{}}}}))
+    return root, {'TEMPLATE':str(template),'ISPATIALGYM_CAMPAIGN_CONFIG':str(cfg)}, receipt, external
+
+
+def test_exact_customs_preflight_joins_new_ready_config_without_mutating_frozen_source(tmp_path):
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import register_exact_template_customs_inputs,template_customs_inputs
+    root,env,receipt,external=exact_customs_preflight_fixture(tmp_path)
+    before=external.read_bytes();joins=register_exact_template_customs_inputs(env,root)
+    assert len(joins)==1 and external.read_bytes()==before
+    assert template_customs_inputs(env,root)==[{'path':str(external),'sha256':sha(external)}]
+    recorded=receipt.read_bytes();assert register_exact_template_customs_inputs(env,root)==[]
+    assert receipt.read_bytes()==recorded
+
+
+def test_exact_customs_preflight_rejects_wrong_source_unready_and_changed_bytes(tmp_path):
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import register_exact_template_customs_inputs
+    import pytest
+    root,env,receipt,external=exact_customs_preflight_fixture(tmp_path);before=receipt.read_bytes()
+    cfg=Path(env['ISPATIALGYM_CAMPAIGN_CONFIG']);original=cfg.read_bytes()
+    value=json.loads(original);value['template']['scene_setup']['source_template']=str(root/'other')
+    cfg.write_text(json.dumps(value))
+    with pytest.raises(ValueError,match='source template differs'):register_exact_template_customs_inputs(env,root)
+    value=json.loads(original);value['template']['objects'][0]['ready']=False;cfg.write_text(json.dumps(value))
+    with pytest.raises(ValueError,match='confirmed readiness'):register_exact_template_customs_inputs(env,root)
+    cfg.write_bytes(original);external.write_text('{"task":{"changed":true}}')
+    with pytest.raises(ValueError,match='previously frozen'):register_exact_template_customs_inputs(env,root)
+    assert receipt.read_bytes()==before
+
+
+def test_exact_customs_preflight_cannot_introduce_new_external_source(tmp_path):
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import register_exact_template_customs_inputs
+    import pytest
+    root,env,receipt,external=exact_customs_preflight_fixture(tmp_path)
+    doc=json.loads(receipt.read_text());doc['sources']={};receipt.write_text(json.dumps(doc));before=receipt.read_bytes()
+    with pytest.raises(ValueError,match='previously frozen'):register_exact_template_customs_inputs(env,root)
+    assert receipt.read_bytes()==before

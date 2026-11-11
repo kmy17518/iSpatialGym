@@ -42,7 +42,7 @@ try:
     from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
-    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, camera_context_inputs
+    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
     from .async_staging import StagingReservations
     from .lifecycle import retain_attempt
     from .cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
@@ -52,7 +52,7 @@ except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
-    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, camera_context_inputs
+    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
     from async_staging import StagingReservations
     from lifecycle import retain_attempt
     from cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
@@ -354,6 +354,8 @@ def stage(s3, rec, state):
         L.add_file(path)
     # These metadata customs are sampler inputs. Replay uses the pinned TRO
     # and the original native snapshot's own customs/tolerance definitions.
+    if not replay:
+        register_exact_template_customs_inputs(env, OFH)
     customs_inputs = [] if replay else template_customs_inputs(env, OFH)
     camera_inputs = camera_context_inputs(env, OFH)
     for dependency in customs_inputs + camera_inputs:

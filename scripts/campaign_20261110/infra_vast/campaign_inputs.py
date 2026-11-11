@@ -160,6 +160,71 @@ def require(value, message):
         raise ValueError(message)
 
 
+def register_exact_template_customs_inputs(env, root):
+    """Extend an existing frozen-source receipt for an exact ready standard source.
+
+    This staging preflight never authorizes a new external file or changes a
+    source. It joins a newly authored config to already approved immutable
+    customs bytes; the ordinary reader still verifies both hashes afterwards.
+    """
+    if not env.get('ISPATIALGYM_CAMPAIGN_CONFIG') or not env.get('TEMPLATE'):
+        return None
+    from scripts.campaign_20261110.contracts import ObjectRef, Template, write_json_atomic
+    from scripts.campaign_20261110.storage import atomic_directory_lock
+    root = Path(root).resolve()
+    config_path = Path(env['ISPATIALGYM_CAMPAIGN_CONFIG']).resolve()
+    require(config_path.is_relative_to(root), 'customs preflight config outside campaign')
+    cfg = json.loads(config_path.read_text())
+    if cfg.get('purpose') != 'validation' or cfg.get('split') != 'eval_standard':
+        return None
+    require(cfg.get('campaign_id') == 'campaign_20261110', 'customs preflight campaign differs')
+    template = Path(env['TEMPLATE']).resolve()
+    metadata_path = template/'template_meta.json'
+    metadata = json.loads(metadata_path.read_text())
+    candidates = [metadata.get('customs'), str(template.parent.parent/'task_custom_lists.json')]
+    external = [Path(v).resolve() for v in candidates if v and Path(v).is_file() and not Path(v).resolve().is_relative_to(root)]
+    if not external:
+        return None
+    receipt = root/'manifests/external_template_customs_inputs.json'
+    require(receipt.is_file(), 'template customs dependency outside owned campaign')
+    existing = json.loads(receipt.read_text())
+    if all(existing.get('sources', {}).get(str(p), {}).get('templates', {}).get(str(template)) == sha(metadata_path) for p in external):
+        return []
+    raw = cfg['template']
+    template_contract = Template(**{**raw, 'objects': tuple(ObjectRef(**x) for x in raw['objects'])})
+    setup = template_contract.scene_setup
+    require(Path(setup['source_template']).resolve() == template, 'customs preflight source template differs')
+    require(sha(template/'template.json') == setup['source_template_sha256'], 'customs preflight template bytes changed')
+    require(sha((template/metadata['activity_definition']).resolve()) == setup['source_bddl_sha256'] == metadata['bddl_sha256'],
+            'customs preflight source BDDL changed')
+    with atomic_directory_lock(root/'manifests/.external_template_customs_inputs.lock'):
+        approved = json.loads(receipt.read_text())
+        require(approved.get('schema') == 'isg-exact-external-template-customs-v1' and
+                approved.get('campaign_id') == 'campaign_20261110', 'external customs receipt identity differs')
+        added = []
+        for path in external:
+            source = approved.get('sources', {}).get(str(path))
+            require(isinstance(source, dict) and source.get('sha256') == sha(path),
+                    'customs preflight requires previously frozen external source bytes')
+            selected = json.loads(path.read_text())
+            require(isinstance(selected, dict) and metadata.get('variant') in selected,
+                    'customs preflight selected variant absent')
+            old = source.setdefault('templates', {}).get(str(template))
+            require(old in (None, sha(metadata_path)), 'customs preflight recorded template metadata changed')
+            if old is None:
+                source['templates'][str(template)] = sha(metadata_path)
+                added.append({'source': str(path), 'source_sha256': source['sha256'],
+                              'template': str(template), 'template_metadata_sha256': sha(metadata_path),
+                              'config': str(config_path), 'config_sha256': sha(config_path),
+                              'template_sha256': sha(template/'template.json'),
+                              'source_bddl_sha256': setup['source_bddl_sha256'],
+                              'validation_key': cfg['validation_key']})
+        if added:
+            approved.setdefault('automatic_exact_source_joins', []).extend(added)
+            write_json_atomic(receipt, approved)
+        return added
+
+
 def template_customs_inputs(env, root):
     """Retain the template's original customs file across runtime revisions.
 
