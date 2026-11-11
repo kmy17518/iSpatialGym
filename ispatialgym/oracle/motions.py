@@ -2322,7 +2322,8 @@ class Motions:
     # ------------------------------------------------------------------ base
 
     def _base_reference(self, waypoints: Sequence[Any], v_lin: float, v_ang: float, a_max: Optional[float] = None, style: Optional[str] = None,
-                        corner_stop: bool = False, face_travel_cfg: Optional[Dict[str, float]] = None) -> th.Tensor:
+                        corner_stop: bool = False, face_travel_cfg: Optional[Dict[str, float]] = None,
+                        deceleration: Optional[float] = None) -> th.Tensor:
         """Time-parameterise the polyline current pose → waypoints.
 
         ``style = "face_travel"`` (owner 2026-09-22, camera relocalization): the shared ``robot.base_path`` schedule —
@@ -2343,8 +2344,12 @@ class Motions:
         obstacle; 25 cm off after a 90° turn). ``corner_stop`` (owner 2026-10-13, an axis-aligned leg: forward / backward
         or left / right moves one after the other): zero speed at every interior waypoint, held ``corner_dwell_s``."""
         a_max = float(self.cfg.base_tracker.a_max[0] if a_max is None else a_max)
+        if deceleration is not None and (not math.isfinite(float(deceleration)) or float(deceleration) <= 0):
+            raise SkillError("execution", "recorded-path deceleration must be finite and positive")
         pts = [self.base_pose2d()] + [as_pose2d(w) for w in waypoints]
         if style == BP.FACE_TRAVEL:
+            if deceleration is not None:
+                raise SkillError("execution", "reference deceleration override requires recorded path style")
             if corner_stop:
                 raise SkillError("execution", "track_path: corner_stop drives the recorded polyline, not the face_travel schedule")
             path = BP.BasePath.build(pts, BP.config_with(face_travel_cfg, self.cfg.face_travel))
@@ -2408,6 +2413,10 @@ class Motions:
         v = v_max_at.clone()
         v[0] = min(float(v[0]), 0.05)  # start from (nearly) rest
         a_dec = min(a_max, float(self.cfg.corner_stop_decel)) if corner_stop else a_max
+        if deceleration is not None:
+            # Reference braking only: preserve the polyline, cruise speed,
+            # tracker acceleration limits and native collision checks.
+            a_dec = min(a_dec, float(deceleration))
         for j in range(1, len(grid)):
             v[j] = min(float(v[j]), math.sqrt(float(v[j - 1]) ** 2 + 2.0 * a_max * (grid[j] - grid[j - 1])))
         for j in range(len(grid) - 2, -1, -1):
@@ -2467,7 +2476,7 @@ class Motions:
 
     def track_path(self, waypoints: Sequence[Any], posture: Optional[str] = None, tracker_cfg: Optional[BaseTrackerConfig] = None,
                    style: Optional[str] = None, corner_stop: bool = False, on_step: Optional[Callable[[], bool]] = None,
-                   face_travel_cfg: Optional[Dict[str, float]] = None) -> Iterator[th.Tensor]:
+                   face_travel_cfg: Optional[Dict[str, float]] = None, deceleration: Optional[float] = None) -> Iterator[th.Tensor]:
         """Follow a recorded ``[x, y, yaw]`` waypoint list with the joystick-like tracker (feed-forward + pose
         feedback, velocity / acceleration limited, smoothed; translation and rotation simultaneous). ``posture`` is the
         recorded navigation posture (informational: Layer 1 changes no posture). ``style`` (``Navigate.style``): the
@@ -2484,7 +2493,8 @@ class Motions:
         v_lin = self.cfg.path_speed_fraction * min(cfg.v_max[0], cfg.v_max[1])
         v_ang = self.cfg.path_speed_fraction * cfg.v_max[2]
         ref = self._base_reference(waypoints, v_lin, v_ang, a_max=min(cfg.a_max[0], cfg.a_max[1]), style=style, corner_stop=corner_stop,
-                                   **({"face_travel_cfg": face_travel_cfg} if face_travel_cfg else {}))
+                                   **({"face_travel_cfg": face_travel_cfg} if face_travel_cfg else {}),
+                                   **({"deceleration": deceleration} if deceleration is not None else {}))
         tracker = PathTracker(ref, self.dt, cfg, max_lag=self.cfg.path_max_lag)
         self.tracker = tracker
         try:
