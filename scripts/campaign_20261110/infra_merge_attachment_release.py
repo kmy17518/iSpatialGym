@@ -63,11 +63,16 @@ def merge(root, previous, admission, destination):
         partner = row['partner']
         assert all(spec.data['partner'][key] == partner[key] for key in ('category', 'model', 'scale'))
         for record in row['maps']:
-            mapped = AM.AttachMap.find(str(destination / 'maps' / row['entry']), .7588,
+            # Older held releases declare the fixed .7588 m right-arm surface.
+            # New exact native admissions carry their measured surface and arm.
+            height = float(record.get('height', .7588))
+            arm = record.get('arm', 'right')
+            assert np.isfinite(height) and height > 0 and arm in ('left', 'right')
+            mapped = AM.AttachMap.find(str(destination / 'maps' / row['entry']), height,
                 partner=(partner['category'], partner['model'], partner['scale']), rest_id=G.v2_rest_id(lib),
-                object_key=lib.identity_key(), arm='right', hover=AM.oracle_hover_params(record['rule']),
+                object_key=lib.identity_key(), arm=arm, hover=AM.oracle_hover_params(record['rule']),
                 pre_back_m=defaults_for('configuration_matching-attachment')['pre_attach_back_m'],
-                policy_key=CP.DEFAULT.key('right'), robot=RM.robot_digest())
+                policy_key=CP.DEFAULT.key(arm), robot=RM.robot_digest())
             assert mapped and sha(mapped.path) == record['sha256']
             assert mapped.meta['spec']['digest'] == spec.digest() and mapped.meta['male']['entry'] == row['entry']
             assert np.isfinite(mapped.cells).all() and np.isfinite(mapped.yaws).all()
@@ -76,7 +81,7 @@ def merge(root, previous, admission, destination):
             positive = sum(int((v == AM.STATUS['feasible']).sum()) for v in values)
             assert positive == record['positive_cells'] and positive > 0
             checked.append({'class_id': row['class_id'], 'entry': row['entry'], 'rule': record['rule'],
-                            'map': mapped.path, 'positive_cells': positive})
+                            'map': mapped.path, 'positive_cells': positive, 'height': height, 'arm': arm})
     audit_name = 'attachment_reader_audit_' + token + '.json'
     audit = {'native_reader_errors': 0, 'checked': checked, 'source_permissions_unchanged': True,
              'task_geometry_demo_replay_still_required': True}
