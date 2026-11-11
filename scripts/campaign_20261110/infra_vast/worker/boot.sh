@@ -56,18 +56,26 @@ if ! $S5 cp "$ISG_S3/bundle/boot_policy.json" "$POLICY" >/dev/null 2>&1; then
   heartbeat recovery_blocked "private boot policy unavailable"
   sleep infinity
 fi
-if ! mode=$(python3 "$RUN/recovery.py" mode "$POLICY" "$ISG_INSTANCE"); then
+CONTROL=/work/campaign_boot_control.txt
+if ! $S5 cp "$ISG_S3/bundle/boot_control.txt" "$CONTROL" >/dev/null 2>&1; then
+  upload_logs
+  heartbeat recovery_blocked "private boot control unavailable"
+  sleep infinity
+fi
+if ! mode=$(bash "$RUN/boot_mode.sh" "$CONTROL" "$ISG_INSTANCE"); then
+  upload_logs
   heartbeat recovery_blocked "invalid private boot policy"
   sleep infinity
 fi
 if [[ "$mode" == recover ]]; then
   heartbeat recovery "archive existing stopped training outputs only"
-  if timeout 1200 python3 "$RUN/recovery.py" recover "$POLICY" "$ISG_INSTANCE"; then
+  if timeout 1200 "$ENVP/bin/python" "$RUN/recovery.py" recover "$POLICY" "$ISG_INSTANCE" > "$LOG/recovery.log" 2>&1; then
+    upload_logs
     heartbeat recovery_complete "awaiting cluster archive verification"
   else
+    upload_logs
     heartbeat recovery_blocked "archive failed; disk preserved"
   fi
-  upload_logs
   sleep infinity
 fi
 heartbeat boot

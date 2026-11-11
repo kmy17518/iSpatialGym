@@ -52,3 +52,15 @@ def test_archive_preserves_native_and_logs_without_decrypted_assets(tmp_path,mon
     report=json.loads((tmp_path/'recovery/1/report.json').read_text())
     assert report['collection_started'] is False and report['jobs'][0]['archive_sha256']==r.digest(archive)
     assert len(uploads)==2
+
+
+def test_shell_boot_routing_needs_no_python_and_fails_closed(tmp_path):
+    import subprocess
+    from pathlib import Path
+    route=Path(__file__).resolve().parents[1]/'infra_vast/worker/boot_mode.sh'
+    p=tmp_path/'control.txt';p.write_text(SCHEMA+' campaign_20261110\n123 recover\n')
+    def run(iid):return subprocess.run(['/bin/bash',str(route),str(p),iid],capture_output=True,text=True)
+    assert run('123').stdout.strip()=='recover'
+    assert run('124').stdout.strip()=='normal'
+    p.write_text('wrong campaign_20261110\n123 recover\n');assert run('123').returncode!=0
+    p.write_text(SCHEMA+' campaign_20261110\n123 unknown\n');assert run('123').returncode!=0
