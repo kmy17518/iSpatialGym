@@ -50,8 +50,12 @@ def state_proof(proof, state, *, started=False):
 def run(registered, proofs, **kwargs):
     root, path, _, _, _ = registered
     iterator = iter(proofs)
+    capacity_fn = kwargs.pop('capacity_fn', lambda: {
+        'status': 'observed', 'observed_at': time.time(),
+        'accounts_checked': ['minyeong', 'shiyuc'],
+        'account_slots': {'minyeong': 0, 'shiyuc': 8}})
     return owner.recover(path, root, proof_fn=lambda j: next(iterator),
-                         capacity_fn=lambda: {'accounts_checked': ['minyeong', 'shiyuc']}, **kwargs)
+                         capacity_fn=capacity_fn, **kwargs)
 
 
 def test_pending_cancel_activate_exact_owner(registered):
@@ -62,6 +66,41 @@ def test_pending_cancel_activate_exact_owner(registered):
     assert cancelled == ['12345'] and activated == ['900000123']
     assert result['status'] == 'active'
     assert result['capacity']['accounts_checked'] == ['minyeong', 'shiyuc']
+
+
+def test_apparent_capacity_does_not_delay_actual_pending_work(registered):
+    proof = registered[-1]
+    capacity = {'status': 'observed', 'observed_at': time.time(),
+                'accounts_checked': ['minyeong', 'shiyuc'],
+                'account_slots': {'minyeong': 8, 'shiyuc': 8}}
+    cancelled, activated = [], []
+    result = run(registered, [proof, proof, state_proof(proof, 'CANCELLED')],
+                 capacity_fn=lambda: capacity, cancel_fn=cancelled.append,
+                 activate_fn=lambda r, j, s: activated.append(j))
+    assert cancelled == ['12345'] and activated == ['900000123']
+    assert result['capacity_decision']['inventory_admission_mismatch'] is True
+    assert result['capacity_decision']['minimum_pending_seconds'] == 0
+
+
+@pytest.mark.parametrize('change', ['unavailable', 'stale', 'future', 'missing_account', 'missing_slots'])
+def test_unavailable_capacity_observation_blocks_cancel_without_claiming_zero(registered, change):
+    capacity = {'status': 'observed', 'observed_at': time.time(),
+                'accounts_checked': ['minyeong', 'shiyuc'],
+                'account_slots': {'minyeong': 8, 'shiyuc': 8}}
+    if change == 'unavailable':
+        capacity['status'] = 'unavailable'
+    elif change == 'stale':
+        capacity['observed_at'] -= 61
+    elif change == 'future':
+        capacity['observed_at'] += 60
+    elif change == 'missing_account':
+        capacity['accounts_checked'] = ['minyeong']
+    else:
+        capacity['account_slots'].pop('shiyuc')
+    with pytest.raises(ValueError, match='observation'):
+        run(registered, [registered[-1]], capacity_fn=lambda: capacity,
+            cancel_fn=lambda j: pytest.fail('unobserved cancellation'),
+            activate_fn=lambda *a: pytest.fail('unobserved activation'))
 
 
 def test_budget_uses_full_typed_runtime_including_startup(registered):

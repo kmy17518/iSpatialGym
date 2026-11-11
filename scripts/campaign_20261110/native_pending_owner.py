@@ -93,6 +93,33 @@ def funded_scheduler(job, scheduler):
     return {**scheduler, 'TimeLimit': clock}
 
 
+def pending_capacity_decision(capacity, *, now=None):
+    """Validate the observation without mistaking inventory for admission.
+
+    The registered job has already attempted its exact broad primary route.
+    An independently pending allocation may overflow even when inventory
+    suggests room; the secondary route has a separate exact transport proof.
+    """
+    now = time.time() if now is None else now
+    require(capacity.get('status') == 'observed',
+            'two-account capacity observation unavailable; owner must refresh')
+    require(set(capacity.get('accounts_checked', [])) == {'minyeong', 'shiyuc'},
+            'both-account capacity observation required')
+    observed = capacity.get('observed_at')
+    require(isinstance(observed, (int, float)) and 0 <= now-observed <= 60,
+            'two-account capacity observation stale; owner must refresh')
+    slots = capacity.get('account_slots', {})
+    require(set(slots) == {'minyeong', 'shiyuc'}
+            and all(type(v) is int and v >= 0 for v in slots.values()),
+            'capacity observation lacks exact account results')
+    return {'allow_overflow': True,
+            'reason': 'exact_independent_pending_after_cluster_submission',
+            'observed_at': observed, 'apparent_account_slots': slots,
+            'inventory_admission_mismatch': slots['minyeong'] > 0,
+            'secondary_excluded_by_registered_transport_proof': True,
+            'inventory_is_not_admission': True, 'minimum_pending_seconds': 0}
+
+
 def recover(path, root, *, proof_fn=scheduler_proof, capacity_fn=cluster_return_capacity.probe,
             cancel_fn=None, activate_fn=None):
     """One locked cycle; the durable cancellation proof survives any later error."""
@@ -129,8 +156,10 @@ def recover(path, root, *, proof_fn=scheduler_proof, capacity_fn=cluster_return_
                 require(0 <= time.time()-restriction['observed_at'] <= 300,
                         'refresh exact secondary transport observation before cancellation')
                 capacity = capacity_fn()  # Actual two-account scheduler query, never periodic inventory alone.
+                decision = pending_capacity_decision(capacity)
                 budget = overflow_readiness.check(root, funded_scheduler(job, proof['scheduler']))
-                state.update(cancel_requested=True, before=proof, capacity=capacity, budget=budget,
+                state.update(cancel_requested=True, before=proof, capacity=capacity,
+                             capacity_decision=decision, budget=budget,
                              registration=reference(path), observed_at=time.time())
                 native.write(state_path, state)
                 again = proof_fn(row['job_id'])
