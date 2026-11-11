@@ -7,7 +7,7 @@ turned 0.22 rad on the way ended ``symbolic_only`` (i7-floorpush A). The demo QA
 rotations as free in two places (``oracle.executor.Executor.placed_orientation_report``): a cylinder of ``assets/icl/revolution_axes.json``
 modulo rotation about its long axis, and any push-under target modulo the world vertical.
 
-With ``ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC=1`` (default OFF; it flips only in the eval-measure commit, together with A2's
+With ``ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC`` (default ON since lead #100; ``=0`` off; was default OFF; it flips only in the eval-measure commit, together with A2's
 ``ISPATIALGYM_BRIEFCASE_LYING``) one symmetry notion serves both:
 
 * the table: :data:`ROUND_AXES_PATH` (``scripts/symmetry/revolution_axes.py --rule round``) - every model whose ICL ``symmetry`` column
@@ -42,8 +42,9 @@ import torch as th
 log = logging.getLogger(__name__)
 
 SUCCESS_YAW_FREE_ENV = "ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC"
-#: default OFF (owner: ship with another eval-measure change, so scores change once - A2's lying briefcase; one commit flips both)
-SUCCESS_YAW_FREE_DEFAULT = "0"
+#: default ON since lead #100 (owner 2026-11-10: "ship both together" - A4 with the block_design pose tiebreak, one eval-measure
+#: change without A2's lying briefcase, which stays off); "0" restores the pre-change measure
+SUCCESS_YAW_FREE_DEFAULT = "1"
 _ON = ("1", "true", "yes", "on")
 
 _ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")

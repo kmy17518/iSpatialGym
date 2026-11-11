@@ -17,8 +17,10 @@ from ispatialgym.sampling.v2.tasks import iors_large as IL
 # ------------------------------------------------------------------ A4: the round-axis table and the success measure
 
 
-def test_yaw_free_switch_default_off(monkeypatch):
+def test_yaw_free_switch_default_on(monkeypatch):
     monkeypatch.delenv(RS.SUCCESS_YAW_FREE_ENV, raising=False)
+    assert RS.yaw_free_on()  # default on since lead #100
+    monkeypatch.setenv(RS.SUCCESS_YAW_FREE_ENV, "0")
     assert not RS.yaw_free_on()
     monkeypatch.setenv(RS.SUCCESS_YAW_FREE_ENV, "1")
     assert RS.yaw_free_on()
@@ -57,7 +59,7 @@ def test_apply_yaw_free_frees_the_spin_only(monkeypatch):
     meta = SimpleNamespace(pose_targets={"ashcan.n.01_1": _target(goal), "box.n.01_1": _target(goal)})
     scope = {"ashcan.n.01_1": SimpleNamespace(category="trash_can", model="jlawet", name="target_trash_can_jlawet_0"),
              "box.n.01_1": SimpleNamespace(category="briefcase", model="lwbctq", name="briefcase_lwbctq_0")}
-    monkeypatch.delenv(RS.SUCCESS_YAW_FREE_ENV, raising=False)
+    monkeypatch.setenv(RS.SUCCESS_YAW_FREE_ENV, "0")
     assert RS.apply_yaw_free(meta, scope) == {}
     assert meta.pose_targets["ashcan.n.01_1"].orientation_equivalences == []
     monkeypatch.setenv(RS.SUCCESS_YAW_FREE_ENV, "1")
