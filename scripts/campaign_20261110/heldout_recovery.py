@@ -15,6 +15,13 @@ SPLITS=('eval_model','eval_category')
 def iso(t):return datetime.fromtimestamp(t,timezone.utc).isoformat() if t else None
 def ref(p):return {'path':str(p),'sha256':file_digest(p)}
 def read(p):return json.loads(pathlib.Path(p).read_text())
+def quota_bucket(task,value,has_buckets):
+    if not has_buckets:return None
+    if task.startswith('camera_relocalization-'):
+        require(str(value) in ('3','5','10'),'unknown native camera radius bucket')
+        return ('3','5','10').index(str(value))
+    require(isinstance(value,int) and not isinstance(value,bool),'unknown native evaluation bucket')
+    return value
 def targets(catalog):
     quotas={q.task:q for q in task_quotas()};require(len(catalog)==100 and Counter(catalog.values())==Counter({q.task:q.standard_classes for q in quotas.values()}),'incomplete canonical inventory')
     rows=[]
@@ -62,7 +69,7 @@ def publish(root):
     accepted,groups,snapshot_sources=snapshot(root);ledger,lref=read_ledger(root);eligible,_=assess(root,accepted,groups,ledger);counts=Counter();rawcounts=Counter();last=defaultdict(float)
     quotas={q.task:q for q in task_quotas()}
     for r in accepted:
-        task=r['task'];split=r['split'];q=quotas[task];bucket=r.get('bucket')if(getattr(q,'model_buckets'if split=='eval_model'else'category_buckets'))else None
+        task=r['task'];split=r['split'];q=quotas[task];bucket=quota_bucket(task,r.get('bucket'),getattr(q,'model_buckets'if split=='eval_model'else'category_buckets'))
         cls=r.get('class_id')or r.get('contract',{}).get('class_id')or task;scope=cls if split=='eval_model'else task;key=(split,scope,bucket);rawcounts[key]+=1
         if eligible[r['instance_id']]['quota_eligible']:counts[key]+=1
         p=root/'dataset/groups'/(r.get('group_id','')+'.json')
