@@ -121,7 +121,7 @@ def return_report(output):
         stream=json.loads(stream_path.read_text())
         if stream.get('campaign_id')=='campaign_20261110':
             lines += ['','INDEPENDENT TRAINING VALIDATION STREAM', 'Observed: '+chicago(stream.get('observed_at')),
-                'Standalone production and new generation canaries held until100/100 canonical validation. Dependency preparation may continue. After100/100, shared pipeline, applicable path, exact proof and diversity capacity remain required.',
+                'Bulk standalone production remains held until100/100 canonical validation plus shared pipeline, applicable path and exact proof. Bounded end-to-end canaries, augmentation/batched replay/render restoration and exact dependency preparation may proceed independently. Canonical and held-out eval retain priority; canaries must not become production.',
                 *[key+': '+str(row.get('annotated_status',row.get('status')))+'; '+str(row.get('annotated_error',row.get('reason',''))) for key,row in stream.get('records',{}).items()]]
     canonical_path=output/'canonical_validation.json'
     if canonical_path.exists():
