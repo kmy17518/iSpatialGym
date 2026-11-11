@@ -78,3 +78,20 @@ def positive_rest_arms(context, states, row, *, other_arm):
                if arm == context['target_board'] or other_arm]
     _require(bool(options), 'fixed shelf compartment has no permitted mapped arm')
     return options
+
+
+def target_depth_proposal(context, rng):
+    """Propose only the movable book's start depth near its proven source.
+
+    Partner, compartment, row and goal remain fixed. The native shelf ray,
+    support, full-object frame, grasp, carry and settled checks judge the draw.
+    This does not move a final goal or change a tolerance.
+    """
+    depth = context['spine_behind_edge_m']
+    _require(type(depth) in (int, float) and math.isfinite(depth) and 0 <= depth <= .5,
+             'invalid source shelf depth')
+    lo, hi = max(0., depth - .03), min(.5, depth + .03)
+    value = float(rng.uniform(lo, hi))
+    _require(math.isfinite(value) and lo <= value <= hi, 'invalid target shelf depth proposal')
+    return value, {'source_depth_m': depth, 'interval_m': [lo, hi], 'target_depth_m': value,
+                   'partner_depth_unchanged': True, 'goal_unchanged': True}

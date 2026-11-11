@@ -203,3 +203,14 @@ def test_touching_protected_carry_requires_exact_class_policy(monkeypatch):
     template.class_id='inter_object_relation_satisfaction-touching_03'
     with pytest.raises(ContractError,match='another audited class'):
         EX.protected_carry_recovery_wanted()
+
+
+def test_shelf_depth_proposal_is_hash_bound_to_only_touching03(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG', raising=False)
+    assert not CR.contact_recovery('shelf_target_depth_draw')
+    template=bind(monkeypatch,'inter_object_relation_satisfaction-touching_03',
+        'inter_object_relation_satisfaction-touching_small_scale',{'shelf_target_depth_draw':True})
+    assert CR.contact_recovery('shelf_target_depth_draw')
+    template.class_id='inter_object_relation_satisfaction-touching_04'
+    with pytest.raises(ContractError,match='another audited class'):
+        CR.contact_recovery('shelf_target_depth_draw')

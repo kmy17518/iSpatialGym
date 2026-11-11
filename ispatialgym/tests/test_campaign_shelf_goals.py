@@ -105,3 +105,49 @@ def test_failed_visibility_never_reserves_a_shelf_member(monkeypatch):
     s.check_goal_occlusion(d,'screened')
     assert s._campaign_group_written==1
     assert s._campaign_written_shelf_starts[p.sha256]==[(p.release,'side1')]
+
+
+def test_target_depth_proposal_is_bounded_and_does_not_mutate_goal_context():
+    from copy import deepcopy
+    from types import SimpleNamespace
+    from ispatialgym.sampling.campaign_shelf_goals import target_depth_proposal
+    context = {'spine_behind_edge_m': .06, 'partner_pose': [1, 2, 3], 'goal': [4, 5, 6]}
+    original = deepcopy(context)
+    depth, facts = target_depth_proposal(context, SimpleNamespace(uniform=lambda lo, hi: hi))
+    assert depth == .09 and facts['interval_m'] == [.03, .09]
+    assert facts['partner_depth_unchanged'] and facts['goal_unchanged']
+    assert context == original
+    for value in (-.01, float('nan'), .51, True):
+        with pytest.raises(GoalPlanError, match='source shelf depth'):
+            target_depth_proposal({'spine_behind_edge_m': value}, None)
+
+
+def test_depth_draw_changes_only_target_start_preserving_partner_check(monkeypatch):
+    ctx = context()
+    p = replace(plan('touching'), shelf_tip_context=ctx)
+    calls = []
+    target_hull, partner_hull = object(), object()
+    def lean_pose(s, hull, rest, *args, spine_behind=None, **kwargs):
+        calls.append(('target' if hull is target_hull else 'partner', spine_behind))
+        value = ((0., float(spine_behind), .7), p.partner[1]) if hull is target_hull else p.partner
+        return tuple(th.tensor(v) for v in value), {'position':list(value[0])}
+    s = SimpleNamespace(_campaign_pair_active=p, _shelf_template={'key':'key', 'lean_deg':20.},
+        shelf_start={'lean_side':1.}, _shelf_side_layouts=[(0.,1.)], _shelf_draw={'layout':[0.,'left']},
+        edge=SimpleNamespace(name=ctx['edge_name']), support=SimpleNamespace(name='bookcase'), top=None,
+        hull={'target':target_hull,'partner':partner_hull}, rest={}, segment_arms=['left'],
+        shelf_start_draw=lambda:{'tries':1,'lean_deg':None,'spine_behind_edge_m':None},
+        gen=lambda key, default=None:default, tol=lambda key,default:default,
+        shelf_rests=lambda *args:(th.tensor([0.,0.,0.,1.]),th.tensor([0.,0.,0.,1.])),
+        world=SimpleNamespace(hull_at=lambda *args:None), gp=SimpleNamespace(variant='test'))
+    monkeypatch.setattr(I.TT,'shelf_lean_pose',lean_pose)
+    monkeypatch.setattr(I.TT,'lean_rest_side',lambda *a:1.)
+    monkeypatch.setattr(I,'shelf_free_span',lambda *a:.2)
+    monkeypatch.setattr(I,'shelf_span_rule_on',lambda:False)
+    monkeypatch.setattr(I,'merge_shelf_pose_facts',lambda *a:None)
+    from ispatialgym.sampling import campaign_runtime
+    monkeypatch.setattr(campaign_runtime,'contact_recovery',lambda name:name=='shelf_target_depth_draw')
+    I.IORSSmall.draw_shelf_layout(s,SimpleNamespace(uniform=lambda lo,hi:hi))
+    assert calls == [('target',.09),('partner',.09),('partner',.06)]
+    assert s.shelf_pose[0][1] == pytest.approx(.09)
+    assert s.shelf_partner_pose[0].tolist() == pytest.approx(p.partner[0])
+    assert s._shelf_draw['target_depth_proposal']['source_depth_m'] == .06

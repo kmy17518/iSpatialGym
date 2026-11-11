@@ -4668,8 +4668,13 @@ class IORSSmall(SamplerV2):
             if TT.lean_rest_side(getattr(self, "grasp_key", None)) is not None:  # i7-lean: the v2 lean rest's own angle (the partner's lean is still drawn)
                 lean_t = float(base["lean_deg"])
             spine = float(rng.uniform(*spec["spine_behind_edge_m"])) if spec["spine_behind_edge_m"] else None
+            depth_proposal = None
             if ctx is not None:
+                from ispatialgym.sampling import campaign_runtime
                 lean_p = ctx['partner_lean_deg']
+                if campaign_runtime.contact_recovery('shelf_target_depth_draw'):
+                    from ispatialgym.sampling.campaign_shelf_goals import target_depth_proposal
+                    spine, depth_proposal = target_depth_proposal(ctx, rng)
             rest_t, rest_p = self.shelf_rests(side, lean_t, lean_p)
             label = f"bay {bay:+.2f} {TT.side_name(side)} board, leans {lean_t:.1f} / {lean_p:.1f} deg" + ("" if spine is None else f", spine {spine:.3f} m")
             try:
@@ -4710,6 +4715,8 @@ class IORSSmall(SamplerV2):
             self.shelf_start = start
             self.rest["target"], self.rest["partner"] = rest_t, rest_p
             self.shelf_pose, self.shelf_partner_pose = t_pose, p_pose
+            if depth_proposal is not None:
+                self._shelf_draw['target_depth_proposal'] = depth_proposal
             self._shelf_draw.update({"bay_m": round(bay, 4), "target_board": TT.side_name(side), "target_lean_deg": round(lean_t, 2), "partner_lean_deg": round(lean_p, 2),
                                      "spine_behind_edge_m": start["spine_behind_edge_m"], "target_position": tf.get("position"), "partner_position": pf.get("position"),
                                      "wall_lateral_m": [tf.get("wall_lateral_m"), pf.get("wall_lateral_m")], "free_span_m": round(free, 4), "tries": k + 1,

@@ -107,6 +107,8 @@ def contact_recovery(option: str) -> bool:
                              'inter_object_relation_satisfaction-touching_small_scale'),
         'shelf_other_arm': ('inter_object_relation_satisfaction-touching_03',
                             'inter_object_relation_satisfaction-touching_small_scale'),
+        'shelf_target_depth_draw': ('inter_object_relation_satisfaction-touching_03',
+                                   'inter_object_relation_satisfaction-touching_small_scale'),
         'marker_gentle_pinch': ('inter_object_relation_satisfaction-nextto_01',
                                 'inter_object_relation_satisfaction-nextto_small_scale'),
     }
