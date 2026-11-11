@@ -357,10 +357,6 @@ def stage(s3, rec, state):
     shipped = [code, b1k] + list(STORES) + list(CACHES) + list(NOT_SHIPPED)
     L = Lister(shipped)
     L.add_tree(jd)
-    if exact_ik:
-        manifest = json.loads(Path(exact_ik['manifest_path']).read_text())
-        for reference in manifest['provenance']['robot_refs'].values():
-            L.add_file(reference['path'])
     if replay:
         sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
         from scripts.campaign_20261110.vast_replay import transport_inputs, sha as replay_sha
