@@ -46,6 +46,20 @@ class ReadOnlyDashboardTests(unittest.TestCase):
     def hashes(self):
         return {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in self.root.rglob('*') if p.is_file()}
 
+    def test_capacity_ledger_is_read_only_and_campaign_scoped(self):
+        value={'campaign_id':'campaign_20261110','observed_at':123,
+               'unused_capacity_blockers':[{'owner':'root','missing_input':'exact native map','next_action':'audit'}]}
+        self.write('dashboard/capacity_recovery.json',value)
+        before=self.hashes()
+        data=snapshot(self.root,self.root/'inventory')
+        self.assertEqual(data['capacity_recovery'],value)
+        self.assertEqual(self.request('GET','/reports/capacity-recovery')[0],200)
+        self.assertEqual(self.hashes(),before)
+        value['campaign_id']='previous_campaign'
+        self.write('dashboard/capacity_recovery.json',value)
+        self.assertEqual(snapshot(self.root,self.root/'inventory')['capacity_recovery'],{})
+        self.assertNotEqual(self.request('GET','/reports/capacity-recovery')[0],200)
+
     def test_reads_preserve_all_monitoring_files_and_counts(self):
         before = self.hashes()
         for _ in range(3):
