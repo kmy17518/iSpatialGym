@@ -16,7 +16,7 @@ from scripts.campaign_20261110.group_lane import check_reservations
 from scripts.campaign_20261110.reservation_policy import active_policy
 
 
-def make_pool(template, definition, *, maximum=48, provenance=None, extra_candidates=()):
+def make_pool(template, definition, *, maximum=48, provenance=None, extra_candidates=(), mandatory_rebinding=None):
     require(template.task == 'disembedding' and template.split == 'eval_standard', 'standard disembedding source required')
     require(type(maximum) is int and 1 <= maximum <= 48, 'invalid finite pool maximum')
     roles = definition['roles']
@@ -38,7 +38,17 @@ def make_pool(template, definition, *, maximum=48, provenance=None, extra_candid
         declared = roles[declared_role]['category']
         declared = {declared} if isinstance(declared, str) else set(declared)
         actual = {obj.category for obj in choices.values() if obj.role == role}
-        require(actual == declared, 'ready contract does not cover the complete declared ' + role + ' category pool')
+        if role == 'distractor' and mandatory_rebinding is not None:
+            policy = mandatory_rebinding
+            require(policy.get('key') == template.class_id and policy.get('action') == 'restrict_distractor_models',
+                    'mandatory distractor policy has the wrong class or action')
+            models = {obj.category+'/'+obj.model for obj in choices.values() if obj.role == role}
+            removed = set(policy['remove'])
+            require(models == set(policy['to']) and not models & removed, 'eligible models differ from mandatory restriction')
+            require(actual <= declared and declared-actual <= {model.split('/')[0] for model in removed},
+                    'mandatory restriction does not explain omitted declared categories')
+        else:
+            require(actual == declared, 'ready contract does not cover the complete declared ' + role + ' category pool')
     counts = Counter(selection.values())
     n_distractors = sum(obj.role == 'distractor' for obj in template.objects)
     require(1 <= n_distractors <= maximum, 'active distractors exceed finite maximum')
@@ -79,10 +89,21 @@ def main():
              'reservation_policy_sha256': active[0]['policy_sha256'],
              'geometry_models_counts_and_definition_unchanged': True,
              'scope': 'All models in the ready standard contract; every declared target/distractor category covered; finite copy maximum'}
+    restrictions = [row for row in active[1].get('mandatory_standard_rebindings', [])
+                    if row.get('key') == template.class_id and row.get('action') == 'restrict_distractor_models']
+    require(len(restrictions) <= 1, 'ambiguous mandatory standard pool restriction')
+    restriction = restrictions[0] if restrictions else None
+    if restriction:
+        require(set(restriction['remove']) <= set(active[1]['train_exclude_models']),
+                'mandatory omitted models are not globally reserved')
+        proof['mandatory_standard_rebinding'] = restriction
+        proof['reservation_manifest'] = active[0]['reservations']
+        proof['scope'] = 'Complete eligible ready pool under the exact active mandatory standard restriction; declared task categories and selected native objects unchanged.'
     if a.pool_candidates:
         proof['extra_candidates'] = {'path': str(a.pool_candidates.resolve()), 'sha256': file_digest(a.pool_candidates)}
         proof['scope'] = 'All active ready models and hash-pinned extra ready candidates; full declared category coverage; inactive extras do not change native bindings.'
-    pool, selection = make_pool(template, customs[alias], maximum=a.max_distractors, provenance=proof, extra_candidates=extras)
+    pool, selection = make_pool(template, customs[alias], maximum=a.max_distractors, provenance=proof,
+                                extra_candidates=extras, mandatory_rebinding=restriction)
     check_reservations(pool.audit_template(), active[1], active[2])
     out.mkdir(parents=True)
     # Legacy standard contracts named only source_alias. Explicit template

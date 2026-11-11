@@ -47,3 +47,20 @@ def test_inactive_ready_candidate_completes_pool_without_changing_active_objects
     definition['generation'] = {'fixed_layout': {'enabled': True}}
     with pytest.raises(c.ContractError, match='fixed-layout pools'):
         make_pool(original, definition, extra_candidates=(extra,))
+
+
+def test_exact_mandatory_reservation_subset_preserves_declared_pool_and_active_selection():
+    template = source()
+    definition = {'roles': {'target': {'category': 'apple'}, 'distractors': {'category': ['shampoo', 'tissue', 'soy_bottle']}}}
+    models = [o.category+'/'+o.model for o in template.objects if o.role == 'distractor']
+    policy = {'key': template.class_id, 'action': 'restrict_distractor_models', 'to': models,
+              'remove': ['soy_bottle/heldout']}
+    maximum, selection = make_pool(template, definition, mandatory_rebinding=policy)
+    assert len(maximum.candidates) == 3 and len(selection) == 3
+    assert definition['roles']['distractors']['category'] == ['shampoo', 'tissue', 'soy_bottle']
+    with pytest.raises(c.ContractError, match='wrong class'):
+        make_pool(template, definition, mandatory_rebinding={**policy, 'key': 'another_class'})
+    with pytest.raises(c.ContractError, match='eligible models differ'):
+        make_pool(template, definition, mandatory_rebinding={**policy, 'to': models[:1]})
+    with pytest.raises(c.ContractError, match='does not explain'):
+        make_pool(template, definition, mandatory_rebinding={**policy, 'remove': ['other_category/heldout']})
