@@ -70,6 +70,9 @@ def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,
     suffix=Path(original_output.removeprefix('${CAMPAIGN_OUT}/')).parts
     require('..' not in suffix and tuple(output.parts[-len(suffix):])==suffix,'native output identity differs from source entry')
     job=root/'out/vast_native_dependency'/token;require(not job.exists(),'dependency token already exists');job.mkdir(parents=True)
+    # The existing private worker streamer watches this name while native
+    # evidence stays in the isolated result directory.
+    (job/'sample.log').symlink_to('result/sample.log')
     roots=[]
     for flag in ('--customs','--bddl-root'):
         roots.append(Path(argv[argv.index(flag)+1]))

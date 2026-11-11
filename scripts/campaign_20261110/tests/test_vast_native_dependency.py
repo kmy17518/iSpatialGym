@@ -32,6 +32,7 @@ def test_native_source_and_reserved_index_are_preserved_and_queue_stays_inactive
     job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
     assert all(Path(name).read_bytes()==body for name,body in before.items())
     value=native.verify(job,tmp_path)
+    assert (job/'sample.log').is_symlink() and (job/'sample.log').readlink()==Path('result/sample.log')
     assert value['argv'][-4:]==['--start-index','50108200','--time-budget-s','1800']
     assert str(tmp_path/'proofs/handles.json') in value['files']
     jid=native.enqueue(job,tmp_path);assert native.enqueue(job,tmp_path)==jid
