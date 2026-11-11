@@ -123,7 +123,9 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     base_push = raw.get("base_push")
     placement_mode = raw.get("placement_mode")
     release_policy = raw.get("release_policy", "fixed")
-    _require(release_policy == "fixed" or (release_policy == "native_grasp_height" and scale == "small" and relation == "inside"),
+    _require(release_policy == "fixed" or (scale == "small" and
+             ((release_policy == "native_grasp_height" and relation == "inside") or
+              (release_policy == "native_raised_height" and relation == "nextto"))),
              "unsupported pair release policy")
     if placement_mode is not None:
         _require(scale == "large" and relation in ("touching", "under") and placement_mode in ("surface", "drop_push") and base_push is None

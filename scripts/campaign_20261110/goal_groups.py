@@ -487,6 +487,11 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
         if relation == "inside" and scale == "small":
             plan["release_policy"] = "native_grasp_height"
+        if relation == 'nextto' and scale == 'small' and template.class_id == 'inter_object_relation_satisfaction-nextto_03':
+            proof = anchor['sources']['summary']
+            require(file_digest(proof['path']) == proof['sha256'], 'raised-release source summary changed after audit')
+            require(anchor['summary'].get('raised_release') is not None, 'nextto03 source lacks native raised-release evidence')
+            plan['release_policy'] = 'native_raised_height'
         from ispatialgym.sampling.campaign_tabletop_starts import source_stance_hint_enabled
         if source_stance_hint_enabled(relation, scale, template.class_id):
             source_stance = anchor['summary'].get('manipulation_stance')
