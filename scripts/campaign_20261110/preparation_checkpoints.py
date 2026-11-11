@@ -69,6 +69,10 @@ def batch(directory, number, entries, *, maximum=12):
         raise ValueError('batch source indices overlap or are noncontiguous')
     if any(r['source'] != rows[0]['source'] or r['native'] != rows[0]['native'] for r in rows):
         raise ValueError('batch mixes source or native identities')
+    # A caller cannot change the width or source between batches and thereby
+    # make otherwise valid ordinal ranges overlap.
+    immutable_json(Path(directory) / 'batch_policy.json', {
+        'source': rows[0]['source'], 'native': rows[0]['native'], 'maximum': maximum})
     return immutable_json(Path(directory) / 'batches' / f'{number:06d}.json', {
         'schema': 'isg-preparation-batch-v1', 'source': rows[0]['source'],
         'native': rows[0]['native'], 'source_indices': expected, 'entries': entries,

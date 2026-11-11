@@ -44,6 +44,8 @@ def test_batch_is_disjoint_and_rejects_failed_or_changed_entries(tmp_path):
     assert json.loads(Path(ref['path']).read_text())['source_indices'] == [0, 1]
     with pytest.raises(ValueError, match='overlap'):
         p.batch(tmp_path, 1, refs, maximum=2)
+    with pytest.raises(ValueError, match='immutable preparation record differs'):
+        p.batch(tmp_path, 1, [refs[1]], maximum=1)
     failed = checkpoint(tmp_path, 2, status='blocked')
     with pytest.raises(ValueError, match='unverified'):
         p.batch(tmp_path, 1, [failed], maximum=2)
