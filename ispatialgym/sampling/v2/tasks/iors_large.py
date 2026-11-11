@@ -734,6 +734,50 @@ PUSH_GUIDE_HAND_AHEAD_M = (0.49, 0.875)
 PUSH_HEEL_TIGHT_ENV = "ISPATIALGYM_PUSH_HEEL_TIGHT"
 PUSH_HEEL_TIGHT_TOL_DEG = 5.0
 PUSH_HEEL_TIGHT_JITTER_FRAC = 0.8
+# r3 (uh2_ul01_on g360000: 4 written, 2 robot_touching_itself left_arm_link3 / link5 - both LEFT-arm grasps; every OFF demo and every ON
+# success the right arm): the tight window leaves the default (right) arm no kept yaw at the B the coupling starts from - 360002: the right
+# arm's F_init at B (0.75, -0.56) holds 11 yaws, none at the heel-back grid yaw 0 ('kept 0 of 11 yaws' at every C; OFF kept 5.89 there),
+# while the left arm's holds it - and the segment then couples the LEFT arm at that same B before the right arm is tried at the next B
+# (fp_def wrote 360002 with the right arm at yaw 0 from B (0.0, -1.22); 360003 right at yaw 0 in 9 tags). Under the switch the coupling runs
+# the default arm at every B whose F_init holds a kept yaw first, the other arm's couplings after (:func:`heel_tight_couple_plan`; kit
+# ``push_heel_tight.arm_deferred``). And a program whose planned LEFT joint 4 comes within :data:`PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD` of its
+# lower limit is rejected (kit ``push_heel_tight.left_j4_rejected``): over the 23 left-arm under_large_01 demos ($OFH/out, 2026-11-06..10)
+# the 3 robot_touching_itself (ad_int1 300015, uh2 360002 / 360003) planned left j4 -2.0921..-2.0923 (2.1-2.3 mrad from -2.0944, the
+# retreat witness) and touched within 1 step of their executed j4 minimum (-2.079..-2.087); the 20 others planned >= -2.0374 (57 mrad),
+# the 11 ok >= -2.0320 (62 mrad). The right arm plans to -2.094 with 0 robot_touching_itself in 127 demos (the 11-07 hull sweep: right
+# link3-link5 >= 6.9 mm) - not gated. The elbow QA / PhysX switches are not used.
+PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD = 0.03
+
+
+def heel_tight_couple_plan(arms_per_b: Sequence[Sequence[str]], arm0: str, kept) -> Tuple[List[Tuple[int, List[str]]], int]:
+    """i7-ul01reach r3 (:data:`PUSH_HEEL_TIGHT_ENV`): the order of the segment couplings over the B candidates (``arms_per_b[i]``: the arms with
+    pairs at B ``i`` in their coupling order). First ``(i, [arm0])`` for every B whose ``arm0`` has a yaw the heel lock keeps (``kept(i, arm)``),
+    in the B order; then every B again with its arms not yet coupled (in their order, so the segment fallback between them stays). Returns the
+    plan and how many other-arm couplings it put behind a later B's default arm (``push_heel_tight.arm_deferred``)."""
+    first = [i for i, arms in enumerate(arms_per_b) if arm0 in arms and kept(i, arm0)]
+    plan: List[Tuple[int, List[str]]] = [(i, [arm0]) for i in first]
+    deferred = 0
+    for i, arms in enumerate(arms_per_b):
+        rest = [a for a in arms if not (a == arm0 and i in first)]
+        if rest:
+            plan.append((i, rest))
+            deferred += sum(1 for a in rest if a != arm0 and any(j > i for j in first))
+    return plan, deferred
+
+
+def left_j4_margin(witnesses: Sequence[Dict[str, Any]], j: int, lo: float) -> Optional[Tuple[float, str]]:
+    """i7-ul01reach r3: the smallest margin (rad) of joint ``j`` (the 28-D witness q's index of left_arm_joint4) above its lower limit ``lo``
+    over the program check's ``ik_witnesses``, and where (``"<action name><index>.<target>"``); None without a witness q."""
+    best: Optional[Tuple[float, str]] = None
+    for w in witnesses or []:
+        for tn, t in ((w or {}).get("targets") or {}).items():
+            q = t.get("q") if isinstance(t, dict) else None
+            if q is None or len(q) <= j:
+                continue
+            m = float(q[j]) - float(lo)
+            if best is None or m < best[0]:
+                best = (m, f"{w.get('name')}{w.get('action')}.{tn}")
+    return best
 
 
 def push_heel_tight_tol_deg() -> Optional[float]:
@@ -5361,6 +5405,7 @@ class IORSLarge(SamplerV2):
         # C is decided by the init yaw graspable at B - a B whose F_init has no yaw with a large blade contact offset at C (a sandal
         # toe-first: 0.11 m; its strap: 0.03 m, the blade goal then 0.85 m ahead and out of reach, 0920-192539/40) is tried last
         pushable: Dict[int, float] = {}
+        pushable_arm: Dict[Tuple[int, str], float] = {}  # i7-ul01reach r3: the same per arm (heel_tight_couple_plan)
         if self.push_under and pre:
             faces_of: Dict[str, Any] = {}
 
@@ -5382,6 +5427,7 @@ class IORSLarge(SamplerV2):
                         continue
                     best = -1.0
                     for a, (_, F_a) in by_arm.items():
+                        best_a = -1.0
                         if not F_a:
                             continue
                         for c_yaw, pd in _faces(a):
@@ -5391,6 +5437,8 @@ class IORSLarge(SamplerV2):
                                 o = self.push_contact_offset(q, th.as_tensor(pd))
                                 if o is not None and self.push_yaw_kept(q, pd, o):  # generation.push_under_yaw: the yaws it keeps
                                     best = max(best, o)
+                                    best_a = max(best_a, o)
+                        pushable_arm[(idx, a)] = best_a
                     pushable[idx] = best
             _offsets()
             # no pushable B among the first batch: screen more (up to ``b_prescreen_batches`` batches) before coupling blind
@@ -5451,8 +5499,24 @@ class IORSLarge(SamplerV2):
         if sm is not None and self._sm_skipped_b:
             errors.append(f"stance memo: {self._sm_skipped_b} B candidates of the pool skipped (failed in earlier attempts of this instance)")
         a_key = SM.stance_key(init)
-        for i_b, (n_f, manip, F_init, by_arm) in enumerate(pre[:n_couple]):
-            self._check_deadline(f"B candidate {i_b + 1} of {min(n_couple, len(pre))}")
+        couple = [(t, None) for t in pre[:n_couple]]
+        if self.push_under and len(offered) > 1 and self.push_heel_tight() is not None:
+            # i7-ul01reach r3 (ISPATIALGYM_PUSH_HEEL_TIGHT): the default arm at every B with a kept yaw before the other arm's couplings
+            # (uh2_ul01_on 360002 / 360003: the left arm coupled at the first B whose right-arm F_init held no heel-back yaw, then grazed its
+            # elbow); a B the pre-screen did not judge counts as kept
+            arms_b = [self._segment_order(t[1], t[3]) for t in pre[:n_couple]]
+            plan, deferred = heel_tight_couple_plan(arms_b, offered[0], lambda i, a: pushable_arm.get((idx_of[id(pre[i])], a), 0.0) >= 0.0)
+            couple = [(pre[i], arms) for i, arms in plan]
+            if deferred:
+                TT._countn(self, "push_heel_tight.arm_deferred", deferred)
+            log.info("%s: push-under yaw lock heel_first (%s): couplings %s (B trunk -> arms; %d other-arm couplings after a later B's %s arm)", self.gp.variant,
+                     PUSH_HEEL_TIGHT_ENV, [((round(float(t[1].translate), 2), round(float(t[1].tilt), 2)), arms) for t, arms in couple], deferred, offered[0])
+        for i_b, (t_b, arms_b_only) in enumerate(couple):
+            n_f, manip, F_init, by_arm = t_b
+            if arms_b_only is not None:
+                by_arm = {a: by_arm[a] for a in arms_b_only if a in by_arm}
+                F_init = union_feasible({a: F for a, (_, F) in by_arm.items()}, 2.0 * math.pi / max(1, len(yaws)))
+            self._check_deadline(f"B candidate {i_b + 1} of {len(couple)}")
             self.sidecar.transitions.clear()
             self.sidecar.paths.clear()
             b_key = self._sm_b = SM.stance_key(manip)
@@ -7967,7 +8031,25 @@ class IORSLarge(SamplerV2):
         if rec is not None:
             self._ef_agree("preplace", rec.get("preplace"), True)
             self._ef_agree("grasp_tip", rec.get("tip"), True)
+        self.heel_tight_left_j4_check()
         return rep
+
+    def heel_tight_left_j4_check(self) -> None:
+        """i7-ul01reach r3 (:data:`PUSH_HEEL_TIGHT_ENV`, only where the tight heel lock acts): ``Reject("program_check_failed")`` for a
+        program whose planned left_arm_joint4 (the program check's ``ik_witnesses``) comes within :data:`PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD`
+        of its lower limit - the left elbow's link3 / link5 graze (robot_touching_itself) of every such under_large_01 demo."""
+        if self.push_heel_tight() is None:
+            return
+        robot = self.kit.robot
+        j = int(robot.arm_control_idx["left"][3])
+        lo = float(robot.joint_lower_limits[j])
+        got = left_j4_margin(getattr(self.sidecar, "ik_witnesses", None) or [], j, lo)
+        TT._count(self, "push_heel_tight.left_j4_checked")
+        if got is None or got[0] >= PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD:
+            return
+        TT._count(self, "push_heel_tight.left_j4_rejected")
+        raise Reject("program_check_failed", f"left_arm_joint4 planned {lo + got[0]:.4f} rad at {got[1]}, {got[0] * 1000:.1f} mrad from its limit {lo:.4f} "
+                     f"(< {PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD * 1000:.0f} mrad, {PUSH_HEEL_TIGHT_ENV}: the left elbow's link3 / link5 graze)", action="left_j4")
 
     # ------------------------------------------------------------------ goal (§5.6 / §6.12)
 
