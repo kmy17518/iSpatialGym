@@ -407,6 +407,65 @@ def check_pending_record(record, state, cfg, root, queue, save, *, reconcile_onl
         save()
 
 
+def early_saved_pending(root, state, cfg, queue, save):
+    """Check owned queued allocations before source audits or all-ledger I/O."""
+    from scripts.campaign_20261110.controller_saved_allocations import adopt_receipt
+    started = time.time()
+    blocked, observed = set(), []
+    specs = list(cfg.get('seeds', []))
+    if cfg.get('seed_catalog'):
+        specs += read(cfg['seed_catalog']).get('seeds', [])
+    sources = {s['id']: s for s in specs}
+    for sid, current in state.get('seeds', {}).items():
+        for record in current.get('queues', []):
+            if record.get('status') == 'complete' and not record.get('migration_replacement'):
+                continue
+            try:
+                adopted = adopt_receipt(root, record)
+                if adopted:
+                    save()
+                allocation = record.get('allocation') or {}
+                if allocation or record.get('migration_replacement'):
+                    spec = sources.get(sid)
+                    cls = spec['class_id'] if spec else allocation.get('key')
+                    scheduled = queue.get(str(allocation.get('jobid'))) or [None, None]
+                    if cfg.get('migrate_pending_seconds') is not None and (
+                            scheduled[1] == 'PENDING' or record.get('migration_replacement')):
+                        require(spec is not None, 'pending allocation has no source owner')
+                        require(file_digest(spec['seed_config']) == spec['seed_config_sha256'],
+                                'pending source config changed')
+                        require(file_digest(spec['source_gate']) == spec['source_gate_sha256'] and
+                                read(spec['source_gate']).get('success') is True,
+                                'pending source replay gate changed or failed')
+                    check_pending_record(record, current, cfg, root, queue, save,
+                                         reconcile_only=retired_class(cfg, cls))
+                observed.append({'seed': sid, 'index': record.get('index'), 'adopted': adopted,
+                                 'job_id': allocation.get('jobid'),
+                                 'scheduler_state': (queue.get(str(allocation.get('jobid'))) or [None, None])[1]})
+                record.pop('allocation_receipt_error', None)
+            except Exception as exc:
+                blocked.add(sid)
+                record['allocation_receipt_error'] = {'observed_at': time.time(), 'reason': repr(exc)}
+                current.update(error='saved allocation reconciliation: '+str(exc), error_at=time.time())
+                save()
+    state['early_pending_observation'] = {'started_at': started, 'completed_at': time.time(),
+        'records': observed, 'blocked_seeds': sorted(blocked), 'before_allocation_and_source_scan': True}
+    save()
+    return blocked
+
+
+def observe_saved_allocations(root, state, cfg, save):
+    from scripts.campaign_20261110.controller_saved_allocations import seed_existing_queues
+    seed_existing_queues(root, cfg, state)
+    queue = slurm_status()
+    blocked = early_saved_pending(root, state, cfg, queue, save)
+    from scripts.campaign_20261110.controller_saved_allocations import bounded_rows
+    rows = bounded_rows(cfg, state)
+    if rows is None:
+        rows = allocations(root)
+    return rows, queue, blocked
+
+
 def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=None):
     require(file_digest(spec["seed_config"]) == spec["seed_config_sha256"], "held seed config changed")
     seed_config = read(spec["seed_config"])
@@ -436,6 +495,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
             record_runtime_failure(record, state)
             continue
         routing_key = record['command'][3] if record.get('command') else spec['class_id']
+        already_joined = bool(record.get('allocation'))
         allocation = record.get("allocation") or reconcile(rows, key=routing_key, index=record["index"],
             count=record["count"], snapshot=spec["snapshot"], tag="goal_groups")
         if allocation is None:
@@ -456,6 +516,11 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=Non
             perform_submit(record, record["command"], save, rows, spec, root, "goal_groups", spec["snapshot"], record["count"])
             return 1
         record["allocation"] = allocation
+        if not already_joined:
+            check_pending_record(record,state,cfg,root,queue,save,
+                                 reconcile_only=retired_class(cfg,spec['class_id']))
+            if record.get('allocation') != allocation or record['status'] == 'complete':
+                continue
         if record.get("needs_new_gate"):
             gate = root / "validation/open_loop" / allocation['key'] / allocation["jobid"] / "gate.json"
             if gate.exists() and read(gate).get("success") is True:
@@ -603,7 +668,7 @@ def main(*, adapter=None):
             state['operational_limits']['migrate_pending_seconds']=cfg.get('migrate_pending_seconds')
             cfg['_migration_checks_remaining']=8
             save = lambda: write_json_atomic(path, state)
-            rows, queue = allocations(root), slurm_status()
+            rows, queue, blocked = observe_saved_allocations(root, state, cfg, save)
             allowance = cfg.get('maximum_new_jobs_per_pass',3) if cfg.get('dispatch_spool') else submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))
             if cfg.get("seed_catalog"):
                 if adapter is None:
@@ -615,6 +680,8 @@ def main(*, adapter=None):
                 specs = cfg["seeds"]
             for spec in specs:
                 current = state["seeds"].setdefault(spec["id"], {})
+                if spec['id'] in blocked:
+                    continue
                 try:
                     allowance -= advance(spec, current, cfg, root, rows, queue, allowance, save, adapter=adapter)
                     current.pop("error", None)
