@@ -54,6 +54,7 @@ def snapshot(root, inventory):
     containment, cts = read_source(root / 'dashboard/training_containment.json')
     requirements, reqs = read_source(root / 'dashboard/training_requirements.json')
     training_stream, tss = read_source(root / 'dashboard/training_stream.json')
+    pipeline_status, pss = read_source(root / 'dashboard/pipeline_status.json')
     ik_observation, iks = read_source(root / 'dashboard/ik_observation.json')
     existing_reviews, ers = read_source(root / 'dashboard/existing_native_reviews.json')
     change_impact, cis = read_source(root / 'dashboard/change_impact.json')
@@ -65,6 +66,8 @@ def snapshot(root, inventory):
     sync, ss = read_source(root / 'dashboard/sync_status.json')
     candidates, ins = read_source(inventory / 'train_candidate_summary.json')
     runtime, _ = read_source(root / 'infra/runtime.json')
+    if pipeline_status and pipeline_status.get('campaign_id') != 'campaign_20261110':
+        pipeline_status = {}; pss = {'available': False, 'error': 'Campaign identity mismatch'}
     if live and live.get('campaign_id') != 'campaign_20261110':
         live = {}; ls = {'available': False, 'error': 'Campaign identity mismatch'}
     if evidence and evidence.get('campaign_id') != 'campaign_20261110':
@@ -134,6 +137,8 @@ def snapshot(root, inventory):
         'training_containment': containment,
         'training_requirements': requirements,
         'training_stream': training_stream,
+        'pipeline_status': pipeline_status,
+        'pipeline_status_source': pss,
         'ik_observation': ik_observation,
         'ik_observation_source': iks,
         'existing_native_reviews': existing_reviews,
@@ -180,6 +185,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/existing-native-reviews': 'existing_native_reviews.json',
             '/reports/change-impact': 'change_impact.json',
             '/reports/current-eligibility': 'current_eligibility.json',
+            '/reports/pipeline-status': 'pipeline_status.json',
             '/reports/standard-recovery': 'standard_recovery.json',
             '/reports/replay-quality': 'gate_quality_audit.json',
             '/reports/gpu-denominator-coverage': 'cohort_rental_denominator_coverage.json',
@@ -190,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
+            if path in ('/reports/pipeline-status', '/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,

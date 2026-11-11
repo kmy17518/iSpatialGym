@@ -60,6 +60,21 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertEqual(snapshot(self.root,self.root/'inventory')['capacity_recovery'],{})
         self.assertNotEqual(self.request('GET','/reports/capacity-recovery')[0],200)
 
+    def test_pipeline_attempts_are_scoped_read_only_and_zero_credit(self):
+        value={'campaign_id':'campaign_20261110','observed_at':123,
+               'benchmark_credit':0,'quota_consumed':0,
+               'records':[{'candidate_id':'augmentation_a','status':'validated_canary_exported'}],
+               'batch_stages':[{'status':'prepared_unvalidated'}],'api_key':'HIDDEN'}
+        self.write('dashboard/pipeline_status.json',value)
+        before=self.hashes();data=json.loads(self.request('GET','/api/status')[1])
+        self.assertEqual(data['pipeline_status']['benchmark_credit'],0)
+        self.assertEqual(data['pipeline_status']['batch_stages'][0]['status'],'prepared_unvalidated')
+        code,raw=self.request('GET','/reports/pipeline-status')
+        self.assertEqual(code,200);self.assertNotIn(b'HIDDEN',raw);self.assertEqual(before,self.hashes())
+        self.write('dashboard/pipeline_status.json',{'campaign_id':'previous_campaign'})
+        self.assertEqual(snapshot(self.root,self.root/'inventory')['pipeline_status'],{})
+        self.assertEqual(self.request('GET','/reports/pipeline-status')[0],404)
+
     def test_reads_preserve_all_monitoring_files_and_counts(self):
         before = self.hashes()
         for _ in range(3):
