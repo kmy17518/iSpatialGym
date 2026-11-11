@@ -227,6 +227,7 @@ def prepare(proof, allocation, cfg, root):
             "target snapshot does not support this queue schema")
     require(all(proof["validation_key"][key] == cfg[key] for key in ("physics_sha256", "data_sha256")),
             "source anchor differs from pinned campaign physics/data")
+    require_source_runtime(proof, cfg, root)
     env = read_env(Path(allocation["job_dir"]) / "job.env")
     v2_root = source_release(template, env, cfg)
     identity = admission_id(source_template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"))
@@ -349,9 +350,22 @@ def recent_gates(root):
     return [path for _, path in sorted(rows, reverse=True)]
 
 
+def require_source_runtime(proof, cfg, root):
+    expected = cfg.get("required_source_snapshot")
+    if expected is None:
+        return
+    snapshot = Path(expected).resolve()
+    require(snapshot.is_relative_to(root / "code"), "required source runtime outside campaign snapshots")
+    require(proof["validation_key"]["code_sha256"] == file_digest(snapshot / ".snapshot_commit"),
+            "source has not passed the required fresh runtime")
+
+
 def source_in_scope(gate, root, cfg):
     """Cheap negative filter only; every eligible source still gets the full audit."""
     try:
+        if cfg.get("required_source_snapshot") and gate.get("snapshot"):
+            if Path(gate["snapshot"]).resolve() != Path(cfg["required_source_snapshot"]).resolve():
+                return False
         path = Path(gate['instance']).resolve()
         if not path.is_relative_to(root / 'out'):
             return True  # Let the authoritative audit explain invalid paths.

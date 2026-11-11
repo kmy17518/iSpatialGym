@@ -187,6 +187,22 @@ def test_scope_filter_skips_unowned_history_without_replacing_full_proof(tmp_pat
     assert admission.source_in_scope({}, tmp_path, cfg)
 
 
+def test_required_source_runtime_filters_history_and_checks_full_proof(tmp_path, monkeypatch):
+    f, template, _ = anchor_fixture(tmp_path, monkeypatch, split='eval_model')
+    gate = json.loads(f.gate.read_text())
+    newer = tmp_path / 'code/newer'; newer.mkdir()
+    (newer / '.snapshot_commit').write_text('new scoped fix')
+    cfg = {'admission_split': 'eval_model', 'admitted_classes': [template.class_id],
+           'required_source_snapshot': str(newer)}
+    assert not admission.source_in_scope(gate, tmp_path, cfg)
+    assert admission.source_in_scope({**gate, 'snapshot': str(newer)}, tmp_path, cfg)
+    proof = {'validation_key': {'code_sha256': c.file_digest(tmp_path / 'code/snapshot/.snapshot_commit')}}
+    with pytest.raises(c.ContractError, match='required fresh runtime'):
+        admission.require_source_runtime(proof, cfg, tmp_path)
+    admission.require_source_runtime({'validation_key': {'code_sha256': c.file_digest(newer / '.snapshot_commit')}}, cfg, tmp_path)
+    admission.require_source_runtime(proof, {}, tmp_path)  # Existing admission policies stay unchanged.
+
+
 def test_runtime_exclusion_keeps_other_repaired_classes_eligible(tmp_path, monkeypatch):
     f, template, _ = anchor_fixture(tmp_path, monkeypatch)
     cfg = {'excluded_classes': ['disembedding_02']}
