@@ -15,7 +15,7 @@ SCHEMA = 'isg-training-production-gate-v1'
 CAMPAIGN = 'campaign_20261110'
 # Latest owner clarification: the other four promised updates are available.
 # Availability removes the hold; their exact native/demo/replay gates still apply.
-PARKED_CLASSES = {'inter_object_relation_satisfaction-under_large_scale_01'}
+PARKED_CLASSES = set()  # Owner supplied the final under01 update in c570f17d.
 
 
 def read_policy(root):
@@ -119,7 +119,7 @@ def canonical_training_ready(root):
         return False
 
 
-def heldout_parallel_ready(root, config, config_sha256, authorization):
+def heldout_parallel_ready(root, config, config_sha256, authorization, *, check_freshness=True):
     """Future training tests must advance their related holdouts in parallel.
 
     An actionable engineering blocker is permitted; this is deliberately not
@@ -134,7 +134,7 @@ def heldout_parallel_ready(root, config, config_sha256, authorization):
             CAMPAIGN, config_sha256, template['class_id'], template['task']):
         raise ValueError('held-out parallel-work scope differs from exact training config')
     age = (dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(proof['observed_at'].replace('Z','+00:00'))).total_seconds()
-    if not 0 <= age <= 1800:
+    if age < 0 or (check_freshness and age > 1800):
         raise ValueError('held-out parallel-work observation is stale or future-dated')
     from scripts.campaign_20261110.contracts import task_quotas
     quota = next(q for q in task_quotas() if q.task == template['task'])
@@ -214,13 +214,18 @@ def check_environment(root, environment, *, kind='collection', start=None, count
             if int(authorization['start']) != int(start) or int(authorization['count']) != int(count): continue
             if count > int(authorization['max_instances']) or count > 24: continue
             expiry = dt.datetime.fromisoformat(authorization['expires_at'].replace('Z', '+00:00'))
-            if expiry <= now: continue
+            # Replaying an already generated bounded canary produces validation
+            # evidence only. The audit separately proves native creation was
+            # inside this exact authorization window; expiry still bars every
+            # collection attempt, retry and new native instance.
+            if kind == 'collection' and expiry <= now: continue
             evidence = _owned(root, authorization['authorization_path'])
             if file_digest(evidence) != authorization['authorization_sha256']: continue
             proof = json.loads(evidence.read_text())
             if proof.get('purpose') != 'training_pipeline_canary' or proof.get('config_sha256') != result['config_sha256']: continue
             if (proof.get('start'), proof.get('count')) != (int(start), int(count)): continue
-            result['heldout_parallel_work'] = heldout_parallel_ready(root,config,result['config_sha256'],proof)
+            result['heldout_parallel_work'] = heldout_parallel_ready(root,config,result['config_sha256'],proof,
+                check_freshness=kind == 'collection')
             return {**result, 'allowed': True, 'category': 'validation_canary',
                     'reason': 'exact bounded pipeline canary', 'authorization': authorization}
         if not canonical_training_ready(root):

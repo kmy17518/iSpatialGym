@@ -114,6 +114,12 @@ def test_exact_canary_authorization_is_bounded_and_expires(tmp_path,monkeypatch)
     changed=list(cmd);changed[4]='4';assert not check_dispatch(tmp_path,changed)['allowed']
     auth['expires_at']='2000-01-01T00:00:00+00:00';gate.write_text(json.dumps(policy))
     assert not check_dispatch(tmp_path,cmd)['allowed']
+    # Expiry must not suppress strict action replay of existing canary outputs.
+    # This route cannot submit native collection and still requires exact scope.
+    replay=tmp_path/'replay';replay.mkdir()
+    (replay/'replay_inputs.json').write_text(json.dumps({'source_job':str(job)}))
+    assert check_job(tmp_path,replay,kind='physics_replay')['allowed']
+    assert not check_job(tmp_path,job)['allowed']
 
 
 def test_heldout_parallel_work_requires_both_scopes_and_exact_identity(tmp_path):
@@ -181,27 +187,30 @@ def test_replay_checks_true_source_scope_but_not_exhausted_eval_quota(tmp_path):
     config=tmp_path/'config.json';value=json.loads(config.read_text());value['template']['split']='eval_standard';config.write_text(json.dumps(value))
     assert check_job(tmp_path,replay,kind='physics_replay')['allowed']
     value['template']['class_id']='inter_object_relation_satisfaction-under_large_scale_01';config.write_text(json.dumps(value))
-    assert not check_job(tmp_path,replay,kind='physics_replay')['allowed']
+    assert check_job(tmp_path,replay,kind='physics_replay')['allowed']
 
 
-def test_native_dependency_cannot_resume_owner_parked_class(tmp_path):
+def test_native_dependency_requires_owned_input_after_final_owner_release(tmp_path):
     job=tmp_path/'native';job.mkdir();p=job/'native_inputs.json'
     value={'campaign_root':str(tmp_path),'original_entry':{'class_id':'inter_object_relation_satisfaction-under_large_scale_01'}}
+    p.write_text(json.dumps(value));assert check_job(tmp_path,job,kind='native_dependency')['allowed']
+    value['campaign_root']='/foreign'
     p.write_text(json.dumps(value));assert not check_job(tmp_path,job,kind='native_dependency')['allowed']
+    value['campaign_root']=str(tmp_path)
     value['original_entry']['class_id']='inter_object_relation_satisfaction-inside_large_scale_01'
     p.write_text(json.dumps(value));assert check_job(tmp_path,job,kind='native_dependency')['allowed']
 
 
 def test_available_owner_updates_resume_validation_without_releasing_training(tmp_path):
     from scripts.campaign_20261110.production_gate import PARKED_CLASSES
-    assert PARKED_CLASSES == {'inter_object_relation_satisfaction-under_large_scale_01'}
+    assert PARKED_CLASSES == set()
     env,cmd,job=setup(tmp_path,'eval_standard')
     native=tmp_path/'native';native.mkdir()
     replay=tmp_path/'replay';replay.mkdir()
     (replay/'replay_inputs.json').write_text(json.dumps({'source_job':str(job)}))
     config=tmp_path/'config.json'
     value=json.loads(config.read_text())
-    for suffix in ('touching_03','under_large_scale_02','under_large_scale_03','nextto_04'):
+    for suffix in ('touching_03','under_large_scale_01','under_large_scale_02','under_large_scale_03','nextto_04'):
         cls='inter_object_relation_satisfaction-'+suffix
         value['template'].update(class_id=cls,split='eval_standard')
         config.write_text(json.dumps(value))
