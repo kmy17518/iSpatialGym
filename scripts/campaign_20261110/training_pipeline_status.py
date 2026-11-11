@@ -15,6 +15,37 @@ def ref(path): return {'path': str(path), 'sha256': file_digest(path)}
 def timestamp(path): return datetime.fromtimestamp(Path(path).stat().st_mtime, timezone.utc).isoformat()
 
 
+def sequence_stage_references(root, sequence_path, stage):
+    """Check immutable stage identities, including explicit append-journal repair.
+
+    This checks evidence identities for reporting, not physics or release.
+    """
+    root=Path(root).resolve()
+    def checked(reference):
+        path=Path(reference['path']).resolve()
+        require(path.is_relative_to(root) and file_digest(path)==reference['sha256'],
+                'sampler stage evidence changed')
+        return reference
+    result={'native_gate':checked(stage['native_gate']),
+            'template_export':checked(stage['isolation']['template_export'])}
+    original=stage['isolation']['pool_execution']
+    repair=sequence_path.parent/'immutable_stage_evidence_r1/audit.json'
+    if repair.exists():
+        audit=read(repair)
+        require(audit['original_sequence_result']==ref(sequence_path) and
+                audit['status']=='all_recorded_stage_hashes_reproduced',
+                'sampler stage reconciliation identity differs')
+        matches=[r for r in audit['stages'] if r['original_reference']==original and
+                 r['event_prefix_length']==stage['isolation']['event_range'][1]]
+        require(len(matches)==1 and matches[0]['immutable_reference']['sha256']==original['sha256'],
+                'sampler original stage hash was not reproduced')
+        result.update(pool_execution=checked(matches[0]['immutable_reference']),
+                      original_pool_execution=original,reconciliation=ref(repair))
+    else:
+        result['pool_execution']=checked(original)
+    return result
+
+
 _BATCH_OBSERVATION_CACHE = {}
 
 
@@ -198,6 +229,16 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                     submitted_path = selected
                 if submitted_path.exists():
                     submitted = read(submitted_path)
+                    if 'jobs' in submitted:
+                        require(submitted['request'] in (current_request,original_request),
+                                'native submission request differs')
+                        matches=[job for job in submitted['jobs'] if job.get('candidate_id')==key[0]]
+                        require(len(matches)<=1,'duplicate native member submission')
+                        submitted=matches[0] if matches else {}
+                        if submitted:
+                            require(submitted.get('config_sha256')==request['config_sha256'] and
+                                    submitted.get('count')==request['count'],
+                                    'native member configuration/count differs')
                     if all(k in submitted for k in ('job_id','native_runtime','request')) and ('start' in submitted or 'members' in submitted):
                         require(submitted['request'] in (current_request,original_request)
                                 and submitted['native_runtime']==request['native_runtime']
@@ -258,6 +299,9 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                         require(len(stages)<=1,'duplicate sequence stage')
                         row['sampler_sequence'].update(status=sequence['status'],evidence=ref(sequence_path),
                             observed_at=sequence['observed_at'],stage=stages[0] if stages else None)
+                        if stages:
+                            row['sampler_sequence']['stage_references']=sequence_stage_references(root,sequence_path,stages[0])
+                            row['sampler_sequence']['evidence_identity_verified']=True
                 row['last_observed_at'] = datetime.now(timezone.utc).isoformat()
                 result['records'].append(row)
         except Exception as error:
@@ -412,6 +456,9 @@ def family_paths(records, batches):
         selected=[r for r in records if r.get('task')==quota.task]
         passed=[r for r in selected if r.get('validated_evidence')]
         evidence=[r['validated_evidence']['review'] for r in passed]
+        sequences=[r['sampler_sequence'] for r in selected if r.get('sampler_sequence',{}).get('evidence_identity_verified')
+                   and r['sampler_sequence']['status']=='sampler_sequence_passed'
+                   and r['sampler_sequence']['stage'].get('native_passed') is True]
         paths={}
         for kind in ('physics_action_open_loop','kinematic_observation_rendering'):
             stages=[(batch,stage) for batch in batches if quota.task in batch.get('tasks',[])
@@ -427,8 +474,10 @@ def family_paths(records, batches):
             'exact_configurations_with_demo_physics_export':len({r['configuration_sha256']for r in passed}),
             'exact_validation':{'status':'partial' if passed else 'untested','evidence':evidence},
             'aba_restoration':paths,
-            'model_pool_switch_active_only_export':{'status':'untested','owner':'/root',
-                'next_action':'Execute different active model selections in a reused preloaded world and audit exports; A/B/A is separate.'},
+            'model_pool_switch_active_only_export':{'status':'partial' if sequences else 'untested','owner':'/root/dataset_contract',
+                'exact_native_stages':sequences,
+                'scope':'Only referenced sampler-world native switching/export evidence; independent exact template demo/replay/render remain separate.',
+                'next_action':'Complete each exact template demo/replay/render and selected configuration coverage; no whole-family inference.'},
             'required_configuration_denominator':None,'denominator_status':'owned_full_selected_inventory_in_progress',
             'dependency_owner':'/root/templates_assets','runtime_owner':'/root',
             'next_action':'Advance each dependency-ready exact configuration independently; validate this family path with bounded zero-credit canaries.',

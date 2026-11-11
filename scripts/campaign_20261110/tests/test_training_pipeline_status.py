@@ -242,3 +242,39 @@ def test_native_submission_normalization_preserves_original_and_checks_pointer(t
     assert record['native_submission']['evidence']==status.ref(folder/'submission_normalized.json')
     write_json_atomic(folder/'submission_current.json',{'path':str(folder/'submission_normalized.json'),'sha256':'b'*64})
     assert 'native submission revision changed' in status.observe(tmp_path)['errors'][0]['error']
+
+
+def test_independent_native_submissions_do_not_wait_for_other_members(tmp_path):
+    folder,row=request(tmp_path,'independent',40)
+    document=status.read(folder/'requests.json')
+    document['records'].append({**row,'candidate_id':'second','start':41,'output':str(folder/'second_native')})
+    write_json_atomic(folder/'requests.json',document)
+    first={**row,'request':status.ref(folder/'requests.json'),'job_id':'77','returncode':0}
+    write_json_atomic(folder/'submission.json',{'request':status.ref(folder/'requests.json'),'jobs':[first]})
+    rows=status.observe(tmp_path)['records']
+    assert rows[0]['native_submission']['job_id']=='77'
+    assert rows[1]['status']=='native_not_observed' and 'native_submission' not in rows[1]
+    first['config_sha256']='changed'
+    write_json_atomic(folder/'submission.json',{'request':status.ref(folder/'requests.json'),'jobs':[first]})
+    assert 'configuration/count differs' in status.observe(tmp_path)['errors'][0]['error']
+
+
+def test_stage_reconciliation_must_reproduce_original_recorded_hash(tmp_path):
+    import pytest
+    native=tmp_path/'native.json';native.write_text('native')
+    template=tmp_path/'template.json';template.write_text('template')
+    journal=tmp_path/'journal.json';journal.write_text('first')
+    original=status.ref(journal)
+    stage={'native_gate':status.ref(native),'isolation':{'template_export':status.ref(template),
+        'pool_execution':original,'event_range':[0,4]}}
+    sequence=tmp_path/'sequence_result.json';write_json_atomic(sequence,{'stages':[stage]})
+    snapshot=tmp_path/'immutable_stage_evidence_r1/stage_0.json';snapshot.parent.mkdir();snapshot.write_text('first')
+    journal.write_text('first plus later append')
+    audit={'original_sequence_result':status.ref(sequence),'status':'all_recorded_stage_hashes_reproduced',
+        'stages':[{'original_reference':original,'event_prefix_length':4,'immutable_reference':status.ref(snapshot)}]}
+    write_json_atomic(snapshot.parent/'audit.json',audit)
+    proof=status.sequence_stage_references(tmp_path,sequence,stage)
+    assert proof['pool_execution']==status.ref(snapshot) and proof['original_pool_execution']==original
+    snapshot.write_text('wrong')
+    with pytest.raises(ValueError,match='evidence changed'):
+        status.sequence_stage_references(tmp_path,sequence,stage)
