@@ -754,7 +754,7 @@ class ArticulationSmall(SamplerV2):
         finally:
             self.world.restore(state)
             self.world.park(obj, list(self.world.spawned).index(obj.name))
-        return sorted(set(round(v, 4) for v in out))
+        return CJG.unique_probed_angles(out)
 
     def _required_waypoints(self, obj, q_init: Optional[float] = None, q_goal: Optional[float] = None) -> Tuple[List[float], Optional[float]]:
         """§5.3 required handle poses: q_init plus every q_k up to and including the first k from which the link reaches

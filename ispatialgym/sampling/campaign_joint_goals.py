@@ -16,6 +16,13 @@ __all__ = ["ENV", "GoalGroupTimeout", "GoalPlanError", "JointGoalPlan", "SCHEMA"
 SCHEMA = "isg-joint-goal-plan-v1"
 
 
+def unique_probed_angles(values):
+    """Keep the exact angles that passed physics; rounding can cross a strict bucket."""
+    result = [float(value) for value in values]
+    _require(all(math.isfinite(value) for value in result), "nonfinite probed joint angle")
+    return sorted(set(result))
+
+
 def start_key(start):
     return hashlib.sha256(json.dumps(start, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 

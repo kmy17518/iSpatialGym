@@ -48,6 +48,22 @@ def test_native_small_angle_pairs_keep_goal_and_soften_only_training_bucket():
         opening.eligible_pairs([(0, .2), (0, .8)], direction="open", lower=0, upper=1)
 
 
+def test_physics_probed_half_angle_is_not_rounded_out_of_strict_bucket():
+    upper = 2.79252552986145  # Native hinged_jar/jnjtrl joint range.
+    half = .5 * upper
+    angles = j.unique_probed_angles([half + .000001, half, half])
+    assert angles == [half, half + .000001]  # Only exact duplicates coalesce.
+    p = plan()
+    assert p.eligible_pairs([(q, 0.) for q in angles], direction="close", lower=0., upper=upper) == [(half, 0.)]
+    assert replace(p, fraction_range=(.5, 1.)).eligible_pairs(
+        [(q, 0.) for q in angles], direction="close", lower=0., upper=upper) == [(half + .000001, 0.)]
+    # The historical rounded value really is outside bucket0; keep rejecting it.
+    with pytest.raises(j.GoalPlanError, match="no native angle"):
+        p.eligible_pairs([(round(half, 4), 0.)], direction="close", lower=0., upper=upper)
+    with pytest.raises(j.GoalPlanError, match="nonfinite"):
+        j.unique_probed_angles([float("nan")])
+
+
 def test_articulation_plan_rejects_wrong_identity_and_queue_time_does_not_consume_budget():
     raw={"schema":j.SCHEMA,"campaign_id":"fresh","group_id":"g","split":"train","template_id":"t",
          "contract_template_sha256":"a"*64,"scene":"scene","room":"room","target":"target","joint":"hinge",
