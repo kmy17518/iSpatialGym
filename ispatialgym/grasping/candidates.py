@@ -39,6 +39,7 @@ Output ``candidates.json`` (schema ``CANDIDATES``) in the model's library direct
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import math
 import os
@@ -591,6 +592,40 @@ def _scale_key(scale) -> Tuple[float, ...]:
 
 def attach_seat_record(job: Dict[str, Any], path: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """The seat record of ``job``'s male (category, model, scale) in ATTACH_SEATS_FILE (or ``path``), or None."""
+    proof = job.get("attach_seat_proof")
+    if proof is not None:
+        # New scaled mating pairs need their own live link/seat measurement.
+        # An explicitly pinned record must never silently fall back to the
+        # unrelated metadata frame when it is missing, changed or unmatched.
+        if not isinstance(proof, dict) or not proof.get("path") or not proof.get("sha256"):
+            raise ValueError("incomplete explicit attachment seat proof")
+        if path is not None and os.path.realpath(path) != os.path.realpath(proof["path"]):
+            raise ValueError("explicit attachment seat proof path differs")
+        with open(proof["path"], "rb") as stream:
+            payload = stream.read()
+        if hashlib.sha256(payload).hexdigest() != proof["sha256"]:
+            raise ValueError("explicit attachment seat proof bytes changed")
+        data = json.loads(payload)
+        if data.get("schema") != "isg-attach-seats/1":
+            raise ValueError("unknown explicit attachment seat proof schema")
+        key = (job.get("category"), job.get("model"), _scale_key(job.get("scale")))
+        matches = [r for r in data.get("pairs", []) if
+                   (r.get("male", {}).get("category"), r.get("male", {}).get("model"),
+                    _scale_key(r.get("male", {}).get("scale"))) == key]
+        if len(matches) != 1 or matches[0].get("error") or matches[0]["male"].get("error") or not matches[0]["male"].get("links"):
+            raise ValueError("explicit attachment seat proof lacks exact successful male measurement")
+        partner = proof.get("partner") or {}
+        wanted = (partner.get("category"), partner.get("model"), _scale_key(partner.get("scale")))
+        partners = [r for r in matches[0].get("partners", []) if
+                    (r.get("category"), r.get("model"), _scale_key(r.get("scale"))) == wanted]
+        if len(partners) != 1 or partners[0].get("error") or not partners[0].get("female"):
+            raise ValueError("explicit attachment seat proof lacks exact successful partner measurement")
+        measured = {**matches[0], "partners": partners}
+        directions = seat_mating_dirs(measured)
+        if not directions or any(not r.get("locs") or r.get("position") is None or r.get("orientation") is None
+                                 for r in directions.values()):
+            raise ValueError("explicit attachment seat proof lacks live mating directions")
+        return measured
     d = S.load_json(path or ATTACH_SEATS_FILE)
     if not d:
         return None
