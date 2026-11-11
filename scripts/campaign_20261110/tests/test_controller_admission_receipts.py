@@ -80,3 +80,19 @@ def test_exact_seed_ledger_never_needs_discovery_and_changed_row_is_rejected(tmp
     assert lookup.find(row['job_dir'],ledger=row['ledger'])==row
     p=Path(row['ledger']);p.write_text(p.read_text().replace('\t123\t','\t124\t'))
     with pytest.raises(ContractError,match='changed'):lookup.find(row['job_dir'])
+
+
+def test_two_live_cycles_keep_immutable_config_identity(tmp_path,monkeypatch):
+    import sys
+    cfg={'root':str(tmp_path),'schema':'isg-group-admission-controller-v1','snapshot':str(tmp_path/'code/native')}
+    config=write(tmp_path/'controllers/test/config.json',cfg);state=tmp_path/'controllers/test/state.json'
+    cycles=iter([True,True,False]);monkeypatch.setattr(a.lifecycle,'continue_running',lambda cfg:next(cycles))
+    monkeypatch.setattr(a.lifecycle,'record_policy',lambda *args:None)
+    monkeypatch.setattr(a,'slurm_status',lambda:{})
+    monkeypatch.setattr(a,'recent_gates',lambda root:[])
+    monkeypatch.setattr(a.time,'sleep',lambda _:None)
+    monkeypatch.setattr(a,'allocations',lambda root:pytest.fail('empty scope must not scan'))
+    monkeypatch.setattr(sys,'argv',['controller','--config',str(config),'--state',str(state)])
+    a.main()
+    from scripts.campaign_20261110.contracts import digest
+    assert json.loads(state.read_text())['config_sha256']==digest(cfg)

@@ -573,10 +573,11 @@ def main():
     require(Path(cfg["snapshot"]).resolve().is_relative_to(root / "code"), "admission runtime outside owned snapshots")
     require(1 <= cfg.get("new_admissions_per_pass", 2) <= 12 and 1 <= cfg.get("maximum_pending_admissions", 12) <= 32,
             "invalid admission concurrency limits")
+    original_config_hash = digest(cfg)
     while lifecycle.continue_running(cfg):
         with atomic_directory_lock(path.with_suffix(".lockdir")):
-            state = read(path, {"config_sha256": digest(cfg), "records": {}, "checked_gates": {}})
-            require(state["config_sha256"] == digest(cfg), "admission controller config changed")
+            state = read(path, {"config_sha256": original_config_hash, "records": {}, "checked_gates": {}})
+            require(state["config_sha256"] == original_config_hash, "admission controller config changed")
             lifecycle.record_policy(cfg, state)
             reconcile_author_gaps(state)
             save = lambda: write_json_atomic(path, state)
