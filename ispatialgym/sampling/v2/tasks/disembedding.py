@@ -1380,7 +1380,7 @@ class Disembedding(SamplerV2):
         reference = CTG.configured_reference_start()
         if reference is not None:
             from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
-            order = prioritize_written_stances(order, self.manip_candidates, [reference['manipulation']], explore=1, exploit=3)
+            order = prioritize_written_stances(order, self.manip_candidates, [reference['manipulation']], explore=0, exploit=3)
         for k in order[:6]:
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
