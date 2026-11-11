@@ -79,6 +79,19 @@ def observe(root, *, now=None):
                         'artifact':ref(artifact),'source_ref':current_request})
                 output = Path(request['output']).resolve()
                 require(output.is_relative_to(base), 'native output outside pipeline scope')
+                submitted_path = path.parent/'submission.json'
+                if submitted_path.exists():
+                    submitted = read(submitted_path)
+                    if all(k in submitted for k in ('job_id','start','native_runtime','request')):
+                        require(submitted['request'] in (current_request,original_request)
+                                and submitted['native_runtime']==request['native_runtime']
+                                and int(submitted['start'])==key[1]
+                                and submitted.get('returncode')==0,
+                                'native submission does not bind this exact request/runtime/index')
+                        row['native_submission'] = {'evidence':ref(submitted_path),
+                            'job_id':str(submitted['job_id']),'observed_at':submitted.get('observed_at'),
+                            'status':'submitted','scheduler_state':'unavailable'}
+                        row['status'] = 'native_submitted'
                 gate_path = output/'sampling_gate.json'
                 if gate_path.exists():
                     gate = read(gate_path)

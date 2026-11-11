@@ -30,6 +30,21 @@ def test_review_must_match_original_native_index(tmp_path):
     assert value['records'][0]['status'] == 'native_not_observed'
 
 
+def test_native_submission_binds_request_index_and_runtime_without_success(tmp_path):
+    folder,row=request(tmp_path,'pool',10)
+    submitted={'campaign_id':'campaign_20261110','request':status.ref(folder/'requests.json'),
+        'start':10,'native_runtime':'/native','job_id':'123','returncode':0}
+    write_json_atomic(folder/'submission.json',submitted)
+    value=status.observe(tmp_path)
+    assert value['records'][0]['status']=='native_submitted'
+    assert value['records'][0]['native'] is None
+    assert value['records'][0]['native_submission']['scheduler_state']=='unavailable'
+    assert value['benchmark_credit']==value['quota_consumed']==0
+    write_json_atomic(folder/'submission.json',{**submitted,'start':11})
+    invalid=status.observe(tmp_path)
+    assert not invalid['records'] and 'exact request/runtime/index' in invalid['errors'][0]['error']
+
+
 def test_batch_request_is_not_batch_success(tmp_path):
     path = tmp_path/'training_pipeline_canaries/batch/batch_restoration_r1'
     write_json_atomic(path/'request.json', {'canaries': []})
