@@ -32,5 +32,24 @@ class ContactProbeTests(unittest.TestCase):
                 if change=='duplicate':d['results'].append(copy.deepcopy(d['results'][0]))
                 with self.assertRaises(ContractError):contact_variants(d,'right')
 
+    def exact_audit(self):
+        d=self.audit();d['schema']='isg-carton-lip-exact-clearance-audit-v1'
+        for r,(pitch,y,inset) in zip(d['results'],[(10,0.,.004),(0,.07,.006)]):
+            r.update(pitch_deg=pitch,side_y_m=y,inset_from_body_plane_m=inset,
+                     body_clearance_m=.001,first_inflated_body_contact=None)
+        return d
+
+    def test_exact_piece_retry_uses_only_changed_clearance_checked_contacts(self):
+        d=self.exact_audit();before=copy.deepcopy(d);v=contact_variants(d,'right')
+        self.assertEqual(d,before);self.assertEqual(len(v),2)
+        self.assertEqual([r['geometry_proposal']['inset_from_body_plane_m']for r in v],[.004,.006])
+        for change in ['intersection','clearance','old_pose']:
+            with self.subTest(change=change):
+                d=self.exact_audit()
+                if change=='intersection':d['results'][0]['first_inflated_body_contact']={'lift_m':.01}
+                if change=='clearance':d['results'][0]['body_clearance_m']=0.
+                if change=='old_pose':d['results'][0]['inset_from_body_plane_m']=0.
+                with self.assertRaises(ContractError):contact_variants(d,'right')
+
 
 if __name__=='__main__':unittest.main()

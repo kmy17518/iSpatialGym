@@ -20,25 +20,37 @@ KIND = 'diagnostic_single_closed_lid_lift'
 
 
 def contact_variants(audit, arm):
-    require(audit['schema']=='isg-carton-lip-contact-audit-v1'
+    exact = audit['schema']=='isg-carton-lip-exact-clearance-audit-v1'
+    require(audit['schema'] in ('isg-carton-lip-contact-audit-v1',
+                              'isg-carton-lip-exact-clearance-audit-v1')
             and audit['asset_sha256']==ASSET_SHA256
             and audit['scale']==[1,1,1] and audit['joint_initial_rad']==0,
             'wrong geometry audit or closed initial state')
     rows=[]
-    for pitch in [0,10]:
+    # The first native probe reached the outer chamfer accurately but slid off.
+    # These two changed contacts passed a swept approach against every actual
+    # body convex piece, conservatively inflated by 1 mm. Native checks remain.
+    proposals = [(10, 0., .004), (0, .07, .006)] if exact else [(0, -.07, 0.), (10, -.07, 0.)]
+    for pitch, side_y, inset in proposals:
         candidates=[r for r in audit['results']if r['arm']==arm and r['yaw_deg']==0
-                    and r['pitch_deg']==pitch and r['side_y_m']==-.07
+                    and r['pitch_deg']==pitch and r['side_y_m']==side_y
+                    and (not exact or r['inset_from_body_plane_m']==inset)
                     and r['geometry_contact_candidate']]
         require(len(candidates)==1,'missing exact bounded contact proposal')
         r=candidates[0];contact=r['first_lid_contact']
-        require(contact['role']=='finger' and r['conservative_body_plane_clearance_m']>=.001-1e-10,
+        clearance = r['body_clearance_m'] if exact else r['conservative_body_plane_clearance_m']
+        require(contact['role']=='finger' and clearance>=.001-1e-10,
                 'contact lacks conservative body clearance')
+        if exact:
+            require(r['first_inflated_body_contact'] is None,
+                    'swept contact approach intersects the inflated body')
         origin=list(r['origin_closed_fingers']);origin[2]+=contact['lift_m']
         R=r['rotation_eef_to_object'];approach=[R[i][2]for i in range(3)];closing=[R[i][1]for i in range(3)]
         h={'kind':'diagnostic_lip_fist','contact':[origin[i]+.012*approach[i]for i in range(3)],
            'approach_dir':approach,'pinch_axis':closing,'width':None,
            'note':'Exact closed-lid underside contact; geometry proposal only.'}
-        rows.append({'name':f'closed_lip_yaw0_pitch{pitch}_{arm}','handle':h,
+        suffix = f'_y{side_y}_inset{inset}' if exact else ''
+        rows.append({'name':f'closed_lip_yaw0_pitch{pitch}{suffix}_{arm}','handle':h,
                      'preshape_q':0.,'contact_q':0.,'width_m':None,'geometry_proposal':r})
     return rows
 
