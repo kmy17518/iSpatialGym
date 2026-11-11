@@ -6,6 +6,7 @@ from scripts.campaign_20261110 import controller_lifecycle as lifecycle
 
 import math
 import argparse
+import csv
 from collections import Counter
 from pathlib import Path
 import re
@@ -164,10 +165,8 @@ def refresh_production(record, gate, template, cfg, root, directory, *, closed):
     return record.get("requires_new_runtime_gate")
 
 
-def advance(spec, state, cfg, root, rows, queue, allowance, save):
+def validated_seed(spec, cfg, root):
     from scripts.campaign_20261110.goal_groups import load_template_contract
-    from scripts.campaign_20261110.camera_lane import room_caps
-    from scripts.campaign_20261110.contracts import task_quotas
     from scripts.campaign_20261110.reservation_policy import active_policy
     from scripts.campaign_20261110.group_lane import check_reservations
     directory = Path(spec["inputs"]).resolve()
@@ -182,8 +181,98 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
     policy = active_policy(root)
     require(policy is not None, "camera controller requires active reservations")
     check_reservations(template, policy[1], policy[2])
+    return directory, template, config
+
+
+def verify_saved_row(root, row):
+    """Recheck the exact immutable source ledger without global discovery."""
+    ledger = Path(row['ledger']).resolve()
+    require(ledger.is_relative_to(root/'manifests'), 'camera source ledger outside campaign')
+    require(str(row['jobid']).isdigit() and Path(row['job_dir']).resolve().is_relative_to(root/'out'),
+            'camera source allocation outside campaign')
+    with ledger.open() as stream:
+        found = [r for r in csv.DictReader(stream, delimiter='\t')
+                 if r.get('key') == row['key'] and r.get('start') == row['start']]
+    require(len(found) == 1 and found[0] == {k: v for k, v in row.items() if k != 'ledger'},
+            'camera source ledger changed or ambiguous')
+
+
+def observe_camera_allocations(root, state, cfg, save):
+    """Observe owned pending jobs before any historical allocation scan."""
+    from scripts.campaign_20261110.controller_saved_allocations import adopt_receipt
+    from scripts.campaign_20261110.controller_migration import controller_check
+    started = time.time()
+    queue = slurm_status()
+    rows, observed, blocked = [], [], set()
+    needs_discovery = False
+    for spec in cfg['seeds']:
+        current = state.setdefault('seeds', {}).setdefault(spec['id'], {})
+        try:
+            source = current.get('source_allocation')
+            if source is None:
+                needs_discovery = True
+            else:
+                require(source['jobid'] == str(spec['validation_jobid']) and source['key'] == spec['class_id'],
+                        'camera source owner changed')
+                verify_saved_row(root, source)
+                rows.append(source)
+            records = current.get('production', [])
+            known_jobs = {str(r.get('allocation', {}).get('jobid')) for r in records}
+            if any(str(j) not in known_jobs for j in spec.get('existing_production_jobids', [])):
+                needs_discovery = True
+            for record in records:
+                adopted = adopt_receipt(root, record, expected_tag='camera_auto_production')
+                if adopted:
+                    save()
+                allocation = record.get('allocation') or {}
+                scheduler = queue.get(str(allocation.get('jobid'))) or [None, None]
+                if cfg.get('migrate_pending_seconds') is not None and record.get('status') != 'complete' and (
+                        scheduler[1] == 'PENDING' or record.get('migration_intent')):
+                    # Preserve the source readiness/reservation and replay checks
+                    # which previously preceded migration inside advance().
+                    validated_seed(spec, cfg, root)
+                    gate = root/'validation/open_loop'/spec['class_id']/str(spec['validation_jobid'])/'gate.json'
+                    require(gate.is_file() and read(gate).get('success') is True,
+                            'camera source replay unavailable or failed')
+                    controller_check(root, record, current, cfg, queue, save, family='camera')
+                if allocation:
+                    rows.append(allocation)
+                elif record.get('status') != 'complete' and not (
+                        record.get('status') == 'external_submission' and record.get('dispatch_receipt')):
+                    needs_discovery = True
+                observed.append({'seed': spec['id'], 'job_id': allocation.get('jobid'),
+                                 'adopted': adopted, 'scheduler_state': scheduler[1]})
+            current.pop('allocation_receipt_error', None)
+        except Exception as exc:
+            blocked.add(spec['id'])
+            current['allocation_receipt_error'] = {'observed_at': time.time(), 'reason': repr(exc)}
+            save()
+    state['early_pending_observation'] = {'started_at': started, 'completed_at': time.time(),
+        'records': observed, 'blocked_seeds': sorted(blocked), 'before_allocation_and_source_scan': True,
+        'legacy_discovery_required': needs_discovery}
+    save()
+    if needs_discovery:
+        # Preserve global duplicate detection on the legacy discovery path.
+        return allocations(root), queue, blocked
+    # A source can also appear as a production row in a historical saved record.
+    # Identical repeated observations do not create duplicate allocations.
+    unique = {}
+    for row in rows:
+        key = (row['jobid'], row['ledger'])
+        require(key not in unique or unique[key] == row, 'camera saved allocation conflict')
+        unique[key] = row
+    return list(unique.values()), queue, blocked
+
+
+def advance(spec, state, cfg, root, rows, queue, allowance, save):
+    from scripts.campaign_20261110.camera_lane import room_caps
+    from scripts.campaign_20261110.contracts import task_quotas
+    directory, template, config = validated_seed(spec, cfg, root)
     source = allocation_for(rows, spec["validation_jobid"])
     require(source["key"] == template.class_id, "camera allocation class differs")
+    if state.get('source_allocation') != source:
+        state['source_allocation'] = source
+        save()
     gate = root / "validation/open_loop" / source["key"] / source["jobid"] / "gate.json"
     if not gate.exists():
         reports = report_signature(source['job_dir'])
@@ -211,7 +300,11 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
         if record.get('status') in ('external_submission','submitting'):
             allocation=reconcile(rows,key=spec['class_id'],index=record['index'],count=record['count'],
                                  snapshot=source['code'],tag='camera_auto_production')
-            if allocation is not None:record.update(allocation=allocation,status='waiting')
+            if allocation is not None:
+                record.update(allocation=allocation,status='waiting')
+                save()
+                controller_check(root,record,state,cfg,queue,save,family='camera')
+                if record.get('migration',{}).get('never_started'):continue
             elif record['status']=='external_submission':continue
         if record["status"] in ("ready", "submitting"):
             if state.get("runtime_failure") is not None:
@@ -333,10 +426,12 @@ def main():
             state['operational_limits']['migrate_pending_seconds']=cfg.get('migrate_pending_seconds')
             cfg['_migration_checks_remaining']=8
             save = lambda: write_json_atomic(path, state)
-            rows, queue = allocations(root), slurm_status()
+            rows, queue, blocked = observe_camera_allocations(root, state, cfg, save)
             allowance = cfg.get('maximum_new_jobs_per_pass',3) if cfg.get('dispatch_spool') else submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))
             for spec in cfg["seeds"]:
                 record = state["seeds"].setdefault(spec["id"], {})
+                if spec['id'] in blocked:
+                    continue
                 try:
                     allowance -= advance(spec, record, cfg, root, rows, queue, allowance, save)
                     record.pop("error", None)

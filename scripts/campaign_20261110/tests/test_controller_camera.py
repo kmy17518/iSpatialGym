@@ -109,13 +109,15 @@ def test_nfs_lock_failure_keeps_successful_members_but_requires_new_runtime_gate
     assert len(claimed) == 1
 
 
-def test_parallel_camera_reservations_share_room_and_class_caps():
+def test_parallel_camera_eval_reservations_preserve_bulk_training_hold():
     from scripts.campaign_20261110.controller_camera import reserved_capacity
     template=SimpleNamespace(task='camera_relocalization-obstructed',split='eval_standard',class_id='chair',scene='s',room='r')
     quotas={'eval_standard':{'3':3,'5':4,'10':3}}
     pending=[{'task':template.task,'class_id':'chair','split':'eval_standard','room':'s/other','count':8},
              {'task':template.task,'class_id':'hamper','split':'train','room':'s/r','count':80}]
-    assert reserved_capacity(template,{}, {'s/r':100},quotas,pending)==22
+    # The bulk-training hold leaves only two eval slots. Historical train-room
+    # capacity must not turn an eval refill into standalone production.
+    assert reserved_capacity(template,{}, {'s/r':100},quotas,pending)==2
     template.split='eval_model'
     quotas={'eval_model':{'3':3,'5':3,'10':3}}
     assert reserved_capacity(template,{}, {'s/r':100},quotas,pending)==9

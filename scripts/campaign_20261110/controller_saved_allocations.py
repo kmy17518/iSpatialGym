@@ -12,7 +12,8 @@ import time
 from scripts.campaign_20261110.contracts import digest, file_digest, require
 
 
-def adopt_receipt(root, record):
+def adopt_receipt(root, record, *, expected_tag='goal_groups'):
+    require(expected_tag in ('goal_groups', 'camera_auto_production'), 'unsupported saved allocation tag')
     if record.get('allocation') or not record.get('dispatch_receipt'):
         return False
     root = Path(root).resolve()
@@ -34,7 +35,7 @@ def adopt_receipt(root, record):
             receipt['identity'] == intent['identity'], 'saved receipt identity differs')
     identity, allocation = intent['identity'], receipt['allocation']
     expected = {'key': command[3], 'start': int(record['index']), 'n': int(record['count']),
-                'code': command[command.index('--code')+1], 'tag': 'goal_groups'}
+                'code': command[command.index('--code')+1], 'tag': expected_tag}
     require(all(identity[k] == v for k, v in expected.items()), 'saved queue identity differs')
     require(all((int(allocation[k]) if k in ('start', 'n') else allocation[k]) == v
                 for k, v in expected.items()), 'saved allocation differs')
