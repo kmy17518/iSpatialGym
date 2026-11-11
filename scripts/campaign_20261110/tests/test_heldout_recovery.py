@@ -1,0 +1,24 @@
+import pytest
+from scripts.campaign_20261110.heldout_recovery import targets
+from scripts.campaign_20261110.contracts import task_quotas,ContractError
+
+
+def catalog():
+    return {q.task+'__'+str(i):q.task for q in task_quotas() for i in range(q.standard_classes)}
+
+
+def test_all_held_targets_include_zero_count_scopes_and_strict_owner_buckets():
+    rows=targets(catalog())
+    assert sum(r['target']for r in rows if r['split']=='eval_model')==891
+    assert sum(r['target']for r in rows if r['split']=='eval_category')==109
+    assert len({r['class_id']for r in rows if r['split']=='eval_model'})==99
+    assert len({r['task']for r in rows if r['split']=='eval_category'})==23
+    assert not any(r['split']=='eval_model'and r['task']=='camera_relocalization-standard'for r in rows)
+    assert [r['target']for r in rows if r['split']=='eval_category'and r['task']=='configuration_matching-articulation_open_large_scale']==[2,1]
+    assert [r['target']for r in rows if r['split']=='eval_model'and r['task']=='configuration_matching-block_design']==[2,3,2,2]
+
+
+def test_incomplete_ready_manifest_cannot_silently_remove_seven_missing_classes():
+    c=catalog()
+    for key in list(c)[-7:]:c.pop(key)
+    with pytest.raises(ContractError,match='incomplete canonical'):targets(c)
