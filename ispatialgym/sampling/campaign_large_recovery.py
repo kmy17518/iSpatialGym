@@ -18,7 +18,10 @@ def soap_lift_frame_rejection(sampler, stance, grasp, lift):
     require(enabled in ('0', '1'), 'soap lift frame option must be 0 or 1')
     if enabled == '0':
         return None
-    require(sampler.gp.variant == 'inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor',
+    require(sampler.gp.variant in {
+                'inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor',
+                'inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floors',
+            },
             'soap lift frame recovery belongs to the audited soap class')
     from ispatialgym.sampling.v2.program_check import fingertips_in_frame
 

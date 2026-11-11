@@ -25,7 +25,8 @@ def test_option_is_exact_class_scoped_and_strict(monkeypatch):
     with pytest.raises(ValueError,match='must be boolean'):pillow_grasp_margin()
 
 
-def test_soap_early_lift_uses_existing_program_projection(monkeypatch):
+@pytest.mark.parametrize('floor_alias', ['floor', 'floors'])
+def test_soap_early_lift_uses_existing_program_projection(monkeypatch, floor_alias):
     import torch
     from ispatialgym.sampling.campaign_large_recovery import SOAP_LIFT_FRAME_ENV, soap_lift_frame_rejection
     from ispatialgym.sampling.v2.program_check import fingertips_in_frame
@@ -38,7 +39,7 @@ def test_soap_early_lift_uses_existing_program_projection(monkeypatch):
             return torch.tensor([[960., 900. + 900. * float(points[0, 2])]]), torch.tensor([.8])
 
     sampler = SimpleNamespace(
-        gp=SimpleNamespace(variant='inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor'),
+        gp=SimpleNamespace(variant='inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-' + floor_alias),
         kit=SimpleNamespace(world=SimpleNamespace(camera_model=Camera())),
         ikc=SimpleNamespace(camera_pose=lambda stance: object()))
     stance = object()
