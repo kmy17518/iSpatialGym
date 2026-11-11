@@ -4,10 +4,11 @@ from scripts.campaign_20261110.contracts import require
 
 
 def terminal_deceleration():
-    """Brake the audited trash-can empty-handed approach before its endpoint.
+    """Brake the audited empty-handed approaches before their checked endpoints.
 
     The original native line is preserved. Source1375's base followed that line
     within 2.8 mm but crossed its checked endpoint by 32.7 mm into a wall.
+    Lid sibling50219000 crossed by7.65mm before torso-table contact.
     The existing 0.2 m/s² corner-stop reference profile avoids the same
     overshoot in a tracker reproduction without changing controller limits.
     """
@@ -19,7 +20,9 @@ def terminal_deceleration():
     require(type(enabled) is bool, 'navigation terminal braking option must be boolean')
     if not enabled:
         return None
-    require(template.class_id == 'inter_object_relation_satisfaction-under_large_scale_03'
-            and template.task == 'inter_object_relation_satisfaction-under_large_scale',
-            'navigation terminal braking belongs to the audited trash-can class')
+    require((template.class_id, template.task) in {
+                ('inter_object_relation_satisfaction-under_large_scale_03',
+                 'inter_object_relation_satisfaction-under_large_scale'),
+                ('configuration_matching-attachment_01', 'configuration_matching-attachment')},
+            'navigation terminal braking belongs to an audited endpoint-overshoot class')
     return .2
