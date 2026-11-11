@@ -50,6 +50,38 @@ def test_source_author_requires_actual_tip_release():
     with pytest.raises(GoalPlanError):author_context(a,target_name='target',support_name='bookcase')
 
 
+def shelf_anchor():
+    ctx = raw()['shelf_tip_context']
+    return {'summary': {'shelf_start': {
+        **{k: ctx[k] for k in ('target_board','arm','target_lean_deg','partner_lean_deg','bay_m','spine_behind_edge_m')},
+        'board_draw': {'grasp_key': ctx['grasp_key'], 'row_z': ctx['row_z']}},
+        'touching': {'tip_release': True}, 'manipulation_stance': {'edge': ctx['edge_name']}},
+        'planned_start_poses': {'target': ([0, 0, .6], [0, 0, 0, 1])}, 'sources': raw()['anchor_sources']}
+
+
+def test_refill_preserves_fixed_partner_depth_after_target_start_draw():
+    a = shelf_anchor()
+    assert author_context(a,target_name='target',support_name='bookcase')['spine_behind_edge_m'] == .06
+    start = a['summary']['shelf_start']
+    start['spine_behind_edge_m'] = .0443
+    start['target_depth_proposal'] = {'source_depth_m': .06, 'target_depth_m': .04427400200423898,
+        'partner_depth_unchanged': True, 'goal_unchanged': True}
+    context = author_context(a,target_name='target',support_name='bookcase')
+    assert context['spine_behind_edge_m'] == .06
+    assert context['source_summary_sha256'] == a['sources']['summary']['sha256']
+    assert start['spine_behind_edge_m'] == .0443
+
+
+@pytest.mark.parametrize('mutation', [
+    {'partner_depth_unchanged': False}, {'goal_unchanged': False},
+    {'source_depth_m': float('nan')}, {'target_depth_m': .08}])
+def test_refill_rejects_inconsistent_depth_provenance(mutation):
+    a = shelf_anchor(); start = a['summary']['shelf_start']; start['spine_behind_edge_m'] = .0443
+    start['target_depth_proposal'] = {'source_depth_m': .06, 'target_depth_m': .044274,
+        'partner_depth_unchanged': True, 'goal_unchanged': True, **mutation}
+    with pytest.raises(GoalPlanError): author_context(a,target_name='target',support_name='bookcase')
+
+
 def test_diversity_filter_distinguishes_pose_and_grasp():
     p=plan().goal
     assert same_start_grasp(p,'side1',p,'side1')

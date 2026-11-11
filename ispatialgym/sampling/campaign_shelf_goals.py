@@ -43,11 +43,25 @@ def author_context(anchor, *, target_name, support_name):
     board = start['board_draw']
     _require(summary.get('touching', {}).get('tip_release') is True, 'shelf source is not a native tip release')
     source = anchor['planned_start_poses'][target_name]
+    depth = start['spine_behind_edge_m']
+    proposal = start.get('target_depth_proposal')
+    if proposal is not None:
+        # A successful grouped member may have moved only the target's start.
+        # Reusing that draw as the fixed partner's depth makes every next group
+        # fail the unchanged native board-supported partner check.
+        _require(proposal.get('partner_depth_unchanged') is True and proposal.get('goal_unchanged') is True,
+                 'shelf source depth proposal changed partner or goal')
+        fixed, drawn = proposal.get('source_depth_m'), proposal.get('target_depth_m')
+        _require(all(type(x) in (int, float) and math.isfinite(x) and 0 <= x <= .5
+                     for x in (fixed, drawn, depth)), 'invalid shelf source depth provenance')
+        # Native summary writes the drawn start depth to four decimal places.
+        _require(abs(drawn-depth) <= .00005001, 'shelf drawn depth differs from source summary')
+        depth = fixed
     return {'mode': 'native_shelf_tip', 'support_name': support_name,
             'grasp_key': board['grasp_key'], 'row_z': board['row_z'], 'bay_m': start['bay_m'],
             'target_board': start['target_board'], 'arm': start['arm'],
             'target_lean_deg': start['target_lean_deg'], 'partner_lean_deg': start['partner_lean_deg'],
-            'spine_behind_edge_m': start['spine_behind_edge_m'],
+            'spine_behind_edge_m': depth,
             'edge_name': summary['manipulation_stance']['edge'],
             'source_target_start': {'position': source[0], 'orientation': source[1]},
             'source_summary_sha256': anchor['sources']['summary']['sha256'],
