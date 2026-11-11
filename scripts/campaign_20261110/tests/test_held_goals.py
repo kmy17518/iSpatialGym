@@ -24,6 +24,17 @@ def validate(raw):
 
 
 class GoalPlanTests(unittest.TestCase):
+    def test_successful_grasp_remains_reachable_after_diversity_reordering(self):
+        initial = ["a", "b", "c", "d", "e", "f"]
+        self.assertEqual(g.campaign_grasp_candidates(initial, {}), initial[:4])
+        # The only feasible grasp succeeded once. Other failed IK draws never
+        # increment usage, so repeated diversity ordering must not starve it.
+        reordered = ["b", "c", "d", "e", "f", "a"]
+        candidates = g.campaign_grasp_candidates(reordered, {"a": 1})
+        self.assertEqual(candidates, ["b", "c", "d", "e", "a"])
+        self.assertEqual(g.campaign_grasp_candidates(reordered, {"a": 2}), candidates)
+        self.assertNotIn("f", candidates)
+
     def test_fixed_goal_identity_and_bucket_policy(self):
         p = validate(plan())
         self.assertEqual(p.position, (0, 1, 2))

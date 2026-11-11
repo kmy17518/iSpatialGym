@@ -56,7 +56,7 @@ def source_proof(gate_path, *, root, started_at, campaign_id, permitted_split=No
     block = raw.get("campaign")
     require(block is not None, "unannotated anchor cannot admit a generic training seed")
     validate_campaign_block(block, object_bindings=raw["object_bindings"])
-    require(permitted_split in (None, "eval_model", "eval_category"), "unsupported explicit source-proof split")
+    require(permitted_split in (None, "eval_standard", "eval_model", "eval_category"), "unsupported explicit source-proof split")
     allowed_splits = (permitted_split,) if permitted_split else ("train", "eval_standard")
     require(block["campaign_id"] == campaign_id and block["split"] in allowed_splits, "anchor outside permitted split; heldout anchor cannot train")
     require(groups.supports(block["task"]) or (permitted_split and block["task"] in held.RANGES),
@@ -91,7 +91,9 @@ def source_proof(gate_path, *, root, started_at, campaign_id, permitted_split=No
     check_reservations(template, policy[1], policy[2])
     if template.task == "disembedding":
         require(template.scene_setup.get("binding_pool"), "disembedding admission requires the immutable full-pool contract")
-    return {"schema": "isg-heldout-anchor-admission-v1" if permitted_split else "isg-training-anchor-admission-v1",
+    return {"schema": ("isg-heldout-anchor-admission-v1" if permitted_split in ("eval_model", "eval_category")
+                       else "isg-standard-anchor-admission-v1" if permitted_split == "eval_standard"
+                       else "isg-training-anchor-admission-v1"),
         "campaign_id": campaign_id, "source_job": str(job),
         "source_gate": {"path": str(gate_path), "sha256": file_digest(gate_path)}, "instance_id": iid,
         "config": {"path": str(config_path), "sha256": file_digest(config_path)}, "template": asdict(template),

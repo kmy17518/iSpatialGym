@@ -999,7 +999,9 @@ class HeldObjectV2(SamplerV2):
         if not self.whole_in_frame(cam, goal):
             raise Reject("campaign_goal_out_of_view", "pinned target goal is not wholly in frame")
         order, errors, chosen = self.grasp_order(rng), [], None
-        for gname in order[:4]:
+        candidates = CHG.campaign_grasp_candidates(order, {
+            name: int((self.grasp_stats.get(name) or {}).get("instances", 0)) for name in order})
+        for gname in candidates:
             g = next(x for x in self.grasps if x.name == gname)
             for start_attempt in range(3):
                 # Owner 2026-11-10: train buckets are balancing preferences. The

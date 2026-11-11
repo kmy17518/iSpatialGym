@@ -9,9 +9,9 @@ from scripts.campaign_20261110 import contracts as c
 from scripts.campaign_20261110.tests.test_acceptance import fixture
 
 
-def anchor_fixture(root, monkeypatch, split="eval_standard"):
+def anchor_fixture(root, monkeypatch, split="eval_standard", task="inter_object_relation_satisfaction-ontop_small_scale"):
     f = fixture(root, split=split)
-    template = replace(f.template, task="inter_object_relation_satisfaction-ontop_small_scale")
+    template = replace(f.template, task=task)
     for path in (f.job / "inst").rglob("*-tro_state.json"):
         tro = json.loads(path.read_text()); block = tro["ispatialgym"]["campaign"]
         block["task"] = template.task
@@ -53,6 +53,19 @@ def test_heldout_or_goal_overridden_anchor_cannot_enter_training(tmp_path, monke
     value = json.loads(f.reports[0].read_text()); value["goal_override"] = "oracle"; c.write_json_atomic(f.reports[0], value)
     with pytest.raises(c.ContractError, match="overwritten"):
         admission.source_proof(f.gate, root=second, started_at=f.since, campaign_id="campaign")
+
+
+def test_standard_held_source_requires_explicit_split_and_full_physical_evidence(tmp_path, monkeypatch):
+    f, _, _ = anchor_fixture(tmp_path, monkeypatch, task="mental_rotation")
+    with pytest.raises(c.ContractError, match="no generic queue adapter"):
+        admission.source_proof(f.gate, root=tmp_path, started_at=f.since, campaign_id="campaign")
+    proof = admission.source_proof(f.gate, root=tmp_path, started_at=f.since,
+                                   campaign_id="campaign", permitted_split="eval_standard")
+    assert proof["schema"] == "isg-standard-anchor-admission-v1"
+    value = json.loads(f.reports[0].read_text()); value["goal_override"] = "oracle"; c.write_json_atomic(f.reports[0], value)
+    with pytest.raises(c.ContractError, match="overwritten"):
+        admission.source_proof(f.gate, root=tmp_path, started_at=f.since,
+                               campaign_id="campaign", permitted_split="eval_standard")
 
 
 def test_admission_identity_keeps_applied_scale_and_light_separate(tmp_path, monkeypatch):

@@ -130,6 +130,21 @@ def load_goal_plan(*, task: str, template_id: str, scene: str, rooms: Sequence[s
     return plan
 
 
+def campaign_grasp_candidates(order, successful_uses, initial_limit=4):
+    """Try diversity candidates first, then retain previously feasible grasps.
+
+    Failed IK draws do not advance grasp-use counts. Without this fallback,
+    one feasible grasp can fall permanently outside the first four after the
+    first member of a fixed-goal group succeeds. Every returned grasp still
+    undergoes the same native start, path, collision, and physical checks.
+    """
+    names = list(order)
+    _require(type(initial_limit) is int and initial_limit > 0, "invalid grasp candidate limit")
+    _require(len(names) == len(set(names)), "duplicate grasp candidates")
+    return names[:initial_limit] + [name for name in names[initial_limit:]
+                                   if int(successful_uses.get(name, 0)) > 0]
+
+
 def draw_start_depth(rng, goal_depth: float, window: Sequence[float], magnitude_range: Sequence[float], *,
                      min_change: float = 0.05, direction: str | None = None,
                      start_band: Sequence[float] | None = None) -> float:
