@@ -326,5 +326,10 @@ def test_nextto_source_hint_survives_plan_validation_with_exact_goal_and_provena
     assert check(touching,'touching').place[0][0]==.95
     changed=copy.deepcopy(raw);changed['anchor_manipulation_stance']['source_summary_sha256']='c'*64
     with pytest.raises(GoalPlanError,match='provenance'):check(changed)
-    changed=copy.deepcopy(raw);changed['task']='inter_object_relation_satisfaction-ontop_small_scale'
-    with pytest.raises(GoalPlanError,match='requires small'):check(changed,'ontop')
+    for relation in ('ontop','under'):
+        changed=copy.deepcopy(raw);changed['task']='inter_object_relation_satisfaction-'+relation+'_small_scale'
+        result=check(changed,relation)
+        assert result.anchor_manipulation_stance==validated.anchor_manipulation_stance
+        assert result.goal==validated.goal and result.release==validated.release
+        changed['anchor_manipulation_stance']['source_summary_sha256']='c'*64
+        with pytest.raises(GoalPlanError,match='provenance'):check(changed,relation)

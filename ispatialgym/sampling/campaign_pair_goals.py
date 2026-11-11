@@ -194,8 +194,8 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     hint = anchor_manipulation(raw)
     # This is only an audited proposal hint. The sampler separately scopes its
     # use to measured class recoveries; native feasibility remains mandatory.
-    _require(hint is None or (scale == 'small' and relation in ('inside', 'nextto', 'touching')),
-             'source manipulation proposal requires small inside, nextto or touching')
+    _require(hint is None or (scale == 'small' and relation in ('inside', 'nextto', 'touching', 'ontop', 'under')),
+             'source manipulation proposal requires a supported small pair relation')
     return PairGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, relation,
                         raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push, placement_mode, release_policy, anchor_base(raw), floor_push, hint)
 

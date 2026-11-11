@@ -68,6 +68,35 @@ def test_source_stance_nextto_scope_does_not_enable_other_pair_classes():
         assert not source_stance_hint_enabled(relation, scale, cls)
 
 
+def test_measured_small_pair_scope_preserves_unmeasured_and_large_classes():
+    from ispatialgym.sampling.campaign_tabletop_starts import source_stance_hint_enabled
+    for relation, suffixes in [('under', ('01','03','04')), ('ontop', ('01','02','04'))]:
+        for suffix in suffixes:
+            cls='inter_object_relation_satisfaction-'+relation+'_small_scale_'+suffix
+            assert source_stance_hint_enabled(relation, 'small', cls)
+            assert not source_stance_hint_enabled(relation, 'large', cls)
+            assert not source_stance_hint_enabled('touching', 'small', cls)
+    assert source_stance_hint_enabled('nextto','small','inter_object_relation_satisfaction-nextto_03')
+    for relation, suffix in [('under','02'),('ontop','03')]:
+        cls='inter_object_relation_satisfaction-'+relation+'_small_scale_'+suffix
+        assert not source_stance_hint_enabled(relation,'small',cls)
+
+
+def test_under_source_torso_and_focus_ranking_retains_checked_pool():
+    from types import SimpleNamespace
+    from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
+    # Under04's initial and manipulation bases coincide, but preserving only
+    # that base loses the successful .25/-0.5325 torso and placement focus.
+    source={'base_pose2d':[-10.126945,-2.997623,.0000012],
+            'focus':[-9.216946,-2.917622,.882931],'translate':.25,'tilt':-.532533}
+    candidates=[SimpleNamespace(**{**source,'translate':.8,'tilt':-.1,
+        'focus':[-9.4,-3.0,.88]}) for _ in range(8)]
+    candidates.append(SimpleNamespace(**source))
+    order=list(range(9));ranked=prioritize_written_stances(order,candidates,[source])
+    assert ranked[:4]==order[:4] and ranked[4]==8
+    assert sorted(ranked)==order
+
+
 def test_nextto_reference_stance_is_tried_without_replacing_native_candidates():
     from types import SimpleNamespace
     from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
