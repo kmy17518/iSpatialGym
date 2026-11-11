@@ -10,13 +10,13 @@ import json
 from pathlib import Path
 
 from scripts.campaign_20261110.binding_pools import BindingPool, PoolCandidate, bind_variant, write_pool
-from scripts.campaign_20261110.contracts import digest, file_digest, require, write_json_atomic
+from scripts.campaign_20261110.contracts import ObjectRef, digest, file_digest, require, write_json_atomic
 from scripts.campaign_20261110.controller_held import template_from
 from scripts.campaign_20261110.group_lane import check_reservations
 from scripts.campaign_20261110.reservation_policy import active_policy
 
 
-def make_pool(template, definition, *, maximum=48, provenance=None):
+def make_pool(template, definition, *, maximum=48, provenance=None, extra_candidates=()):
     require(template.task == 'disembedding' and template.split == 'eval_standard', 'standard disembedding source required')
     require(type(maximum) is int and 1 <= maximum <= 48, 'invalid finite pool maximum')
     roles = definition['roles']
@@ -27,12 +27,18 @@ def make_pool(template, definition, *, maximum=48, provenance=None):
         value = asdict(obj); value.pop('instance')
         key = 'model_' + digest(value)[:20]
         choices.setdefault(key, obj); selection[obj.instance] = key
+    fixed_layout = bool(definition.get('generation', {}).get('fixed_layout'))
+    require(not (fixed_layout and extra_candidates), 'fixed-layout pools cannot add inactive candidates')
+    for obj in extra_candidates:
+        require(obj.role in ('target', 'distractor'), 'extra pool object must be a target or distractor')
+        require(obj.ready and bool(obj.readiness_source), 'unready extra pool candidate')
+        value = asdict(obj); value.pop('instance')
+        choices.setdefault('model_' + digest(value)[:20], obj)
     for role, declared_role in [('target', 'target'), ('distractor', 'distractors')]:
         declared = roles[declared_role]['category']
         declared = {declared} if isinstance(declared, str) else set(declared)
         actual = {obj.category for obj in choices.values() if obj.role == role}
         require(actual == declared, 'ready contract does not cover the complete declared ' + role + ' category pool')
-    fixed_layout = bool(definition.get('generation', {}).get('fixed_layout'))
     counts = Counter(selection.values())
     n_distractors = sum(obj.role == 'distractor' for obj in template.objects)
     require(1 <= n_distractors <= maximum, 'active distractors exceed finite maximum')
@@ -54,6 +60,7 @@ def main():
     for name in ('campaign-root', 'config', 'customs', 'snapshot', 'out'):
         p.add_argument('--' + name, type=Path, required=True)
     p.add_argument('--max-distractors', type=int, default=48)
+    p.add_argument('--pool-candidates', type=Path, help='Immutable JSON list of ready ObjectRefs; inactive in this variant.')
     a = p.parse_args(); root = a.campaign_root.resolve(); out = a.out.resolve()
     require(out.is_relative_to(root) and not out.exists(), 'new owned output directory required')
     config = json.loads(a.config.read_text()); template = template_from(config['template'])
@@ -61,12 +68,21 @@ def main():
     customs = json.loads(a.customs.read_text()); alias = template.scene_setup.get('customs_alias', template.scene_setup['source_alias'])
     require(alias in customs, 'source alias absent from exact native customs')
     active = active_policy(root); require(active is not None, 'active reservation policy required')
+    extras = ()
+    if a.pool_candidates:
+        require(a.pool_candidates.resolve().is_relative_to(root), 'extra candidate manifest must be campaign-owned')
+        raw = json.loads(a.pool_candidates.read_text())
+        require(isinstance(raw, list) and raw, 'extra candidate manifest must be a nonempty ObjectRef list')
+        extras = tuple(ObjectRef(**value) for value in raw)
     proof = {'source_config': str(a.config.resolve()), 'source_config_sha256': file_digest(a.config),
              'source_customs': str(a.customs.resolve()), 'source_customs_sha256': file_digest(a.customs),
              'reservation_policy_sha256': active[0]['policy_sha256'],
              'geometry_models_counts_and_definition_unchanged': True,
              'scope': 'All models in the ready standard contract; every declared target/distractor category covered; finite copy maximum'}
-    pool, selection = make_pool(template, customs[alias], maximum=a.max_distractors, provenance=proof)
+    if a.pool_candidates:
+        proof['extra_candidates'] = {'path': str(a.pool_candidates.resolve()), 'sha256': file_digest(a.pool_candidates)}
+        proof['scope'] = 'All active ready models and hash-pinned extra ready candidates; full declared category coverage; inactive extras do not change native bindings.'
+    pool, selection = make_pool(template, customs[alias], maximum=a.max_distractors, provenance=proof, extra_candidates=extras)
     check_reservations(pool.audit_template(), active[1], active[2])
     out.mkdir(parents=True)
     # Legacy standard contracts named only source_alias. Explicit template
