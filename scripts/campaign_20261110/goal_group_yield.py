@@ -71,6 +71,31 @@ def member_start(block):
     return digest([digest(goal), digest(start), perturbations.fingerprint])
 
 
+def held_activity(ev, jid, job, state_path, now):
+    """Recent identity-bound stop evidence, never a stale assignment inference."""
+    path = ev.root/'vast/activity/jobs'/f'{jid}.json'
+    if not path.exists():
+        return None
+    row = ev.read(path, 'job_activity')
+    if (row.get('schema'), row.get('campaign_id'), row.get('job_id'), row.get('job_dir')) != (
+            'campaign-job-activity-v1', CAMPAIGN, jid, str(job)):
+        return None
+    if row.get('activity') != 'held' or row.get('verified_running') is not False:
+        return None
+    if not 0 <= now - float(row.get('observed_at', 0)) <= 1800:
+        return None
+    state_ref = row.get('source_state', {})
+    observation = row.get('authoritative_observation', {})
+    if state_ref.get('path') != str(state_path):
+        return None
+    for ref in (state_ref, observation):
+        raw = ev.bytes(ref['path'], 'job_activity_support')
+        if hashlib.sha256(raw).hexdigest() != ref.get('sha256'):
+            return None
+    return {'path': str(path), 'observed_at': row['observed_at'], 'reason': row.get('reason'),
+            'state': 'held', 'verified_running': False}
+
+
 def fresh_group(gid, config, plan, path):
     t = config['template']
     return {'group_id': gid, 'task': t['task'], 'class_id': t['class_id'], 'split': config['split'],
@@ -268,10 +293,14 @@ def snapshot(root):
             if not gids or any(g not in groups for g in gids):
                 unresolved.append({'job_id': jid, 'reason': 'executed group absent from authored registry', 'groups': gids}); continue
             a = account.get(jid, {}); state = a.get('state', '')
+            activity = None
             if jid in vast_ids:
                 state_path = root/'vast/state/jobs'/f'{jid}.json'
                 if state_path.exists():
                     state = ev.read(state_path, 'vast_job_state').get('status', state)
+                    activity = held_activity(ev, jid, job, state_path, time.time())
+                    if activity:
+                        state = activity['state']
             dispatch_gate = None
             if state in ('PENDING', 'queued', 'staging') and all(groups[g]['split'] == 'train' for g in gids):
                 # A queued record is not runnable work when the exact production
@@ -288,7 +317,7 @@ def snapshot(root):
             j = {'job_id': jid, 'group_ids': gids, 'job_dir': str(job), 'runtime_revision': Path(row['code']).name.removeprefix('trunk_'),
                 'backend': a.get('backend', 'vast' if jid in vast_ids else 'slurm'), 'state': state or 'unavailable',
                 'terminal': terminal, 'allocated_gpu_seconds': a.get('allocated_gpu_seconds'),
-                'dispatch_gate': dispatch_gate,
+                'dispatch_gate': dispatch_gate, 'activity_receipt': activity,
                 'queue_evidence_scope': queue_scope,
                 'missing_time_components': a.get('missing_time_components', []), 'activated_groups': [],
                 'unassigned_failure_rows': 0, 'sampling_rejections': Counter(), 'validation': gate_states.get(jid, [])}

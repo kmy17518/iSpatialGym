@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 from scripts.campaign_20261110.contracts import file_digest
-from scripts.campaign_20261110.goal_group_yield import summarize, member_start, snapshot
+from scripts.campaign_20261110.goal_group_yield import summarize, member_start, snapshot, held_activity, Evidence
 
 
 def group(n, status='completed', accepted=None, jobs=('1',), exact=False):
@@ -140,6 +140,21 @@ class GoalYieldTest(unittest.TestCase):
             self.assertEqual(result['summary']['train_only']['pending_running_unstarted'],{'held':2})
             self.assertEqual(result['jobs'][0]['dispatch_gate'],decision)
             self.assertEqual(result['summary']['train_only']['groups_attempted'],0)
+
+    def test_held_receipt_requires_fresh_matching_authoritative_evidence(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);job,q,rows,write=self.fixture(root)
+            state=write(root/'vast/state/jobs/9001.json',{'status':'assigned'})
+            observation=write(root/'infra/instance.json',{'actual_status':'exited','intended_status':'stopped'})
+            receipt={'schema':'campaign-job-activity-v1','campaign_id':'campaign_20261110','job_id':'9001',
+                     'job_dir':str(job),'observed_at':100.,'activity':'held','verified_running':False,
+                     'source_state':{'path':str(state),'sha256':file_digest(state)},
+                     'authoritative_observation':{'path':str(observation),'sha256':file_digest(observation)}}
+            path=write(root/'vast/activity/jobs/9001.json',receipt)
+            self.assertEqual(held_activity(Evidence(root),'9001',job,state,101.)['state'],'held')
+            self.assertIsNone(held_activity(Evidence(root),'9001',job,state,2000.))
+            write(state,{'status':'assigned','instance':'new'})
+            self.assertIsNone(held_activity(Evidence(root),'9001',job,state,101.))
 
     def test_duplicate_successes_and_incomplete_transfer(self):
         with tempfile.TemporaryDirectory() as t:
