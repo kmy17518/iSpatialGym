@@ -3,7 +3,7 @@ import copy
 import pytest
 
 from scripts.campaign_20261110.training_attachment_dependencies import (
-    coupled_profile, permitted, shared_support_requests,
+    coupled_profile, permitted, shared_support_requests, verify_pair_request,
 )
 
 
@@ -52,3 +52,16 @@ def test_ten_support_candidates_do_not_claim_layout_or_edge_validation():
     assert all(r['usable_edges'].startswith('pending_native') for r in rows)
     profiles['bindings'].pop('0')
     with pytest.raises(ValueError):shared_support_requests(profiles,['attachment01'],['pair'],policy)
+
+
+def test_map_request_rejects_independently_changed_partner_scale():
+    a,b=obj(),obj('stockpot','female');a['role']='target';b['role']='partner'
+    p=coupled_profile(a,b);cls='configuration_matching-attachment_04'
+    source=dict(class_id=cls,objects=[a,b])
+    job={**a,'scale':p['absolute_scales']['target'][0],'campaign_profile':p['id'],
+         'campaign_classes':[cls],'campaign_scale_slot':0}
+    pair=dict(class_id=cls,profile_id=p['id'],scale_slot=0,
+              partner={**b,'scale':p['absolute_scales']['partner'][0]})
+    verify_pair_request(job,pair,source)
+    pair['partner']['scale']=[.65,.65,.65]
+    with pytest.raises(ValueError,match='coupled draw'):verify_pair_request(job,pair,source)

@@ -15,7 +15,7 @@ import random
 
 from scripts.campaign_20261110.contracts import digest, file_digest, require, write_json_atomic
 from scripts.campaign_20261110.goal_groups import read_env
-from scripts.campaign_20261110.height_dependency_jobs import measured_probe, evidence
+from scripts.campaign_20261110.height_dependency_jobs import measured_probe, positive_library, evidence
 from scripts.campaign_20261110.reservation_policy import active_policy
 
 
@@ -65,6 +65,20 @@ def shared_support_requests(profiles, classes, pair_profiles, policy):
             usable_edges='pending_native_chair_removal_and_navigation',production_admitted=False)
     require(len(selected)==10,'attachment training requires ten reserved support candidates')
     return list(selected.values())
+
+
+def verify_pair_request(job, pair, configuration):
+    refs={role:next(o for o in configuration['objects'] if o['role']==role) for role in ('target','partner')}
+    profile=coupled_profile(refs['target'],refs['partner']);slot=pair['scale_slot']
+    require(type(slot) is int and slot in (0,1),'invalid coupled scale slot')
+    require(pair['class_id']==configuration['class_id'] and job['campaign_classes']==[pair['class_id']],
+            'pair class differs from accepted source')
+    require(pair['profile_id']==profile['id']==job['campaign_profile'],'coupled profile identity changed')
+    require(job['campaign_scale_slot']==slot and job['scale']==profile['absolute_scales']['target'][slot]
+            and pair['partner']['scale']==profile['absolute_scales']['partner'][slot], 'pair scales are not the coupled draw')
+    for actual,ref in ((job,refs['target']),(pair['partner'],refs['partner'])):
+        require(all(actual[k]==ref[k] for k in ('category','model','asset_sha256','ready','readiness_source')),
+                'pair dependency differs from ready source asset')
 
 
 def prepare(root, code, output, classes):
@@ -150,10 +164,87 @@ def prepare(root, code, output, classes):
     return report
 
 
+def ready_map_requests(root, batch):
+    """Publish each completed entry immediately, independent of other shards."""
+    from ispatialgym.grasping import schema as S
+    root,batch=Path(root).resolve(),Path(batch).resolve()
+    require(batch.is_relative_to(root),'dependency batch outside campaign')
+    dep=json.loads((batch/'dependencies.json').read_text())
+    pointer,policy,_=active_policy(root)
+    require(pointer['policy_sha256']==dep['reservation_policy']['policy_sha256'],'reservation policy changed')
+    profile_ref=dep['support_profiles'];require(file_digest(profile_ref['path'])==profile_ref['sha256'],'support profiles changed')
+    profiles=json.loads(Path(profile_ref['path']).read_text())
+    pairs={p['male_entry']:p for p in json.loads((batch/'pairs_pending.json').read_text())}
+    sources={s['class_id']:s for s in json.loads((batch/'sources.json').read_text())}
+    ready,blocked=[],[]
+    for shard,job in enumerate(json.loads((batch/'jobs.json').read_text())):
+        pair=pairs[job['id']];output=batch/'ready_map_requests'/pair['id']
+        if (output/'request.json').exists():
+            ready.append(evidence(output/'request.json'));continue
+        try:
+            source=sources[pair['class_id']]['configuration']
+            verify_pair_request(job,pair,source)
+            log=batch/'build/logs'/('glib_'+str(shard)+'.log')
+            require(log.is_file() and 'GB_VALIDATE_DONE' in log.read_text(),'entry physics validation is incomplete')
+            lp=batch/'build/glib/models'/job['id']/'library.json'
+            libdata=positive_library(job,lp,policy)
+            lib=S.load_model(job['category'],job['model'],job['scale'],str(batch/'build/glib'),
+                constraint=job['constraint'],rest_hint_wxyz=job.get('rest_hint_wxyz'))
+            require(lib is not None and Path(lib.path).resolve()==lp.resolve() and bool(lib.grasps()),
+                    'native reader did not resolve exact positive scaled entry')
+            S.check_compatible(lib,scale=job['scale'],rest_kind='stable')
+            permitted(pair['partner'],policy)
+            names=source['scene_setup']['inst_to_name']
+            source_supports={names[o['instance']] for o in source['objects'] if o['role']=='support'
+                             and o.get('semantic_kind')=='object'}
+            probes=[]
+            for ref in dep['measured_support_slots']:
+                require(file_digest(ref['probe']['path'])==ref['probe']['sha256'],'measured probe changed')
+                probe,binding,profile=measured_probe(ref['probe']['path'],profiles,profile_ref['sha256'],root)
+                permitted(profile,policy)
+                if binding['scene']==source['scene'] and binding['name'] in source_supports:
+                    probes.append(ref)
+            require(probes,'no admitted scaled-height probe on canonical support; other supports need a new binding proof')
+            heights=sorted({p['actual_height_key'] for p in probes});anchors=[];surfaces=[]
+            for height in heights:
+                matching=[p for p in probes if p['actual_height_key']==height]
+                ids=[p['binding_id']+'/slot'+str(p['height_slot']) for p in matching]
+                anchors.append(dict(key=height,height=float(height),precision=.0001,
+                    range=[float(height)-.00005,float(height)+.00005],surfaces=ids,status=['measured']))
+                for ref,sid in zip(matching,ids):
+                    native=json.loads(Path(ref['probe']['path']).read_text())
+                    surfaces.append(dict(id=sid,key=height,height=native['measured_height_above_floor'],
+                        scene=native['scene'],support=native['object'],surface='top',precision=.0001,
+                        source=ref['probe']['path'],floor_z=native['floor_z_world'],status='measured'))
+            output.mkdir(parents=True)
+            attach_pair={**pair,'heights':heights};attach_pair.pop('status',None)
+            for name,value in [('jobs.json',[job]),('pairs.json',[attach_pair]),('heights_by_id.json',{job['id']:heights}),
+                ('anchors.json',dict(schema='isg-height-anchors/1',max_approx_m=.00005,anchors=anchors,surfaces=surfaces))]:
+                write_json_atomic(output/name,value)
+            request=dict(schema='campaign-training-attachment-map-request-v1',class_id=pair['class_id'],
+                pair=attach_pair,library=evidence(lp),library_validation_log=evidence(log),
+                positive_grasps=len(libdata['grasps']),measured_support_slots=probes,
+                reservation_sha256=pointer['policy_sha256'],parent_dependencies=evidence(batch/'dependencies.json'),
+                input_files=[evidence(batch/name) for name in ('jobs.json','pairs_pending.json','profiles.json','sources.json')],
+                requires=dict(tabletop_arms=['right','left'],attachment_arms=['right'],attachment_rules=['box','swept']),
+                status='ready_for_exact_native_map_build',production_admitted=False)
+            write_json_atomic(output/'request.json',request);ready.append(evidence(output/'request.json'))
+        except (OSError,ValueError,KeyError,TypeError) as exc:
+            blocked.append(dict(entry_id=job['id'],class_id=pair['class_id'],reason=str(exc)))
+    report=dict(observed_at=datetime.now(timezone.utc).isoformat(),ready=ready,blocked=blocked,production_admitted=False)
+    write_json_atomic(batch/'map_request_status.json',report)
+    return report
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    for name in ('root','code','output'):p.add_argument('--'+name,type=Path,required=True)
-    p.add_argument('--class-id',action='append',required=True);a=p.parse_args()
+    p.add_argument('--root',type=Path,required=True);p.add_argument('--batch',type=Path)
+    for name in ('code','output'):p.add_argument('--'+name,type=Path)
+    p.add_argument('--class-id',action='append',default=[]);a=p.parse_args()
+    if a.batch:
+        report=ready_map_requests(a.root,a.batch)
+        print(json.dumps({'ready':len(report['ready']),'blocked':report['blocked'],'production_admitted':False}));return
+    require(a.code and a.output and a.class_id,'preparation needs code, output and class IDs')
     report=prepare(a.root,a.code,a.output,set(a.class_id))
     print(json.dumps({k:report[k] for k in ('jobs','pairs','production_admitted')}|{
         'measured_support_slots':len(report['measured_support_slots'])}))
