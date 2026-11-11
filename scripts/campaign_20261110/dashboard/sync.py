@@ -19,6 +19,8 @@ AUDIT_FILES = {'canonical_validation.json': 'infra/standard_recovery/canonical_v
                'training_containment.json': 'infra/training_production_gate/containment_status.json',
                'training_requirements.json': 'manifests/training_requirements.json',
                'training_stream.json': 'training_pipeline_canaries/height_r2/stream/state.json',
+               'change_impact.json': 'validation/change_impact/ledger.json',
+               'current_eligibility.json': 'accounting/current_eligibility.json',
                'standard_recovery.json': 'infra/standard_recovery/ledger.json',
                'cohort_rental_denominator_coverage.json': 'accounting/cohort_rental_denominator_coverage.json'}
 
@@ -99,7 +101,7 @@ def return_report(output):
         stream=json.loads(stream_path.read_text())
         if stream.get('campaign_id')=='campaign_20261110':
             lines += ['','INDEPENDENT TRAINING VALIDATION STREAM', 'Observed: '+chicago(stream.get('observed_at')),
-                'Each configuration advances after its own prerequisites. Production also requires shared pipeline, applicable path, exact proof and diversity capacity.',
+                'Standalone production and new generation canaries held until100/100 canonical validation. Dependency preparation may continue. After100/100, shared pipeline, applicable path, exact proof and diversity capacity remain required.',
                 *[key+': '+str(row.get('annotated_status',row.get('status')))+'; '+str(row.get('annotated_error',row.get('reason',''))) for key,row in stream.get('records',{}).items()]]
     canonical_path=output/'canonical_validation.json'
     if canonical_path.exists():
