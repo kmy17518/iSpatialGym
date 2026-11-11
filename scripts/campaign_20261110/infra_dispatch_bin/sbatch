@@ -12,7 +12,7 @@ from scripts.campaign_20261110.production_gate import check_job
 root = Path(os.environ['ISG_DISPATCH_CAMPAIGN_ROOT']).resolve()
 job = Path(sys.argv[-1]).resolve()
 assert job.is_relative_to(root / 'out') and (job / 'job.env').is_file()
-decision = check_job(root, job)
+decision = check_job(root, job, submission_script=Path(sys.argv[-2]).resolve())
 if not decision['allowed']:
     raise SystemExit('training production gate: ' + decision['reason'])
 env = {}
