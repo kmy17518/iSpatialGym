@@ -4675,7 +4675,13 @@ class IORSLarge(SamplerV2):
         """The next random stance-B candidate of the pool (the pre-screen's draw); with the memo, the B candidates it holds as failing
         under this stance A are dropped (not screened) but the k-th hit, which is searched again (re-check). None: the pool is empty."""
         while b_pool:
-            b = b_pool.pop(int(rng.integers(len(b_pool))))
+            index = int(rng.integers(len(b_pool)))
+            from ispatialgym.sampling.campaign_floor_push_proposals import source_hint, preferred_index
+            hint = source_hint(self)
+            if hint is not None and getattr(self, '_campaign_source_b_draws', 0) < 2:
+                index = preferred_index(b_pool, hint)
+                self._campaign_source_b_draws = getattr(self, '_campaign_source_b_draws', 0) + 1
+            b = b_pool.pop(index)
             if m is None or not SM.memo_on():
                 return b
             e, recheck = m.lookup_b(SM.stance_key(b), SM.stance_key(init))
@@ -5488,6 +5494,7 @@ class IORSLarge(SamplerV2):
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         if os.environ.get(CPG.ENV):
             self.campaign_pin_goal()
+        self._campaign_source_b_draws = 0
         init: Stance = self.surface["init"]
         self._sm_in_search = True  # i7-stancememo: a rejection from here on is the B / C search's
         sm = self._sm() if SM.memo_on() else None
@@ -5639,11 +5646,21 @@ class IORSLarge(SamplerV2):
         # nothing flagged: the order unchanged and no random number drawn (alias_memory.reorder_pick; kit alias_memory.pick.*; provenance in B's extras)
         k_pick = AM.reorder_pick(self, range(len(pre)), [t[1] for t in pre], lambda st: (list(getattr(st, "arms", None) or []) or [offered[0]])[0], rng)
         pre = [pre[k] for k in k_pick]
+        from ispatialgym.sampling.campaign_floor_push_proposals import source_hint, ranked_prescreen
+        floor_source = source_hint(self)
+        pre = ranked_prescreen(pre, floor_source)
         n_couple = int(self.num("b_candidates_max", 6))
         if sm is not None and self._sm_skipped_b:
             errors.append(f"stance memo: {self._sm_skipped_b} B candidates of the pool skipped (failed in earlier attempts of this instance)")
         a_key = SM.stance_key(init)
         couple = [(t, None) for t in pre[:n_couple]]
+        if floor_source is not None:
+            arms_b = [self._segment_order(t[1], t[3]) for t in pre[:n_couple]]
+            plan, deferred = heel_tight_couple_plan(arms_b, floor_source['arm'], lambda i, a: True)
+            couple = [(pre[i], arms) for i, arms in plan]
+            TT._countn(self, 'campaign_floor_source.arm_deferred', deferred)
+            log.info('%s: audited floor-source proposals first: arm %s, source grasp %s, trunk (%.2f, %.2f); all native alternatives retained',
+                     self.gp.variant, floor_source['arm'], floor_source['grasp_name'], floor_source['translate'], floor_source['tilt'])
         if self.push_under and len(offered) > 1 and self.push_heel_tight() is not None:
             # i7-ul01reach r3 (ISPATIALGYM_PUSH_HEEL_TIGHT): the default arm at every B with a kept yaw before the other arm's couplings
             # (uh2_ul01_on 360002 / 360003: the left arm coupled at the first B whose right-arm F_init held no heel-back yaw, then grazed its

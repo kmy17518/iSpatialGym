@@ -577,6 +577,10 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                         place_pose={"position":released[0],"orientation":released[1]})
             require(push.get("drop_cell") is not None and math.dist(push["drop_cell"], released[0][:2]) <= .005,
                     "push-under native contact and release disagree on drop cell")
+            from ispatialgym.sampling.campaign_floor_push_proposals import author_hint
+            proposal = author_hint(anchor, template.class_id)
+            if proposal is not None:
+                plan.update(class_id=template.class_id, floor_push_source_proposal=proposal)
         elif scale == "large" and relation == "touching" and (anchor["summary"].get("surface_touching") or anchor["summary"].get("push_touching")):
             from ispatialgym.sampling.campaign_pair_goals import object_pose_from_grasp
 
