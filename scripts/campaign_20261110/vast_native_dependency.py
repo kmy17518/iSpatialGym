@@ -77,7 +77,12 @@ def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,
     for flag in ('--customs','--bddl-root'):
         roots.append(Path(argv[argv.index(flag)+1]))
     environment=dict(entry.get('environment') or {})
-    require(set(environment)<={'ISPATIALGYM_STABLE_SCENE_DIR'},'unrecognized native candidate environment')
+    require(set(environment)<={'ISPATIALGYM_STABLE_SCENE_DIR','ISPATIALGYM_INTERIORS'},
+            'unrecognized native candidate environment')
+    if environment.get('ISPATIALGYM_INTERIORS'):
+        registry=Path(environment['ISPATIALGYM_INTERIORS'])
+        require(registry.suffix=='.json' and registry.is_file(),
+                'native interior registry must be an explicit JSON file')
     roots += [Path(value) for value in environment.values()]
     paths=[manifest,wrapper,native/'.snapshot_commit',helper/'scripts/campaign_20261110/vast_native_dependency.py',
            helper/'scripts/campaign_20261110/job_native_dependency.sh']

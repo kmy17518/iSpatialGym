@@ -49,6 +49,30 @@ def test_changed_native_handle_or_runtime_prevents_dispatch(tmp_path,monkeypatch
     assert not (tmp_path/'vast/queue').exists()
 
 
+def test_private_native_interior_registry_is_pinned_and_changes_block_dispatch(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    registry=tmp_path/'proofs/interiors.json'
+    registry.write_text('{"interiors":{"measured_bookcase":{"height":0.8354}}}')
+    entries=json.loads(manifest.read_text())
+    entries['jobs'][0]['environment']['ISPATIALGYM_INTERIORS']=str(registry)
+    manifest.write_text(json.dumps(entries))
+    job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
+    value=native.verify(job,tmp_path)
+    assert value['environment']['ISPATIALGYM_INTERIORS']==str(registry)
+    assert value['files'][str(registry)]==native.sha(registry)
+    registry.write_text('{"changed_geometry":true}')
+    with pytest.raises(ValueError,match='bytes changed'):native.enqueue(job,tmp_path)
+
+
+def test_native_interior_registry_cannot_escape_campaign(tmp_path,monkeypatch):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    entries=json.loads(manifest.read_text())
+    entries['jobs'][0]['environment']['ISPATIALGYM_INTERIORS']=str(tmp_path/'proofs')
+    manifest.write_text(json.dumps(entries))
+    with pytest.raises(ValueError,match='explicit JSON file'):
+        native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,50108200,'left')
+
+
 def test_existing_native_output_or_wrong_entrypoint_cannot_be_replaced(tmp_path,monkeypatch):
     manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
     out.mkdir(parents=True);(out/'sample.log').write_text('native started')
