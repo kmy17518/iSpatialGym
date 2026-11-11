@@ -6838,11 +6838,12 @@ oracle_failed:not_reached in about half its written demos (int2_31: 4 written, 2
   | -0.35 .. -0.39 rad (jittered), 5.89 rad (= -22.5 deg grid) | 34 | 28 not_reached, 6 plan_failed, 0 ok |
   | -0.48 rad | 1 | execution |
 
-  Every not_reached instance has the sandal placed at -20..-22.4 deg to the push. It is deterministic per instance (360002 failed in
-  all 14 tags that wrote it).
+  Every not_reached instance has the sandal placed at -20..-22.4 deg to the push. It is deterministic per instance: 360002 failed in
+  all 17 tags that wrote it at -22.5 deg (14 not_reached + 3 plan_failed); the one tag that drew yaw 0 for it (fp_def, right arm from
+  B (0.0, -1.22)) succeeded.
 - **Why that yaw is sampled.** `generation.push_under_yaw` = `heel_first` keeps the yaws at which the heel points back within one step of
   the 16-yaw grid (22.5 deg): the grid yaws 0 and 5.89 rad ('push-under yaw lock heel_first: kept 2 of N yaws ... [0.0, 5.89]'), and the
-  B IK's retries jitter the drawn yaw by up to 22.5 deg (`TARGET_JITTER`). Of 185 written instances 43 carry 5.89 rad and 18 another
+  B IK's retries jitter the drawn yaw by up to 22.5 deg (`TARGET_JITTER`). Of 186 written instances 43 carry 5.89 rad and 18 another
   jittered yaw beyond 0.04 rad.
 
 ### The switch: `ISPATIALGYM_PUSH_HEEL_TIGHT` (default off; commit b413aab9)
