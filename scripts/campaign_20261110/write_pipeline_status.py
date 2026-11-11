@@ -88,7 +88,8 @@ def main():
                'held_touching02_replacement_fronts_v1', 'heldout_category_disembedding_reception_v1',
                'heldout_model_disembedding_garage_v1', 'heldout_model_disembedding_garage_right_v2',
                'heldout_model_disembedding_garage_ordered_v1', 'heldout_category_disembedding_reception_right_v1',
-               'held_touching02_ordered_fronts_v1', 'heldout_wechsler_v1')
+               'held_touching02_ordered_fronts_v1', 'heldout_wechsler_v1',
+               'heldout_category_large_artic_open_state_v3')
     manifests = [root / folder / 'contract_candidates.json' for folder in folders]
     index_path = root / 'manifests/category_materialization_index_v4.json'
     index = json.loads(index_path.read_text())
@@ -198,6 +199,7 @@ def main():
                     'model_garage_disembedding_ordered_vast04_fresh_contract_r*.json',
                     'category_reception_disembedding_right_fresh_contract_r*.json',
                     'category_floating_fresh_contract_r*.json', 'category_jar_close_fresh_contract_r*.json',
+                    'category_wardrobe_open_fresh_contract_v3_r*.json',
                     'held_touching02_ordered_fresh_contract_r*.json'):
         bound_paths.extend(sorted((root / 'manifests').glob(pattern)))
     for bound_path in bound_paths:
