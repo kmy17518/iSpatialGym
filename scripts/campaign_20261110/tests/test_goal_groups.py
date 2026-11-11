@@ -92,6 +92,29 @@ class GoalGroupControllerTests(unittest.TestCase):
                     self.assertGreater(collector_deadline, 1977)  # block18423951
                     self.assertGreater(collector_deadline, 806)  # attachment1409
 
+    def test_required_native_visibility_survives_group_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            job, ledger, _, template, code = self.fixture(root)
+            anchor = g.successful_anchor(job, campaign_root=root, ledger=ledger, campaign_started_at=time.time()-10)
+            out = root/'groups/visibility'
+            g.prepare_group(anchor=anchor, template=template, campaign_id='new', group_id='visibility', output=out,
+                code_sha256=c.file_digest(code/'.snapshot_commit'), physics_sha256=c.digest('physics'),
+                data_sha256=c.digest('maps'), magnitude_range=[.05, .10])
+            args = dict(snapshot=code, campaign_root=root, v2_root=root/'maps')
+            self.assertNotIn('ISGF_GOAL_OCCLUSION=on', g.submission_command(out, **args))
+            config = g.read_json(out/'campaign_config.json')
+            config['template'].update(class_id='inter_object_relation_satisfaction-inside_02',
+                                      task='inter_object_relation_satisfaction-inside_small_scale')
+            config['template']['scene_setup']['recovery_options'] = {'native_goal_occlusion_screen': True}
+            c.write_json_atomic(out/'campaign_config.json', config)
+            command = g.submission_command(out, **args)
+            for name in ('ISGF_GOAL_OCCLUSION', 'ISPATIALGYM_GOAL_OCCLUSION'):
+                self.assertIn(name+'=on', command)
+                with self.assertRaises(c.ContractError):
+                    g.submission_command(out, **args, extra_env=[name+'=off'])
+                self.assertIn(name+'=on', g.submission_command(out, **args, extra_env=[name+'=on']))
+
     def test_historical_or_unallocated_anchor_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

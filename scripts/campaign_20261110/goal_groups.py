@@ -694,9 +694,18 @@ def submission_command(group_dir, *, snapshot, campaign_root, v2_root, base_inde
            "KIT_TEX_STORE": str(root / "kit_textures"), "ISGF_EXP_PATH": str(root / "isaacsim_overlay/apps"),
            "ISPATIALGYM_FAST_BAND_SHARE": "0", "ISPATIALGYM_FAST_COLLECTOR_PREBUILD": "0"}
     protected = {"ISPATIALGYM_CAMPAIGN_GOAL_PLAN", "ISPATIALGYM_CAMPAIGN_CONFIG", "TEMPLATE", "EVAL_INDEX", "ISGF_COLLECT_EXTRA"}
+    from ispatialgym.sampling.campaign_visibility import required as visibility_required
+    data = dict(config['template'])
+    data['objects'] = tuple(ObjectRef(**obj) for obj in data['objects'])
+    if visibility_required(Template(**data)):
+        # fast_env defaults this screen off for most task families. A validated
+        # source's exact visibility requirement must survive sibling dispatch.
+        env['ISGF_GOAL_OCCLUSION'] = 'on'
+        env['ISPATIALGYM_GOAL_OCCLUSION'] = 'on'
+        protected.update(('ISGF_GOAL_OCCLUSION', 'ISPATIALGYM_GOAL_OCCLUSION'))
     for item in extra_env:
         name, value = item.split("=", 1)
-        require(name not in protected, f"cannot override group invariant {name}")
+        require(name not in protected or env.get(name) == value, f"cannot override group invariant {name}")
         env[name] = value
     cmd = [sys.executable, str(code / "scripts/trainfast/submit_fast.py"), "submit", key, str(n), "--flow", "fast", "--code", str(code),
            "--root", str(root), "--ledger", str(root / "manifests/goal_group_allocations.tsv"), "--base-index", str(base_index),
