@@ -118,7 +118,8 @@ def publish(root):
             if str(config.resolve())not in known:
                 workers.append({'name':directory.name,'config':str(config),'state':str(directory/'state.json')})
                 known.add(str(config.resolve()))
-    for filename in ('prepared_category_jar_upper_r1.json','prepared_scoped_refill_r1.json'):
+    for filename in ('prepared_category_jar_upper_r1.json','prepared_scoped_refill_r1.json',
+                     'prepared_camera_hamper_recovery_r1.json','prepared_scaling_model_admission_r1.json'):
         receipt=root/'infra/heldout_recovery'/filename
         if receipt.exists():
             directory=pathlib.Path(load(receipt)['controller'])
