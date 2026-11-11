@@ -747,6 +747,10 @@ PUSH_HEEL_TIGHT_JITTER_FRAC = 0.8
 # the 11 ok >= -2.0320 (62 mrad). The right arm plans to -2.094 with 0 robot_touching_itself in 127 demos (the 11-07 hull sweep: right
 # link3-link5 >= 6.9 mm) - not gated. The elbow QA / PhysX switches are not used.
 PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD = 0.03
+# r3b (uh3_ul01_on 18436497: 360002 rejected twice in a row by the j4 margin, the same left program 'left_arm_joint4 planned -2.0921 rad at
+# retreat8.retreat' from two start draws, ~920 s per attempt, 360003 not reached): after this many left-j4 rejections of one instance its
+# further attempts couple the default arm only (kit ``push_heel_tight.left_banned``; the right arm's attempts without a heel-back yaw end fast)
+PUSH_HEEL_TIGHT_LEFT_J4_BAN_AFTER = 2
 
 
 def heel_tight_couple_plan(arms_per_b: Sequence[Sequence[str]], arm0: str, kept) -> Tuple[List[Tuple[int, List[str]]], int]:
@@ -5506,6 +5510,14 @@ class IORSLarge(SamplerV2):
             # elbow); a B the pre-screen did not judge counts as kept
             arms_b = [self._segment_order(t[1], t[3]) for t in pre[:n_couple]]
             plan, deferred = heel_tight_couple_plan(arms_b, offered[0], lambda i, a: pushable_arm.get((idx_of[id(pre[i])], a), 0.0) >= 0.0)
+            if self.heel_tight_left_banned():
+                # r3b: this instance's left programs failed the j4 margin PUSH_HEEL_TIGHT_LEFT_J4_BAN_AFTER times - the default arm only
+                plan = [(i, [a for a in arms if a == offered[0]]) for i, arms in plan]
+                plan = [(i, arms) for i, arms in plan if arms]
+                TT._count(self, "push_heel_tight.left_banned")
+                if not plan:
+                    raise Reject("grasp_unreachable", f"{PUSH_HEEL_TIGHT_ENV}: the left arm banned for this instance (its programs failed the left j4 margin "
+                                                      f"{PUSH_HEEL_TIGHT_LEFT_J4_BAN_AFTER} times) and no B with {offered[0]}-arm pairs")
             couple = [(pre[i], arms) for i, arms in plan]
             if deferred:
                 TT._countn(self, "push_heel_tight.arm_deferred", deferred)
@@ -8034,6 +8046,11 @@ class IORSLarge(SamplerV2):
         self.heel_tight_left_j4_check()
         return rep
 
+    def heel_tight_left_banned(self) -> bool:
+        """r3b: the current instance (``attempt_begin``'s index) had :data:`PUSH_HEEL_TIGHT_LEFT_J4_BAN_AFTER` left-j4 rejections."""
+        idx = (getattr(self, "_sm_attempt", None) or (None, None))[0]
+        return (getattr(self, "_ht_left_j4_rej", None) or {}).get(idx, 0) >= PUSH_HEEL_TIGHT_LEFT_J4_BAN_AFTER
+
     def heel_tight_left_j4_check(self) -> None:
         """i7-ul01reach r3 (:data:`PUSH_HEEL_TIGHT_ENV`, only where the tight heel lock acts): ``Reject("program_check_failed")`` for a
         program whose planned left_arm_joint4 (the program check's ``ik_witnesses``) comes within :data:`PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD`
@@ -8048,6 +8065,9 @@ class IORSLarge(SamplerV2):
         if got is None or got[0] >= PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD:
             return
         TT._count(self, "push_heel_tight.left_j4_rejected")
+        idx = (getattr(self, "_sm_attempt", None) or (None, None))[0]
+        rej = self.__dict__.setdefault("_ht_left_j4_rej", {})
+        rej[idx] = rej.get(idx, 0) + 1
         raise Reject("program_check_failed", f"left_arm_joint4 planned {lo + got[0]:.4f} rad at {got[1]}, {got[0] * 1000:.1f} mrad from its limit {lo:.4f} "
                      f"(< {PUSH_HEEL_TIGHT_LEFT_J4_MARGIN_RAD * 1000:.0f} mrad, {PUSH_HEEL_TIGHT_ENV}: the left elbow's link3 / link5 graze)", action="left_j4")
 
