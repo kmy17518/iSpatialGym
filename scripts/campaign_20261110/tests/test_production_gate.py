@@ -93,6 +93,15 @@ def test_exact_canary_authorization_is_bounded_and_expires(tmp_path,monkeypatch)
     env,cmd,job=setup(tmp_path,'train')
     proof=tmp_path/'authorization.json'
     value={'purpose':'training_pipeline_canary','config_sha256':file_digest(tmp_path/'config.json'),'start':50000,'count':3}
+    evidence=tmp_path/'heldout_source.json';evidence.write_text('{}')
+    work=tmp_path/'heldout_work.json'
+    related={'owner':'heldout_worker','task':'object_scaling','class_id':'apple','state':'engineering_blocked',
+             'blocker':'Exact model map missing','next_action':'Build the exact ready-model map',
+             'evidence':[{'path':str(evidence),'sha256':file_digest(evidence)}]}
+    work.write_text(json.dumps({'campaign_id':'campaign_20261110','training_config_sha256':value['config_sha256'],
+        'training_class_id':'apple','task':'object_scaling','observed_at':datetime.now(timezone.utc).isoformat(),
+        'model':related,'category_room':related}))
+    value['heldout_parallel_work']={'path':str(work),'sha256':file_digest(work)}
     proof.write_text(json.dumps(value))
     auth={**value,'max_instances':3,'expires_at':(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat(),
           'authorization_path':str(proof),'authorization_sha256':file_digest(proof)}
@@ -105,6 +114,26 @@ def test_exact_canary_authorization_is_bounded_and_expires(tmp_path,monkeypatch)
     changed=list(cmd);changed[4]='4';assert not check_dispatch(tmp_path,changed)['allowed']
     auth['expires_at']='2000-01-01T00:00:00+00:00';gate.write_text(json.dumps(policy))
     assert not check_dispatch(tmp_path,cmd)['allowed']
+
+
+def test_heldout_parallel_work_requires_both_scopes_and_exact_identity(tmp_path):
+    from datetime import datetime,timezone
+    import pytest
+    from scripts.campaign_20261110.production_gate import heldout_parallel_ready
+    from scripts.campaign_20261110.contracts import file_digest
+    cfg={'template':{'task':'object_scaling','class_id':'apple'}}
+    evidence=tmp_path/'state.json';evidence.write_text('{}')
+    row={'owner':'named_worker','task':'object_scaling','class_id':'apple','state':'running','active_jobs':['exact_job'],
+         'evidence':[{'path':str(evidence),'sha256':file_digest(evidence)}]}
+    value={'campaign_id':'campaign_20261110','training_config_sha256':'config_hash','training_class_id':'apple',
+           'task':'object_scaling','observed_at':datetime.now(timezone.utc).isoformat(),'model':row,'category_room':row}
+    path=tmp_path/'parallel.json';path.write_text(json.dumps(value))
+    auth={'heldout_parallel_work':{'path':str(path),'sha256':file_digest(path)}}
+    assert heldout_parallel_ready(tmp_path,cfg,'config_hash',auth)==auth['heldout_parallel_work']
+    with pytest.raises(ValueError,match='exact training config'):heldout_parallel_ready(tmp_path,cfg,'changed',auth)
+    value['category_room']={**row,'state':'engineering_blocked','blocker':'missing map'};path.write_text(json.dumps(value))
+    auth['heldout_parallel_work']['sha256']=file_digest(path)
+    with pytest.raises(ValueError,match='actionable'):heldout_parallel_ready(tmp_path,cfg,'config_hash',auth)
 
 
 def test_projection_unverified_overrides_mechanically_proven_sibling_quota(tmp_path):

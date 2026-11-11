@@ -119,6 +119,56 @@ def canonical_training_ready(root):
         return False
 
 
+def heldout_parallel_ready(root, config, config_sha256, authorization):
+    """Future training tests must advance their related holdouts in parallel.
+
+    An actionable engineering blocker is permitted; this is deliberately not
+    an all-heldouts-complete release condition. The100-class hold is separate.
+    """
+    ref = authorization['heldout_parallel_work']
+    path = _owned(root, ref['path'])
+    if file_digest(path) != ref['sha256']:
+        raise ValueError('held-out parallel-work evidence changed')
+    proof = json.loads(path.read_text()); template = config['template']
+    if (proof.get('campaign_id'), proof.get('training_config_sha256'), proof.get('training_class_id'), proof.get('task')) != (
+            CAMPAIGN, config_sha256, template['class_id'], template['task']):
+        raise ValueError('held-out parallel-work scope differs from exact training config')
+    age = (dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(proof['observed_at'].replace('Z','+00:00'))).total_seconds()
+    if not 0 <= age <= 1800:
+        raise ValueError('held-out parallel-work observation is stale or future-dated')
+    from scripts.campaign_20261110.contracts import task_quotas
+    quota = next(q for q in task_quotas() if q.task == template['task'])
+    for key, split, applicable in [('model','eval_model',bool(quota.model_instances_per_class)),
+                                   ('category_room','eval_category',bool(quota.category_instances))]:
+        row = proof[key]
+        if not applicable:
+            if row.get('state') != 'not_applicable':
+                raise ValueError('inapplicable held-out scope must be explicit')
+            continue
+        if row.get('task') != template['task'] or (key == 'model' and row.get('class_id') != template['class_id']):
+            raise ValueError('related held-out class/task differs')
+        if not row.get('owner'):
+            raise ValueError('related held-out work lacks a named owner')
+        state = row.get('state')
+        if state == 'complete':
+            if not evaluation_exhausted(root,{**template,'split':split}):
+                raise ValueError('related held-out quota is not authoritatively complete')
+        elif state in ('queued','running'):
+            if not (row.get('controller') or row.get('active_jobs')):
+                raise ValueError('related held-out work has no active controller/job')
+        elif state == 'engineering_blocked':
+            if not row.get('blocker') or not row.get('next_action'):
+                raise ValueError('related held-out blocker lacks an actionable correction')
+        else:
+            raise ValueError('related held-out work has not advanced')
+        if not row.get('evidence'):
+            raise ValueError('related held-out work lacks source evidence')
+        for evidence in row['evidence']:
+            if file_digest(_owned(root,evidence['path'])) != evidence['sha256']:
+                raise ValueError('related held-out source evidence changed')
+    return ref
+
+
 def check_environment(root, environment, *, kind='collection', start=None, count=None):
     result = {'allowed': False, 'reason': 'unknown collection scope', 'category': 'unverified',
               'gate_sha256': None}
@@ -172,6 +222,7 @@ def check_environment(root, environment, *, kind='collection', start=None, count
             proof = json.loads(evidence.read_text())
             if proof.get('purpose') != 'training_pipeline_canary' or proof.get('config_sha256') != result['config_sha256']: continue
             if (proof.get('start'), proof.get('count')) != (int(start), int(count)): continue
+            result['heldout_parallel_work'] = heldout_parallel_ready(root,config,result['config_sha256'],proof)
             return {**result, 'allowed': True, 'category': 'validation_canary',
                     'reason': 'exact bounded pipeline canary', 'authorization': authorization}
         return result
