@@ -395,7 +395,9 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                 result['records'].append(row)
         except Exception as error:
             result['errors'].append({'path': str(path), 'error': f'{type(error).__name__}: {error}'})
-    for request in sorted(base.glob('*/restoration_control*/request.json')):
+    controls=set(base.glob('*/restoration_control*/request.json'))
+    controls.update(base.glob('*/batch_restoration*/control_aa/request.json'))
+    for request in sorted(controls):
         try:
             control=read(request)
             require(control.get('diagnostic_control')=='A_A' and control.get('diagnostic_only') is True

@@ -220,14 +220,15 @@ def test_sequence_submission_requires_exact_member_config_and_does_not_mean_succ
 
 
 def test_repeated_a_control_is_separate_from_restoration_release_evidence(tmp_path):
-    folder=tmp_path/'training_pipeline_canaries/tray/restoration_control_aa_r1'
-    write_json_atomic(folder/'request.json',{'diagnostic_control':'A_A','diagnostic_only':True,'production_released':False})
-    write_json_atomic(folder/'physics/probe.json',{'schema':'isg-training-restoration-control-v1',
-        'request':status.ref(folder/'request.json'),'entries':[{'returncode':0,'result':{'success':True}}]*2})
+    for name in ['restoration_control_aa_r1','batch_restoration_control_step_r2/control_aa']:
+        folder=tmp_path/'training_pipeline_canaries/tray'/name
+        write_json_atomic(folder/'request.json',{'diagnostic_control':'A_A','diagnostic_only':True,'production_released':False})
+        write_json_atomic(folder/'physics/probe.json',{'schema':'isg-training-restoration-control-v1',
+            'request':status.ref(folder/'request.json'),'entries':[{'returncode':0,'result':{'success':True}}]*2})
     observed=status.observe(tmp_path)
     assert observed['batch_stages']==[]
-    control=observed['diagnostic_controls'][0]
-    assert control['successful_episodes']==2 and control['release_eligible'] is False
+    assert len(observed['diagnostic_controls'])==2
+    assert all(c['successful_episodes']==2 and c['release_eligible'] is False for c in observed['diagnostic_controls'])
     assert observed['benchmark_credit']==0
 
 
