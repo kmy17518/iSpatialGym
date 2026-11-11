@@ -126,7 +126,9 @@ def publish(root):
                      'prepared_category_jar_brace_r1.json','prepared_scaling_native_regions_r1.json',
                      'prepared_classroom_native_regions_r1.json','prepared_under_model_group_r2.json',
                      'prepared_axial_passed_groups_r1.json','prepared_under_model_stance86_r1.json',
-                     'prepared_under_category_remaining390_r1.json'):
+                     'prepared_under_category_remaining390_r1.json',
+                     'prepared_under_category_stancef9_r1.json','prepared_under_model_refill86_r1.json',
+                     'prepared_held_jar_grid390_r1.json','prepared_held_blender_open_high390_r1.json'):
         receipt=root/'infra/heldout_recovery'/filename
         if receipt.exists():
             directory=pathlib.Path(load(receipt)['controller'])
