@@ -9,7 +9,7 @@ import argparse
 from datetime import datetime,timezone
 import fcntl,json,os,subprocess,time
 from pathlib import Path
-from .contracts import file_digest,require,write_json_atomic
+from .contracts import digest,file_digest,require,write_json_atomic
 from .training_stream import native_evidence
 from .training_canaries import publish_canary
 from .training_restoration import checked,validated_canary
@@ -53,6 +53,7 @@ def prepare_matrix(root,batch,reviews,runtime,started_at,render_runtime=None,phy
         kind='physics_action_open_loop'if stage=='physics'else'kinematic_observation_rendering'
         stage_runtime=physics_probe_runtime if stage=='physics'else render_runtime
         stage_proof=proof if stage=='physics'else render_proof
+        verified_stage_inputs=None
         for name,(control,order)in specs.items():
             destination=directory/stage/name;request=destination/'request.json';output=destination/'output'
             value={'schema':'isg-training-batch-probe-request-v1','campaign_id':'campaign_20261110','canaries':reviews,
@@ -65,7 +66,20 @@ def prepare_matrix(root,batch,reviews,runtime,started_at,render_runtime=None,phy
             if stage=='rendering'and render_runtime!=runtime:value['sequential_render_only']=True
             if stage=='physics'and physics_probe_runtime!=runtime:value['sequential_checker_only']=True
             request_ref=immutable(request,value)
-            actual,records=inputs(root,request);verify_runtime_compatibility(root,actual,records,stage_runtime)
+            actual,records=inputs(root,request)
+            # The frozen runtime and source bytes are common to this stage. Keep
+            # every request/source binding check, but audit the full payload
+            # inventory once here. Native entry and final verification still
+            # independently perform their complete runtime checks per control.
+            stage_inputs=digest({'request':{k:v for k,v in actual.items()
+                if k not in ('diagnostic_control','diagnostic_only')},'records':records})
+            require(actual.get('diagnostic_control')==control and
+                    actual.get('diagnostic_only',False)==bool(control),
+                    'matrix control scope changed')
+            if verified_stage_inputs is None:
+                verify_runtime_compatibility(root,actual,records,stage_runtime)
+                verified_stage_inputs=stage_inputs
+            else:require(stage_inputs==verified_stage_inputs,'matrix stage input identity changed')
             preflight=immutable(destination/'preflight.json',{'passed':True,'request':request_ref,'runtime':str(stage_runtime),
                 'runtime_proof':stage_proof,'source_environment':env,'control':name,'kind':kind,'max_native_episodes':len(order),
                 'output':str(output),'native_draws':0,'benchmark_credit':0,'actual_native_execution':False,
@@ -78,6 +92,15 @@ def prepare_matrix(root,batch,reviews,runtime,started_at,render_runtime=None,phy
 
 
 def render_runtime_proof(path,native,runtime,*,physics_checker=False):
+    if Path(path).exists():
+        # This is an immutable candidate proof, not authorization by itself.
+        # Its full payload inventory is re-audited by the caller before use.
+        saved=read(path)
+        require(saved.get('schema')==('isg-sequential-checker-runtime-compatibility-v1'if physics_checker else'isg-render-cleanup-runtime-compatibility-v1')and
+                saved.get('native_runtime')==ref(native/'.snapshot_commit')and
+                saved.get('checker_runtime'if physics_checker else'cleanup_runtime')==ref(runtime/'.snapshot_commit'),
+                'saved runtime proof identity changed')
+        return ref(path)
     changed={}
     for folder in ('ispatialgym','scripts'):
         paths={str(p.relative_to(tree))for tree in (native,runtime)for p in(tree/folder).rglob('*.py')}

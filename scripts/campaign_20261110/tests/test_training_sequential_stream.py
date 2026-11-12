@@ -98,7 +98,11 @@ def test_matrix_binds_normal_and_cleanup_rendering_to_one_renderer(tmp_path,monk
     reviews=[stream.immutable(tmp_path/(name+'.json'),{'identity':name})for name in ('A','B')]
     sources=[{'instance_id':name,'source_job':str(job),'export_record':{'validation_key':{'code_sha256':stream.file_digest(native/'.snapshot_commit')}}}for name in ('A','B')]
     monkeypatch.setattr(stream,'validated_canary',lambda root,reference,started:sources[reviews.index(reference)])
-    monkeypatch.setattr(stream,'inputs',lambda root,p:(stream.read(p),[s['export_record']for s in sources]))
+    input_checks=[]
+    def checked_inputs(root,p):
+        input_checks.append(p)
+        return stream.read(p),[s['export_record']for s in sources]
+    monkeypatch.setattr(stream,'inputs',checked_inputs)
     audited=[]
     def audit(root,request,records,runtime):
         assert request['probe_runtime_sha256']==stream.file_digest(runtime/'.snapshot_commit')
@@ -109,7 +113,8 @@ def test_matrix_binds_normal_and_cleanup_rendering_to_one_renderer(tmp_path,monk
     assert len(manifest['records'])==9
     assert {r['runtime']for r in manifest['records']if r['stage']=='physics'}=={str(checker)}
     assert {r['runtime']for r in manifest['records']if r['stage']=='rendering'}=={str(renderer)}
-    assert sum(flag is True for flag,runtime in audited)==3
+    assert audited==[(None,checker),(True,renderer)]
+    assert len(input_checks)==9
     assert all(stream.read(r['request']['path'])['sequential_checker_only'] is True for r in manifest['records']if r['stage']=='physics')
     cleanup=stream.read(stream.prepare_render_cleanup(tmp_path,batch,reviews,native,renderer,stream.ref(job/'job.env'))['path'])
     assert len(cleanup['records'])==2 and {r['runtime']for r in cleanup['records']}=={str(renderer)}
@@ -117,3 +122,11 @@ def test_matrix_binds_normal_and_cleanup_rendering_to_one_renderer(tmp_path,monk
     assert proof['permitted_execution_kinds']==['kinematic_observation_rendering']
     with pytest.raises(ContractError,match='source identity changed'):
         stream.prepare_matrix(tmp_path,batch,reviews,native,0,native)
+    # Shared audit reuse never authorizes a different source/input binding.
+    def changed_inputs(root,p):
+        value,records=checked_inputs(root,p)
+        if p.parent.name=='fresh_B':records=[{'changed_source':True}]
+        return value,records
+    monkeypatch.setattr(stream,'inputs',changed_inputs)
+    with pytest.raises(ContractError,match='stage input identity changed'):
+        stream.prepare_matrix(tmp_path,tmp_path/'changed',reviews,native,0,renderer,checker)
