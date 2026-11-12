@@ -35,8 +35,11 @@ def check_review(root, job, environment, policy, *, kind, submission_script=None
     require(Path(request['config']).resolve() == config_path and request['class_id'] == config['template']['class_id'] and
             int(environment['START']) == prepared['start'] == request['start_index'] and
             int(environment['N']) == request['count'] == 1, 'prospective source range differs')
-    require(review['request'] == prepared['source_request'] and review['returncode'] == 0 and
-            review['native_artifacts_complete'] is True and review['benchmark_credit'] == 0 and
+    native_complete = review['returncode'] == 0 and review['native_artifacts_complete'] is True
+    if review.get('returncode') == 124:
+        from .prepare_recovery_group_members import validate_timed_out_member
+        native_complete = validate_timed_out_member(root, request, review)
+    require(review['request'] == prepared['source_request'] and native_complete and review['benchmark_credit'] == 0 and
             review['production_released'] is False, 'prospective native evidence incomplete')
     native = Path(prepared['runtime']).resolve(); script = checked(prepared['submission_script'])
     require(native.is_relative_to(root/'code') and request['native_runtime'] == review['native_runtime'] == str(native) and

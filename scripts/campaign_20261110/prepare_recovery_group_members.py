@@ -26,8 +26,19 @@ def checked(root, ref):
     return p
 
 
-def member_projection(root, request_ref, review_path, index, output):
-    """Bind one existing member without changing its native identity."""
+def parent_has_complete_members(v):
+    """A timed-out parent may contain complete members; it remains timed out."""
+    if v.get('returncode') == 0 and v.get('native_artifacts_complete') is True:
+        return True
+    members = v.get('members', [])
+    return (v.get('returncode') == 124 and v.get('native_artifacts_complete') is False and
+            v.get('requested_count') == 3 and type(v.get('written_count')) is int and
+            0 < v['written_count'] <= 3 and v['written_count'] == len(members) and
+            len(v.get('artifacts', [])) == 3 * len(members))
+
+
+def checked_member_source(root, request_ref, review_path, index):
+    """Verify existing bytes independently of the parent's completion status."""
     qpath = checked(root, request_ref)
     q = json.loads(qpath.read_text()); review_ref = reference(review_path)
     v = json.loads(checked(root, review_ref).read_text())
@@ -35,7 +46,7 @@ def member_projection(root, request_ref, review_path, index, output):
             q['campaign_id'] == 'campaign_20261110' and q['purpose'] == 'canonical_recovery_bounded_canary' and
             q['count'] == 3 and q['benchmark_credit'] == q['quota_credit'] == q['current100_r1_credit'] == 0 and
             q['production_released'] is False, 'not an authorized bounded engineering group')
-    require(v['request'] == request_ref and v['returncode'] == 0 and v['native_artifacts_complete'] is True and
+    require(v['request'] == request_ref and parent_has_complete_members(v) and
             v['native_runtime'] == q['native_runtime'] and v['benchmark_credit'] == 0 and
             v['production_released'] is False, 'native group review incomplete')
     require(type(index) is int and q['start_index'] <= index < q['start_index'] + q['count'], 'member outside reserved group')
@@ -51,20 +62,51 @@ def member_projection(root, request_ref, review_path, index, output):
     selected = [tro, tro.with_name(iid + '.oracle.json'), tro.with_name(iid + '.summary.json')]
     require(all(str(p) in artifacts for p in selected) and
             json.loads(selected[1].read_text())['tro_sha256'] == file_digest(tro), 'member sidecar is not bound')
-    member = {**q, 'schema': 'isg-bounded-canonical-member-projection-v1',
+    members = [m for m in v.get('members', []) if m['instance_id'] == iid and m['index'] == index]
+    require(len(members) == 1, 'member omitted or ambiguous in native review')
+    return q, v, review_ref, artifacts, selected, members
+
+
+def member_projection(root, request_ref, review_path, index, output):
+    """Bind one existing member without changing its native identity."""
+    q, v, review_ref, artifacts, selected, members = checked_member_source(root, request_ref, review_path, index)
+    member = {**q, 'schema': 'isg-bounded-canonical-member-projection-v2',
               'start_index': index, 'count': 1,
               'native_generation_request': request_ref, 'native_generation_review': review_ref,
               'projection_only': True, 'new_native_draws': 0,
               'projection_meaning': 'Exact existing member of parent group; no new native execution or identity change.'}
     output.mkdir(parents=True, exist_ok=False)
     write_json_atomic(output/'request.json', member)
-    mv = {**v, 'schema': 'isg-bounded-native-member-review-v1', 'request': reference(output/'request.json'),
-          'artifacts': [artifacts[str(p)] for p in selected], 'members': [m for m in v.get('members', []) if m['instance_id'] == iid],
+    mv = {**v, 'schema': 'isg-bounded-native-member-review-v2', 'request': reference(output/'request.json'),
+          'artifacts': [artifacts[str(p)] for p in selected], 'members': members,
           'requested_count': 1, 'written_count': 1, 'parent_requested_count': q['count'],
           'native_generation_request': request_ref, 'native_generation_review': review_ref,
-          'projection_only': True, 'new_native_draws': 0}
+          'projection_only': True, 'new_native_draws': 0, 'member_native_artifacts_complete': True,
+          'parent_returncode': v['returncode'], 'parent_native_artifacts_complete': v['native_artifacts_complete']}
     write_json_atomic(output/'native_review.json', mv)
-    return member, tro
+    return member, selected[0]
+
+
+def validate_timed_out_member(root, request, review):
+    """Strict consumer verification; never turn parent rc124 into success."""
+    require(request.get('schema') == 'isg-bounded-canonical-member-projection-v2' and
+            review.get('schema') == 'isg-bounded-native-member-review-v2' and
+            request.get('projection_only') is review.get('projection_only') is True and
+            request.get('new_native_draws') == review.get('new_native_draws') == 0 and
+            review.get('member_native_artifacts_complete') is True and
+            review.get('returncode') == review.get('parent_returncode') == 124 and
+            review.get('native_artifacts_complete') is review.get('parent_native_artifacts_complete') is False,
+            'invalid timed-out member projection')
+    require(request['native_generation_request'] == review['native_generation_request'] and
+            request['native_generation_review'] == review['native_generation_review'], 'member parent differs')
+    parent_review = checked(root, request['native_generation_review'])
+    q, v, _, artifacts, selected, members = checked_member_source(root, request['native_generation_request'], parent_review, request['start_index'])
+    require(v['returncode'] == 124 and request['count'] == review['requested_count'] == review['written_count'] == 1 and
+            review['parent_requested_count'] == q['count'] and review['members'] == members and
+            review['artifacts'] == [artifacts[str(p)] for p in selected], 'incomplete projected native member')
+    require(all(request.get(k) == value for k, value in q.items() if k not in ('schema', 'count', 'start_index')),
+            'projected native identity changed')
+    return True
 
 
 def prepare(root, parent_ref, index):
@@ -179,7 +221,7 @@ def run(root, batch_ref, *, register_members=False):
         parent = checked(root, row['request']); review = parent.parent/'native_review.json'
         if not review.exists(): pending.append(row['class_id']); continue
         v = json.loads(review.read_text())
-        if v.get('returncode') != 0 or not v.get('native_artifacts_complete'): pending.append(row['class_id']); continue
+        if not parent_has_complete_members(v): pending.append(row['class_id']); continue
         for member in v['members']:
             prepared.append(prepare(root, row['request'], int(member['index'])))
     entries = register(root, prepared) if register_members and prepared else []
