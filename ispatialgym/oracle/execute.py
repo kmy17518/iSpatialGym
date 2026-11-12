@@ -5941,6 +5941,32 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             after, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
             ctx["push_residual"]["extended_by"] = residual
             ctx["push_residual"]["after"] = after
+            # Prospective close-small repair: the first correction can leave a
+            # joint improving but outside its unchanged layout tolerance.
+            # Each additional leg uses the live residual and the existing
+            # guarded motion path. The original extension cap is cumulative.
+            if (os.environ.get("ISPATIALGYM_ARTICULATED_ARC_REPUSH") == "1"
+                    and art_c is not None and geom.kind == "arc"):
+                from ispatialgym.oracle.campaign_articulated_residual import next_correction
+                used, rounds, previous = abs(residual), 1, residual
+                history = ctx["push_residual"].setdefault("articulated_repush", [])
+                while True:
+                    correction = next_correction(after, previous, tol, rmin, used, cap,
+                                                 rounds, math.copysign(1.0, geom.angle))
+                    if correction is None:
+                        break
+                    previous = after
+                    ext = extend_push(geom, end_pose, correction)
+                    yield from _push_leg(motions, state, arm, obj, ext, geom, pose0,
+                                         cfg, ctx, "articulated re-push", partial=True)
+                    yield from _hold_until_still(motions, state, obj, cfg)
+                    end_pose = as_world_pose(state.eef_pose(arm))
+                    after, _ = push_residual(geom, state, obj, pose0, art_c)
+                    used += abs(correction)
+                    rounds += 1
+                    history.append({"round": rounds, "before": previous, "after": after,
+                                    "extended_by": correction, "cumulative_extension": used,
+                                    "cumulative_cap": cap})
         elif forward and abs(residual) > cap:
             ctx["push_residual"]["skipped"] = "beyond the recorded arc"
         elif not forward and abs(residual) >= rmin:
