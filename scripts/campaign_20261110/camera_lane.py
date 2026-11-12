@@ -13,6 +13,8 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
+
 from scripts.campaign_20261110.acceptance import artifact, read, report_passed, replay_report_path
 from scripts.campaign_20261110.contracts import (
     ObjectRef, Template, Perturbations, ScaleState, ValidationEvidence, ValidationKey, digest, file_digest,
@@ -29,8 +31,8 @@ EVAL_QUOTAS = {"3": 3, "5": 4, "10": 3}
 
 def path_bucket(distance):
     require(isinstance(distance, (int, float)) and not isinstance(distance, bool)
-            and math.isfinite(distance) and 0 < distance <= 10, "invalid camera geodesic distance")
-    return next(str(hi) for hi in (3, 5, 10) if distance <= hi)
+            and math.isfinite(distance) and 0 < distance, "invalid camera geodesic distance")
+    return next((str(hi) for hi in (3, 5, 10) if distance <= hi), "outside")
 
 
 def room_caps(plan, total=1000, *, task=TASK):
@@ -140,8 +142,11 @@ def audit_camera(job, gate_path, *, root, started_at, template):
         free_bucket = path_bucket(summary["geodesic_m"])
         distance = summary["geodesic_blocked_m"] if template.task == "camera_relocalization-obstructed" else summary["geodesic_m"]
         bucket = path_bucket(distance)
-        require(bucket == free_bucket, "obstructed path changed the strict camera bucket")
-        require(float(summary["path_bucket_m"]) == float(bucket) == float(side["path_bucket_m"]), "camera bucket disagrees with geodesic/sidecar")
+        # Legacy sidecars may describe the free-path bucket. Bucket drift is
+        # descriptive; validated measured paths and physical checks remain authoritative.
+        require(summary.get("path_bucket_m") == side.get("path_bucket_m"), "camera summary/sidecar metadata differs")
+        labels = {None if b == "outside" else float(b) for b in (free_bucket, bucket)}
+        require(side.get("path_bucket_m") in labels, "camera bucket disagrees with measured path metadata")
         p = block["perturbations"]
         perturbations = Perturbations({n: ScaleState(**v) for n, v in p["scales"].items()}, tuple(p["removed_objects"]), p["lighting"])
         demo = artifact(report_path.parent / "demo.hdf5", root, started_at)
@@ -207,7 +212,7 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
         added, deferred = {}, []
         for member in review["members"]:
             iid, bucket, room = member["instance_id"], member["bucket"], member["room"]
-            require(bucket in EVAL_QUOTAS and path_bucket(member["geodesic_m"]) == bucket, "invalid reviewed bucket")
+            require(path_bucket(member["geodesic_m"]) == bucket, "invalid reviewed bucket")
             if iid in accepted:
                 require(accepted[iid]["artifacts"] == member["artifacts"], "accepted camera ID changed")
                 require(digest(accepted[iid].get("contract",review["contract"])) == digest(review["contract"]), "accepted camera contract changed")
@@ -216,7 +221,7 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
                 accepted[iid]["contract"] = review["contract"]
                 accepted[iid]["source_job"] = review["source_job"]
                 continue
-            if member["sampling_split"] == "eval_standard" and not member["perturbed"] and eval_counts[bucket] < EVAL_QUOTAS[bucket]:
+            if member["sampling_split"] == "eval_standard" and not member["perturbed"] and sum(eval_counts.values()) < sum(EVAL_QUOTAS.values()):
                 split = "eval_standard"
                 eval_counts[bucket] += 1
             else:

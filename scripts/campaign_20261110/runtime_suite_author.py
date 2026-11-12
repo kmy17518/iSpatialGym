@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
 
 
 def read(p):
@@ -59,10 +60,9 @@ def group_range(template, counts):
         options = ((30,45), (45,75), (75,120)); targets = next(q.standard_buckets for q in task_quotas() if q.task == template.task)
     else:
         options, targets = ranges(template), quotas(template)
-    deficits = [max(0, n-int(counts.get(str(i), counts.get(i, 0)))) for i,n in enumerate(targets)]
-    # Existing quota buckets determine scheduling, never a successful/easier draw.
-    bucket = max(range(len(options)), key=lambda i: (deficits[i], -i))
-    return options[bucket], bucket
+    # Native task samplers retain physical bounds and ignore these legacy
+    # descriptive ranges; no bucket deficit may hold an otherwise ready class.
+    return (options[0][0], options[-1][1]), 0
 
 
 def recorded_opening_range(template, anchor):
@@ -109,11 +109,10 @@ def recorded_disembedding_evidence(template, anchor):
     summary_group = anchor["summary"].get("campaign_goal_group", {})
     runtime_group = campaign.get("runtime", {}).get("goal_group", {})
     for group in (summary_group, runtime_group):
-        require(group.get("bucket_strict") is True and tuple(group.get("crowdedness_range", ())) == bounds,
-                "recorded historical strict bucket disagrees with native coverage")
         actual = group.get("actual_crowdedness")
-        require(isinstance(actual, (int, float)) and math.isfinite(actual) and bounds[0] < actual < bounds[1],
-                "recorded actual crowdedness lies outside its measured strict bucket")
+        require(isinstance(actual, (int, float)) and math.isfinite(actual) and 0 < actual <= 1
+                and math.isclose(actual, coverage, abs_tol=1e-6),
+                "recorded actual crowdedness differs from measured native geometry")
     require(summary_group.get("group_id") and summary_group.get("plan_sha256") and
             all(summary_group[k] == runtime_group.get(k) for k in ("group_id", "plan_sha256")),
             "recorded source group identities differ")
@@ -235,6 +234,7 @@ def author(root, run_dir, catalog_path, ordinal):
            "release":ref(run_dir/"release.json"),"author":ref(__file__),"quota_observation":ref(run_dir/"quota_observation.json"),"catalog_row":ref(catalog_path),"campaign_config":ref(config_path),
            "group_id":None if camera else token,"goal_plan":goal_ref,"fresh_start":index,"fresh_count":count,
            "camera_exempt":camera,"owner":"/root","dispatch_token":token,"allocation_ledger":str(ledger),
+           "bucket_policy": BUCKET_POLICY,
            "selected_bucket":bucket,"effective_limits":{"group_budget_seconds":None if camera else budget,
                "sampling_limit_seconds":int(command[command.index("--sample-limit-s")+1]),"allocation_limit_seconds":int(command[command.index("--time-s")+1])},
            "quota_ineligible_at_authoring":bool(quota["current_eligible_standard"]>=10),

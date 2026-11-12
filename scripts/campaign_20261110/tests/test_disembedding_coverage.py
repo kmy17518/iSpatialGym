@@ -24,8 +24,9 @@ def test_measured_low_coverage_never_schedules_impossible_middle_or_spills_train
     assert eligible_buckets(bound) == (0,)
     counts = {'evaluation':{},'train_buckets':{},'class_remaining':1000,'task_remaining':10000}
     assert next_work(bound,counts)['bucket'] == 0
-    assert next_work(bound,{**counts,'evaluation':{0:3}}) is None
-    assert next_work(original,counts)['bucket'] == 1
+    assert next_work(bound,{**counts,'evaluation':{0:3}})['groups'] == 6
+    assert next_work(bound,{**counts,'evaluation':{0:10}}) is None
+    assert next_work(original,counts)['bucket'] == 0
     assert bind_standard_coverage(bound,anchor) is bound
 
 
@@ -39,4 +40,4 @@ def test_changed_native_evidence_models_and_boundaries_fail_closed(tmp_path):
     profile['target']['model'] = next(o.model for o in template.objects if o.role=='target')
     profile['source_floor_area_m2'] = .1
     c.write_json_atomic(tmp_path/'template_meta.json',anchor['template_meta'])
-    with pytest.raises(c.ContractError,match='strict bucket boundary'):bind_standard_coverage(template,anchor)
+    assert bind_standard_coverage(template,anchor).scene_setup['standard_native_coverage']['coverage'] == pytest.approx(.3)

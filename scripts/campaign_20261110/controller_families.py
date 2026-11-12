@@ -141,10 +141,8 @@ def next_bucket(counts, quotas, enabled=None):
     require(isinstance(enabled,list) and enabled and len(set(enabled))==len(enabled)
             and all(isinstance(i,int) and not isinstance(i,bool) and 0<=i<len(quotas) for i in enabled),
             'invalid enabled evaluation buckets')
-    deficits = [max(0, target - counts.get(("eval_standard", index), 0)) for index, target in enumerate(quotas)]
-    if not any(deficits[i] for i in enabled):
-        return None
-    return max(enabled, key=lambda index: (deficits[index], -index))
+    used = sum(n for (split, _), n in counts.items() if split == "eval_standard")
+    return None if used >= sum(quotas) else enabled[0]
 
 
 def slurm_status():

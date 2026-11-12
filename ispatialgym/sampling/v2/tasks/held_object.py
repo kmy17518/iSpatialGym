@@ -1015,11 +1015,11 @@ class HeldObjectV2(SamplerV2):
         for gname in candidates:
             g = next(x for x in self.grasps if x.name == gname)
             for start_attempt in range(3):
-                # Owner 2026-11-10: train buckets are balancing preferences. The
-                # final draw can use the full task range; eval buckets stay strict.
-                magnitude_range = plan.magnitude_range
-                if plan.split == "train" and start_attempt == 2:
-                    magnitude_range = (0.05, 0.30) if self.activity == "object_scaling" else (30.0, 120.0)
+                # Bucket labels do not constrain any campaign split. Preserve
+                # minimum meaningful depth change and the native rotation domain.
+                magnitude_range = ((float(self.g("min_depth_change_m")),
+                                    float(self.options[gname]["window"][1]) - float(self.options[gname]["window"][0]))
+                                   if self.activity == "object_scaling" else tuple(self.g("goal_angle_range_deg")))
                 if self.activity == "object_scaling":
                     opt = self.options[gname]
                     d1 = float(th.dot(goal[0] - G.t(cam[0]), axis))

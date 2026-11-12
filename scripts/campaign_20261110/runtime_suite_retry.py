@@ -127,8 +127,6 @@ def _row(root, row_ref, prior_ref, number, reservation, pointer, base, correctio
             from .runtime_suite_opening_correction import recorded_opening
             correction_proof=recorded_opening(root,correction_ref,prior_ref,row)
         else:raise ValueError('unknown exact input correction type')
-    else:
-        require(row.get('selected_bucket')==prior.get('selected_bucket'), 'retry changes selected strict bucket')
     _reservation(root,reservation,row,checked(root,pointer['index_reservation']))
     if row['camera_exempt']:
         require(row['goal_plan'] is None and row['group_id'] is None and row['fresh_count']==1,
@@ -139,8 +137,8 @@ def _row(root, row_ref, prior_ref, number, reservation, pointer, base, correctio
         old=checked(root,prior['goal_plan']);new=checked(root,row['goal_plan'])
         require(new['group_id']==row['group_id'], 'retry goal group binding differs')
         # New indices/group and a measured time allowance may change; target,
-        # geometry, source proposals, strict bucket, and every QA option may not.
-        ignored={'group_id','created_at','budget_seconds'}
+        # geometry, source proposals, and every QA option may not. Bucket metadata is descriptive.
+        ignored={'group_id','created_at','budget_seconds','magnitude_range','magnitude_range_deg','fraction_range','crowdedness_range','bucket_policy'}
         if correction_ref:ignored.update(k.split('.',1)[1]for k in correction_proof['changed_fields']if k.startswith('goal_plan.'))
         require({k:v for k,v in old.items() if k not in ignored}==
                 {k:v for k,v in new.items() if k not in ignored}, 'retry changes physical goal or checks')

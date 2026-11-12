@@ -38,7 +38,7 @@ def test_standard_camera_category_keeps_its_distinct_three_four_three_quota():
     added,deferred=allocate_members(accepted,members("standardcat","eval_category"),class_id="camera_relocalization-standard",
         training_room_caps={"scene/room":1000},eval_quotas={"eval_category":{"3":3,"5":4,"10":3}})
     assert list(added.values())==["eval_category"]*10 and len(deferred)==5
-    assert [sum(row["bucket"]==b for row in accepted.values()) for b in ("3","5","10")]==[3,4,3]
+    assert [sum(row["bucket"]==b for row in accepted.values()) for b in ("3","5","10")]==[5,5,0]
 
 
 def test_training_honors_room_and_class_caps_and_accepts_only_held_in():
@@ -76,9 +76,13 @@ def test_obstructed_audit_and_atomic_claim_bind_poses_and_global_reservations(tm
         camera_classes.claim_obstructed(review, path, **kwargs)
 
 
-def test_blocked_and_free_distance_must_both_match_strict_bucket(tmp_path):
+def test_blocked_path_can_cross_buckets_with_consistent_metadata(tmp_path):
     f = fixture(tmp_path, obstructed=True)
     summary = f.inst/"camera_01.summary.json"
     c.write_json_atomic(summary, {"geodesic_m": 2, "geodesic_blocked_m": 4, "path_bucket_m": 5})
-    with pytest.raises(c.ContractError, match="changed the strict camera bucket"):
+    with pytest.raises(c.ContractError, match="metadata differs"):
         audit(f)
+    side = f.inst/"camera_01.oracle.json"
+    value = camera_classes.read(side); value["path_bucket_m"] = 5
+    c.write_json_atomic(side, value)
+    assert next(m for m in audit(f)["members"] if m["instance_id"] == "camera_01")["bucket"] == "5"

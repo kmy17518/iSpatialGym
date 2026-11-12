@@ -558,9 +558,9 @@ def test_large_opening_anchor_reuse_preserves_verified_goal_and_strict_bucket(tm
     assert plan['goal_joints'] == {'hinge': .28274476528167725, 'other': .3}
     assert plan['goal_joint_proposal']['method'] == 'verified_anchor_joint_goal_before_starts'
     assert plan['goal_joint_proposal']['requires_native_passive_stability'] is True
-    with pytest.raises(c.ContractError, match='outside the requested strict bucket'):
-        g.prepare_group(**kwargs, group_id='wrong_bucket', output=tmp_path / 'groups/wrong_bucket',
-                        magnitude_range=[.5, 1.])
+    g.prepare_group(**kwargs, group_id='other_bucket', output=tmp_path / 'groups/other_bucket',
+                    magnitude_range=[.5, 1.])
+    assert g.read_json(tmp_path/'groups/other_bucket/goal_plan.json')['goal_joints'] == plan['goal_joints']
 
 
 def test_nextto_marker_group_preserves_native_raised_release_and_source_view(tmp_path):

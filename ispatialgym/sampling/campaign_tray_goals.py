@@ -7,6 +7,7 @@ import json
 import math
 import os
 import time
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
 from dataclasses import dataclass
 
 from ispatialgym.sampling.campaign_held_goals import ENV, GoalGroupTimeout, GoalPlanError, _require, _vector
@@ -122,14 +123,14 @@ class TrayGoalPlan:
                 "requested_goal": {"target": as_pose(self.goal), "destination": as_pose(self.destination)},
                 "target_name": self.target_name, "destination_name": self.destination_name,
                 "plan_sha256": self.sha256, "crowdedness_range": list(self.crowdedness_range),
-                "bucket_strict": self.split != "train", "deadline_at": self.deadline_at,
+                "bucket_strict": False, "bucket_policy": BUCKET_POLICY, "deadline_at": self.deadline_at,
                 "destination_side": self.destination_side,
                 "max_members": self.max_members, "phase": "planned_before_start"}
 
     def accepts_coverage(self, value):
         lo, hi = self.crowdedness_range
         # The specified buckets are [0,.3), [.3,.45), [.45,1].
-        return self.split == "train" or (lo <= value and (value < hi or (hi == 1 and value <= hi)))
+        return math.isfinite(value) and 0 <= value <= 1
 
 
 def validate_tray_plan(raw, *, template_id, scene, rooms, activated_at, now=None):

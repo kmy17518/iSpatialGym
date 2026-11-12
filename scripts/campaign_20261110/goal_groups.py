@@ -406,7 +406,8 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                 pose = anchor.get("bound_object_poses", {}).get(targets[0])
         require(pose is not None, "anchor lacks a world goal/root pose")
         source_goal = pose if isinstance(pose, dict) else {"position": pose[0], "orientation": pose[1]}
-    plan = {"schema": SCHEMA, "campaign_id": campaign_id, "group_id": group_id, "split": template.split,
+    from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
+    plan = {"bucket_policy": BUCKET_POLICY, "schema": SCHEMA, "campaign_id": campaign_id, "group_id": group_id, "split": template.split,
             "task": template.task, "template_id": runtime_id, "contract_template_sha256": template.fingerprint,
             "scene": template.scene, "room": template.room,
             "goal_pose": {"position": source_goal["position"], "orientation": source_goal["orientation"]},
@@ -478,11 +479,11 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         elif template.task.endswith("_large_scale"):
             limits = facts.get("limits")
             require(limits and len(limits) == 2 and limits[0] < limits[1], "opening anchor lacks authoritative joint limits")
-            lo, hi = plan["magnitude_range"]
+            lo, hi = 0., 1.  # native joint limits, independent of former sampling bucket
             require(0 <= lo < hi <= 1, "opening goal bucket is invalid")
             if reuse_anchor_goal:
                 fraction = (joints[joint]-float(limits[0]))/(float(limits[1])-float(limits[0]))
-                require(lo <= fraction <= hi, "verified opening anchor is outside the requested strict bucket")
+                require(lo < fraction <= hi, "verified opening anchor is outside physical joint limits")
                 method = "verified_anchor_joint_goal_before_starts"
             else:
                 uniform = (int(digest({"group": group_id, "anchor": anchor["instance_id"], "joint": joint})[:16], 16)+.5)/(2**64)

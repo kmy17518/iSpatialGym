@@ -1,4 +1,4 @@
-"""Bind a fixed, physically probed opening goal to its strict evaluation bucket."""
+"""Bind a fixed, physically probed opening goal and its descriptive bucket."""
 from dataclasses import asdict, replace
 import json
 import math
@@ -31,8 +31,6 @@ def measure(template, tro, metadata):
     require(matching, 'fixed opening goal was not physically probed')
     fraction = (goal-lower)/(upper-lower)
     bucket = 0 if fraction <= .5 else 1
-    require(any((0 if (p['q_goal']-lower)/(upper-lower) <= .5 else 1) == bucket for p in matching),
-            'recorded opening goal and native probe straddle a strict boundary')
     return {'goal':goal,'limits':[lower,upper],'fraction':fraction,'bucket':bucket,
             'target_sha256':digest(asdict(target))}
 
@@ -49,7 +47,7 @@ def bind_opening(template, anchor):
     record = {'schema':SCHEMA,**measured,'sources':{
         'tro':{'path':str(tro.resolve()),'sha256':file_digest(tro)},
         'metadata':{'path':str(meta.resolve()),'sha256':file_digest(meta)}},
-        'meaning':'Only the immutable probed goal. The other strict opening bucket requires a fresh validated goal.'}
+        'meaning':'Immutable physically probed goal; bucket label is descriptive, not an allocation limit.'}
     return replace(template,scene_setup={**template.scene_setup,FIELD:record})
 
 

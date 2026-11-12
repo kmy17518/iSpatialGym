@@ -126,18 +126,15 @@ def next_work(template, counts, *, max_groups=6, training_validated=False, mode=
     require(mode in ("eval_only", "eval_then_train", "train_only"), "unknown group controller phase policy")
     split = template.split
     if split != "train" and mode != "train_only":
-        deficits = [max(0, n - counts["evaluation"].get(i, 0)) for i, n in enumerate(quotas(template))]
-        if any(deficits):
+        remaining = max(0, sum(quotas(template)) - sum(counts["evaluation"].values()) - counts.get("evaluation_unbucketed", 0))
+        if remaining:
             from scripts.campaign_20261110.disembedding_coverage import eligible_buckets
             eligible = eligible_buckets(template)
             if eligible is None:
                 from scripts.campaign_20261110.joint_goal_eligibility import eligible_buckets as joint_buckets
                 eligible = joint_buckets(template)
-            available = [i for i in (eligible if eligible is not None else range(len(deficits))) if deficits[i]]
-            if not available:
-                return None  # Remaining strict buckets need a different physical count variant.
-            bucket = max(available, key=lambda i: (deficits[i], -i))
-            groups = min(max_groups, deficits[bucket] if split == "eval_standard" else (deficits[bucket] + 2) // 3)
+            bucket = eligible[0] if eligible else 0
+            groups = min(max_groups, remaining if split == "eval_standard" else (remaining + 2) // 3)
             if split == "eval_standard":
                 groups = min(groups, counts["class_remaining"], counts["task_remaining"])
             return {"phase": split, "bucket": bucket, "groups": groups, "needs_new_gate": False} if groups else None

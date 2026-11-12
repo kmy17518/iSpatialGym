@@ -1,4 +1,4 @@
-"""Keep a fixed active tray selection within its measured strict eval bucket."""
+"""Bind exact measured geometry and a descriptive tray coverage label."""
 from dataclasses import asdict, replace
 import math
 from pathlib import Path
@@ -24,8 +24,7 @@ def measure(template, profile):
     floor = profile['source_floor_area_m2']
     require(math.isfinite(floor) and floor > 0, 'invalid native tray floor area')
     coverage = sum(r['area_m2'] for r in rows) / floor
-    require(0 < coverage < 1 and min(abs(coverage-.30), abs(coverage-.45)) > 1e-6,
-            'native coverage is outside or on a strict bucket boundary')
+    require(0 < coverage <= 1, 'native coverage outside physical tray area')
     bucket = 0 if coverage < .30 else 1 if coverage < .45 else 2
     return coverage, bucket, digest([asdict(o) for o in template.objects if o.role in ('target', 'distractor')])
 
@@ -41,7 +40,7 @@ def bind_standard_coverage(template, anchor):
         return template
     record = {'schema': SCHEMA, 'bucket': bucket, 'coverage': coverage, 'active_objects_sha256': objects,
               'source': {'path': str(path.resolve()), 'sha256': file_digest(path)}, 'profile_sha256': digest(profile),
-              'meaning': 'Only this fixed active default-scale selection; other strict buckets require fresh count variants and gates.'}
+              'meaning': 'Exact fixed active default-scale geometry; bucket label is descriptive, not an allocation limit.'}
     return replace(template, scene_setup={**template.scene_setup, FIELD: record})
 
 

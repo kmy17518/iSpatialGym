@@ -69,11 +69,11 @@ def test_full_strict_regression_never_creates_or_changes_quota_database(tmp_path
     assert path.read_bytes()==before
 
 
-def test_regression_rejects_singleton_and_invalid_bucket(tmp_path):
+def test_regression_rejects_singleton_but_admits_valid_outside_bucket(tmp_path):
     f=fixture(tmp_path,starts=(1,))
     with pytest.raises(c.ContractError):regression(tmp_path,f,audit(f))
     f2,review=candidate(tmp_path,1,magnitude=.31)
-    with pytest.raises(c.ContractError,match='outside task buckets'):regression(tmp_path,f2,review)
+    assert regression(tmp_path,f2,review)['validation_passed'] is True
 
 
 def test_regression_releases_writer_lock_before_readonly_evidence_join(tmp_path,monkeypatch):
@@ -113,17 +113,17 @@ def test_suite_marked_source_cannot_enter_legacy_single_gate_claim(tmp_path):
     assert not (tmp_path/'dataset').exists()
 
 
-def test_strict_eval_bucket_caps_with_train_siblings_and_idempotent_export(tmp_path):
-    for index in range(4):
+def test_class_total_caps_with_train_siblings_and_idempotent_export(tmp_path):
+    for index in range(11):
         f, review = candidate(tmp_path, index)
         result = claim(tmp_path, f, review)
-        assert list(result["accepted"].values()).count("eval_standard") == (1 if index < 3 else 0)
-        assert list(result["accepted"].values()).count("train") == (1 if index < 3 else 0)
+        assert list(result["accepted"].values()).count("eval_standard") == (1 if index < 10 else 0)
+        assert list(result["accepted"].values()).count("train") == (1 if index < 10 else 0)
         assert claim(tmp_path, f, review) == result
         exported = tmp_path / "dataset/groups" / (review["group_id"]+".json")
-        if index < 3: assert read(exported) == result
+        if index < 10: assert read(exported) == result
         else: assert not exported.exists()
-    assert read(tmp_path / "dataset/group_counts.json")["counts"] == {"eval_standard": 3, "train": 3}
+    assert read(tmp_path / "dataset/group_counts.json")["counts"] == {"eval_standard": 10, "train": 10}
 
 
 def test_repeated_canonical_goal_can_form_another_fresh_group_under_owner_policy(tmp_path):
@@ -147,11 +147,10 @@ def test_changed_artifacts_and_reserved_models_fail_before_claim(tmp_path):
     assert not (tmp_path / "dataset/quotas.sqlite3").exists()
 
 
-def test_train_buckets_soft_eval_strict_and_boundary_rules(tmp_path):
+def test_bucket_labels_are_descriptive_for_every_split(tmp_path):
     f, review = candidate(tmp_path, 0, magnitude=.31, split="train")
     assert claim(tmp_path, f, review)["accepted"] == {}
-    with pytest.raises(c.ContractError, match="outside task buckets"):
-        lane.bucket_index(replace(f.template, split="eval_standard"), {"actual_magnitude": .31}, strict=True)
+    assert lane.bucket_index(replace(f.template, split="eval_standard"), {"actual_magnitude": .31}, strict=True) is None
     assert lane.bucket_index(f.template, {"actual_magnitude": .10}, strict=True) == 0
     tray = replace(f.template, task="disembedding")
     assert lane.bucket_index(tray, {"actual_crowdedness": .30}, strict=True) == 1
@@ -159,17 +158,18 @@ def test_train_buckets_soft_eval_strict_and_boundary_rules(tmp_path):
     assert lane.bucket_index(joint, {"actual_open_fraction": .5}, strict=True) == 0
     block = replace(f.template, task="configuration_matching-block_design")
     assert lane.bucket_index(block, {"actual_flips": 0}, strict=False) is None
-    with pytest.raises(c.ContractError, match="flip count"):
-        lane.bucket_index(block, {"actual_flips": 0}, strict=True)
+    assert lane.bucket_index(block, {"actual_flips": 0}, strict=True) is None
+    with pytest.raises(c.ContractError, match="physical fraction"):
+        lane.bucket_index(tray, {"actual_crowdedness": 1.1}, strict=True)
 
 
 def test_heldout_allocations_never_fall_back_to_training():
     rows = [{"instance_id": str(i), "bucket": 0} for i in range(3)]
     counts = lane.Counter({0: 3, 1: 3, 2: 2})
     q = lane.QUOTAS["object_scaling"]
-    assert lane._allocate(rows, split="eval_model", q=q, eval_counts=counts, train_count=0) == {}
-    rows[0]["bucket"] = 2
     assert lane._allocate(rows, split="eval_model", q=q, eval_counts=counts, train_count=0) == {"0": "eval_model"}
+    rows[0]["bucket"] = 2
+    assert lane._allocate(rows, split="eval_model", q=q, eval_counts=counts, train_count=0) == {}
     assert lane._allocate(rows, split="eval_standard", q=q, eval_counts=lane.Counter(), train_count=q.train_instances) == {}
 
 

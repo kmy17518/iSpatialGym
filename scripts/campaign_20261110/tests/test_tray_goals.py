@@ -21,8 +21,10 @@ class TrayGoalsTests(unittest.TestCase):
         raw = self.fixture()
         plan = self.parse(raw)
         self.assertTrue(plan.accepts_coverage(.3))
-        self.assertFalse(plan.accepts_coverage(.45))
-        self.assertFalse(plan.accepts_coverage(.299))
+        self.assertTrue(plan.accepts_coverage(.45))
+        self.assertTrue(plan.accepts_coverage(.299))
+        self.assertFalse(plan.accepts_coverage(1.01))
+        self.assertFalse(plan.accepts_coverage(float("nan")))
         raw["split"] = "train"
         self.assertTrue(self.parse(raw).accepts_coverage(.2))
         raw["split"], raw["crowdedness_range"] = "eval_standard", [.45, 1]

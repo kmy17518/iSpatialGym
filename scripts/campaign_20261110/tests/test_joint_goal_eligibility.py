@@ -25,7 +25,8 @@ def test_fixed_high_goal_never_targets_low_bucket_or_spills_training(tmp_path):
     counts={'evaluation':{},'train_buckets':{},'class_remaining':1000,'task_remaining':2000}
     assert next_work(original,counts)['bucket']==0
     assert next_work(template,counts)['bucket']==1
-    assert next_work(template,{**counts,'evaluation':{1:5}}) is None
+    assert next_work(template,{**counts,'evaluation':{1:5}})['groups'] == 5
+    assert next_work(template,{**counts,'evaluation':{1:10}}) is None
     assert bind_standard_opening(template,anchor) is template
 
 
@@ -45,7 +46,9 @@ def test_held_fixed_goal_only_fills_its_actual_strict_bucket(tmp_path,split,high
     counts={'evaluation':{},'train_buckets':{},'class_remaining':1000,'task_remaining':2000}
     decision=next_work(template,counts)
     assert decision['phase']==split and decision['bucket']==1
-    assert next_work(template,{**counts,'evaluation':{1:high_quota}}) is None
+    assert next_work(template,{**counts,'evaluation':{1:high_quota}}) is not None
+    total = 9 if split == 'eval_model' else 2
+    assert next_work(template,{**counts,'evaluation':{1:total}}) is None
     assert template.objects==original.objects and template.definition_sha256==original.definition_sha256
     with pytest.raises(c.ContractError,match='standard split'):bind_standard_opening(original,anchor)
 

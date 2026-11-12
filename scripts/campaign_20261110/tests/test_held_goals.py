@@ -38,14 +38,14 @@ class GoalPlanTests(unittest.TestCase):
     def test_fixed_goal_identity_and_bucket_policy(self):
         p = validate(plan())
         self.assertEqual(p.position, (0, 1, 2))
-        self.assertTrue(p.summary()["bucket_strict"])
+        self.assertFalse(p.summary()["bucket_strict"])
         self.assertFalse(validate(plan(split="train")).summary()["bucket_strict"])
         self.assertNotEqual(validate(plan(group_id="group2")).sha256, p.sha256)
 
     def test_plan_rejects_expiry_wrong_identity_bad_quaternion_or_bucket(self):
         cases = [plan(task="mental_rotation"), plan(template_id="other"), plan(room="other"), plan(deadline_at=499),
                  plan(goal_pose={"position": [0, 0, 0], "orientation": [0, 0, 0, 2]}),
-                 plan(magnitude_range=[0.01, 0.1]), plan(max_members=4), plan(split=None)]
+                 plan(magnitude_range=[-0.01, 0.1]), plan(max_members=4), plan(split=None)]
         for raw in cases:
             with self.assertRaises(g.GoalPlanError):
                 validate(raw)

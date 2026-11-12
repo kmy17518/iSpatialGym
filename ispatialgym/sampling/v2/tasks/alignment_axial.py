@@ -465,7 +465,7 @@ class AlignmentAxial(SamplerV2):
             if actual_dp > self.ikc.WITNESS_POS_TOL or actual_dq > self.tol("orientation", .10):
                 raise Reject("campaign_goal_drift", "settled axial goal differs from shared goal")
         magnitude = abs(math.degrees(C.wrap_angle(self._heading(canonical[1])-self._heading(draft.object_poses[self.tname][1]))))
-        if plan.split != "train" and not plan.magnitude_range_deg[0] <= magnitude <= plan.magnitude_range_deg[1]:
+        if plan.summary()["bucket_strict"] and not plan.magnitude_range_deg[0] <= magnitude <= plan.magnitude_range_deg[1]:
             raise Reject("campaign_bucket_drift", "settled axial start left strict eval bucket")
         draft.summary["campaign_goal_group"].update({"actual_magnitude_deg": magnitude,
             "endpoint_residual": {"position_m": dp, "orientation_rad": dq}})

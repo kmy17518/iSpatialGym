@@ -11,6 +11,7 @@ import json
 import math
 import os
 import time
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
 from dataclasses import dataclass
 
 from ispatialgym.sampling.campaign_held_goals import ENV, GoalGroupTimeout, GoalPlanError, _require, _vector
@@ -40,7 +41,7 @@ class SurfaceGoalPlan:
                 "runtime_template_id": self.template_id, "contract_template_sha256": self.contract_template_sha256,
                 "requested_goal": {"position": list(self.position), "orientation": list(self.orientation)},
                 "plan_sha256": self.sha256, "magnitude_range_deg": list(self.magnitude_range_deg),
-                "bucket_strict": self.split != "train", "deadline_at": self.deadline_at, "max_members": self.max_members,
+                "bucket_strict": False, "bucket_policy": BUCKET_POLICY, "deadline_at": self.deadline_at, "max_members": self.max_members,
                 "phase": "planned_before_start"}
 
 
@@ -88,12 +89,7 @@ def load_surface_plan(*, template_id, scene, rooms, activated_at, expected_sha25
 
 
 def deviation_range(plan: SurfaceGoalPlan, allowed_rad, *, fallback=False):
-    """Intersect requested buckets with existing bounds; train can use full bounds."""
+    """Use the native physical range independently of descriptive bucket labels."""
     lo, hi = (float(x) for x in allowed_rad)
-    requested = tuple(math.radians(x) for x in plan.magnitude_range_deg)
-    overlap = max(lo, requested[0]), min(hi, requested[1])
-    if plan.split == "train" and (fallback or overlap[0] >= overlap[1]):
-        return lo, hi
-    if overlap[0] >= overlap[1]:
-        raise GoalPlanError("requested eval deviation bucket is outside the existing sampler range")
-    return overlap
+    _require(math.isfinite(lo) and math.isfinite(hi) and 0 <= lo < hi, "invalid physical deviation range")
+    return lo, hi

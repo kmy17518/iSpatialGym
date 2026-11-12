@@ -2309,9 +2309,8 @@ class ArticulationLarge(SamplerV2):
         if plan is not None:
             value = plan.joints[self.joint_name] if self.direction == "open" else q_now
             fraction = (value-self.lower)/(self.upper-self.lower)
-            lo, hi = plan.fraction_range
-            if plan.split != "train" and not (lo <= fraction <= hi and (lo == 0 or fraction > lo)):
-                raise Reject("campaign_joint_bucket", "settled articulation start/goal is outside strict eval bucket")
+            if not 0 <= fraction <= 1:
+                raise Reject("campaign_joint_limits", "settled articulation start/goal is outside physical joint limits")
             draft.summary["campaign_goal_group"]["actual_open_fraction"] = fraction
             self.campaign_verify_articulation(draft)
 

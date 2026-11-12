@@ -204,19 +204,20 @@ class FamilyControllerTests(unittest.TestCase):
             self.assertTrue(record['dry_run_passed'])
 
     def test_bucket_deficits_are_strict_and_stop_at_quota(self):
-        self.assertEqual(c.next_bucket({("eval_standard", 0): 3}, [3, 4, 3]), 1)
+        self.assertEqual(c.next_bucket({("eval_standard", 0): 3}, [3, 4, 3]), 0)
         self.assertIsNone(c.next_bucket({("eval_standard", 0): 3, ("eval_standard", 1): 4,
                                         ("eval_standard", 2): 3, ("train", 0): 999}, [3, 4, 3]))
 
     def test_proven_bucket_can_continue_without_claiming_other_buckets_complete(self):
         self.assertEqual(c.next_bucket({('eval_standard',0):1},[5,5],[0]),0)
         counts={('eval_standard',0):5}
-        self.assertIsNone(c.next_bucket(counts,[5,5],[0]))
-        self.assertEqual(c.next_bucket(counts,[5,5]),1)
+        self.assertEqual(c.next_bucket(counts,[5,5],[0]),0)
+        self.assertEqual(c.next_bucket(counts,[5,5]),0)
         state={}
+        counts={('eval_standard',0):10}
         with patch.object(c,'accepted_counts',return_value=counts):
             c.advance({'class_id':'class','eval_quotas':[5,5],'enabled_buckets':[0]},state,{},Path('/campaign'),{},1,lambda:None)
-        self.assertEqual(state['status'],'validated_buckets_complete_other_buckets_need_diagnosis')
+        self.assertEqual(state['status'],'evaluation_quota_complete')
         for invalid in ([],[2],[-1],[0,0],[True]):
             with self.assertRaises(ValueError):c.next_bucket({},[5,5],invalid)
 

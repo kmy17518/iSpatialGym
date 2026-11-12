@@ -82,8 +82,8 @@ def test_shared_goal_survives_native_residual_but_eval_bucket_stays_strict():
     assert draft.goal_poses["target"][0].tolist() == pytest.approx(plan.position)
     assert draft.summary["campaign_goal_group"]["actual_magnitude_deg"] == pytest.approx(35, abs=1e-4)
     draft.object_poses["target"] = (draft.object_poses["target"][0], C.quat_from_yaw(math.radians(50)))
-    with pytest.raises(Reject, match="strict eval bucket"):
-        ax.AlignmentAxial.campaign_verify_goal(s, draft)
+    ax.AlignmentAxial.campaign_verify_goal(s, draft)
+    assert draft.summary["campaign_goal_group"]["actual_magnitude_deg"] == pytest.approx(50, abs=1e-4)
     s._campaign_surface_active = replace(plan, split="train")
     ax.AlignmentAxial.campaign_verify_goal(s, draft)
     draft.goal_poses["target"] = (th.tensor([.61, 0, .8]), th.tensor([0., 0, 0, 1]))

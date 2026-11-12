@@ -7,6 +7,7 @@ import json
 import math
 import os
 import time
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
 from dataclasses import dataclass
 
 from ispatialgym.sampling.campaign_held_goals import ENV, GoalGroupTimeout, GoalPlanError, _require, _vector
@@ -17,7 +18,7 @@ SCHEMA = "isg-joint-goal-plan-v1"
 
 
 def unique_probed_angles(values):
-    """Keep the exact angles that passed physics; rounding can cross a strict bucket."""
+    """Keep exact physically probed angles for native record lookup."""
     result = [float(value) for value in values]
     _require(all(math.isfinite(value) for value in result), "nonfinite probed joint angle")
     return sorted(set(result))
@@ -59,24 +60,19 @@ class JointGoalPlan:
         return {"campaign_id": self.campaign_id, "group_id": self.group_id, "split": self.split,
                 "runtime_template_id": self.template_id, "contract_template_sha256": self.contract_template_sha256,
                 "plan_sha256": self.sha256, "requested_goal": {"pose": self.pose, "joints": self.joints},
-                "joint": self.joint, "fraction_range": self.fraction_range, "bucket_strict": self.split != "train",
+                "joint": self.joint, "fraction_range": self.fraction_range, "bucket_strict": False, "bucket_policy": BUCKET_POLICY,
                 "deadline_at": self.deadline_at, "max_members": self.max_members, "phase": "planned_before_start"}
 
     def initial(self, *, direction, lower, upper, stable, rng):
         goal = self.joints[self.joint]
         span = upper-lower
         _require(span > 0 and lower-1e-6 <= goal <= upper+1e-6, "fixed articulation goal outside joint limits")
-        def in_bucket(value):
-            fraction = (value-lower)/span
-            lo, hi = self.fraction_range
-            return lo <= fraction <= hi and (lo == 0 or fraction > lo)
         if direction == "open":
             _require(goal > lower+1e-6, "opening goal is closed")
-            _require(self.split == "train" or in_bucket(goal), "fixed opening goal outside strict eval bucket")
             return float(lower), float(goal)
         _require(direction == "close" and abs(goal-lower) < 1e-6, "closing goal must be the closed joint limit")
-        candidates = [float(v) for v in stable if v > goal+1e-6 and (self.split == "train" or in_bucket(v))]
-        _require(bool(candidates), "no stable initial angle in the requested articulation bucket")
+        candidates = [float(v) for v in stable if goal+1e-6 < v <= upper+1e-6]
+        _require(bool(candidates), "no physically stable initial angle within joint limits")
         return candidates[int(rng.integers(len(candidates)))], float(goal)
 
     def verify_joint_change(self, names, initial, goal, tolerances=None):
@@ -88,15 +84,15 @@ class JointGoalPlan:
                 _require(abs(float(q0)-float(q1)) <= tolerance, f"another joint changes initial-to-goal: {name}")
 
     def closing_probe_values(self, *, direction, lower, upper, stable, count=7):
-        """Fill missing closing-start grid points within the strict eval bucket.
+        """Fill missing closing-start grid points over the physical joint range.
 
         Every returned value still needs the native passive-stability probe and
-        all later contact/reach/path checks. Training retains its soft bucket.
+        all later contact/reach/path checks for every split.
         """
-        if direction != "close" or self.split == "train":
+        if direction != "close":
             return []
         _require(upper > lower and isinstance(count, int) and 1 <= count <= 31, "invalid stable probe range/count")
-        lo, hi = self.fraction_range
+        lo, hi = 0., 1.
         # A legacy low-angle grid often includes the fully-open endpoint. That
         # single endpoint must not suppress every interior high-bucket probe.
         # Deduplication skips a probe, never substitutes or admits an angle.
@@ -117,12 +113,12 @@ class JointGoalPlan:
             if not (q1 > q0+1e-6 if direction == "open" else q0 > q1+1e-6):
                 continue
             fraction = ((q1 if direction == "open" else q0)-lower)/(upper-lower)
-            if self.split == "train" or (lo <= fraction <= hi and (lo == 0 or fraction > lo)):
+            if 0 <= fraction <= 1:
                 # Keep the exact native probe identity. Callers select records
                 # by this pair; replacing q1 with a close float from the TRO
                 # would discard a valid record during the subsequent draw.
                 result.append((float(q0), float(q1)))
-        _require(bool(result), "no native angle pair satisfies the fixed goal and articulation bucket")
+        _require(bool(result), "no native angle pair satisfies the fixed goal and joint limits")
         return result
 
 

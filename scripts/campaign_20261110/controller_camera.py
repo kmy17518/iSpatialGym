@@ -40,7 +40,7 @@ def remaining_capacity(template, accepted, caps, quotas):
     eligible = [r for r in rows if r["split"] == split
                 and (split == "eval_category" or r.get("class_id", class_id) == class_id)]
     counts = Counter(r["bucket"] for r in eligible)
-    evaluation = sum(max(0, n - counts[b]) for b, n in quotas.get(split, {}).items())
+    evaluation = max(0, sum(quotas.get(split, {}).values()) - len(eligible))
     # No standalone camera training until the complete pipeline is released.
     return evaluation
 

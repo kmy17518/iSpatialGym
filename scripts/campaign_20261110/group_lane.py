@@ -16,6 +16,7 @@ from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
 
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
 from scripts.campaign_20261110.acceptance import audit_job, read
 from scripts.campaign_20261110.contracts import (
     Perturbations, ScaleState, canonical_json, digest, file_digest, require,
@@ -142,7 +143,7 @@ def bucket_index(template, group, *, strict):
         require(len(edges) == 4, "alignment needs three pinned native-range buckets")
     elif task == "configuration_matching-block_design":
         value = group.get("actual_flips")
-        if not strict and isinstance(value, int) and not isinstance(value, bool) and value == 0:
+        if isinstance(value, int) and not isinstance(value, bool) and value == 0:
             return None
         require(isinstance(value, int) and 1 <= value <= 4, "block group lacks verified flip count")
         return value - 1
@@ -150,9 +151,12 @@ def bucket_index(template, group, *, strict):
         require(not QUOTAS[task].standard_buckets, "missing strict bucket adapter")
         return 0
     require(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value), "missing actual bucket metric")
+    require(value > 0, "task magnitude must be positive")
     require(all(math.isfinite(x) for x in edges) and all(a < b for a, b in zip(edges, edges[1:])), "invalid bucket edges")
     if not edges[0] <= value <= edges[-1]:
-        require(not strict, "eval metric lies outside task buckets")
+        require(value >= 0, "negative task magnitude")
+        if task == "disembedding" or task.startswith("configuration_matching-articulation_"):
+            require(value <= 1, "metric outside physical fraction domain")
         return None
     # Crowdedness explicitly assigns .30/.45 to the upper bucket; other tasks
     # assign a shared boundary to the lower bucket, including exactly50% open.
@@ -210,7 +214,7 @@ def _allocate(rows, *, split, q, eval_counts, train_count, train_capacity=None):
     """Whole standard groups preserve a train sibling; train buckets stay soft."""
     total, buckets = _quota(q, split) if split != "train" else (0, ())
     def space(row):
-        return sum(eval_counts.values()) < total and (not buckets or eval_counts[row["bucket"]] < buckets[row["bucket"]])
+        return sum(eval_counts.values()) < total
     result = {}
     if split in ("eval_model", "eval_category"):
         for row in rows:
@@ -327,7 +331,8 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                 'validation_passed': True, 'quota_consumed': 0,
                 'members': rows, 'canonical_goal_sha256': goals[0],
                 'conceptual_template_sha256': conceptual, 'physical_template_sha256': physical_template(template),
-                'scope': 'Full fresh evidence, distinct members, shared goal, strict bucket, ready reservations and room policy; no quota transaction.'}
+                'bucket_policy': BUCKET_POLICY,
+                'scope': 'Full fresh evidence, distinct members, shared goal, ready reservations and room policy; descriptive buckets; no quota transaction.'}
     production = None
     if template.split == 'train':
         from scripts.campaign_20261110.training_release import acceptance_proof
@@ -377,7 +382,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                     capacity = min(capacity,room_policy["caps"][room]-room_counts[room])
                 if split == "eval_standard":
                     total, buckets = _quota(QUOTAS[task], split)
-                    if sum(counts.values()) >= total or not any(not buckets or counts[row["bucket"]] < buckets[row["bucket"]] for row in rows):
+                    if sum(counts.values()) >= total:
                         return {"accepted": {}, "deferred": [row["instance_id"] for row in rows],
                                 "reason": "training production gate: evaluation purpose exhausted"}
                 allocation = _allocate(rows, split=split, q=QUOTAS[task], eval_counts=counts, train_count=train_count,train_capacity=capacity)
@@ -408,7 +413,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                         templates = {v[0] for v in db.execute("SELECT DISTINCT template FROM current_members WHERE split=? AND task=? AND class_id=?",
                                                             (final, task, scope))}
                         require(not templates or templates == {conceptual}, "evaluation class changed its pinned conceptual template")
-                    record = {**row, "split": final, "group_id": gid, "task": task, "class_id": template.class_id,
+                    record = {**row, "bucket_policy": BUCKET_POLICY, "split": final, "group_id": gid, "task": task, "class_id": template.class_id,
                               "room":room,"validation_key": review["validation_key"], "gate": review["gate"], "evidence": review["evidence"],
                               "physical_template_sha256": physical, "conceptual_template_sha256": conceptual,
                               "binding_pool": template.scene_setup.get("binding_pool")}
@@ -423,7 +428,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                           "canonical_goal_sha256": goals[0], "release_review_sha256": digest(review),
                           "conceptual_template_sha256": conceptual, "physical_template_sha256": physical,
                           "pool_sha256": pool.fingerprint if pool else None,
-                          "goal_reuse_policy": GOAL_REUSE_POLICY,
+                          "goal_reuse_policy": GOAL_REUSE_POLICY, "bucket_policy": BUCKET_POLICY,
                           "training_policy": {"per_class_cap":class_cap,"room_policy":room_policy},
                           "members": [json.loads(value[0]) for value in db.execute("SELECT record FROM members WHERE group_id=? ORDER BY id", (gid,))]}
                 if suite_context is not None:
@@ -451,7 +456,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
             try:
                 counts = {split: count for split, count in db.execute("SELECT split,COUNT(*) FROM members GROUP BY split")}
                 summary = {"campaign_id": review["campaign_id"], "counts": counts,
-                           "goal_reuse_policy": GOAL_REUSE_POLICY,
+                           "goal_reuse_policy": GOAL_REUSE_POLICY, "bucket_policy": BUCKET_POLICY,
                            "groups": db.execute("SELECT COUNT(*) FROM groups").fetchone()[0], "database": str(state_path),
                            "conceptual_templates": db.execute("SELECT COUNT(DISTINCT template) FROM members").fetchone()[0],
                            "physically_validated_variants": len({json.loads(record).get("physical_template_sha256", identity)

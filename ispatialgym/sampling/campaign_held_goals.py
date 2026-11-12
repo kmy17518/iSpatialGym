@@ -13,6 +13,7 @@ import json
 import math
 import os
 import time
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
@@ -66,7 +67,7 @@ class HeldGoalPlan:
     def summary(self) -> dict[str, Any]:
         return {"group_id": self.group_id, "campaign_id": self.campaign_id, "plan_sha256": self.sha256,
                 "runtime_template_id": self.template_id, "contract_template_sha256": self.contract_template_sha256,
-                "split": self.split, "bucket_strict": self.split != "train",
+                "split": self.split, "bucket_strict": False, "bucket_policy": BUCKET_POLICY,
                 "requested_goal": {"position": list(self.position), "orientation": list(self.orientation)},
                 "base_pose2d": list(self.base_pose2d), "magnitude_range": list(self.magnitude_range),
                 "max_members": self.max_members, "deadline_at": self.deadline_at, "phase": "planned_before_start"}
@@ -89,8 +90,8 @@ def validate_goal_plan(raw: Mapping[str, Any], *, task: str, template_id: str, s
     _require(abs(sum(x * x for x in orientation) - 1.0) <= 1e-5, "goal quaternion must be normalized")
     base = _vector(raw.get("base_pose2d", ()), 3, "base_pose2d")
     bounds = _vector(raw.get("magnitude_range", ()), 2, "magnitude_range")
-    limits = (0.05, 0.30) if task == "object_scaling" else (30.0, 120.0)
-    _require(limits[0] <= bounds[0] < bounds[1] <= limits[1], "magnitude range outside campaign task bounds")
+    _require(0 < bounds[0] < bounds[1] and (task == "object_scaling" or bounds[1] <= 180),
+             "invalid descriptive magnitude range")
     now = time.time() if now is None else float(now)
     created = float(raw.get("created_at", 0))
     if "deadline_at" in raw:

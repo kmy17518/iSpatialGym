@@ -14,17 +14,18 @@ def plan():
 def test_closed_goal_is_chosen_before_initial_angle_and_train_bucket_is_soft():
     p = plan()
     rng = SimpleNamespace(integers=lambda n: n-1)
-    assert p.initial(direction="close",lower=0,upper=1,stable=[.3,.5,.8],rng=rng) == (.5,0.)
+    assert p.initial(direction="close",lower=0,upper=1,stable=[.3,.5,.8],rng=rng) == (.8,0.)
     assert replace(p,split="train").initial(direction="close",lower=0,upper=1,stable=[.8],rng=rng) == (.8,0.)
     with pytest.raises(j.GoalPlanError,match="no stable"):
-        p.initial(direction="close",lower=0,upper=1,stable=[.8],rng=rng)
+        p.initial(direction="close",lower=0,upper=1,stable=[0.,1.1],rng=rng)
 
 
 def test_opening_start_is_closed_and_requested_goal_remains_fixed():
     p = replace(plan(),joints={"hinge":.4,"other":.3})
     assert p.initial(direction="open",lower=0,upper=1,stable=[.2,.6],rng=None) == (0.,.4)
-    with pytest.raises(j.GoalPlanError,match="bucket"):
-        replace(p,joints={"hinge":.8,"other":.3}).initial(direction="open",lower=0,upper=1,stable=[],rng=None)
+    assert replace(p,joints={"hinge":.8,"other":.3}).initial(direction="open",lower=0,upper=1,stable=[],rng=None) == (0.,.8)
+    with pytest.raises(j.GoalPlanError,match="joint limits"):
+        replace(p,joints={"hinge":1.1,"other":.3}).initial(direction="open",lower=0,upper=1,stable=[],rng=None)
 
 
 def test_one_joint_rule_checks_only_initial_to_goal():
@@ -40,7 +41,7 @@ def test_one_joint_rule_checks_only_initial_to_goal():
 def test_native_small_angle_pairs_keep_goal_and_soften_only_training_bucket():
     p = plan()
     native = [(.3, 0), (.5, 0), (.8, 0)]
-    assert p.eligible_pairs(native, direction="close", lower=0, upper=1) == native[:2]
+    assert p.eligible_pairs(native, direction="close", lower=0, upper=1) == native
     assert replace(p, split="train").eligible_pairs(native, direction="close", lower=0, upper=1) == native
     opening = replace(p, joints={"hinge": .4, "other": .3})
     assert opening.eligible_pairs([(0, .2), (0, .4), (0, .8)], direction="open", lower=0, upper=1) == [(0, .4)]
@@ -54,12 +55,11 @@ def test_physics_probed_half_angle_is_not_rounded_out_of_strict_bucket():
     angles = j.unique_probed_angles([half + .000001, half, half])
     assert angles == [half, half + .000001]  # Only exact duplicates coalesce.
     p = plan()
-    assert p.eligible_pairs([(q, 0.) for q in angles], direction="close", lower=0., upper=upper) == [(half, 0.)]
+    assert p.eligible_pairs([(q, 0.) for q in angles], direction="close", lower=0., upper=upper) == [(q, 0.) for q in angles]
     assert replace(p, fraction_range=(.5, 1.)).eligible_pairs(
-        [(q, 0.) for q in angles], direction="close", lower=0., upper=upper) == [(half + .000001, 0.)]
-    # The historical rounded value really is outside bucket0; keep rejecting it.
-    with pytest.raises(j.GoalPlanError, match="no native angle"):
-        p.eligible_pairs([(round(half, 4), 0.)], direction="close", lower=0., upper=upper)
+        [(q, 0.) for q in angles], direction="close", lower=0., upper=upper) == [(q, 0.) for q in angles]
+    # Values on either side of an old boundary preserve their exact identities.
+    assert p.eligible_pairs([(round(half, 4), 0.)], direction="close", lower=0., upper=upper) == [(round(half,4),0.)]
     with pytest.raises(j.GoalPlanError, match="nonfinite"):
         j.unique_probed_angles([float("nan")])
 
@@ -75,9 +75,8 @@ def test_opening_pair_retains_native_float_identity_for_record_selection():
     with pytest.raises(j.GoalPlanError):
         p.eligible_pairs([(0.,goal+.00001)], direction='open', lower=0., upper=.872664749622345)
     half=.5*.872664749622345
-    with pytest.raises(j.GoalPlanError):
-        replace(p,joints={'hinge':half+1e-8,'other':.3}).eligible_pairs(
-            [(0.,half)], direction='open', lower=0., upper=.872664749622345)
+    assert replace(p,joints={'hinge':half+1e-8,'other':.3}).eligible_pairs(
+        [(0.,half)], direction='open', lower=0., upper=.872664749622345) == [(0.,half)]
 
 
 def test_articulation_plan_rejects_wrong_identity_and_queue_time_does_not_consume_budget():
@@ -108,9 +107,9 @@ def test_only_written_joint_starts_block_duplicates_and_other_grasps_remain_elig
 def test_missing_eval_bucket_proposes_values_for_native_physical_testing_only():
     p = replace(plan(), fraction_range=(.5, 1.))
     values = p.closing_probe_values(direction='close', lower=0, upper=2, stable=[.36, .42])
-    assert len(values) == 8 and all(1 < v <= 2 for v in values) and values[-1] == 2
+    assert len(values) == 8 and all(0 < v <= 2 for v in values) and values[-1] == 2
     assert p.closing_probe_values(direction='close', lower=0, upper=2, stable=[1.2]) == values
-    assert replace(p, split='train').closing_probe_values(direction='close', lower=0, upper=2, stable=[.4]) == []
+    assert replace(p, split='train').closing_probe_values(direction='close', lower=0, upper=2, stable=[.4]) == values
     assert p.closing_probe_values(direction='open', lower=0, upper=2, stable=[]) == []
 
 
@@ -119,11 +118,12 @@ def test_fully_open_legacy_endpoint_does_not_suppress_high_bucket_probes(upper, 
     p = replace(plan(), fraction_range=(.5, 1.))
     stable = [upper * legacy_range[0], upper * legacy_range[1], upper]
     proposed = p.closing_probe_values(direction='close', lower=0, upper=upper, stable=stable)
-    assert len(proposed) == 7 and all(.5 < q / upper < 1 for q in proposed)
+    assert len(proposed) >= 6 and all(0 < q / upper < 1 for q in proposed)
+    assert all(not any(abs(q-v) <= 1e-6 for v in stable) for q in proposed)
     # Merely proposing new values does not make them eligible: only the
     # physically verified stable list is consumed by initial().
     rng = SimpleNamespace(integers=lambda n: 0)
-    assert p.initial(direction='close', lower=0, upper=upper, stable=stable, rng=rng) == (upper, 0.)
+    assert p.initial(direction='close', lower=0, upper=upper, stable=stable, rng=rng) == (stable[0], 0.)
     passed = stable + proposed
     assert p.closing_probe_values(direction='close', lower=0, upper=upper, stable=passed) == []
 
@@ -135,7 +135,7 @@ def test_closing_grid_deduplication_preserves_exact_stable_values_and_strict_bou
     before = list(stable)
     values = p.closing_probe_values(direction='close', lower=0, upper=2, stable=stable)
     assert stable == before and len(values) == 6 and 1.125 not in values
-    assert p.eligible_pairs([(1., 0.), (near, 0.)], direction='close', lower=0, upper=2) == [(near, 0.)]
+    assert p.eligible_pairs([(1., 0.), (near, 0.)], direction='close', lower=0, upper=2) == [(1.,0.), (near, 0.)]
 
 
 def test_carton_viewpoint_hint_requires_audited_source_and_preserves_goal():

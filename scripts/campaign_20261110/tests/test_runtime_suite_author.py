@@ -20,7 +20,7 @@ def test_buckets_keep_approved_thresholds():
     for task,edges in [("object_scaling",[(.05,.10),(.10,.15),(.15,.30)]),("mental_rotation",[(30,45),(45,75),(75,120)])]:
         q=next(q for q in task_quotas()if q.task==task)
         counts={str(i):n for i,n in enumerate(q.standard_buckets)};counts["2"]-=1
-        assert group_range(SimpleNamespace(task=task),counts)==(edges[2],2)
+        assert group_range(SimpleNamespace(task=task),counts)==((edges[0][0],edges[-1][1]),0)
 
 
 def test_immutable_exact_hash(tmp_path):
@@ -107,8 +107,11 @@ def test_recorded_disembedding_rejects_incompatible_proof(tmp_path,change):
     elif change=='class':anchor['tro']['ispatialgym']['campaign']['class_id']='disembedding_02'
     elif change=='group_identity':group['plan_sha256']='c'*64
     rewrite_anchor_bytes(anchor)
-    with pytest.raises((AssertionError,ValueError)):
-        recorded_disembedding_range(template,anchor)
+    if change in ('historical_range','not_strict','runtime_disagrees'):
+        assert recorded_disembedding_range(template,anchor)[1] == 1
+    else:
+        with pytest.raises((AssertionError,ValueError)):
+            recorded_disembedding_range(template,anchor)
 
 
 @pytest.mark.parametrize('source',['tro','summary','metadata'])

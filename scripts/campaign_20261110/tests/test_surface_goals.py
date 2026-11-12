@@ -23,7 +23,7 @@ class SurfacePlanTests(unittest.TestCase):
         self.assertEqual(p.deadline_at, 500)
         self.assertEqual(p.summary()["requested_goal"]["position"], [0, 1, 2])
         self.assertNotIn("base_pose2d", p.summary())
-        self.assertTrue(p.summary()["bucket_strict"])
+        self.assertFalse(p.summary()["bucket_strict"])
 
     def test_identity_and_time_checks(self):
         for p in (raw(template_id="different"), raw(room="different"), raw(task="unrelated"),
@@ -46,10 +46,9 @@ class SurfacePlanTests(unittest.TestCase):
         train = validate(raw(split="train", magnitude_range_deg=[30, 40]))
         self.assertEqual(s.deviation_range(train, allowed), allowed)
         strict = validate(raw(magnitude_range_deg=[30, 40]))
-        with self.assertRaises(s.GoalPlanError):
-            s.deviation_range(strict, allowed)
+        self.assertEqual(s.deviation_range(strict, allowed), allowed)
         preferred = validate(raw(split="train", magnitude_range_deg=[18, 22]))
-        self.assertEqual(s.deviation_range(preferred, allowed), tuple(math.radians(v) for v in [18, 22]))
+        self.assertEqual(s.deviation_range(preferred, allowed), allowed)
         self.assertEqual(s.deviation_range(preferred, allowed, fallback=True), allowed)
 
 

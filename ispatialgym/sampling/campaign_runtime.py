@@ -269,7 +269,9 @@ def annotate(sampler, tro, draft, seed):
     result = attach_tro_metadata(tro, campaign_id=config["campaign_id"], split=config["split"],
                                  template=template, created_at=time.time(), seed=seed, perturbations=perturbations,
                                  validation_key=key, goal_group_id=group.get("group_id"))
+    from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
     result["ispatialgym"]["campaign"]["runtime"] = {
+        "bucket_policy": BUCKET_POLICY,
         "observed_scales": observed, "goal_group": group, "planned_goal_poses": _plain(draft.goal_poses),
         "planned_start_poses": _plain(draft.object_poses),
         "planned_start_joints": _plain(draft.object_joints), "planned_goal_joints": _plain(draft.goal_joints),

@@ -54,6 +54,8 @@ divergence facts), ``path_bucket_m``, ``language.objects`` (the obstacle).
 
 from __future__ import annotations
 
+from ispatialgym.sampling.campaign_bucket_policy import active as relaxed_buckets, POLICY as BUCKET_POLICY
+
 import logging
 import math
 import os
@@ -285,14 +287,14 @@ def bucket_min_detour(bucket_hi: float, min_detour_m: float, by_bucket: Optional
 
 
 def detour_failure(geo_blocked: Optional[float], geo_free: float, bucket_hi: float, min_detour_m: float,
-                   by_bucket: Optional[Dict[str, float]] = None) -> Optional[str]:
+                   by_bucket: Optional[Dict[str, float]] = None, *, relaxed=False) -> Optional[str]:
     """Why a blocked-map path is inadmissible (§6.2): ``disconnected`` / ``short_detour`` (shorter than the bucket's
     :func:`bucket_min_detour`) / ``too_long`` (leaves the bucket), None when it is."""
-    if geo_blocked is None:
+    if geo_blocked is None or not math.isfinite(float(geo_blocked)):
         return "disconnected"
     if float(geo_blocked) - float(geo_free) < bucket_min_detour(bucket_hi, min_detour_m, by_bucket):
         return "short_detour"
-    if float(geo_blocked) > float(bucket_hi):
+    if not relaxed and float(geo_blocked) > float(bucket_hi):
         return "too_long"
     return None
 
@@ -568,9 +570,12 @@ class CameraRelocalizationV2(SamplerV2):
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         d = Draft()
         buckets = self.buckets()
+        relaxed = relaxed_buckets()
         requested = self.requested_bucket_m if self.requested_bucket_m is not None else self.gen("requested_bucket_m")
         try:
-            if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+            if relaxed:
+                bi = 0
+            elif os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
                 from ispatialgym.sampling.campaign_runtime import choose_soft_bucket, training_soft_buckets
 
                 bi = (choose_soft_bucket(rng, buckets, self.bucket_counts()) if training_soft_buckets()
@@ -580,6 +585,8 @@ class CameraRelocalizationV2(SamplerV2):
         except ValueError as e:
             raise Reject("spec", str(e))
         lo, hi = bucket_bounds(buckets)[bi]
+        if relaxed:
+            lo, hi = 0., float("inf")
         max_h = math.radians(float(self.g("max_heading_deg")))
         tr_lo, tr_hi = self.g("goal_translate_range")
         tr_hi = min(float(tr_hi), MAX_TRANSLATE)
@@ -619,7 +626,7 @@ class CameraRelocalizationV2(SamplerV2):
                 raise Reject("goal_sampling", f"no free cell of the task room at a geodesic in ({lo}, {hi}] m from the init (geodesic field)")
         prefilter = self.obstructed and fast_on("CR_OBSTACLE_PREFILTER")
         retry = self.obstructed and fast_on("CR_OBSTACLE_RETRY")
-        headroom = self.obstructed and bool(self.obstacle_names) and fast_on("CR_OBSTACLE_HEADROOM")
+        headroom = not relaxed and self.obstructed and bool(self.obstacle_names) and fast_on("CR_OBSTACLE_HEADROOM")
         if headroom:
             P_obs = self.obstacle_params()
             min_detour, by_bucket = float(P_obs["min_detour_m"]), P_obs.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET)
@@ -664,10 +671,10 @@ class CameraRelocalizationV2(SamplerV2):
                 fails["goal_collision"] = fails.get("goal_collision", 0) + 1
                 continue
             path, geo = self.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
-            if geo is None or path is None or len(path) < 2:
+            if geo is None or not math.isfinite(float(geo)) or float(geo) <= 0 or path is None or len(path) < 2:
                 fails["no_path"] = fails.get("no_path", 0) + 1
                 continue
-            if bucket_index(float(geo), buckets) != bi:  # the bucket is the geodesic's (module docstring), before the path check
+            if not relaxed and bucket_index(float(geo), buckets) != bi:  # the bucket is the geodesic's (module docstring), before the path check
                 fails["bucket"] = fails.get("bucket", 0) + 1
                 continue
             if self.obstructed and self.obstacle_names and not headroom and fast_value("CR_HEADROOM_DIAG", 0, int):
@@ -728,6 +735,9 @@ class CameraRelocalizationV2(SamplerV2):
                     fast_facts: Dict[str, Any]):
         """The chosen goal into the draft and the sidecar (stances, goal block, path, bucket), then the obstacles (§6.2)."""
         e, heading, base1, tr1, ti1, q1, cam1, arms, geo, goal_vis, init_vis, shared, path, rec = chosen
+        if relaxed_buckets():
+            bi = bucket_index(float(geo), self.buckets())
+            lo, hi = bucket_bounds(self.buckets())[bi] if bi >= 0 else (10., float(geo))
         self.kit.apply(q0, base0)
         d.robot_q = q0
         d.base_pose2d = base0
@@ -829,7 +839,7 @@ class CameraRelocalizationV2(SamplerV2):
         tol = float(fast_value("CR_FIELD_TOL_M", FIELD_TOL_M, float))
         trav = self.world.scene.trav_map
         m = self.kit.eroded_trav_map(0).cpu().numpy() == 255
-        cells = np.argwhere(m & (field > lo - tol) & (field <= hi + tol))
+        cells = np.argwhere(m & np.isfinite(field) & (field > lo - tol) & (field <= hi + tol))
         out: List[th.Tensor] = []
         tries = 0
         while len(cells) and len(out) < n and tries < 50 * n:
@@ -1174,7 +1184,7 @@ class CameraRelocalizationV2(SamplerV2):
             with self.blocked_map(out["footprints"]):
                 path_b, geo_b = self.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
                 out.update(path=path_b, geodesic_m=geo_b)
-                why = detour_failure(geo_b, geo_before, bucket_hi, float(P["min_detour_m"]), P.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET))
+                why = detour_failure(geo_b, geo_before, bucket_hi, float(P["min_detour_m"]), P.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET), relaxed=relaxed_buckets())
                 if why is None and max(corridor) < float(P["min_corridor_width_m"]):
                     why = "corridor"
                 if why is None:
@@ -1259,7 +1269,7 @@ class CameraRelocalizationV2(SamplerV2):
         # the final path (all obstacles blocked) replaces the free-map path in the sidecar; the bucket is re-decided on its
         # geodesic, and every obstacle must be seen before the departure from *its* reference path along this final path
         rec_path: PathRecord = last["path_record"]
-        if bucket_index(float(cur_geo), self.buckets()) != d.extras["bucket"]["index"]:
+        if not relaxed_buckets() and bucket_index(float(cur_geo), self.buckets()) != d.extras["bucket"]["index"]:
             raise Reject("obstacle", f"blocked-map geodesic {cur_geo:.2f} m leaves the bucket ({lo}, {hi}]")
         view = self.view_record(poses, cur_path, last["schedule"], float(P["in_frame_margin"]), ref_paths)
         for name in names:
@@ -1319,13 +1329,13 @@ class CameraRelocalizationV2(SamplerV2):
             hi = draft.extras["bucket"]["hi_m"]
             with self.blocked_map(fps):
                 path_b, geo_b = self.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
-                why = detour_failure(geo_b, float(draft.summary["geodesic_m"]), hi, float(P["min_detour_m"]), P.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET))
+                why = detour_failure(geo_b, float(draft.summary["geodesic_m"]), hi, float(P["min_detour_m"]), P.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET), relaxed=relaxed_buckets())
                 if why:
                     raise Reject("obstacle", f"blocked-map path after the settle {why}")
                 self.kit.sync_world()
                 plan = self.path_schedule(path_b, base0, base1)
                 rec = self.build_path_record(path_b, base0, base1, self.init_trunk(), plan=plan)
-            if rec is None or bucket_index(float(geo_b), self.buckets()) != draft.extras["bucket"]["index"]:
+            if rec is None or (not relaxed_buckets() and bucket_index(float(geo_b), self.buckets()) != draft.extras["bucket"]["index"]):
                 raise Reject("obstacle", f"re-planned path after the settle collides or its geodesic {float(geo_b):.2f} m leaves the bucket")
             sched = plan[1]
             draft.extras["obstacle_path"] = (path_b, float(geo_b))
@@ -1360,8 +1370,14 @@ class CameraRelocalizationV2(SamplerV2):
         return meta
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        if relaxed_buckets():
+            measured = float(draft.summary.get("geodesic_blocked_m", draft.summary["geodesic_m"]))
+            label = bucket_of(measured, self.buckets())
+            draft.summary["path_bucket_m"] = label["max_m"] if label else None
+            draft.summary["bucket_policy"] = BUCKET_POLICY
+            self.sidecar.path_bucket_m = draft.summary["path_bucket_m"]
         path = super().write_instance(draft, index, seed)
-        b = float(draft.summary["path_bucket_m"])
+        b = draft.summary["path_bucket_m"]
         self.buckets_written[b] = self.buckets_written.get(b, 0) + 1
         self.template_meta.setdefault("bucket_counts", {})[str(b)] = self.template_meta.get("bucket_counts", {}).get(str(b), 0) + 1
         if draft.extras.get("blocked_footprints"):

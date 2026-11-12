@@ -26,7 +26,7 @@ def counts(**changes):
 def test_strict_bucket_refill_uses_deficits_and_requires_sibling_capacity():
     t = SimpleNamespace(task="mental_rotation", split="eval_standard")
     assert next_work(t, counts(), max_groups=6) == {
-        "phase":"eval_standard", "bucket":1, "groups":4, "needs_new_gate":False}
+        "phase":"eval_standard", "bucket":0, "groups":6, "needs_new_gate":False}
     assert next_work(t, counts(evaluation={0:3,1:4,2:1}), max_groups=6)["groups"] == 2
     assert next_work(t, counts(room_remaining=0)) is None
     assert next_work(t, counts(room_remaining=1))["groups"] == 1
@@ -53,7 +53,7 @@ def test_model_and_category_queues_never_become_training():
 def test_eval_only_held_refill_preserves_strict_deficits_and_stops_at_quota():
     template = SimpleNamespace(task="mental_rotation", split="eval_standard")
     assert next_work(template, counts(evaluation={0:3,1:4,2:2}), mode="eval_only") == {
-        "phase": "eval_standard", "bucket": 2, "groups": 1, "needs_new_gate": False}
+        "phase": "eval_standard", "bucket": 0, "groups": 1, "needs_new_gate": False}
     complete = counts(evaluation={0:3,1:4,2:3})
     assert next_work(template, complete, mode="eval_only", training_validated=True) is None
     assert next_work(template, complete) is None

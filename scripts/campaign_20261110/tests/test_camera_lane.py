@@ -101,7 +101,7 @@ def test_mutated_report_after_audit_and_train_room_cap_are_enforced(tmp_path):
     f = fixture(tmp_path, distances=(1, 1, 1, 1, 1, 1, 1))
     review = audit(f)
     result = claim(f, review)
-    assert len(result["accepted"]) == 3 and len(result["deferred"]) == 4
+    assert len(result["accepted"]) == 7 and len(result["deferred"]) == 0
     report = Path(review["members"][1]["artifacts"]["report"]["path"])
     report.write_text("{}")
     with pytest.raises(c.ContractError, match="changed after review"):
@@ -114,7 +114,8 @@ def test_area_weighted_room_allocation_preserves_total():
     assert sum(caps.values()) == 1000 and len(caps) == 10
     assert caps["s/r9"] > caps["s/r0"]
     assert [lane.path_bucket(x) for x in (3, 3.00001, 5, 5.00001, 10)] == ["3", "5", "5", "10", "10"]
-    for invalid in (0, -1, float("nan"), 10.01):
+    assert lane.path_bucket(10.01) == "outside"
+    for invalid in (0, -1, float("nan")):
         with pytest.raises(c.ContractError):
             lane.path_bucket(invalid)
 

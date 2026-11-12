@@ -34,9 +34,9 @@ def test_requested_bucket_runs_unchanged_native_stability_test_and_restores_scen
     ArticulationLarge.campaign_complete_stable_bucket(s, p)
     assert len(probes) == len(restores) == 8 and steps == [120]*8
     assert state == {'q': 0.} and s.joint_friction is None
-    assert s.stable == pytest.approx([.36, .42, 1.75, 1.875, 2.])
+    assert s.stable == pytest.approx([.36, .42, 1.75, 2.])
     facts = s.template_facts['campaign_stable_probe']
-    assert sum(row['stable'] for row in facts['probes']) == 3
+    assert sum(row['stable'] for row in facts['probes']) == 2
     ArticulationLarge.campaign_complete_stable_bucket(s, p)
     assert len(probes) == 8  # An immutable goal plan is physically probed once.
 

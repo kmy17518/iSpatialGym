@@ -4,6 +4,8 @@ from dataclasses import asdict
 from pathlib import Path
 import tempfile
 
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
+
 from scripts.campaign_20261110.camera_lane import audit_camera, path_bucket
 from scripts.campaign_20261110.contracts import ObjectRef, Template, digest, require, write_json_atomic, task_quotas
 from scripts.campaign_20261110.acceptance import read
@@ -34,13 +36,13 @@ def allocate_members(accepted, members, *, class_id, training_room_caps, eval_qu
             continue
         source = member["sampling_split"]
         slot = (source, "*" if source == "eval_category" else class_id, bucket)
-        if source in eval_quotas and not member["perturbed"] and eval_counts[slot] < eval_quotas[source][bucket]:
+        if source in eval_quotas and not member["perturbed"] and sum(n for (s, c, _), n in eval_counts.items() if (s, c) == slot[:2]) < sum(eval_quotas[source].values()):
             split = source
             eval_counts[slot] += 1
         else:
             deferred.append(iid)
             continue
-        accepted[iid] = {**member, "class_id": class_id, "split": split}
+        accepted[iid] = {**member, "class_id": class_id, "split": split, "bucket_policy": BUCKET_POLICY}
         added[iid] = split
     return added, deferred
 

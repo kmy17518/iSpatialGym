@@ -128,7 +128,8 @@ def test_eval_only_preserves_pending_capacity_and_never_launches_train_only():
 
 def test_strict_joint_buckets_and_soft_training_use_their_own_weights():
     template = SimpleNamespace(task="configuration_matching-articulation_close_small_scale", split="eval_standard")
-    assert next_work(template, counts(evaluation={0: 5, 1: 2}))["bucket"] == 1
+    assert next_work(template, counts(evaluation={0: 5, 1: 2}))["groups"] == 3
+    assert next_work(template, counts(evaluation={0: 10})) is None
     result = next_work(template, counts(evaluation={0: 5, 1: 5}, train_buckets={0: 100, 1: 0}), training_validated=True)
     assert result is None
     assert next_work(template, counts(class_remaining=0), mode="train_only") is None

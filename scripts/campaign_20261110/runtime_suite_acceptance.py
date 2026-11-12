@@ -7,6 +7,8 @@ import csv
 import json
 from pathlib import Path
 import time
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
+
 from .contracts import ObjectRef, Template, digest, file_digest, require, task_quotas, write_json_atomic
 from .runtime_suite import authorize, checked, timestamp
 
@@ -204,7 +206,7 @@ def quota_snapshot(root, template, members):
     quota = next(q for q in task_quotas() if q.task==template.task)
     limits = dict(zip(('3','5','10') if template.task.startswith('camera_') else
                      (str(i) for i in range(len(quota.standard_buckets or (10,)))), quota.standard_buckets or (10,)))
-    available = len(same)<10 and any(counts[str(m['bucket'])] < limits[str(m['bucket'])] for m in members)
+    available = len(same)<10 and bool(members)
     return {'observed_at':time.time(),'inputs':inputs,'eligible_before':len(same),'bucket_counts':dict(counts),
             'bucket_limits':limits,'eligible':available,'canonical_members':same}, eligible, groups
 

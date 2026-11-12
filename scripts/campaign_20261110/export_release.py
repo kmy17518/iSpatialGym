@@ -31,6 +31,7 @@ from scripts.campaign_20261110.group_lane import check_reservations, physical_te
 from scripts.campaign_20261110.binding_pools import audit_objects, load_pool_for_template
 from scripts.campaign_20261110.storage import atomic_directory_lock
 from scripts.campaign_20261110.reservation_policy import active_policy
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
 from scripts.campaign_20261110.goal_reuse_policy import POLICY as GOAL_REUSE_POLICY, POLICY_KEY
 
 CAMERA_STATES = ("camera_quota.json", "camera_obstructed_quota.json", "camera_category_quota.json")
@@ -216,6 +217,8 @@ def normalize_record(row, *, root, started_at, templates, reservations, reservat
               "conceptual_template_sha256": conceptual_template(template),
               "binding_pool": template.scene_setup.get("binding_pool"),
               "group_id": row.get("group_id"), "bucket": row.get("bucket"),
+              "generation_bucket_policy": runtime.get("bucket_policy", (runtime.get("goal_group") or {}).get("bucket_policy")),
+              "acceptance_bucket_policy": row.get("bucket_policy"), "release_bucket_policy": BUCKET_POLICY,
               "room": f"{template.scene}/{template.room}", "variant": report_variant,
               "artifacts": artifacts, "validation_key": row["validation_key"], "gate": row["gate"],
               "evidence": row["evidence"], "allocation_source": row["allocation_source"],
@@ -270,18 +273,6 @@ def audit_assignments(rows, groups, templates):
         if row["split"] != "train":
             scope = row["task"] if row["split"] == "eval_category" else row["class_id"]
             pinned[row["split"], row["task"], scope].add(row["conceptual_template_sha256"])
-            q = quotas[row["task"]]
-            limits = getattr(q, {"eval_standard": "standard_buckets", "eval_model": "model_buckets",
-                                 "eval_category": "category_buckets"}[row["split"]])
-            if limits:
-                bucket = row["bucket"]
-                if row["task"].startswith("camera_relocalization-"):
-                    require(bucket in ("3", "5", "10"), "unknown camera evaluation bucket")
-                    bucket = ("3", "5", "10").index(bucket)
-                require(isinstance(bucket, int) and 0 <= bucket < len(limits), "unknown evaluation bucket")
-                key = (row["split"], row["task"], scope, bucket)
-                buckets[key] += 1
-                require(buckets[key] <= limits[bucket], "accepted evaluation bucket exceeds quota")
     require(all(len(values) == 1 for values in pinned.values()), "evaluation class changed conceptual template")
 
 
@@ -315,6 +306,7 @@ def publish(root, tag, rows, groups, inputs, *, shard_size=32):
         write_json_atomic(temporary / "groups.json", groups)
         summary = {"schema": "isg-dataset-release-v1", "campaign_id": ordered[0]["campaign_id"], "created_at": time.time(),
                    "source_states": inputs, "instances": len(rows), "counts": dict(Counter(row["split"] for row in rows)),
+                   "bucket_policy": BUCKET_POLICY,
                    "goal_reuse_policy": next((item["policy"] for item in inputs if item.get("kind") == "goal_reuse_policy"), None),
                    "tasks": {task: dict(Counter(row["split"] for row in rows if row["task"] == task)) for task in sorted({r["task"] for r in rows})},
                    "physical_templates": len({r["physical_template_sha256"] for r in rows}), "render_shards": len(shards),

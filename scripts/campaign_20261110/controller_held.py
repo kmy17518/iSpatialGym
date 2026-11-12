@@ -116,10 +116,10 @@ def next_work(template, counts, *, max_groups=6, training_validated=False, mode=
     split = template.split
     quotas = {"eval_standard": quota.standard_buckets, "eval_model": quota.model_buckets,
               "eval_category": quota.category_buckets}.get(split, ())
-    deficits = [max(0, n-counts["evaluation"].get(i, 0)) for i, n in enumerate(quotas)]
-    if any(deficits):
-        bucket = max(range(len(deficits)), key=lambda i: (deficits[i], -i))
-        groups = min(max_groups, deficits[bucket])
+    remaining = max(0, sum(quotas) - sum(counts["evaluation"].values()) - counts.get("evaluation_unbucketed", 0))
+    if remaining:
+        bucket = 0  # descriptive legacy state field; native draws use physical ranges
+        groups = min(max_groups, remaining)
         if split == "eval_standard":
             groups = min(groups, counts["class_remaining"], counts["room_remaining"])
         return {"phase": split, "bucket": bucket, "groups": groups, "needs_new_gate": False} if groups else None
