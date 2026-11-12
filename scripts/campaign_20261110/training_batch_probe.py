@@ -297,7 +297,7 @@ def run(root,request,output,kind):
         from ispatialgym.oracle import run_isg
         if value.get('physical_candidate'):
             from .training_pristine_probe import install_override
-            install_override(run_isg)
+            install_override(run_isg, value)
             common.update(schema='isg-training-physical-diagnostic-v1', release_eligible=False,
                           physical_candidate=value['physical_candidate'])
         from ispatialgym.fastflags import fast_on
