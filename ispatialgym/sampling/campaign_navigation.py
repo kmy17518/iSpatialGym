@@ -3,12 +3,14 @@
 from scripts.campaign_20261110.contracts import require
 
 
-def terminal_deceleration():
+def terminal_deceleration(*, path_style=None):
     """Brake the audited empty-handed approaches before their checked endpoints.
 
     The original native line is preserved. Source1375's base followed that line
     within 2.8 mm but crossed its checked endpoint by 32.7 mm into a wall.
     Lid sibling50219000 crossed by7.65mm before torso-table contact.
+    Close03 source50306500 crossed its face-travel endpoint by35.17mm
+    before its idle left finger contacted the cabinet, in both attempts.
     The existing 0.2 m/s² corner-stop reference profile avoids the same
     overshoot in a tracker reproduction without changing controller limits.
     """
@@ -23,6 +25,10 @@ def terminal_deceleration():
     require((template.class_id, template.task) in {
                 ('inter_object_relation_satisfaction-under_large_scale_03',
                  'inter_object_relation_satisfaction-under_large_scale'),
-                ('configuration_matching-attachment_01', 'configuration_matching-attachment')},
+                ('configuration_matching-attachment_01', 'configuration_matching-attachment'),
+                ('configuration_matching-articulation_close_large_scale_03',
+                 'configuration_matching-articulation_close_large_scale')},
             'navigation terminal braking belongs to an audited endpoint-overshoot class')
+    if path_style == 'face_travel' and template.class_id != 'configuration_matching-articulation_close_large_scale_03':
+        return None
     return .2

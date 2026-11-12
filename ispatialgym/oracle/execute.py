@@ -1592,9 +1592,9 @@ def execute_navigate(action: Navigate, motions: Motions, state, targets, ctx) ->
     # oracle-fix 2026-11-06: a record's own face_travel schedule configuration (``paths[].face_travel_cfg``), passed only when it has one
     ft_cfg = targets.get("face_travel_cfg")
     braking = {}
-    if not targets.get("carried") and targets.get("style") in (None, BP.RECORDED):
+    if not targets.get("carried") and targets.get("style") in (None, BP.RECORDED, BP.FACE_TRAVEL):
         from ispatialgym.sampling.campaign_navigation import terminal_deceleration
-        deceleration = terminal_deceleration()
+        deceleration = terminal_deceleration(path_style=targets.get("style"))
         if deceleration is not None:
             braking['deceleration'] = deceleration
             ctx['navigation_terminal_deceleration_m_s2'] = deceleration

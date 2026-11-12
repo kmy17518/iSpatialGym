@@ -2387,12 +2387,11 @@ class Motions:
             raise SkillError("execution", "recorded-path deceleration must be finite and positive")
         pts = [self.base_pose2d()] + [as_pose2d(w) for w in waypoints]
         if style == BP.FACE_TRAVEL:
-            if deceleration is not None:
-                raise SkillError("execution", "reference deceleration override requires recorded path style")
             if corner_stop:
                 raise SkillError("execution", "track_path: corner_stop drives the recorded polyline, not the face_travel schedule")
             path = BP.BasePath.build(pts, BP.config_with(face_travel_cfg, self.cfg.face_travel))
-            return BP.time_parameterise(path, self.dt, v_lin, v_ang, a_lin=a_max, a_yaw=float(self.cfg.base_tracker.a_max[2]), ds=float(self.cfg.path_profile_ds))
+            return BP.time_parameterise(path, self.dt, v_lin, v_ang, a_lin=a_max, a_yaw=float(self.cfg.base_tracker.a_max[2]), ds=float(self.cfg.path_profile_ds),
+                                        **({"deceleration": deceleration} if deceleration is not None else {}))
         if style not in (None, BP.RECORDED):
             raise SkillError("execution", f"track_path: unknown style {style!r}")
         xy = th.tensor([[p[0], p[1]] for p in pts], dtype=th.float64)

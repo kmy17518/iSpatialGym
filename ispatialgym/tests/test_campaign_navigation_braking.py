@@ -12,12 +12,12 @@ START = (18.2733, -9.4573, 1.184)
 GOAL = (18.458812713623047, -7.637513160705566, -.26078751996222865)
 
 
-def drive(deceleration, start=START, goal=GOAL):
+def drive(deceleration, start=START, goal=GOAL, style=None):
     cfg = MotionsConfig()
     fake = SimpleNamespace(cfg=cfg, dt=1/30, base_pose2d=lambda: start)
     tc = cfg.base_tracker
     ref = Motions._base_reference(fake, [goal], cfg.path_speed_fraction*min(tc.v_max[:2]),
-        cfg.path_speed_fraction*tc.v_max[2], a_max=min(tc.a_max[:2]), deceleration=deceleration)
+        cfg.path_speed_fraction*tc.v_max[2], a_max=min(tc.a_max[:2]), deceleration=deceleration, style=style)
     tracker = PathTracker(ref, fake.dt, tc, max_lag=cfg.path_max_lag)
     cur = list(start)
     direction = [goal[i]-start[i] for i in range(2)]
@@ -65,10 +65,10 @@ def test_braking_requires_exact_audited_class_and_boolean_opt_in(monkeypatch):
     with pytest.raises(ValueError, match='boolean'):CN.terminal_deceleration()
 
 
-def test_navigate_changes_only_opted_in_empty_recorded_paths(monkeypatch):
+def test_navigate_changes_only_opted_in_empty_paths(monkeypatch):
     from ispatialgym.oracle import execute as EX
     seen=[]
-    monkeypatch.setattr(CN,'terminal_deceleration',lambda:.2)
+    monkeypatch.setattr(CN,'terminal_deceleration',lambda **kw:.2)
     def track_path(waypoints,**kw):
         seen.append(kw)
         yield th.zeros(1)
@@ -77,8 +77,8 @@ def test_navigate_changes_only_opted_in_empty_recorded_paths(monkeypatch):
         targets={'waypoints':[GOAL],'carried':carried,'style':style}
         ctx={}
         list(EX.execute_navigate(None,motions,None,targets,ctx))
-        assert ('deceleration' in seen[-1]) == (carried is None and style=='recorded')
-        assert ('navigation_terminal_deceleration_m_s2' in ctx) == (carried is None and style=='recorded')
+        assert ('deceleration' in seen[-1]) == (carried is None)
+        assert ('navigation_terminal_deceleration_m_s2' in ctx) == (carried is None)
 
 
 @pytest.mark.parametrize('bad',[0.,-1.,float('nan'),float('inf')])
@@ -86,11 +86,35 @@ def test_invalid_reference_deceleration_fails_closed(bad):
     with pytest.raises(Exception, match='finite and positive'):drive(bad)
 
 
-def test_reference_override_cannot_silently_change_another_path_style():
-    cfg=MotionsConfig()
-    fake=SimpleNamespace(cfg=cfg,dt=1/30,base_pose2d=lambda:START)
-    with pytest.raises(Exception,match='requires recorded'):
-        Motions._base_reference(fake,[GOAL],.4,.64,style='face_travel',deceleration=.2)
+def test_close03_face_travel_braking_preserves_checked_schedule_and_stops_before_contact():
+    start=(11.080600166320801,-6.528900146484375,3.141592653589793)
+    goal=(9.503800392150879,-6.668616771697998,2.822195816314751)
+    old,_,_,old_ref=drive(None,start,goal,style='face_travel')
+    new,acceleration,_,new_ref=drive(.2,start,goal,style='face_travel')
+    assert old>.03 and new<.005
+    assert acceleration<=.60001
+    assert th.equal(old_ref[-1],new_ref[-1])
+    from ispatialgym.robot.base_path import BasePath, wrap_angle
+    path=BasePath.build([start,goal])
+    direction=th.tensor(goal[:2])-th.tensor(start[:2])
+    length=float(th.linalg.norm(direction))
+    for pose in new_ref:
+        along=float((pose[:2]-th.tensor(start[:2]))@direction)/length
+        assert abs(wrap_angle(float(pose[2])-path.yaw(max(0.,min(length,along)))))<2e-5
+
+
+def test_face_travel_braking_requires_the_audited_close03_scope(monkeypatch):
+    template=SimpleNamespace(class_id='configuration_matching-articulation_close_large_scale_03',
+        task='configuration_matching-articulation_close_large_scale',
+        scene_setup={'recovery_options':{'navigation_terminal_braking':True}})
+    monkeypatch.setattr(CR,'active',lambda:True)
+    monkeypatch.setattr(CR,'configuration',lambda:(None,template,None,None))
+    assert CN.terminal_deceleration(path_style='face_travel')==.2
+    template.class_id='configuration_matching-articulation_close_large_scale_02'
+    with pytest.raises(ValueError,match='audited'):CN.terminal_deceleration(path_style='face_travel')
+    template.class_id='configuration_matching-attachment_01';template.task='configuration_matching-attachment'
+    assert CN.terminal_deceleration()==.2
+    assert CN.terminal_deceleration(path_style='face_travel') is None
 
 
 def test_lid_same_recorded_line_keeps_original_endpoint_and_controller_limits():

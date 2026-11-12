@@ -537,11 +537,16 @@ def dwell_yaws(yaw_from: float, yaw_to: float, dt: float, w_max: float, a_yaw: f
 
 
 def time_parameterise(path: BasePath, dt: float, v_lin: float, v_ang: float, a_lin: float, a_yaw: float, ds: float = 0.005,
-                      v_start: float = 0.05) -> th.Tensor:
+                      v_start: float = 0.05, deceleration: Optional[float] = None) -> th.Tensor:
     """``(T, 3)`` ``(x, y, yaw)`` reference sampled every ``dt`` along ``path`` (see the module docstring for the speed
-    limits). The yaw is continuous (unwrapped) so the tracker's finite differences are meaningful."""
+    limits). The yaw is continuous (unwrapped) so the tracker's finite differences are meaningful.
+    An optional smaller deceleration changes only the backwards speed pass,
+    preserving the checked spatial and heading schedule."""
     dt = float(dt)
     v_lin, v_ang, a_lin, a_yaw = float(v_lin), float(v_ang), float(a_lin), float(a_yaw)
+    if deceleration is not None and (not math.isfinite(float(deceleration)) or float(deceleration) <= 0):
+        raise ValueError("path deceleration must be finite and positive")
+    a_brake = a_lin if deceleration is None else min(a_lin, float(deceleration))
     samples: List[List[float]] = []
     x0, y0 = path.position(0.0)
     for d in path.dwells:
@@ -573,7 +578,7 @@ def time_parameterise(path: BasePath, dt: float, v_lin: float, v_ang: float, a_l
         for j in range(1, len(grid)):
             v[j] = min(v[j], math.sqrt(v[j - 1] ** 2 + 2.0 * a_lin * (grid[j] - grid[j - 1])))
         for j in range(len(grid) - 2, -1, -1):
-            v[j] = min(v[j], math.sqrt(v[j + 1] ** 2 + 2.0 * a_lin * (grid[j + 1] - grid[j])))
+            v[j] = min(v[j], math.sqrt(v[j + 1] ** 2 + 2.0 * a_brake * (grid[j + 1] - grid[j])))
         t_grid = [0.0]
         for j in range(1, len(grid)):
             vm = max(0.5 * (v[j] + v[j - 1]), 0.02)
