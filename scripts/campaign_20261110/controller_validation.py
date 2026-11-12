@@ -190,6 +190,16 @@ def apply_retry_request(entry, request, root, active):
     elif (canonical/'gate.json').exists():
         raise ValueError('retry cannot replace an existing canonical gate')
     else:archived=None
+    if canonical.is_symlink():
+        # A transport can fail before creating its pinned gate directory. Keep
+        # the original canonical link and history, but materialize that exact
+        # owned parent so the new attempt can publish beneath it.
+        transport=entry.get('vast_migration',{}).get('job_dir')
+        target=canonical.resolve()
+        if (not transport or target != pathlib.Path(transport).resolve()/'gate' or
+                not target.is_relative_to(root/'out/vast_replay')):
+            raise ValueError('retry canonical link differs from owned Vast transport')
+        target.mkdir(exist_ok=True)
     history={k:v for k,v in entry.items() if k not in ('attempt_history','applied_retry_requests')}
     if archived:history['archived_failed_gate']=archived
     entry.setdefault('attempt_history',[]).append(history)

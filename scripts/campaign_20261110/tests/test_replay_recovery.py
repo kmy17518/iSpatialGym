@@ -191,3 +191,31 @@ class ReplayRecoveryTests(unittest.TestCase):
             self.assertEqual((folder/'gate.json').read_text(),'immutable different evidence')
 
 if __name__=='__main__':unittest.main()
+
+
+def test_preworker_retry_preserves_exact_broken_vast_output_link(tmp_path):
+    from scripts.campaign_20261110.controller_validation import apply_retry_request
+    job=tmp_path/'out/vast_replay/exact';job.mkdir(parents=True)
+    canonical=tmp_path/'validation/open_loop/class/source';canonical.parent.mkdir(parents=True)
+    canonical.symlink_to(job/'gate')
+    entry={'status':'replay_missing','key':'class','source_job_id':'source','replay_job_id':'9001',
+           'vast_migration':{'job_dir':str(job)},'output':str(canonical)}
+    request={'request_id':'stage_repair','expected_replay_job_id':'9001','reason':'proved pre-worker staging failure'}
+    assert apply_retry_request(entry,request,tmp_path,{})
+    assert canonical.is_symlink()and canonical.resolve()==job/'gate'and (job/'gate').is_dir()
+    assert not list((job/'gate').iterdir())
+    Path(entry['retry_output']).mkdir()
+    assert entry['attempt_history'][0]['replay_job_id']=='9001'
+
+
+def test_retry_rejects_foreign_broken_output_link(tmp_path):
+    import pytest
+    from scripts.campaign_20261110.controller_validation import apply_retry_request
+    job=tmp_path/'out/vast_replay/exact';job.mkdir(parents=True)
+    foreign=tmp_path/'foreign';canonical=tmp_path/'validation/open_loop/class/source';canonical.parent.mkdir(parents=True)
+    canonical.symlink_to(foreign)
+    entry={'status':'replay_missing','key':'class','source_job_id':'source','replay_job_id':'9001',
+           'vast_migration':{'job_dir':str(job)},'output':str(canonical)}
+    request={'request_id':'stage_repair','expected_replay_job_id':'9001','reason':'proved pre-worker staging failure'}
+    with pytest.raises(ValueError,match='owned Vast transport'):apply_retry_request(entry,request,tmp_path,{})
+    assert not foreign.exists()and entry['status']=='replay_missing'

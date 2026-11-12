@@ -55,7 +55,7 @@ def cycle(root,run_dir,helper):
     for rowpath in all_rows(root,run_dir):
         try:
             row=json.loads(rowpath.read_text());validate_row(row)
-            if row['camera_exempt']:continue
+            # Camera has a one-member quota exception, not a replay exemption.
             rp=root/'dispatch/receipts'/(row['dispatch_token']+'.json')
             if not rp.exists():continue
             receipt=json.loads(rp.read_text())

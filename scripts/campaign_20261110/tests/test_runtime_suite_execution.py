@@ -111,3 +111,32 @@ def test_blocked_class_does_not_delay_other_class_publication(tmp_path,monkeypat
         with pytest.raises(StopAfterProof):A.stream(root,base,20,2)
     finally:release.set()
     assert finished[0]=='b_ready'
+
+
+@pytest.mark.parametrize('camera', [True, False])
+def test_suite_owner_submits_each_own_success_including_camera(tmp_path,monkeypatch,camera):
+    import time
+    from types import SimpleNamespace
+    from scripts.campaign_20261110 import dispatch_cluster_first,replay_scheduling
+    root=tmp_path/'campaign';base=root/'suite';source=root/'out/source';source.mkdir(parents=True)
+    (source/'sampling.done').touch();helper=root/'code/helper';wrapper=helper/'scripts/campaign_20261110/infra_open_loop.sh'
+    wrapper.parent.mkdir(parents=True);wrapper.write_text('exact wrapper')
+    row={'dispatch_token':'token','camera_exempt':camera,'run_id':'run','class_id':'camera'if camera else'class',
+         'frozen_runtime':{'path':str(root/'code/native')}}
+    rowpath=base/'rows/row.json';put(rowpath,row);put(root/'dispatch/receipts/token.json',{'status':'submitted'})
+    a={'jobid':'123','job_dir':str(source)};member={'instance_id':'exact__100','demo':{},'tro':{},'report':{}}
+    monkeypatch.setattr(R,'all_rows',lambda *a:[rowpath]);monkeypatch.setattr(R,'validate_row',lambda r:None)
+    monkeypatch.setattr(R,'follow_receipt',lambda *args:({},a,[]));monkeypatch.setattr(R,'successful_members',lambda *a:('exact__100',[member]))
+    monkeypatch.setattr(R,'check_job',lambda *a,**k:{'allowed':True,'reason':'exact source'})
+    monkeypatch.setattr(dispatch_cluster_first,'probe',lambda:{'state':'available','nodes':[],'observed_at':time.time()})
+    monkeypatch.setattr(replay_scheduling,'dual_partition_resources',lambda raw:(['--exact-resource'],{}))
+    calls=[]
+    def submit(command,**kwargs):
+        assert command[0]=='sbatch';calls.append(command);return SimpleNamespace(returncode=0,stdout='456\n',stderr='')
+    monkeypatch.setattr(R.subprocess,'run',submit)
+    result=R.cycle(root,base,helper)
+    assert result['errors']==[]and result['submitted']==['456']and len(calls)==1
+    assert calls[0][-1]=='exact__100'
+    output=root/'validation/runtime_suites/run'/row['class_id']/'exact__100'
+    put(output/'gate.json',{'success':True})
+    assert R.cycle(root,base,helper)['submitted']==[]and len(calls)==1
