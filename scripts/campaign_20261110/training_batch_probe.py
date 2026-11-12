@@ -43,6 +43,9 @@ def verify_runtime_compatibility(root, request, records, runtime):
     require(proof_path.is_relative_to(root) and proof_path.is_file() and
             file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
     proof=json.loads(proof_path.read_text())
+    if proof.get('schema') == 'isg-fixed-parking-rebuild-runtime-v1':
+        from .training_parking_rebuild_probe import verify_runtime
+        return verify_runtime(root, request, records, runtime, verify_runtime_compatibility)
     if proof.get('schema') == 'isg-physics-timeline-rebuild-runtime-compatibility-v1':
         from .training_physics_timeline_rebuild_probe import verify_runtime
         return verify_runtime(root, request, records, runtime, verify_runtime_compatibility)
@@ -473,6 +476,10 @@ def _run(root,request,output,kind,construction):
             from .training_physics_timeline_rebuild_probe import install as install_timeline_rebuild, DELTA as TIMELINE_DELTA
             install_timeline_rebuild(run_isg, value, output)
             common['physics_timeline_reconstruction_delta'] = TIMELINE_DELTA
+        if value.get('parking_before_play_v1') is True:
+            from .training_parking_rebuild_probe import install as install_parking, DELTA as PARKING_DELTA
+            install_parking(run_isg, value, output)
+            common['parking_reconstruction_delta'] = PARKING_DELTA
         if value.get('fixed_mass_baseline') is True:
             from .training_fixed_mass_probe import install_fixed_mass_baseline, DELTA
             install_fixed_mass_baseline(run_isg,value,output)
