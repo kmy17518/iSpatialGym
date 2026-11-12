@@ -252,3 +252,28 @@ def test_diversity_cell_names_complete_multi_support_set(tmp_path):
     assert r.verify_diversity_cell(tmp_path,config,reference())['cell_id']=='cell'
     cell['support_instances']=names[:-1]
     with pytest.raises(ContractError,match='named support set'):r.verify_diversity_cell(tmp_path,config,reference())
+
+
+def test_requested_batch_cannot_be_replaced_by_old_individual_or_same_augmentation_proof(tmp_path):
+    for value in [{'schema':'isg-training-shared-pipeline-v2'}, {'schema':'isg-training-shared-pipeline-v3'},
+                  {'schema':'isg-training-shared-pipeline-v3','changed_augmentation':{}}]:
+        with pytest.raises(ContractError,match='renderer-cleanup evidence'):
+            r.verify_requested_batch(tmp_path,value,0)
+
+
+def test_requested_cleanup_binds_exact_independent_changed_batch_reference(tmp_path,monkeypatch):
+    from scripts.campaign_20261110 import training_sequential_augmentation as sequence
+    def write(name,value):
+        p=tmp_path/name;write_json_atomic(p,value);return {'path':str(p),'sha256':file_digest(p)}
+    fresh={'path':'fresh_A','sha256':'a'*64};execution={'path':'execution_A','sha256':'b'*64}
+    matrix=write('matrix.json',{'rendering':{'fresh_A':fresh},'execution':{'rendering':{'fresh_A':execution}}})
+    cleanup=write('cleanup.json',{'independent_A':{'probe':fresh,'execution':execution}})
+    shared={'schema':'isg-training-shared-pipeline-v3','changed_augmentation':matrix,'renderer_cleanup':cleanup}
+    calls=[]
+    monkeypatch.setattr(sequence,'verify',lambda *a:calls.append('matrix')or{'status':'verified'})
+    monkeypatch.setattr(sequence,'verify_render_cleanup',lambda *a:calls.append('cleanup')or{'status':'verified'})
+    assert r.verify_requested_batch(tmp_path,shared,0)['renderer_cleanup']['status']=='verified'
+    assert calls==['matrix','cleanup']
+    shared['renderer_cleanup']=write('wrong_cleanup.json',{'independent_A':{'probe':{'path':'other','sha256':'c'*64},'execution':execution}})
+    with pytest.raises(ContractError,match='independent reference'):
+        r.verify_requested_batch(tmp_path,shared,0)

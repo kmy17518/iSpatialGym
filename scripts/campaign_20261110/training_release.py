@@ -349,12 +349,35 @@ def verify_sampler_pool(root, reference, started_at):
 # pool canary cannot attest to an unrelated restoration-control implementation.
 STAGE_COMPONENTS = {
     'restoration': {'ispatialgym/oracle/run_isg.py', 'ispatialgym/oracle/campaign_restore.py',
-                    'ispatialgym/sampling/campaign_runtime.py'},
+                    'ispatialgym/oracle/campaign_batch.py', 'ispatialgym/sampling/campaign_runtime.py'},
     'sampler_pool': {'ispatialgym/sampling/sample_isg.py', 'ispatialgym/sampling/model_pool.py',
                      'ispatialgym/sampling/campaign_runtime.py'},
     'rendering': {'ispatialgym/multienv/replay.py', 'ispatialgym/multienv/campaign_rendering.py',
+                  'ispatialgym/multienv/campaign_render_cleanup.py', 'ispatialgym/oracle/campaign_batch.py',
                   'ispatialgym/sampling/campaign_runtime.py'},
 }
+
+
+def verify_requested_batch(root, shared, started_at):
+    """The requested changed-light/parking batch and cleanup are mandatory."""
+    require(shared.get('schema') == 'isg-training-shared-pipeline-v3' and
+            isinstance(shared.get('changed_augmentation'), dict) and
+            isinstance(shared.get('renderer_cleanup'), dict),
+            'changed-augmentation and renderer-cleanup evidence are required')
+    matrix = checked(root, shared['changed_augmentation'])
+    cleanup = checked(root, shared['renderer_cleanup'])
+    require(cleanup.get('independent_A') == {
+        'probe': matrix['rendering']['fresh_A'],
+        'execution': matrix['execution']['rendering']['fresh_A']},
+        'renderer cleanup does not use the changed-batch independent reference')
+    # Local import keeps the read-only verifier's existing release utilities
+    # available without creating a module import cycle.
+    from .training_sequential_augmentation import verify, verify_render_cleanup
+    sequential = verify(root, shared['changed_augmentation'], started_at)
+    rendered = verify_render_cleanup(root, shared['renderer_cleanup'], started_at)
+    require(sequential['status'] == rendered['status'] == 'verified',
+            'requested batched pipeline checks did not pass')
+    return {'changed_augmentation': sequential, 'renderer_cleanup': rendered}
 
 
 def restoration_options(root, canary):
@@ -460,7 +483,7 @@ def verify_configuration(root, config_path, reference):
         require(case['task'] == task and case['export_record']['validation_key']['code_sha256'] == key['code_sha256'],
                 'applicable path runtime/task differs')
     shared = checked(root, release['shared_pipeline'])
-    require(shared.get('schema') == 'isg-training-shared-pipeline-v2', 'shared executed pipeline proof missing')
+    requested_batch = verify_requested_batch(root, shared, started)
     cases = [validated_canary(root, ref, started) for ref in shared['augmentation_cases']]
     perturbations = [case['export_record']['perturbations'] for case in cases]
     require({bool(p['lighting']) for p in perturbations} == {False, True} and
@@ -483,7 +506,9 @@ def verify_configuration(root, config_path, reference):
     native = Path(release['native_runtime']).resolve()
     require(native.is_relative_to(root/'code') and file_digest(native/'.snapshot_commit') == key['code_sha256'],
             'production runtime differs')
-    control_probes = [checked(root, ref) for ref in shared['restoration_controls'].values()]
+    changed_inputs = checked(root, shared['changed_augmentation'])
+    changed_probes = [checked(root, ref) for ref in changed_inputs['physics'].values()]
+    control_probes = [checked(root, ref) for ref in shared['restoration_controls'].values()] + changed_probes
     control_options = []
     for probe in control_probes:
         for entry in probe['entries']:
@@ -502,13 +527,15 @@ def verify_configuration(root, config_path, reference):
     pool_result = checked(root, pool_evidence['sequence_result'])
     pool_request = checked(root, pool_result['request'])
     pool_hashes = {file_digest(Path(row['native_runtime'])/'.snapshot_commit') for row in pool_request['records']}
-    render_probe = checked(root, shared['batch_rendering'])
+    render_probe = checked(root, changed_inputs['rendering']['ABA'])
     witnesses = {
-        'restoration': {'evidence': shared['restoration_controls'],
-                        'runtime_hashes': {p['probe_runtime']['sha256'] for p in control_probes},
+        'restoration': {'evidence': {'restoration_controls': shared['restoration_controls'],
+                                     'changed_augmentation': shared['changed_augmentation']},
+                        'runtime_hashes': {p['probe_runtime']['sha256'] for p in changed_probes},
                         'effective_options': control_options},
         'sampler_pool': {'evidence': shared['sampler_pool'], 'runtime_hashes': pool_hashes},
-        'rendering': {'evidence': shared['batch_rendering'],
+        'rendering': {'evidence': {'changed_augmentation': shared['changed_augmentation'],
+                                  'renderer_cleanup': shared['renderer_cleanup']},
                       'runtime_hashes': {render_probe['probe_runtime']['sha256']}},
     }
     verify_stage_scope(root, native, scope, witnesses, restoration_options(root, own))
@@ -532,6 +559,7 @@ def verify_configuration(root, config_path, reference):
             'task': task, 'class_id': config['template']['class_id'], 'controls': controls,
             'rendering': rendering, 'sampler_pool': pool, 'applicable_pool': applicable_pool, 'dependencies': dependencies,
             'cold_reset_compatibility': cold,
+            'requested_batch': requested_batch,
             'native_process_executions': executions,
             'status': 'exact_evidence_verified', 'production_authorization': False}
 
