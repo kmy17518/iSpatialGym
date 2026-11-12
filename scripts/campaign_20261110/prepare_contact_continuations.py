@@ -44,7 +44,8 @@ sys.exit(0 if rc == 0 and rec['done_marker'] else 2)
 '''
 
 
-def prepare(source_root, account_root, account, inventory, output_relative, relocations=None):
+def prepare(source_root, account_root, account, inventory, output_relative, relocations=None,
+            route_all_account=None):
     source_root, account_root = Path(source_root), Path(account_root)
     inventory = Path(inventory)
     data = json.loads(inventory.read_text())
@@ -67,7 +68,7 @@ def prepare(source_root, account_root, account, inventory, output_relative, relo
 
     tickets = []
     for index, row in enumerate(jobs):
-        expected_account = "minyeong" if index % 2 == 0 else "shiyuc"
+        expected_account = route_all_account or ("minyeong" if index % 2 == 0 else "shiyuc")
         if account != expected_account:
             continue
         assert (row["entry_id"], row["kind"]) not in owned_keys
@@ -137,4 +138,5 @@ if __name__ == "__main__":
     parser.add_argument("--inventory", required=True)
     parser.add_argument("--output-relative", required=True)
     parser.add_argument("--relocations")
+    parser.add_argument("--route-all-account", choices=("minyeong", "shiyuc"))
     print(json.dumps(prepare(**vars(parser.parse_args()))))
