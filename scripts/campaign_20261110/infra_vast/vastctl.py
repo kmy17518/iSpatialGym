@@ -452,10 +452,13 @@ def stage_native_dependency(s3, rec, state):
     diagnostic=typed.get('schema')=='isg-vast-ik-native-probe-v1'
     prebuild=typed.get('schema')=='isg-vast-library-prebuild-v1'
     map_prebuild=typed.get('schema')=='isg-vast-map-prebuild-v1'
+    contact_map=typed.get('schema')=='isg-vast-contact-map-prebuild-v1'
     if diagnostic:
         from scripts.campaign_20261110 import vast_ik_probe as native
     elif prebuild:
         from scripts.campaign_20261110 import vast_prebuild as native
+    elif contact_map:
+        from scripts.campaign_20261110 import vast_contact_map as native
     elif map_prebuild:
         from scripts.campaign_20261110 import vast_map_prebuild as native
     else:
@@ -466,7 +469,7 @@ def stage_native_dependency(s3, rec, state):
     code=value['snapshot'];b1k=os.path.dirname(os.path.realpath(os.path.join(code,'Behavior-1K','OmniGibson')))
     code_keys=['bundle/tools/rsync.tar.zst',ensure_code(s3,code,state)]
     exact_ik=None
-    if diagnostic or prebuild or map_prebuild:
+    if diagnostic or prebuild or map_prebuild or contact_map:
         helper_code=value['helper_snapshot']
         code_keys.append(ensure_code(s3,helper_code,state))
     if diagnostic:
