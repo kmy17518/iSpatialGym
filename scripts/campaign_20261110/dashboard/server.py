@@ -14,6 +14,8 @@ TARGETS = {'eval_standard': 1000, 'eval_model': 891, 'eval_category': 109, 'trai
 # These two campaign geometry probes predate the campaign job-name prefix.
 # Exact IDs prevent unrelated similarly named probes from entering this view.
 GEOMETRY_PROBE_IDS = {'18423600', '18423963'}
+VIDEO_NAMES = {f'{scope}_episode_{episode}_h264.mp4' for scope in
+               ('same_augmentation','changed_augmentation','model_pool') for episode in (2,3)}
 SECRET = re.compile(r'(password|secret|credential|access_token|api_key|authorization|private_key)', re.I)
 
 
@@ -212,6 +214,13 @@ class Handler(BaseHTTPRequestHandler):
         if host not in ('127.0.0.1', 'localhost'):
             return self.send_body(403, b'Loopback access only', 'text/plain')
         path = urlparse(self.path).path
+        if path.startswith('/videos/'):
+            return self.send_video(path.removeprefix('/videos/'))
+        if path == '/reports/batch-restoration':
+            value,status=read_source(self.server.data_root/'dashboard/batch_restoration_status.json')
+            if not status['available'] or value.get('campaign_id')!='campaign_20261110':
+                return self.send_body(404,b'Restoration observation unavailable','text/plain')
+            return self.send_body(200,json.dumps(sanitize(value)).encode(),'application/json')
         if path == '/api/status':
             data = snapshot(self.server.data_root, self.server.inventory)
             return self.send_body(200, json.dumps(data, allow_nan=False).encode(), 'application/json')
@@ -272,11 +281,40 @@ class Handler(BaseHTTPRequestHandler):
             jid = path.rsplit('/', 1)[-1]
             rows = [row for row in snapshot(self.server.data_root, self.server.inventory)['gates'] if row['id'] == jid]
             return self.send_body(200 if rows else 404, json.dumps(rows[0] if rows else {'error':'Unknown campaign job'}, indent=2).encode(), 'application/json')
-        files = {'/': ('index.html', 'text/html; charset=utf-8'), '/app.js': ('app.js', 'text/javascript'), '/style.css': ('style.css', 'text/css')}
+        files = {'/': ('index.html', 'text/html; charset=utf-8'), '/app.js': ('app.js', 'text/javascript'), '/style.css': ('style.css', 'text/css'),
+                 '/batch-restoration':('batch-restoration.html','text/html; charset=utf-8'),
+                 '/batch-restoration.js':('batch-restoration.js','text/javascript')}
         if path in files:
             name, mime = files[path]
             return self.send_body(200, (STATIC / name).read_bytes(), mime)
         self.send_body(404, b'Not found', 'text/plain')
+
+    def send_video(self, name):
+        directory=(self.server.data_root/'dashboard/batch_restoration_videos').resolve()
+        target=directory/name
+        if name not in VIDEO_NAMES or not target.is_file() or target.is_symlink() or target.resolve().parent!=directory:
+            return self.send_body(404,b'Unknown campaign video','text/plain')
+        size=target.stat().st_size;start,end=0,size-1;code=200
+        requested=self.headers.get('Range')
+        if requested:
+            match=re.fullmatch(r'bytes=(\d+)-(\d*)',requested)
+            if not match:return self.send_body(416,b'Unsupported byte range','text/plain')
+            start=int(match[1]);end=min(size-1,int(match[2])) if match[2] else size-1
+            if start>end or start>=size:return self.send_body(416,b'Byte range outside video','text/plain')
+            code=206
+        self.send_response(code);self.send_header('Content-Type','video/mp4')
+        self.send_header('Accept-Ranges','bytes');self.send_header('Content-Length',str(end-start+1))
+        self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff')
+        if code==206:self.send_header('Content-Range',f'bytes {start}-{end}/{size}')
+        self.end_headers()
+        with target.open('rb') as stream:
+            stream.seek(start);remaining=end-start+1
+            while remaining:
+                data=stream.read(min(1024*1024,remaining))
+                if not data:break
+                try:self.wfile.write(data)
+                except (BrokenPipeError,ConnectionResetError):break
+                remaining-=len(data)
 
     def do_HEAD(self):
         self.send_body(405, b'Read-only GET endpoints', 'text/plain')

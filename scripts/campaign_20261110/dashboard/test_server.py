@@ -133,6 +133,29 @@ class ReadOnlyDashboardTests(unittest.TestCase):
             self.assertEqual(self.request(method, '/api/status')[0], 405)
         self.assertEqual(before, self.hashes())
 
+    def test_video_ranges_and_allowlist_are_read_only(self):
+        directory=self.root/'dashboard/batch_restoration_videos';directory.mkdir()
+        video=directory/'same_augmentation_episode_2_h264.mp4';video.write_bytes(b'0123456789')
+        before=self.hashes();conn=http.client.HTTPConnection(*self.server.server_address)
+        conn.request('GET','/videos/'+video.name,headers={'Host':'127.0.0.1','Range':'bytes=2-5'})
+        response=conn.getresponse()
+        self.assertEqual(response.status,206);self.assertEqual(response.getheader('Content-Range'),'bytes 2-5/10')
+        self.assertEqual(response.read(),b'2345');conn.close()
+        self.assertEqual(self.request('GET','/videos/../../live.json')[0],404)
+        self.assertEqual(self.request('GET','/videos/local_videos.json')[0],404)
+        self.assertEqual(self.request('POST','/videos/'+video.name)[0],405)
+        self.assertEqual(self.request('GET','/videos/'+video.name,host='external.example')[0],403)
+        self.assertEqual(before,self.hashes())
+        video.unlink();video.symlink_to(self.root/'LIVE.md')
+        self.assertEqual(self.request('GET','/videos/'+video.name)[0],404)
+
+    def test_restoration_report_requires_campaign_identity(self):
+        self.write('dashboard/batch_restoration_status.json',{'campaign_id':'previous_campaign'})
+        self.assertEqual(self.request('GET','/reports/batch-restoration')[0],404)
+        self.write('dashboard/batch_restoration_status.json',{'campaign_id':'campaign_20261110','api_key':'HIDDEN','scope':'same augmentation'})
+        before=self.hashes();code,raw=self.request('GET','/reports/batch-restoration')
+        self.assertEqual(code,200);self.assertNotIn(b'HIDDEN',raw);self.assertEqual(before,self.hashes())
+
     def test_credentials_and_unapproved_files_are_not_served(self):
         raw = self.request('GET', '/api/status')[1]
         self.assertNotIn(b'SHOULD_NEVER_APPEAR', raw)
