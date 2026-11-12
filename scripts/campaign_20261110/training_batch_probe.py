@@ -40,6 +40,9 @@ def verify_runtime_compatibility(root, request, records, runtime):
     require(proof_path.is_relative_to(root) and proof_path.is_file() and
             file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
     proof=json.loads(proof_path.read_text())
+    if proof.get('schema') == 'isg-sequential-anchor-runtime-compatibility-v1':
+        from .training_anchor_probe import verify_anchor_runtime
+        return verify_anchor_runtime(root,request,records,runtime,verify_runtime_compatibility)
     if proof.get('schema') == 'isg-sequential-checker-runtime-compatibility-v1':
         require(request.get('sequential_checker_only') is True and request.get('sequential_augmentation') is True and
                 request.get('production_released') is False and
@@ -412,6 +415,8 @@ def _run(root,request,output,kind,construction):
             'render cleanup helper cannot execute physics')
     require(not value.get('sequential_checker_only') or kind=='physics_action_open_loop',
             'physics saved-scene checker cannot execute rendering')
+    require(not value.get('sequential_anchor_rebase') or kind=='physics_action_open_loop',
+            'prospective anchor repair cannot execute rendering')
     runtime=Path(__file__).resolve().parents[2]/'.snapshot_commit'
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
     compatibility=verify_runtime_compatibility(root,value,records,runtime.parent)

@@ -72,8 +72,8 @@ def test_oracle_production_scope_requires_exact_job_runtime_and_actual_index(tmp
     with pytest.raises(ContractError,match='outside authorized job range'):
         restoration_execution(meta,tro,native,environment={'ISGF_ROOT':str(tmp_path)})
     raw['ispatialgym']['instance_id']='exact__50000';write_json_atomic(tro,raw)
-    decision['allowed']=False
-    with pytest.raises(ContractError,match='current exact bounded'):
+    decision['allowed']=False;decision['reason']='exact current evidence unavailable'
+    with pytest.raises(ContractError,match='exact current evidence unavailable'):
         restoration_execution(meta,tro,native,environment={'ISGF_ROOT':str(tmp_path)})
     decision['allowed']=True;altered=copy.deepcopy(meta);altered['scene_setup']['restoration_options']['pristine_mass_before_reset_v1']=False
     with pytest.raises(ContractError,match='physical input differs'):

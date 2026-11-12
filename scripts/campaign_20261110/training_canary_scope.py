@@ -70,7 +70,8 @@ def restoration_execution(meta, tro_path, native_runtime, *, environment=None):
     decision = check_job(root, job, kind='source_validation')
     require(decision.get('allowed') is True and decision.get('config_sha256') == file_digest(config_path) and
             decision.get('category') in ('validation_canary', 'released_training'),
-            'production restoration needs current exact bounded or released authorization')
+            'production restoration needs current exact bounded or released authorization; decision=' +
+            json.dumps(decision,sort_keys=True,default=str))
     if decision['category'] == 'validation_canary':
         authorization = decision['authorization']; path = Path(authorization['authorization_path']).resolve()
         require(path.is_relative_to(root) and file_digest(path) == authorization['authorization_sha256'],
