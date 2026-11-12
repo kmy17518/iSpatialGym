@@ -29,7 +29,7 @@ def verify_runtime(root, request, records, runtime, verify_parent):
             'late reconstruction requires bounded fixed-mass scope')
     require(not any(request.get(key) for key in (
         'parking_before_play_v1', 'explicit_physics_timeline_rebuild_v1',
-        'explicit_physics_rebuild_v1', 'contact_reset_v1')),
+        'explicit_physics_sdk_rebuild_v1', 'reset_contact_cache_before_step_v1')),
         'late reconstruction cannot combine independent physical changes')
     reference = request['runtime_compatibility']; path = Path(reference['path']).resolve()
     require(path.is_relative_to(root) and file_digest(path) == reference['sha256'], 'late reconstruction proof changed')
