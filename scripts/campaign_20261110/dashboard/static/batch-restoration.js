@@ -37,7 +37,9 @@ async function refreshPipeline(){
       const native=row.native?`native ${row.native.written} written, observed ${observedText(row.native.observed_at)}`:'native result unavailable';
       const demo=review.demo_completed!=null?`; demo ${review.demo_successful}/${review.demo_completed} successful`:'';
       const job=review.allocation?.jobid?`; collector ${review.allocation.jobid}`:'';
-      p.textContent=`${name} (${row.start}): ${status.replaceAll('_',' ')}. ${native}${demo}${job}. Stage observation: ${observedText(review.observed_at||row.last_observed_at)}. Owner: dataset_contract; dispatch: compute.`;
+      const failure=review.error?` Failed check: ${review.error}.`:'';
+      const next=review.next_action?` Next action: ${review.next_action}.`:'';
+      p.textContent=`${name} (${row.start}): ${status.replaceAll('_',' ')}. ${native}${demo}${job}.${failure}${next} Stage observation: ${observedText(review.observed_at||row.last_observed_at)}. Owner: dataset_contract; dispatch: compute.`;
       p.className='pending';return p;
     });
     byId('live-pipeline').replaceChildren(...nodes);
