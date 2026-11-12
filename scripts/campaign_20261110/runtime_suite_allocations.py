@@ -94,7 +94,7 @@ def observe(root,run_dir):
                     rb='vast' if str(replay_id).startswith('9000') else 'cluster'
                     value['records'].append({'job_id':str(replay_id),'job_dir':e['output'],'backend':rb,'stage':'physics_replay','submission_ref':entry_ref})
                     for old in e.get('scheduler_attempt_history',[]):
-                        value['records'].append({'job_id':str(old['replay_job_id']),'job_dir':e['output'],'backend':'cluster','stage':'physics_replay','submission_ref':entry_ref})
+                        value['records'].append({'job_id':str(old['replay_job_id']),'job_dir':old.get('output',e['output']),'backend':'cluster','stage':'physics_replay','submission_ref':entry_ref})
                 gp=Path(e.get('output','/nonexistent'))/'gate.json'
                 if gp.is_file():
                     member,g=gate_member(gp,row,source)

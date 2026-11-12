@@ -63,3 +63,18 @@ def test_canonical_suite_handoff_retains_existing_attempt_owners():
     assert not isolated_suite_replay_owner(decision,{'vast_migration':{'status':'prepared'}})
     assert not isolated_suite_replay_owner({**decision,'allowed':False},{})
     assert not isolated_suite_replay_owner({**decision,'category':'ordinary_validation'},{})
+
+
+def test_frozen_acceptance_allocation_survives_observation_only_updates(tmp_path):
+    row={'path':'row','sha256':'bound'}
+    rec={'job_id':'123','job_dir':'source','backend':'cluster','stage':'generation_collection'}
+    gate={'path':'gate','sha256':'passed'}
+    original={'row':row,'allocation':{'jobid':'123'},'dispatch_receipt':{'path':'receipt','sha256':'bound'},
+              'records':[rec],'member_gates':[gate],'gate':gate,'observed_at':1}
+    accepted=put(tmp_path/'immutable.json',original)
+    current=put(tmp_path/'current.json',{**original,'observed_at':2,'terminal_evidence':{'new':'raw'},
+                                       'records':[rec,{**rec,'job_id':'124','stage':'physics_replay'}]})
+    M.same_execution_snapshot(accepted,current,row)
+    for change in ({'allocation':{'jobid':'other'}},{'records':[]},{'member_gates':[]},{'dispatch_receipt':{'path':'foreign'}}):
+        bad=put(tmp_path/'bad.json',{**original,**change})
+        with pytest.raises(ValueError):M.same_execution_snapshot(accepted,bad,row)

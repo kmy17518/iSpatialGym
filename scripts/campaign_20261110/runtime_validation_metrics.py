@@ -259,12 +259,30 @@ def sample_distribution(values):
     return {'n': len(values), 'min': values[0], 'median': (values[middle] if len(values) % 2 else (values[middle-1]+values[middle])/2), 'max': values[-1]}
 
 
+def same_execution_snapshot(accepted_ref, current_ref, row_ref):
+    """A frozen acceptance input may precede later observational/cost updates."""
+    if accepted_ref == current_ref:
+        return
+    accepted = checked(accepted_ref); current = checked(current_ref)
+    require(accepted['row'] == current['row'] == row_ref and
+            all(accepted[k] == current[k] for k in ('allocation', 'dispatch_receipt')),
+            'strict outcome execution reference differs')
+    identity = lambda r: tuple(str(r[k]) for k in ('job_id', 'job_dir', 'backend', 'stage'))
+    require({identity(r) for r in accepted['records']} <= {identity(r) for r in current['records']},
+            'accepted execution jobs disappeared or changed')
+    require(all(g in current.get('member_gates', []) for g in accepted.get('member_gates', [])),
+            'accepted member replay evidence disappeared or changed')
+    require(not accepted.get('gate') or accepted['gate'] == current.get('gate') or
+            accepted['gate'] in current.get('member_gates', []), 'accepted gate changed')
+
+
 def strict_outcomes(result, row, row_ref, allocation_ref):
     """Join the strict owner's exact evidence; regression consumes no quota."""
     require(result.get('schema') == 'isg-current-runtime-class-acceptance-v1', 'unknown strict outcome schema')
     for key in ('run_id', 'class_id', 'frozen_runtime', 'campaign_config', 'group_id', 'fresh_start', 'fresh_count', 'camera_exempt'):
         require(result[key] == row[key], 'strict outcome identity differs: ' + key)
-    require(result['row'] == row_ref and result['allocation'] == allocation_ref, 'strict outcome execution reference differs')
+    require(result['row'] == row_ref, 'strict outcome row reference differs')
+    same_execution_snapshot(result['allocation'], allocation_ref, row_ref)
     review = checked(result['strict_review']); validation = checked(result['regression_audit'])
     quota = checked(result['quota_evidence'])
     require(quota == result['quota'], 'strict outcome quota differs')
