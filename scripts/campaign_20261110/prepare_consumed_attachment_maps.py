@@ -16,7 +16,7 @@ def support_identity_matches(selected, measured):
         ('selected_scale', 'absolute_scale'), ('object', 'object'), ('scene', 'scene')))
 
 
-def prepare(root, runtime, graph_path, audit_path, output):
+def prepare(root, runtime, graph_path, audit_path, output, *, family='attachment', owned_units=None, chunk_size=64):
     from ispatialgym.grasping import contact_policy as CP, schema as S
     from ispatialgym.sampling import reach_maps as RM
     root, runtime, graph_path, audit_path, output = map(Path, (root, runtime, graph_path, audit_path, output))
@@ -28,7 +28,8 @@ def prepare(root, runtime, graph_path, audit_path, output):
     ref = lambda p: {'path': str(p), 'sha256': sha(p)}
     read = lambda p: json.loads(Path(p).read_text())
     graph = read(graph_path); audit = read(audit_path)
-    assert audit['schema'] == 'isg-consumed-attachment-native-reader-v1' and not output.exists()
+    assert family in {'attachment', 'tabletop'}
+    assert audit['schema'] == ('isg-consumed-attachment-native-reader-v1' if family == 'attachment' else 'isg-consumed-tabletop-native-reader-v1') and not output.exists()
     positives = {}
     for row in audit['rows']:
         if row['status'] != 'verified_positive': continue
@@ -46,14 +47,17 @@ def prepare(root, runtime, graph_path, audit_path, output):
                  'ispatialgym/grasping/contact_policy.py', 'ispatialgym/grasping/hand_geometry.py', 'ispatialgym/grasping/object_geometry.py']}
     grouped = {}; missing = Counter(); unresolved_supports = {}
     for dep in graph['rows']:
-        if dep['kind'] != 'tabletop_reach_map' or not any(c.startswith('configuration_matching-attachment_') for c in dep['required_by_classes']): continue
-        if dep['inputs']['arm'] != 'right':
+        if dep['kind'] != 'tabletop_reach_map': continue
+        classes = dep['required_by_classes']
+        if family == 'attachment' and not any(c.startswith('configuration_matching-attachment_') for c in classes): continue
+        if family == 'tabletop' and not all(c.startswith('inter_object_relation_satisfaction-') and 'large_scale' not in c for c in classes): continue
+        if family == 'attachment' and dep['inputs']['arm'] != 'right':
             missing['retired_no_left_tabletop_consumer'] += 1
             continue
         target = dep['inputs']['target']; scale = target.get('applied_scale')
         if not scale: missing['target_scale_missing'] += 1; continue
         source = positives.get((target['category'], target['model'], tuple(S.canonical_scale(scale))))
-        if not source: missing['positive_attachment_library_missing'] += 1; continue
+        if not source: missing['positive_' + family + '_library_missing'] += 1; continue
         support = dep['inputs']['support']; measured = supports.get((support['support_profile'], support['height_slot']))
         if measured is None: missing['support_height_missing'] += 1; continue
         proof, value = measured
@@ -63,13 +67,14 @@ def prepare(root, runtime, graph_path, audit_path, output):
                 'selected': support, 'measured': {k: value.get(k) for k in ('absolute_scale', 'object', 'scene', 'actual_height_key')}, 'proof': proof}
             continue
         height = value['actual_height_key']; group_key = (source['native_identity_key'], source['library']['sha256'], height)
+        if family == 'tabletop': group_key += (dep['inputs']['arm'],)
         unit = grouped.setdefault(group_key, {'source': source, 'height': height, 'arms': set(), 'proofs': {}, 'configuration_ids': set(), 'dependency_ids': set(), 'class_ids': set()})
         unit['arms'].add(dep['inputs']['arm']); unit['proofs'][proof['path']] = proof
         unit['configuration_ids'].update(dep['consumer_scopes']['required']); unit['dependency_ids'].add(dep['id']); unit['class_ids'].update(dep['required_by_classes'])
     # New attachment identity has no reusable maps unless an exact stored entry
     # can prove otherwise. Existing candidate artifacts are retained for a reader.
     wanted_entries = {r['entry']['id'] for r in positives.values()}; candidate_maps = []
-    for base in [root / 'training_preparation'] + sorted(root.glob('v2_release*')):
+    for base in ([root / 'training_preparation'] + sorted(root.glob('v2_release*'))) if family == 'attachment' else []:
         if not base.is_dir(): continue
         for directory, dirs, files in os.walk(base):
             dirs[:] = [d for d in dirs if not d.startswith(('floating_', 'camera_')) and d not in ('sampling_cache', 'asset_cache', 'logs', 'jobs', 'native_reader_r1')]
@@ -81,6 +86,13 @@ def prepare(root, runtime, graph_path, audit_path, output):
     cache.write_text(json.dumps({'observed_at': time.time(), 'entry_ids': sorted(wanted_entries), 'candidate_maps': candidate_maps,
                                 'source_audit': ref(audit_path), 'new_library_identity_only': True}, indent=2) + '\n')
     assert not candidate_maps, 'Existing exact entry maps require native-reader join before new admission'
+    retained_owned = []; retained_cache = []; owned = read(owned_units) if owned_units else {'units': []}
+    owned_keys = {(r['library_identity'], r['height'], a) for r in owned['units'] for a in r['arms']}
+    cache_roots = [root / 'scale_prebuild/maps'] + sorted(root.glob('v2_release*/maps'))
+    cache_dirs = {}
+    for row in graph['rows']:
+        p = Path((row.get('artifact') or {}).get('path', ''))
+        if p.name.startswith('map__') and p.suffix == '.json': cache_dirs.setdefault(p.parent.name, set()).add(p.parent)
     runner = '''import hashlib,json,os,subprocess,sys,time
 from pathlib import Path
 D=Path(__file__).parent;p=json.loads((D/'prepared.json').read_text());sha=lambda x:hashlib.sha256(Path(x).read_bytes()).hexdigest()
@@ -100,11 +112,34 @@ v.update(finished_at=time.time(),map_files=[{'path':str(x),'sha256':sha(x)}for x
     compile(runner, 'run.py', 'exec'); tickets = []; units = []
     for _, unit in sorted(grouped.items()):
         row = unit['source']; entry = row['entry']; arms = sorted(unit['arms']); assert arms and set(arms) <= {'left', 'right'}
+        if family == 'tabletop':
+            arm = arms[0]; assert len(arms) == 1
+            if (row['native_identity_key'], unit['height'], arm) in owned_keys:
+                retained_owned.append({'entry_id': entry['id'], 'height': unit['height'], 'arm': arm,
+                                       'dependency_ids': sorted(unit['dependency_ids']), 'configuration_ids': sorted(unit['configuration_ids'])}); continue
+            lib = S.load_model(entry['category'], entry['model'], entry['scale'], str(Path(row['library']['path']).parents[2]), constraint=entry['constraint'])
+            assert lib is not None and lib.identity_key() == row['native_identity_key']
+            hits = {}
+            directories = [r / entry['id'] for r in cache_roots] + list(cache_dirs.get(entry['id'], set()))
+            for directory in directories:
+                if not any(directory.glob('map__*__h' + unit['height'] + '__*.json')): continue
+                for rest in {g['rest_id'] for g in lib.grasps()}:
+                    hit = RM.ReachMap.find(str(directory), lib, float(unit['height']), rest_id=rest, arm=arm,
+                                          policy_key=CP.DEFAULT.key(arm), robot=RM.robot_digest(), config_require=json.loads(json.dumps(RM.MapConfig(arm=arm).key())))
+                    if hit is not None: hits[rest] = ref(hit.path)
+            if hits:
+                retained_cache.append({'entry_id': entry['id'], 'height': unit['height'], 'arm': arm, 'maps': hits,
+                    'status': 'native_lookup_hit_pending_full_grid_audit', 'required_rest_ids': sorted({g['rest_id'] for g in lib.grasps()}),
+                    'dependency_ids': sorted(unit['dependency_ids']), 'configuration_ids': sorted(unit['configuration_ids'])}); continue
         physical = {'kind': 'tabletop', 'library_identity': row['native_identity_key'], 'library_sha256': row['library']['sha256'],
                     'height': float(unit['height']), 'arms': arms, 'config': {a: RM.MapConfig(arm=a).key() for a in arms},
                     'robot': RM.robot_digest(), 'policy': {a: CP.DEFAULT.key(a) for a in arms}, 'generator_files': generator}
         key = hashlib.sha256(json.dumps(physical, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        ident = 'attachment_tabletop_' + key[:20]; directory = output / ident; directory.mkdir()
+        namespace = root / 'infra/coordination/preparation_dispatch/consumed_asset_builds_r1'
+        if (namespace / 'claims' / (key + '.json')).exists():
+            retained_owned.append({'physical_dedup_key': key, 'entry_id': entry['id'], 'height': unit['height'], 'arms': arms,
+                                   'claim': str(namespace / 'claims' / (key + '.json'))}); continue
+        ident = ('attachment_tabletop_' if family == 'attachment' else 'tabletop_') + key[:20]; directory = output / ident; directory.mkdir()
         jobs = directory / 'jobs.json'; jobs.write_text(json.dumps([entry], indent=2) + '\n')
         anchors = directory / 'anchors.json'; height = float(unit['height'])
         anchors.write_text(json.dumps({'schema': 'isg-height-anchors/1', 'anchors': [{'height': height, 'key': unit['height'], 'precision': .0001,
@@ -139,14 +174,22 @@ v.update(finished_at=time.time(),map_files=[{'path':str(x),'sha256':sha(x)}for x
             'scripts': [ref(directory / n) for n in ('run.py', 'job.sh', 'pinned.sh')], 'output': str(directory / 'maps'),
             'dispatch_workdir': str(runtime), 'hard_time_seconds': 1800, 'native_time_seconds': 1500,
             'computation_kind': 'reach_map', 'consumer_kind': 'tabletop', 'workstream': 'training preparation', 'owner': '/root/templates_assets',
-            'stage': 'attachment male tabletop maps', 'class_ids': sorted(unit['class_ids']), 'configuration_ids': sorted(unit['configuration_ids']),
+            'stage': 'attachment male tabletop maps' if family == 'attachment' else 'required tabletop maps', 'class_ids': sorted(unit['class_ids']), 'configuration_ids': sorted(unit['configuration_ids']),
             'selected_dependency_ids': sorted(unit['dependency_ids']), 'followup': 'Native reader checks exact library/rest/height/arm/config/robot/policy and grid coverage; preserve valid zeros; no scene query.',
             'benchmark_credit': 0, 'production_authorized': False})
         units.append({'id': ident, 'physical_dedup_key': key, 'entry_id': entry['id'], 'height': unit['height'], 'arms': arms,
                       'logical_requirements': len(unit['dependency_ids']), 'configuration_ids': sorted(unit['configuration_ids'])})
+        if family == 'tabletop' and len(tickets) % chunk_size == 0:
+            chunk = output / ('tickets_%03d.json' % (len(tickets) // chunk_size - 1))
+            chunk.write_text(json.dumps({'schema': 'isg-preparation-dispatch-tickets-v1', 'campaign_id': root.name, 'account': 'minyeong',
+                'source_account': 'minyeong', 'claim_namespace': str(namespace / 'claims'), 'receipt_namespace': str(namespace / 'receipts'),
+                'jobs': tickets[-chunk_size:], 'observed_at': time.time(), 'owner': '/root/templates_assets', 'dispatch_owner': '/root',
+                'benchmark_credit': 0, 'production_authorized': False}, indent=2) + '\n')
+            print(json.dumps({'ready_chunk': ref(chunk), 'jobs': chunk_size}), flush=True)
     p = output / 'tickets.json'; p.write_text(json.dumps({'schema': 'isg-preparation-dispatch-tickets-v1', 'campaign_id': root.name,
         'account': 'minyeong', 'owner': '/root/templates_assets', 'dispatch_owner': '/root', 'observed_at': time.time(), 'jobs': tickets,
         'source_graph': ref(graph_path), 'source_library_audit': ref(audit_path), 'missing_logical_requirements': dict(missing),
+        'retained_existing_ownership': retained_owned, 'retained_native_cache_hits': retained_cache,
         'unresolved_support_identities': list(unresolved_supports.values()),
         'units': units, 'benchmark_credit': 0, 'production_authorized': False}, indent=2) + '\n')
     print(json.dumps({'manifest': ref(p), 'physical_units': len(units), 'arm_queries': sum(len(u['arms']) for u in units),

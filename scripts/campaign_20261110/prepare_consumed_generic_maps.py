@@ -16,7 +16,7 @@ def identity(height, pose_set, config, robot, policy, generator):
             'config': config, 'robot': robot, 'policy': policy, 'generator_files': generator}
 
 
-def prepare(root, runtime, graph_path, geometry_path, rests_path, output):
+def prepare(root, runtime, graph_path, geometry_path, rests_path, output, *, existing_keys=None, emit=True):
     from ispatialgym.grasping import contact_policy as CP
     from ispatialgym.sampling import reach_maps as RM
     root, runtime, graph_path, geometry_path, rests_path, output = map(Path, (root, runtime, graph_path, geometry_path, rests_path, output))
@@ -65,10 +65,15 @@ def prepare(root, runtime, graph_path, geometry_path, rests_path, output):
         for child in base.iterdir():
             if 'generic' in child.name and child.is_dir(): directories.extend(child.rglob('_generic'))
     output.mkdir(parents=True); tickets = []; cached = []
+    existing_keys = existing_keys if existing_keys is not None else set()
     namespace = root / 'infra/coordination/preparation_dispatch/consumed_asset_builds_r1'
     for height, unit in sorted(grouped.items()):
         physical = identity(height, pose, cfg, RM.robot_digest(), CP.DEFAULT.key('right'), generator)
         key = hashlib.sha256(json.dumps(physical, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        if key in existing_keys or (namespace / 'claims' / (key + '.json')).exists():
+            cached.append({'physical_dedup_key': key, 'height': height, 'status': 'existing_claim_or_prepared_key_preserved',
+                           'configuration_ids': sorted(unit['configuration_ids']), 'dependency_ids': sorted(unit['dependency_ids'])})
+            continue
         hits = []
         for directory in directories:
             hit = RM.find_generic(str(directory), float(height), arm='right', pose_set=pose,
@@ -76,7 +81,6 @@ def prepare(root, runtime, graph_path, geometry_path, rests_path, output):
             if hit is not None: hits.append(ref(hit.path))
         if hits:
             cached.append({'physical_dedup_key': key, 'height': height, 'candidates': hits, 'status': 'native_lookup_hit_pending_grid_audit'}); continue
-        assert not (namespace / 'claims' / (key + '.json')).exists(), 'Physical key already claimed'
         ident = 'generic_right_' + key[:20]; directory = output / ident; directory.mkdir()
         jobs = directory / 'jobs.json'; jobs.write_text(json.dumps([{'id': '_generic', 'kind': 'generic', 'dz_m': pose['dz_m']}], indent=2) + '\n')
         h = float(height); anchors = directory / 'anchors.json'
@@ -126,15 +130,50 @@ v.update(returncode=rc,finished_at=time.time(),native_done='GB_MAP_DONE'in(D/'na
             'selected_dependency_ids': sorted(unit['dependency_ids']), 'ready_since': time.time(),
             'followup': 'Strict native generic reader: exact pose-set, height, arm, policy, robot, config, finite grid, status coverage and consumer lookup.',
             'benchmark_credit': 0, 'production_authorized': False})
+        existing_keys.add(key)
     manifest = output / 'tickets.json'; manifest.write_text(json.dumps({'schema': 'isg-preparation-dispatch-tickets-v1', 'campaign_id': root.name,
         'account': 'minyeong', 'source_account': 'minyeong', 'claim_namespace': str(namespace / 'claims'), 'receipt_namespace': str(namespace / 'receipts'),
         'observed_at': time.time(), 'owner': '/root/templates_assets', 'dispatch_owner': '/root', 'jobs': tickets,
         'cached': cached, 'blocked': blocked, 'source_graph': ref(graph_path), 'benchmark_credit': 0,
         'production_authorized': False, 'full_inventory_complete': False}, indent=2) + '\n')
-    print(json.dumps({'manifest': ref(manifest), 'ready': len(tickets), 'cached': len(cached), 'blocked': len(blocked)}), flush=True)
+    if emit: print(json.dumps({'manifest': ref(manifest), 'ready': len(tickets), 'cached': len(cached), 'blocked': len(blocked)}), flush=True)
+    return manifest
+
+
+def prepare_many(root, runtime, graph, source_index, output):
+    root, source_index, output = map(Path, (root, source_index, output)); assert not output.exists()
+    index = json.loads(source_index.read_text()); assert index['schema'] == 'isg-consumed-generic-source-index-v1'
+    output.mkdir(parents=True); seen_sources = set(); seen_keys = set(); jobs = []; joins = []; blocked = []
+    sha = lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest()
+    ref = lambda p: {'path': str(p), 'sha256': sha(p)}
+    for i, source in enumerate(index['sources']):
+        target = json.dumps(source['target_identity'], sort_keys=True)
+        if target in seen_sources: continue
+        try:
+            for k in ('geometry', 'rests'): assert sha(source[k]['path']) == source[k]['sha256']
+            path = prepare(root, runtime, graph, source['geometry']['path'], source['rests']['path'], output / ('source_%03d' % i), existing_keys=seen_keys, emit=False)
+            value = json.loads(path.read_text()); jobs.extend(value['jobs']); joins.append({'source': source, 'manifest': ref(path), 'cached_or_claimed': value['cached'], 'blocked': value['blocked']})
+            seen_sources.add(target)
+        except (OSError, ValueError, KeyError, AssertionError, StopIteration) as exc:
+            blocked.append({'source': source, 'blocker': type(exc).__name__ + ': ' + str(exc),
+                            'next_action': 'Resolve exact native designated rest/height and source access; other identities continue.'})
+        progress = output / 'author_status.json'; progress.write_text(json.dumps({'observed_at': time.time(), 'sources_processed': i + 1,
+            'ready': len(jobs), 'joined_sources': len(joins), 'blocked_sources': len(blocked), 'complete': False}, indent=2) + '\n')
+    namespace = root / 'infra/coordination/preparation_dispatch/consumed_asset_builds_r1'
+    manifest = output / 'tickets.json'; manifest.write_text(json.dumps({'schema': 'isg-preparation-dispatch-tickets-v1', 'campaign_id': root.name,
+        'account': 'minyeong', 'source_account': 'minyeong', 'claim_namespace': str(namespace / 'claims'), 'receipt_namespace': str(namespace / 'receipts'),
+        'observed_at': time.time(), 'owner': '/root/templates_assets', 'dispatch_owner': '/root', 'source_index': ref(source_index),
+        'jobs': jobs, 'joins': joins, 'blocked': blocked, 'benchmark_credit': 0, 'production_authorized': False,
+        'full_inventory_complete': False}, indent=2) + '\n')
+    print(json.dumps({'manifest': ref(manifest), 'ready': len(jobs), 'joined_sources': len(joins), 'blocked_sources': len(blocked)}), flush=True)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('root', 'runtime', 'graph', 'geometry', 'rests', 'output'): parser.add_argument('--' + name, required=True)
-    args = parser.parse_args(); prepare(args.root, args.runtime, args.graph, args.geometry, args.rests, args.output)
+    for name in ('root', 'runtime', 'graph', 'output'): parser.add_argument('--' + name, required=True)
+    for name in ('geometry', 'rests', 'source-index'): parser.add_argument('--' + name)
+    args = parser.parse_args()
+    if args.source_index: prepare_many(args.root, args.runtime, args.graph, args.source_index, args.output)
+    else:
+        assert args.geometry and args.rests
+        prepare(args.root, args.runtime, args.graph, args.geometry, args.rests, args.output)
