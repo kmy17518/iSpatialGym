@@ -89,3 +89,35 @@ def test_short_only_does_not_pollute_solver_with_original_failures():
             assert all(a is b for a,b in zip(old.chain[1:],new.chain[1:]))
             assert new.q_first is None and old.q_first=='original witness'
         assert proof['pre_approach_program']['original_checked_first']is False
+
+
+def test_program_witness_selection_is_exact_class_opt_in(monkeypatch):
+    from types import SimpleNamespace
+    from ispatialgym.sampling import campaign_runtime
+    from ispatialgym.sampling.campaign_axial_approach import program_witness_selection_enabled
+    monkeypatch.setenv('ISPATIALGYM_AXIAL_PROGRAM_WITNESS_SELECTION','1')
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG',raising=False)
+    assert not program_witness_selection_enabled()
+    monkeypatch.setenv('ISPATIALGYM_CAMPAIGN_CONFIG','exact.json')
+    for cls,expected in [('alignment-axial_04',True),('alignment-axial_01',False)]:
+        monkeypatch.setattr(campaign_runtime,'configuration',lambda:(None,SimpleNamespace(class_id=cls)))
+        assert program_witness_selection_enabled() is expected
+
+
+def test_program_endpoint_rejection_keeps_prior_solutions_and_tolerance():
+    from types import SimpleNamespace
+    import torch
+    from ispatialgym.sampling.campaign_axial_approach import polish_program_endpoints
+    original={('right','pre'):torch.tensor([1.]),('right','goal'):torch.tensor([2.])}
+    calls=[]
+    def polish(q,p,arm,ignore):
+        calls.append((p,arm,ignore))
+        return q+10, .00047 if p=='pre' else .004716873
+    checker=SimpleNamespace(solutions=dict(original),_pose_key=lambda p:p,polish_witness=polish,WITNESS_RESIDUAL_MAX=.002)
+    ok,why=polish_program_endpoints(checker,['pre','middle','goal'],arm='right',ignored=['support','target'])
+    assert not ok and '4.717mm' in why and '2.000mm' in why
+    assert all(torch.equal(checker.solutions[k],q)for k,q in original.items())
+    assert calls==[('pre','right',['support','target']),('goal','right',['support','target'])]
+    checker.polish_witness=lambda q,*a,**kw:(q+10,.00047)
+    assert polish_program_endpoints(checker,['pre','goal'],arm='right',ignored=[])[0]
+    assert all(torch.equal(checker.solutions[k],q+10)for k,q in original.items())

@@ -3,6 +3,38 @@ from dataclasses import replace
 import os
 
 
+def program_witness_selection_enabled():
+    if not (os.environ.get('ISPATIALGYM_CAMPAIGN_CONFIG') and
+            os.environ.get('ISPATIALGYM_AXIAL_PROGRAM_WITNESS_SELECTION', '0') == '1'):
+        return False
+    from ispatialgym.sampling import campaign_runtime
+    return campaign_runtime.configuration()[1].class_id == 'alignment-axial_04'
+
+
+def polish_program_endpoints(checker, chain, *, arm, ignored):
+    """Select only endpoints that survive the existing program witness check.
+
+    Native polishing already retains a candidate only after its collision and
+    joint-margin checks. Publish both solution updates only if both endpoints
+    meet the unchanged program tolerance. This is proposal rejection, never a
+    replacement for the complete program check.
+    """
+    selected = []
+    for label, pose in [('pre', chain[0]), ('goal', chain[-1])]:
+        key = (arm, checker._pose_key(pose))
+        witness = checker.solutions.get(key)
+        if witness is None:
+            return False, label + ': missing endpoint witness'
+        polished, residual = checker.polish_witness(witness, pose, arm, ignore=ignored)
+        if residual > checker.WITNESS_RESIDUAL_MAX:
+            return False, (f'{label}: program witness FK residual {residual * 1000:.3f}mm '
+                           f'> {checker.WITNESS_RESIDUAL_MAX * 1000:.3f}mm')
+        selected.append((key, polished))
+    for key, polished in selected:
+        checker.solutions[key] = polished.clone()
+    return True, ''
+
+
 def short_pre_fallback_enabled():
     # The integrated fallback has not yet reproduced the positive isolated
     # 5 cm experiment. Keep it diagnostic-only until native/demo/replay pass.

@@ -620,9 +620,19 @@ class AlignmentAxial(SamplerV2):
                         props.append(O.Proposal(f"{pitch:.0f}{'' if c_sign > 0 else '-'}{'_side' if c_axis is side_c else ''}", rank, c_sign, chain))
 
                     def evaluate(p):
-                        res = self.ikc.waypoints_ok(list(p.chain), manip, "right", ignore_all=[support, target], q_first=p.q_first)
+                        from ispatialgym.sampling.campaign_axial_approach import program_witness_selection_enabled, polish_program_endpoints
+                        strict_witness = program_witness_selection_enabled()
+                        # Axial04's sampled open-finger witness passed5mm IK,
+                        # then its closed-finger program witness failed2mm FK.
+                        # Match the executable blade posture during selection.
+                        finger_kw = {'fingers': 0.0} if strict_witness else {}
+                        res = self.ikc.waypoints_ok(list(p.chain), manip, "right", ignore_all=[support, target], q_first=p.q_first, **finger_kw)
                         if not res.ok:
                             return False, res, None, str(res.reason)
+                        if strict_witness:
+                            ok, why = polish_program_endpoints(self.ikc, p.chain, arm='right', ignored=[support, target])
+                            if not ok:
+                                return False, res, None, why
                         q_pre = self.ikc.solutions.get(("right", self.ikc._pose_key(p.chain[0])))
                         q_goal = self.ikc.solutions.get(("right", self.ikc._pose_key(p.chain[-1])))
                         if q_pre is None or q_goal is None:
