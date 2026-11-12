@@ -27,8 +27,7 @@ def prepare(root, runtime, graph_path, geometry_path, rests_path, output):
     graph, geometry, rests = read(graph_path), read(geometry_path), read(rests_path)
     # Initial measured source has an upright designated rest. Other object poses
     # must supply their own proven rotated hull height before joining this key.
-    assert geometry['category'] == 'board_game' and geometry['model'] == 'frgdqh'
-    assert geometry['scale'] == [.9688] * 3
+    selected_identity = (geometry['category'], geometry['model'], geometry['scale'])
     rest_rows = rests.get('rests', rests)
     if isinstance(rest_rows, dict): rest_rows = list(rest_rows.values())
     rest = next(r for r in rest_rows if r['rest_id'] == 'r0')
@@ -49,7 +48,7 @@ def prepare(root, runtime, graph_path, geometry_path, rests_path, output):
     for row in graph['rows']:
         if row['kind'] != 'generic_reach_map' or row['inputs']['arm'] != 'right': continue
         target = row['inputs']['target']
-        if (target['category'], target['model'], target.get('applied_scale')) != ('board_game', 'frgdqh', [.9688] * 3): continue
+        if (target['category'], target['model'], target.get('applied_scale')) != selected_identity: continue
         selected = row['inputs']['support']; pair = supports.get((selected['support_profile'], selected['height_slot']))
         reason = 'support_height_missing' if pair is None else 'support_instance_identity_mismatch' if not support_identity_matches(selected, pair[0]) else None
         if reason:
@@ -130,7 +129,8 @@ v.update(returncode=rc,finished_at=time.time(),native_done='GB_MAP_DONE'in(D/'na
     manifest = output / 'tickets.json'; manifest.write_text(json.dumps({'schema': 'isg-preparation-dispatch-tickets-v1', 'campaign_id': root.name,
         'account': 'minyeong', 'source_account': 'minyeong', 'claim_namespace': str(namespace / 'claims'), 'receipt_namespace': str(namespace / 'receipts'),
         'observed_at': time.time(), 'owner': '/root/templates_assets', 'dispatch_owner': '/root', 'jobs': tickets,
-        'cached': cached, 'blocked': blocked, 'source_graph': ref(graph_path), 'benchmark_credit': 0, 'full_inventory_complete': False}, indent=2) + '\n')
+        'cached': cached, 'blocked': blocked, 'source_graph': ref(graph_path), 'benchmark_credit': 0,
+        'production_authorized': False, 'full_inventory_complete': False}, indent=2) + '\n')
     print(json.dumps({'manifest': ref(manifest), 'ready': len(tickets), 'cached': len(cached), 'blocked': len(blocked)}), flush=True)
 
 

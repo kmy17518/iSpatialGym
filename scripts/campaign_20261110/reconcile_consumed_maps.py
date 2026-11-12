@@ -43,6 +43,8 @@ def locate_terminal(ticket, route):
 
 
 def native_read(ticket, terminal_path, maps_root, backend, route, cache):
+    if ticket['consumer_kind'] == 'generic':
+        return native_read_generic(ticket, terminal_path, maps_root, backend, cache)
     import numpy as np
     from ispatialgym.grasping import schema as S, contact_policy as CP
     from ispatialgym.sampling import reach_maps as RM
@@ -94,6 +96,42 @@ def native_read(ticket, terminal_path, maps_root, backend, route, cache):
             'downstream_computation_required': False,
             'next_action': 'Reuse exact map artifact in configuration data closure' if positive else 'Diagnose valid zero; do not repeat unchanged',
             'configuration_readiness_claimed': False, 'benchmark_credit': 0}
+
+
+def native_read_generic(ticket, terminal_path, maps_root, backend, cache):
+    import numpy as np
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.sampling import reach_maps as RM
+    require(backend == 'cluster', 'Generic transport currently supports cluster artifacts only')
+    prepared = checked(ticket['prepared'], cache)
+    for ref in ticket['input_refs'] + [ticket['runtime_ref']]: checked_hash(ref, cache)
+    for module in (CP, RM):
+        expected = next(r for r in ticket['input_refs'] if Path(r['path']).name == Path(module.__file__).name)
+        require(sha(module.__file__) == expected['sha256'], 'Native generic reader runtime differs')
+    terminal = json.loads(terminal_path.read_text()); identity = prepared['physical_identity']
+    require(terminal['physical_dedup_key'] == ticket['physical_dedup_key'] and terminal['prepared_sha256'] == ticket['prepared']['sha256'], 'Generic terminal physical identity differs')
+    require(terminal['returncode'] == 0 and terminal['native_done'], 'Native generic builder failed')
+    declared = {r['path']: r['sha256'] for r in terminal['map_files']}
+    paths = sorted(maps_root.rglob('map__*.json')); require(len(paths) == 1, 'One generic physical map required')
+    path = paths[0]; native = RM.ReachMap(str(path)); meta = native.meta
+    require(meta['kind'] == 'generic' and meta['key'] == RM.generic_map_key(meta), 'Generic key differs')
+    require(meta['arm'] == identity['arm'] and meta['pose_set'] == identity['pose_set'] and meta['config'] == identity['config'], 'Generic pose or configuration differs')
+    require(meta['height']['value'] == identity['height'] and meta['robot'] == identity['robot'] == RM.robot_digest(), 'Generic height/robot differs')
+    require(meta['policy_key'] == identity['policy'] == CP.DEFAULT.key(identity['arm']), 'Generic policy differs')
+    require(np.isfinite(native.cells).all() and np.isfinite(native.yaws).all(), 'Nonfinite generic grid')
+    status = [v for k, v in native.arrays.items() if k.startswith('s')]
+    require(status and all(set(np.unique(v)) <= set(RM.STATUS.values()) for v in status), 'Invalid generic status grid')
+    hit = RM.find_generic(str(path.parent), identity['height'], arm=identity['arm'], pose_set=identity['pose_set'],
+                          policy_key=identity['policy'], robot=identity['robot'], config_require=identity['config'])
+    require(hit is not None and Path(hit.path) == path, 'Native generic consumer lookup failed')
+    files = [{'path': str(p), 'sha256': sha(p)} for p in (path, path.with_suffix('.npz'))]
+    require(all(declared.get(r['path']) == r['sha256'] for r in files), 'Unbound generic map payload')
+    positive = sum(int((v == RM.STATUS['feasible']).sum()) for v in status)
+    return {'status': 'verified_positive' if positive else 'valid_zero', 'native_reader_passed': True,
+            'positive_cells': positive, 'maps': [{'arm': identity['arm'], 'pose_set': identity['pose_set'], 'files': files}],
+            'verified_files': files, 'builder_elapsed_seconds': terminal['finished_at'] - terminal['started_at'],
+            'downstream_computation_required': False, 'configuration_readiness_claimed': False, 'benchmark_credit': 0,
+            'next_action': 'Reuse exact generic map in configuration data closure' if positive else 'Diagnose valid zero; do not repeat unchanged'}
 
 
 def checked_hash(ref, cache):
@@ -165,7 +203,7 @@ def reconcile(root, manifest_ref, route_ref, output, *, max_seconds=15, max_item
                'owner': '/root/templates_assets', 'manifest_ready_at': epoch(manifest.get('observed_at')),
                'observed_at': timestamp, 'dispatch_owner': '/root'}
         try:
-            require(ticket['computation_kind'] == 'reach_map' and ticket['consumer_kind'] == 'tabletop', 'Unsupported callback kind')
+            require(ticket['computation_kind'] == 'reach_map' and ticket['consumer_kind'] in {'tabletop', 'generic'}, 'Unsupported callback kind')
             receipt = Path(ticket['submission_path'])
             if receipt.exists():
                 value = json.loads(receipt.read_text()); row['submission'] = {'path': str(receipt), 'sha256': sha(receipt)}
@@ -230,6 +268,7 @@ def main():
     for key in ('root', 'manifest', 'manifest-sha256', 'output'): parser.add_argument('--' + key, required=True)
     parser.add_argument('--route'); parser.add_argument('--route-sha256')
     parser.add_argument('--library-audit'); parser.add_argument('--library-audit-sha256')
+    parser.add_argument('--additional-manifests'); parser.add_argument('--additional-manifests-sha256')
     parser.add_argument('--max-seconds', type=int, default=15); parser.add_argument('--max-items', type=int, default=128)
     parser.add_argument('--watch', action='store_true'); parser.add_argument('--interval', type=int, default=30)
     parser.add_argument('--max-cycles', type=int, default=720)
@@ -237,10 +276,18 @@ def main():
     output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
     require(30 <= args.interval <= 60 and 1 <= args.max_cycles <= 2880, 'Unbounded watch cadence/lifetime')
     stopped = [False]
+    additional = []
+    additional_cursor = [0]
+    if args.additional_manifests:
+        extra = checked({'path': args.additional_manifests, 'sha256': args.additional_manifests_sha256}, {})
+        require(extra['schema'] == 'isg-consumed-map-verifier-inputs-v1', 'Unsupported extra verifier inputs')
+        additional = extra['manifests']
+        require(len(additional) <= 32, 'Unbounded extra verifier manifests')
     def stop(signum, frame): stopped[0] = True
     signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)
 
     def run():
+        began = time.monotonic()
         with atomic_directory_lock(output / 'callback.lockdir'):
             report = reconcile(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
                                {'path': args.route, 'sha256': args.route_sha256} if args.route else None, args.output,
@@ -249,6 +296,18 @@ def main():
                 project_library_advancement(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
                                             {'path': args.library_audit, 'sha256': args.library_audit_sha256})
             print(json.dumps({k: report[k] for k in ('summary', 'verified_this_cycle', 'cycle_seconds')}), flush=True)
+            start = additional_cursor[0] % max(1, len(additional))
+            for offset in range(len(additional)):
+                if time.monotonic() - began >= args.max_seconds: break
+                item = additional[(start + offset) % len(additional)]
+                target = Path(item['output'])
+                require(target.resolve().is_relative_to(Path(args.root).resolve()) and target != output, 'Invalid additional verifier output')
+                target.mkdir(parents=True, exist_ok=True)
+                with atomic_directory_lock(target / 'callback.lockdir'):
+                    extra = reconcile(args.root, item['manifest'], item.get('route'), target,
+                                      max_seconds=max(1, args.max_seconds - int(time.monotonic() - began)), max_items=args.max_items)
+                    print(json.dumps({'additional_manifest': item['manifest'], **{k: extra[k] for k in ('summary', 'verified_this_cycle', 'cycle_seconds')}}), flush=True)
+                    additional_cursor[0] = start + offset + 1
             return report
 
     try:
