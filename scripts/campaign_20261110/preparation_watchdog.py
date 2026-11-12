@@ -56,7 +56,7 @@ def project(root, scheduled, now, previous=None):
             errors.append({'kind': 'preparation_ready_count_unknown', 'account': account,
                            'owner': '/root', 'detail': status.get('errors')})
         for row in status.get('requests', []):
-            status_rows[row.get('claim_path')] = row
+            status_rows[(account, row.get('claim_path'))] = row
     by_id = {str(j['job_id']): j for j in scheduled}
     metrics = read(root/'vast/metrics.json', errors, optional=True)
     provider_fresh = 0 <= now-(epoch(metrics.get('observed_at_unix')) or 0) <= 180
@@ -67,6 +67,7 @@ def project(root, scheduled, now, previous=None):
     intake = read(directory/'consumed_vast_intake/status.json', errors, optional=True)
     vast_routable = {r['physical_dedup_key'] for r in intake.get('ready', [])}
     rows = []; seen = set(); complete = bool(contract_ref)
+    required_manifests = []; physical_routes = {}
     for ref in policy.get('prepared_manifests', []):
         if ref['path'] not in links:
             continue
@@ -82,6 +83,18 @@ def project(root, scheduled, now, previous=None):
         manifest = read(ref['path'], errors, digest=ref['sha256'])
         if 'tickets' not in manifest:
             complete = False
+        required_manifests.append((ref, source, manifest))
+        for ticket in manifest.get('tickets', []):
+            physical_routes.setdefault(ticket['physical_dedup_key'], []).append(ticket)
+
+    def account_capacity(account):
+        cap = statuses[account].get('capacity', {}); cap_at = epoch(cap.get('observed_at'))
+        if cap.get('status') == 'observed' and cap_at is not None and -5 <= now-cap_at <= 60:
+            return min(cap.get('account_slots', {}).get(account, 0),
+                       max(0, cap.get('compatible_available_slots', 0)-policy.get('critical_reserved_physical_slots', 4)))
+        return None
+
+    for ref, source, manifest in required_manifests:
         for ticket in manifest.get('tickets', []):
             key = ticket['physical_dedup_key']
             if key in seen:
@@ -112,19 +125,24 @@ def project(root, scheduled, now, previous=None):
                 terminal_at = now
             dispatched = epoch(receipt.get('submitted_at')) or (epoch(receipt.get('observed_at')) if jid else None)
             ready = not receipt and not Path(ticket['claim_path']).exists()
-            account = ticket['expected_account']; dispatch = statuses[account]
-            cap = dispatch.get('capacity', {}); cap_at = epoch(cap.get('observed_at'))
-            slots = None
-            if cap.get('status') == 'observed' and cap_at is not None and -5 <= now-cap_at <= 60:
-                slots = min(cap.get('account_slots', {}).get(account, 0),
-                            max(0, cap.get('compatible_available_slots', 0)-policy.get('critical_reserved_physical_slots', 4)))
-            blocked = status_rows.get(ticket['claim_path'], {}).get('blocker')
+            # Alternate accounts share one physical key. Inspect every admitted
+            # route before deduplicating; a full first account must not hide a
+            # ready secondary route. Do not count unapproved account headroom.
+            accounts = {t['expected_account'] for t in physical_routes[key]}
+            route_slots = {a: account_capacity(a) for a in sorted(accounts)}
+            account = max(sorted(accounts), key=lambda a: route_slots[a] if route_slots[a] is not None else -1)
+            if receipt.get('account') in accounts:
+                account = receipt['account']
+            slots = route_slots[account]
+            blocked = status_rows.get((account, ticket['claim_path']), {}).get('blocker')
             compatible = slots is not None and slots > 0 or idle_vast > 0 and key in vast_routable
             artifact_ready = epoch(request.get('artifact_ready_at') or request.get('observed_at'))
             row = {'physical_dedup_key': key, 'id': ticket['id'], 'owner': ticket['owner'],
                    'required_for_readiness': source['required_for_readiness'], 'consumer_kind': source['consumer_kind'],
                    'manifest': ref, 'account': account, 'backend': backend, 'job_id': jid or None,
-                   'artifact_ready_at': artifact_ready, 'manifest_ready_at': epoch(ticket.get('ready_since')),
+                   'admitted_accounts': sorted(accounts), 'compatible_account_slots': route_slots,
+                   'artifact_ready_at': artifact_ready,
+                   'manifest_ready_at': min((v for t in physical_routes[key] if (v := epoch(t.get('ready_since'))) is not None), default=None),
                    'submitted_at': dispatched, 'terminal_at': terminal_at,
                    'verification_started_at': epoch(disposition.get('verification_started_at')),
                    'verified_at': epoch(disposition.get('verified_at')),

@@ -97,3 +97,28 @@ def test_optional_historical_work_does_not_create_required_verification_gate(tmp
     value=project(tmp_path,[{'job_id':'123','execution_state':'COMPLETED','ended_at':600}],1000)
     assert value['completed_awaiting_verification']==0 and value['items']==[]
     assert not any(e['kind']=='preparation_terminal_unreviewed'for e in value['exceptions'])
+
+
+def test_secondary_capacity_requires_admitted_route_and_preserves_ready_clock(tmp_path):
+    d,_,_=fixture(tmp_path)
+    for account in ['minyeong','shiyuc']:
+        p=d/f'status_{account}.json';v=json.loads(p.read_text())
+        v['capacity']['account_slots']={'minyeong':0,'shiyuc':8};put(p,v)
+    first=project(tmp_path,[],1000)
+    assert not first['items'][0]['compatible_capacity_available']
+    ticket=json.loads((tmp_path/'tickets.json').read_text())['tickets'][0]
+    secondary={**ticket,'expected_account':'shiyuc','ready_since':990}
+    manifest=put(tmp_path/'secondary.json',{'tickets':[secondary]})
+    source=put(tmp_path/'secondary_source.json',{'jobs':[secondary]})
+    contract=json.loads((tmp_path/'scope.json').read_text())
+    contract['approved_manifests'].append({'manifest':source,'required_for_readiness':True,'consumer_kind':'tabletop'})
+    policy=json.loads((d/'policy.json').read_text());policy['prepared_manifests'].append(manifest)
+    policy['preparation_scope']['policy_ref']=put(tmp_path/'scope.json',contract)
+    policy['preparation_scope']['normalized_manifests'].append({'manifest':manifest,'source_manifest':source})
+    put(d/'policy.json',policy)
+    result=project(tmp_path,[],1000)
+    assert result['ready_count']==1 and result['oldest_ready_age_seconds']==300
+    assert result['items'][0]['account']=='shiyuc'
+    assert result['items'][0]['compatible_capacity_available']
+    assert result['items'][0]['admitted_accounts']==['minyeong','shiyuc']
+    assert any(e['kind']=='preparation_dispatch_stall' for e in result['exceptions'])
