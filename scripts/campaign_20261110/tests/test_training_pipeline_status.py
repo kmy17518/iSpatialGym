@@ -453,3 +453,26 @@ def test_batch_current_pointer_and_tampered_original_receipt(tmp_path):
     assert status.batch_submission_pointer(request,pointer)[0]==selected
     write_json_atomic(selected,{'jobs':['changed']})
     with pytest.raises(ValueError,match='revision changed'):status.batch_submission_pointer(request,pointer)
+
+
+def test_control_current_submission_schema_checks_every_historical_receipt(tmp_path):
+    request=tmp_path/'control/fresh_A/request.json'
+    write_json_atomic(request,{'diagnostic_control':'FRESH_A','diagnostic_only':True,'production_released':False})
+    refs=[]
+    for name,job in [('submission.json','10'),('repair/submission.json','11'),('shutdown/submission.json','12')]:
+        path=request.parent/name
+        write_json_atomic(path,{'request':status.ref(request),'jobs':[{'request':status.ref(request),
+            'job_id':job,'returncode':0,'output':str(request.parent/('physics_'+job))}]})
+        refs.append(status.ref(path))
+    pointer=request.parent/'submission_current.json'
+    value={'campaign_id':'campaign_20261110','request':status.ref(request),'current_submission':refs[2],
+           'original_submission':refs[0],'previous_submission':refs[1]}
+    write_json_atomic(pointer,value)
+    result=status.diagnostic_control_observation(tmp_path,request)
+    assert result['submission']==refs[2] and result['prior_submission_history']==refs[:2]
+    assert result['current_output']==str(request.parent/'physics_12') and not result['release_eligible']
+    value['request']={'path':str(request),'sha256':'wrong'};write_json_atomic(pointer,value)
+    with pytest.raises(ValueError,match='identity differs'):status.diagnostic_control_observation(tmp_path,request)
+    value['request']=status.ref(request);write_json_atomic(pointer,value)
+    Path(refs[1]['path']).write_text('{}')
+    with pytest.raises(ValueError,match='history changed'):status.diagnostic_control_observation(tmp_path,request)

@@ -30,7 +30,22 @@ def diagnostic_control_observation(root, request):
     output=request.parent/'physics'
     pointer=request.parent/'submission_current.json'
     if pointer.exists():
-        selected=read(pointer);reference=selected.get('current',selected)
+        selected=read(pointer)
+        if 'current_submission' in selected:
+            require('current' not in selected and selected.get('campaign_id')=='campaign_20261110'
+                    and selected.get('request')==ref(request),'control current-submission pointer identity differs')
+            require(all(name in selected for name in ('original_submission','previous_submission')),
+                    'control current-submission pointer lacks preserved history')
+            history=[]
+            for name in ('original_submission','previous_submission'):
+                item=selected[name];path=Path(item['path']).resolve()
+                require(path.is_relative_to(request.parent.resolve()) and file_digest(path)==item['sha256']
+                        and read(path).get('request')==ref(request),'control preserved submission history changed')
+                history.append(item)
+            row['prior_submission_history']=history
+            reference=selected['current_submission']
+        else:
+            reference=selected.get('current',selected)
         submission=Path(reference['path']).resolve()
         require(submission.is_relative_to(request.parent.resolve()) and
                 file_digest(submission)==reference['sha256'],'control submission revision changed')
