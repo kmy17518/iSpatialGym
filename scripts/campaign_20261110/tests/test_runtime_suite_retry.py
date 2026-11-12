@@ -113,3 +113,14 @@ def test_no_start_cancel_is_routing_work_not_a_physical_retry(tmp_path):
     base,prior,allocation,rowref,proposal=proposed(tmp_path)
     (tmp_path/'out/job/sample.log').unlink()
     with pytest.raises(ContractError,match='routing reconciliation'):r.prepare(tmp_path,proposal)
+
+
+def test_diagnosis_can_bind_binary_action_evidence_without_rewriting_it(tmp_path):
+    base,prior,allocation,rowref,proposal=proposed(tmp_path)
+    data=tmp_path/'actions.hdf5';data.write_bytes(b'\x89HDF\r\n\x1a\nexact actions')
+    body=json.loads(Path(proposal['path']).read_text());diagnosis=json.loads(Path(body['diagnosis']['path']).read_text())
+    diagnosis['evidence'].append({'path':str(data),'sha256':file_digest(data)})
+    body['diagnosis']=put(Path(body['diagnosis']['path']),diagnosis);proposal=put(Path(proposal['path']),body)
+    assert r.prepare(tmp_path,proposal)
+    data.write_bytes(b'changed')
+    with pytest.raises(ContractError,match='artifact bytes changed'):r.prepare(tmp_path,proposal)

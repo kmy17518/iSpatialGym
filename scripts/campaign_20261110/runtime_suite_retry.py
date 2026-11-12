@@ -114,8 +114,11 @@ def _diagnosis(root, ref, previous_row, allocation_ref, failed_gates):
             'retry needs exact owner diagnosis and concrete changed next action')
     require(value.get('physical_runtime_change') is False and value.get('configuration_change') is False,
             'physical changes require a new current-runtime release')
-    require(value.get('evidence') and all(checked(root,r) is not None for r in value['evidence']),
-            'retry diagnosis lacks hashed evidence')
+    require(isinstance(value.get('evidence'),list) and value['evidence'], 'retry diagnosis lacks hashed evidence')
+    for artifact in value['evidence']:
+        path=Path(artifact['path']).resolve()
+        require(path.is_relative_to(Path(root).resolve()) and reference(path)['sha256']==artifact['sha256'],
+                'retry diagnosis artifact bytes changed or outside campaign')
     return value
 
 
