@@ -45,7 +45,8 @@ def probe():
         accounts[account]=total
     return {'status':'observed','observed_at':observation['observed_at'],'accounts_checked':['minyeong','shiyuc'],
             'compatible_available_slots':min(sum(physical.values()),sum(accounts.values())),
-            'account_slots':accounts,'routes':routes}
+            'account_slots':accounts,'routes':routes,
+            'pending_job_ids':[r[6] for r in observation['jobs'] if r[2]=='PENDING']}
 
 
 def read(path):
@@ -110,11 +111,18 @@ def submit(ticket, capacity, runner=subprocess.run):
         return None
     for path,digest in ticket['inputs'].items():
         verify_ref({'path':path,'sha256':digest})
-    command=ticket['command']
+    command=list(ticket['command'])
     if not command or command[0]!='sbatch' or '--parsable' not in command:
         raise ValueError('Only exact sbatch argv is supported')
+    if ticket.get('workstream')=='training preparation':
+        # Keep ready engineering controls ahead of preparation as slots free.
+        # This changes scheduler priority only, never the pinned native payload.
+        for i,arg in enumerate(command):
+            if arg.startswith('--nice='):command[i]='--nice='+str(max(1000,int(arg.split('=',1)[1])))
+        if not any(arg.startswith('--nice=') for arg in command):command.insert(2,'--nice=1000')
     claim=Path(ticket['claim_path']);claim.parent.mkdir(parents=True,exist_ok=True)
     record={**ticket,'status':'submitting','observed_at':time.time(),'dispatch_owner':'/root',
+            'prepared_command':ticket['command'],'command':command,
             'capacity_observed_at':capacity['observed_at'],'accounts_checked':capacity['accounts_checked']}
     if ticket.get('claim_kind')=='directory':
         claim.mkdir();shared_json(claim/'owner.json',record)
@@ -172,6 +180,13 @@ def cycle(root, account, capacity_probe=probe):
             errors.append({'source':reference['path'],'error':str(exc),'owner':'/root'})
     capacity=capacity_probe()
     allowance=min(capacity.get('compatible_available_slots',0),capacity.get('account_slots',{}).get(account,0)) if capacity.get('status')=='observed' else 0
+    critical={'pipeline','canonical recovery'}
+    pending=set(map(str,capacity.get('pending_job_ids',[])));known_pending=set()
+    for ticket in tickets:
+        if ticket.get('workstream') in critical and Path(ticket['submission_path']).exists():
+            jid=str(read(ticket['submission_path']).get('job_id'))
+            if jid in pending:known_pending.add(jid)
+    queue_allowance=max(0,int(policy.get('critical_pending_limit',6))-len(known_pending)) if capacity.get('status')=='observed' else 0
     rows=[]
     # Oldest ready request first; all streams get access, no final-production gate
     # is used to block these separately authorized preparation and recovery jobs.
@@ -179,10 +194,12 @@ def cycle(root, account, capacity_probe=probe):
     for ticket in sorted(tickets,key=lambda row:(priority.get(row.get('workstream'),4),row.get('ready_since',0))):
         try:
             state=pending_status(ticket)
-            if state=='ready' and allowance>=int(ticket.get('gpu_slots',1)):
+            slots=int(ticket.get('gpu_slots',1));is_critical=ticket.get('workstream') in critical
+            if state=='ready' and (allowance>=slots or is_critical and queue_allowance>=slots):
                 result=submit(ticket,capacity)
                 if result:
-                    allowance-=int(ticket.get('gpu_slots',1));state=result['status']
+                    allowance=max(0,allowance-slots);state=result['status']
+                    if is_critical:queue_allowance=max(0,queue_allowance-slots)
             rows.append({'id':ticket['id'],'workstream':ticket['workstream'],'owner':ticket['owner'],
                          'class_id':ticket.get('class_id'),'state':state,'ready_since':ticket.get('ready_since'),
                          'submission_path':ticket['submission_path'],'claim_path':ticket['claim_path'],
