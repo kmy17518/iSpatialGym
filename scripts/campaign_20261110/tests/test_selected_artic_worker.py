@@ -6,6 +6,7 @@ import pytest
 
 from ispatialgym.grasping import schema as S, validate_artic as VA
 from scripts.campaign_20261110.selected_artic_worker import audit_library
+from scripts.campaign_20261110 import selected_artic_worker as worker
 
 
 def fixture(tmp_path):
@@ -70,3 +71,48 @@ def test_rejects_fixed_base_and_unstable_rest(tmp_path):
     (tmp_path / 'trace.json').write_text(json.dumps(trace))
     with pytest.raises(AssertionError):
         check(tmp_path, unit, lib)
+
+
+def relocation_fixture(tmp_path, monkeypatch):
+    roots = (tmp_path / 'primary/campaign_20261110', tmp_path / 'secondary/campaign_20261110')
+    monkeypatch.setattr(worker, 'CAMPAIGN_ROOTS', roots)
+    wave_root = roots[0] / 'training_preparation/selected_artic_motion_r1'
+    wave_root.mkdir(parents=True)
+    request = wave_root / 'request.json'
+    request.write_text('{"immutable": true}\n')
+    unit = {'id': 'artic_' + 'a' * 24, 'index': 2, 'output': str(wave_root / 'native/original'),
+            'request': worker.ref(request), 'native_runtime': '/pinned/native', 'identity': {'scale': [.9316] * 3}}
+    output = roots[1] / 'training_preparation/selected_artic_motion_r1/native_secondary'
+    return roots, request, unit, output
+
+
+def test_output_relocation_preserves_request_and_unit(tmp_path, monkeypatch):
+    _, request, unit, output = relocation_fixture(tmp_path, monkeypatch)
+    before = copy.deepcopy(unit); source = request.read_bytes()
+    out, receipt = worker.resolve_output(request, {'campaign_id': 'campaign_20261110'}, unit, output)
+    assert out == output / unit['id']
+    assert receipt['request'] == worker.ref(request)
+    assert receipt['unit_id'] == unit['id'] and receipt['unit_index'] == 2
+    assert receipt['original_output'] == unit['output'] and receipt['actual_output'] == str(out)
+    assert receipt['native_inputs_unchanged'] and len(receipt['unit_payload_sha256']) == 64
+    assert unit == before and request.read_bytes() == source and not output.exists()
+
+
+def test_no_relocation_preserves_original_path(tmp_path, monkeypatch):
+    _, request, unit, _ = relocation_fixture(tmp_path, monkeypatch)
+    out, mapping = worker.resolve_output(request, {}, unit)
+    assert str(out) == unit['output'] and mapping is None
+
+
+@pytest.mark.parametrize('kind', ['outside', 'different_wave', 'relative', 'parent_escape', 'symlink_escape'])
+def test_relocation_rejects_foreign_or_escaping_paths(tmp_path, monkeypatch, kind):
+    roots, request, unit, output = relocation_fixture(tmp_path, monkeypatch)
+    if kind == 'outside': output = tmp_path / 'outside'
+    if kind == 'different_wave': output = roots[1] / 'training_preparation/another_wave'
+    if kind == 'relative': output = type(output)('relative/output')
+    if kind == 'parent_escape': output = output / '..' / '..' / 'foreign'
+    if kind == 'symlink_escape':
+        output.parent.mkdir(parents=True); target = tmp_path / 'outside'; target.mkdir()
+        output.symlink_to(target, target_is_directory=True)
+    with pytest.raises(AssertionError):
+        worker.resolve_output(request, {'campaign_id': 'campaign_20261110'}, unit, output)

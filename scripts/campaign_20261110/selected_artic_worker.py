@@ -4,9 +4,15 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
+
+CAMPAIGN_ROOTS = (
+    Path('/vision/u/minyeong/projects/isg_home/campaign_20261110'),
+    Path('/vision/u/shiyuc/minyeong/campaign_20261110'),
+)
 
 
 def read(path):
@@ -40,6 +46,33 @@ def verify(path, index):
     return wave, unit
 
 
+def resolve_output(path, wave, unit, output_root=None):
+    """Relocate output only, preserving the immutable wave and native unit."""
+    original = Path(unit['output'])
+    if output_root is None:
+        return original, None
+    source = Path(path).resolve()
+    root = Path(output_root)
+    assert root.is_absolute() and '..' not in root.parts, 'output root must be an absolute campaign path'
+    assert re.fullmatch(r'artic_[0-9a-f]{24}', unit['id']), 'invalid physical unit identity'
+    # The caller may relocate only into this same named preparation wave.
+    assert source.parent.name.startswith('selected_artic_motion_'), 'foreign request scope'
+    assert any(source.is_relative_to(c / 'training_preparation') for c in CAMPAIGN_ROOTS), 'foreign request root'
+    allowed = [c / 'training_preparation' / source.parent.name for c in CAMPAIGN_ROOTS]
+    resolved = root.resolve()
+    assert any(root.is_relative_to(p) and resolved.is_relative_to(p.resolve()) for p in allowed), 'output root outside isolated campaign wave'
+    assert original.resolve().is_relative_to(source.parent), 'original output outside request wave'
+    out = resolved / unit['id']
+    assert out.resolve().is_relative_to(resolved), 'unit output escaped relocated root'
+    mapping = {'schema': 'isg-selected-artic-output-relocation-v1', 'campaign_id': wave['campaign_id'],
+               'request': ref(path), 'unit_request': unit['request'], 'unit_id': unit['id'], 'unit_index': unit['index'],
+               'unit_payload_sha256': hashlib.sha256(json.dumps(unit, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+               'original_output': str(original), 'output_root': str(resolved), 'actual_output': str(out),
+               'native_runtime': unit['native_runtime'], 'native_inputs_unchanged': True,
+               'worker': ref(__file__), 'benchmark_credit': 0, 'production_authorization': False}
+    return out, mapping
+
+
 def audit_library(path, unit):
     from ispatialgym.grasping import schema as S
     from ispatialgym.grasping import validate_artic as VA
@@ -71,15 +104,23 @@ def audit_library(path, unit):
             'handle_sig': lib['handle_sig'], 'positive': moving > 0}
 
 
-def run(path, index):
-    _, unit = verify(path, index)
-    out = Path(unit['output'])
+def run(path, index, output_root=None):
+    wave, unit = verify(path, index)
+    out, relocation = resolve_output(path, wave, unit, output_root)
+    if relocation is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
     out.mkdir(exist_ok=False)
+    if relocation is not None:
+        write(out / 'output_relocation.json', relocation)
     start = time.time()
     result = {'schema': 'isg-selected-artic-motion-result-v1', 'campaign_id': 'campaign_20261110', 'unit_id': unit['id'],
               'request': ref(path), 'unit_request': unit['request'], 'owner': '/root', 'job_id': os.environ.get('SLURM_JOB_ID'),
               'array_task_id': os.environ.get('SLURM_ARRAY_TASK_ID'), 'started_at': start, 'cpu_affinity': sorted(os.sched_getaffinity(0)),
               'benchmark_credit': 0, 'production_authorization': False, 'status': 'running', 'artifacts': []}
+    if relocation is not None:
+        result['output_relocation'] = ref(out / 'output_relocation.json')
+    result['actual_output'] = str(out)
+    result['original_output'] = unit['output']
     write(out / 'result.json', result)
     runtime = Path(unit['native_runtime'])
     sys.path.insert(0, str(runtime))
@@ -124,9 +165,12 @@ if __name__ == '__main__':
     parser.add_argument('--request', type=Path, required=True)
     parser.add_argument('--unit', type=int, required=True)
     parser.add_argument('--verify-only', action='store_true')
+    parser.add_argument('--output-root', type=Path, help='Relocate outputs within this named campaign preparation wave only')
     args = parser.parse_args()
     if args.verify_only:
-        _, unit = verify(args.request, args.unit)
-        print(json.dumps({'status': 'inputs_verified', 'unit_id': unit['id'], 'request': ref(args.request)}))
+        wave, unit = verify(args.request, args.unit)
+        out, relocation = resolve_output(args.request, wave, unit, args.output_root)
+        print(json.dumps({'status': 'inputs_verified', 'unit_id': unit['id'], 'request': ref(args.request),
+                          'actual_output': str(out), 'output_relocation': relocation}))
     else:
-        run(args.request, args.unit)
+        run(args.request, args.unit, args.output_root)
