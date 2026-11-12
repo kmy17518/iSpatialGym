@@ -56,3 +56,15 @@ def test_rendering_only_proof_cannot_verify_physics(tmp_path):
     scheduler={'123':{'state':'COMPLETED','exit_code':'0:0'},'124':{'state':'COMPLETED','exit_code':'0:0'}}
     assert status.control(tmp_path,b,'rendering','fresh_A',scheduler,o)['verification_status']=='verified'
     assert status.control(tmp_path,b,'physics','fresh_A',scheduler,o)['verification_status']=='not_verified'
+
+
+def test_prospective_attempt_preserves_original_status_and_separate_jobs(tmp_path):
+    b,d,o=fixture(tmp_path);directory=b/'sequential_anchor_r2';rows=[]
+    for name in status.PHYSICS:
+        p=directory/'physics'/name/'request.json';p.parent.mkdir(parents=True);p.write_text('{}')
+        rows.append({'stage':'physics','control':name,'request':status.ref(p)})
+    (directory/'requests.json').write_text(json.dumps({'records':rows}))
+    value=status.project(tmp_path,b,{'123':{'state':'COMPLETED','exit_code':'0:0'}},o)
+    assert len(value['controls'])==11 and len(value['prospective_controls'])==6
+    assert value['controls'][0]['job_id']=='123'and value['prospective_controls'][0]['job_id']is None
+    assert value['prospective_verified_controls']==0 and value['verified_controls']==0

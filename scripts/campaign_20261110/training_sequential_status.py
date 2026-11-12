@@ -20,9 +20,9 @@ def checked(root,reference):
     require(p.is_relative_to(Path(root).resolve())and file_digest(p)==reference['sha256'],'control evidence changed')
     return read(p)
 
-def control(root,batch,stage,name,scheduler,observation):
+def control(root,batch,stage,name,scheduler,observation,*,directory=None):
     cleanup=stage=='renderer_cleanup'
-    directory=Path(batch)/('renderer_cleanup_r1'if cleanup else'sequential_verification_r1')
+    directory=Path(directory)if directory else Path(batch)/('renderer_cleanup_r1'if cleanup else'sequential_verification_r1')
     d=directory/name if cleanup else directory/stage/name
     out={'stage':stage,'control':name,'status':'awaiting_request','scheduler_state':None,'job_id':None,
          'verification_status':'not_verified','evidence':{},'next_action':'Existing author prepares exact bounded request'}
@@ -82,16 +82,27 @@ def project(root,batch,scheduler,observation):
     rows=[control(root,batch,stage,name,scheduler,observation)for stage,names in
           [('physics',PHYSICS),('rendering',RENDER),('renderer_cleanup',('failure','interruption'))]for name in names]
     state_path=Path(batch)/'stream/state.json';state=read(state_path)if state_path.exists()else{}
+    prospective=[];manifest=Path(batch)/'sequential_anchor_r2/requests.json'
+    if manifest.exists():
+        value=read(manifest)
+        require(len(value['records'])==6 and {r['control']for r in value['records']}==set(PHYSICS)and
+                all(r['stage']=='physics'for r in value['records']),'prospective matrix scope differs')
+        for row in value['records']:
+            require(row['request']==ref(manifest.parent/'physics'/row['control']/'request.json'),
+                    'prospective request binding differs')
+            prospective.append(control(root,batch,'physics',row['control'],scheduler,observation,directory=manifest.parent))
     return {'schema':'isg-sequential-control-status-v1','campaign_id':'campaign_20261110',
         'observed_at':datetime.now(timezone.utc).isoformat(),'owner':'/root/dataset_contract',
         'strict_source_observed_at':state.get('observed_at'),'strict_state':ref(state_path)if state_path.exists()else None,
         'strict_errors':{k:state[k]for k in ('matrix_error','verification_error','renderer_cleanup_error','cycle_error')if state.get(k)},
         'scheduler_observed_at':observation['observed_at'],'controls':rows,'required_controls':11,
+        'prospective_physics_manifest':ref(manifest)if manifest.exists()else None,
+        'prospective_controls':prospective,'prospective_verified_controls':sum(r['verification_status']=='verified'for r in prospective),
         'verified_controls':sum(r['verification_status']=='verified'for r in rows),'production_released':False,'benchmark_credit':0}
 
 def observe(root,batch):
     jobs=[]
-    for directory in (Path(batch)/'sequential_verification_r1',Path(batch)/'renderer_cleanup_r1'):
+    for directory in (Path(batch)/'sequential_verification_r1',Path(batch)/'renderer_cleanup_r1',Path(batch)/'sequential_anchor_r2'):
         for p in directory.rglob('submission.json'):
             for j in read(p).get('jobs',[]):
                 if j.get('job_id'):jobs.append(str(j['job_id']))
