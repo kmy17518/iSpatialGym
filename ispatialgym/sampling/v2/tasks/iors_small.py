@@ -1521,6 +1521,7 @@ class IORSSmall(SamplerV2):
             partner_world = self.world.hull_at(self.hull['partner'], tuple(G.t(v) for v in plan.partner))
             bounds = th.stack([partner_world.min(0).values, partner_world.max(0).values]).detach().cpu().numpy()
             yaw_kw['grasp_pose_allowed'] = CID.pregrasp_predicate(bounds)
+            yaw_kw['grasp_segment_allowed'] = CID.grasp_segment_predicate(self.objects[plan.partner_name])
         if plan is not None and (inside_descent or os.environ.get('ISPATIALGYM_UNDER04_START_GAP_PROPOSAL', '0') == '1'):
             from ispatialgym.sampling import campaign_runtime
             if inside_descent or campaign_runtime.configuration()[1].class_id == 'inter_object_relation_satisfaction-under_small_scale_04':
