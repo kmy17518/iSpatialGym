@@ -143,3 +143,28 @@ def test_full_strict_bucket_is_quota_ineligible_while_other_buckets_remain(tmp_p
     assert result['bucket_limits']=={'0':3,'1':4,'2':3}
     result,_,_=a.quota_snapshot(tmp_path,SimpleNamespace(task='object_scaling',class_id='apple'),[{'bucket':1}])
     assert result['eligible'] is True
+
+
+@pytest.mark.parametrize('starts,passes', [((1,1,2),True), ((1,1,1),False)])
+def test_audited_duplicate_replay_is_checked_but_never_counted(tmp_path,starts,passes):
+    from scripts.campaign_20261110.tests.test_acceptance import fixture, audit
+    f=fixture(tmp_path,starts=starts);review=audit(f)
+    original=json.loads(f.gate.read_text());refs=[]
+    for member in review['members']+review.get('excluded_duplicate_members',[]):
+        report=json.loads(Path(member['report']).read_text());report['mode']='replay'
+        put(f.gate.parent/'replay'/member['instance_id']/'meta.json',report)
+        refs.append(put(f.gate.parent/(member['instance_id']+'.json'),{**original,
+            'replay_rc':0,'instance':member['tro'],'demo':member['demo'],
+            'tro_sha256':member['tro_sha256'],'demo_sha256':member['demo_sha256']}))
+    row={'run_started_at':f.since,'frozen_runtime':{'path':original['snapshot']}}
+    if not passes:
+        with pytest.raises(ContractError,match='fewer than two distinct'):
+            a.member_replays(tmp_path,row,{'member_gates':refs},review)
+        return
+    proof=a.member_replays(tmp_path,row,{'member_gates':refs},review)
+    assert set(proof)=={'fresh_0','fresh_2'}
+    # Even excluded work cannot smuggle unrelated/modified replay evidence in.
+    duplicate=refs[-1];bad=json.loads(Path(duplicate['path']).read_text())
+    bad['demo_sha256']='0'*64;refs[-1]=put(Path(duplicate['path']),bad)
+    with pytest.raises(ContractError,match='identity differs'):
+        a.member_replays(tmp_path,row,{'member_gates':refs},review)

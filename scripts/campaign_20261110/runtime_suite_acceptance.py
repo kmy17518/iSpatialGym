@@ -144,7 +144,11 @@ def member_replays(root,row,allocation,review):
     from .acceptance import replay_report_path, report_passed
     from .runtime_suite import timestamp
     from .replay_gate_quality import assess
-    members={m['instance_id']:m for m in review['members']}; proven={}
+    members={m['instance_id']:m for m in review['members']}; proven={}; seen=set()
+    excluded=review.get('excluded_duplicate_members',[])
+    require(all(m.get('reason')=='duplicate_start_grasp_configuration' and
+                m['instance_id'] not in members for m in excluded),
+            'suite excluded member is not an audited duplicate')
     references=allocation.get('member_gates',[])
     require(isinstance(references,list) and len(references)>=2,'awaiting_member_replay: suite needs two actual member gates')
     for gate_ref in references:
@@ -155,17 +159,22 @@ def member_replays(root,row,allocation,review):
                 Path(gate['source_job']).resolve()==Path(review['source_job']).resolve() and
                 Path(gate['snapshot']).resolve()==Path(row['frozen_runtime']['path']).resolve(),
                 'suite member replay source/runtime differs or failed')
-        matches=[m for m in members.values() if Path(m['tro']).resolve()==Path(gate['instance']).resolve()]
+        matches=[m for m in list(members.values())+excluded if Path(m['tro']).resolve()==Path(gate['instance']).resolve()]
         require(len(matches)==1,'suite member replay does not match a successful distinct demo')
         member=matches[0];iid=member['instance_id']
-        require(iid not in proven and gate['tro_sha256']==member['tro_sha256'] and
+        require(iid not in seen and gate['tro_sha256']==member['tro_sha256'] and
                 gate['demo_sha256']==member['demo_sha256'] and Path(gate['demo']).resolve()==Path(member['demo']).resolve(),
                 'suite member replay TRO/demo identity differs or is duplicated')
         path=replay_report_path(gate,gate_ref['path'],iid,root=Path(root).resolve(),started_at=timestamp(row['run_started_at']))
         report=json.loads(path.read_text());report_passed(report,'replay')
         require(Path(report['provenance']['isg_root']).resolve()==Path(row['frozen_runtime']['path']).resolve() and
                 timestamp(report['started_utc'])>=timestamp(row['run_started_at']), 'member replay used old runtime or evidence')
-        proven[iid]={'gate':gate_ref,'report':reference(path),'tro_sha256':member['tro_sha256'],'demo_sha256':member['demo_sha256']}
+        seen.add(iid)
+        # The full audit already excluded this exact successful duplicate start.
+        # Verify its replay identity above, retain its cost, but never count it
+        # as an independent sibling or let it block two distinct valid members.
+        if iid in members:
+            proven[iid]={'gate':gate_ref,'report':reference(path),'tro_sha256':member['tro_sha256'],'demo_sha256':member['demo_sha256']}
     require(len(proven)>=2,'awaiting_member_replay: fewer than two distinct native replay successes')
     return proven
 
