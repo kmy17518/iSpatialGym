@@ -41,3 +41,31 @@ def test_prospective_pair_retains_A_and_exact_new_B_without_relabeling_failure(t
     assert [r['start']for r in document['records']]==[1,3]and old.read_bytes()==original
     new.write_text('{}')
     with pytest.raises(ContractError,match='changed'):stream.selected_requests(tmp_path,cfg)
+
+
+def test_matrix_binds_normal_and_cleanup_rendering_to_one_renderer(tmp_path,monkeypatch):
+    native=tmp_path/'code/native';renderer=tmp_path/'code/renderer'
+    for directory,label in ((native,'native'),(renderer,'render')):
+        (directory/'scripts').mkdir(parents=True);(directory/'ispatialgym').mkdir();(directory/'.snapshot_commit').write_text(label)
+    job=tmp_path/'job';job.mkdir();(job/'job.env').write_text('source bytes')
+    reviews=[stream.immutable(tmp_path/(name+'.json'),{'identity':name})for name in ('A','B')]
+    sources=[{'instance_id':name,'source_job':str(job),'export_record':{'validation_key':{'code_sha256':stream.file_digest(native/'.snapshot_commit')}}}for name in ('A','B')]
+    monkeypatch.setattr(stream,'validated_canary',lambda root,reference,started:sources[reviews.index(reference)])
+    monkeypatch.setattr(stream,'inputs',lambda root,p:(stream.read(p),[s['export_record']for s in sources]))
+    audited=[]
+    def audit(root,request,records,runtime):
+        assert request['probe_runtime_sha256']==stream.file_digest(runtime/'.snapshot_commit')
+        audited.append((request.get('sequential_render_only'),runtime))
+        return request['runtime_compatibility']
+    monkeypatch.setattr(stream,'verify_runtime_compatibility',audit)
+    batch=tmp_path/'batch';manifest=stream.read(stream.prepare_matrix(tmp_path,batch,reviews,native,0,renderer)['path'])
+    assert len(manifest['records'])==9
+    assert {r['runtime']for r in manifest['records']if r['stage']=='physics'}=={str(native)}
+    assert {r['runtime']for r in manifest['records']if r['stage']=='rendering'}=={str(renderer)}
+    assert sum(flag is True for flag,runtime in audited)==3
+    cleanup=stream.read(stream.prepare_render_cleanup(tmp_path,batch,reviews,native,renderer,stream.ref(job/'job.env'))['path'])
+    assert len(cleanup['records'])==2 and {r['runtime']for r in cleanup['records']}=={str(renderer)}
+    proof=stream.read(manifest['records'][-1]['runtime_proof']['path'])
+    assert proof['permitted_execution_kinds']==['kinematic_observation_rendering']
+    with pytest.raises(ContractError,match='source identity changed'):
+        stream.prepare_matrix(tmp_path,batch,reviews,native,0,native)

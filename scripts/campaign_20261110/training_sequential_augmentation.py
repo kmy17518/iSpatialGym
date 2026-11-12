@@ -46,7 +46,7 @@ def verify(root, reference, started_at):
             set(document['execution']['physics']) == set(PHYSICS) and
             set(document['execution']['rendering']) == set(RENDER),
             'complete independent-reference/success/failure/interruption matrix required')
-    sources = {}; source_refs = None; runtime = None; artifacts = set(); results = {}; all_processes = set()
+    sources = {}; source_refs = None; runtimes = {}; artifacts = set(); results = {}; all_processes = set()
     for stage, specifications in (('physics', PHYSICS), ('rendering', RENDER)):
         cases = {}; stage_results = {}
         expected_kind = 'physics_action_open_loop' if stage == 'physics' else 'kinematic_observation_rendering'
@@ -60,9 +60,9 @@ def verify(root, reference, started_at):
                     len(probe['entries']) == len(order), 'sequential reference/control identity differs')
             source_refs = source_refs or request['canaries']
             require(request['canaries'] == source_refs, 'sequential controls use different validated inputs')
-            identity = probe['probe_runtime']; runtime = runtime or identity
-            require(identity == runtime and file_digest(identity['path']) == request['probe_runtime_sha256'] == identity['sha256'],
-                    'sequential matrix runtime differs')
+            identity = probe['probe_runtime']; runtimes.setdefault(stage,identity)
+            require(identity == runtimes[stage] and file_digest(identity['path']) == request['probe_runtime_sha256'] == identity['sha256'],
+                    'sequential matrix stage runtime differs')
             require(verify_runtime_compatibility(root, request, records, Path(identity['path']).parent) ==
                     probe['runtime_compatibility'], 'sequential matrix runtime proof differs')
             observations = []; case = []
@@ -134,7 +134,7 @@ def verify(root, reference, started_at):
                 else: same_loaded_state(independent['observation']['loaded_state'], episode['observation']['loaded_state'])
         results[stage] = stage_results
     return {'schema': 'isg-sequential-augmentation-verification-v1', 'input': reference,
-            'status': 'verified', 'runtime': runtime, 'sources': source_refs, 'stages': results,
+            'status': 'verified', 'runtimes': runtimes, 'sources': source_refs, 'stages': results,
             'independent_processes': len(all_processes), 'checks': ['changed lighting and fixed-actor parking',
                 'one actual Environment construction per process', 'exact native task/model/scale/room/assets',
                 'independent A and B references', 'A/B/A restoration', 'successful A/A cleanup',
@@ -172,6 +172,7 @@ def verify_render_cleanup(root,reference,started_at):
         require(value['canaries']==request['canaries']and value.get('render_cleanup_only')is True and
                 value['diagnostic_control']==('RENDER_FAILURE_A'if name=='failure'else'RENDER_INTERRUPT_A')and
                 probe['kind']=='kinematic_observation_rendering'and len(probe['entries'])==2,'renderer cleanup exact source/order differs')
+        require(probe['probe_runtime']==original['probe_runtime'],'normal and cleanup rendering revisions differ')
         require(file_digest(probe['probe_runtime']['path'])==probe['probe_runtime']['sha256']==value['probe_runtime_sha256'],
                 'renderer cleanup executed runtime differs')
         require(verify_runtime_compatibility(root,value,actual,Path(probe['probe_runtime']['path']).parent)==probe['runtime_compatibility'],'renderer cleanup runtime differs')

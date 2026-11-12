@@ -26,12 +26,13 @@ def immutable(path,value):
     return ref(path)
 
 
-def prepare_matrix(root,batch,reviews,runtime,started_at):
+def prepare_matrix(root,batch,reviews,runtime,started_at,render_runtime=None):
     root,batch,runtime=Path(root),Path(batch),Path(runtime)
+    render_runtime=Path(render_runtime)if render_runtime else runtime
     directory=batch/'sequential_verification_r1';manifest=directory/'requests.json'
     if manifest.exists():
         saved=read(manifest)
-        require(saved['canaries']==reviews and saved['runtime']==str(runtime),'matrix source identity changed')
+        require(saved['canaries']==reviews and saved['runtime']==str(runtime)and saved.get('render_runtime',str(runtime))==str(render_runtime),'matrix source identity changed')
         for row in saved['records']:
             checked(root,row['request']);checked(root,row['preflight'])
         return ref(manifest)
@@ -41,29 +42,45 @@ def prepare_matrix(root,batch,reviews,runtime,started_at):
     require(all(s['export_record']['validation_key']['code_sha256']==native_hash for s in sources),'matrix native source differs')
     payloads={str(p.relative_to(runtime)):file_digest(p) for folder in ('ispatialgym','scripts') for p in sorted((runtime/folder).rglob('*.py')) if p.is_file()}
     proof=immutable(directory/'runtime_compatibility.json',{'schema':'isg-exact-native-runtime-compatibility-v1','native_runtime':ref(stamp),'python_payloads':payloads,'physical_code_changes':0})
+    render_proof=render_runtime_proof(directory/'renderer_runtime_compatibility.json',runtime,render_runtime)if render_runtime!=runtime else proof
     env=ref(Path(sources[1]['source_job'])/'job.env');rows=[]
     for stage,specs in [('physics',PHYSICS),('rendering',RENDER)]:
         kind='physics_action_open_loop'if stage=='physics'else'kinematic_observation_rendering'
+        stage_runtime=runtime if stage=='physics'else render_runtime
+        stage_proof=proof if stage=='physics'else render_proof
         for name,(control,order)in specs.items():
             destination=directory/stage/name;request=destination/'request.json';output=destination/'output'
             value={'schema':'isg-training-batch-probe-request-v1','campaign_id':'campaign_20261110','canaries':reviews,
-                'sequential_augmentation':True,'probe_runtime_sha256':native_hash,'runtime_compatibility':proof,
+                'sequential_augmentation':True,'probe_runtime_sha256':file_digest(stage_runtime/'.snapshot_commit'),'runtime_compatibility':stage_proof,
                 'observe_reset_boundary':True,'observe_final_pre_action':True,'observe_native_dynamics':True,
                 'observe_next_native_control_step':True,'accepted':False,'eligible_for_benchmark':False,
                 'benchmark_credit':0,'quota_consumed':0,'production_released':False,'source_files_unchanged':True,
                 'scope':'Changed lighting and one fixed non-task actor parking; exact independent references and native cleanup controls; one actual world constructor, no added physics steps.'}
             if control:value.update(diagnostic_control=control,diagnostic_only=True)
+            if stage=='rendering'and render_runtime!=runtime:value['sequential_render_only']=True
             request_ref=immutable(request,value)
-            actual,records=inputs(root,request);verify_runtime_compatibility(root,actual,records,runtime)
-            preflight=immutable(destination/'preflight.json',{'passed':True,'request':request_ref,'runtime':str(runtime),
-                'runtime_proof':proof,'source_environment':env,'control':name,'kind':kind,'max_native_episodes':len(order),
+            actual,records=inputs(root,request);verify_runtime_compatibility(root,actual,records,stage_runtime)
+            preflight=immutable(destination/'preflight.json',{'passed':True,'request':request_ref,'runtime':str(stage_runtime),
+                'runtime_proof':stage_proof,'source_environment':env,'control':name,'kind':kind,'max_native_episodes':len(order),
                 'output':str(output),'native_draws':0,'benchmark_credit':0,'actual_native_execution':False,
                 'cpu_scope':'Exact source artifacts, recorded input contract and full frozen payloads; native saved-world audit still executes before world creation.'})
-            rows.append({'control':name,'stage':stage,'kind':kind,'request':request_ref,'runtime':str(runtime),
-                'runtime_proof':proof,'source_environment':env,'output':str(output),'preflight':preflight,
+            rows.append({'control':name,'stage':stage,'kind':kind,'request':request_ref,'runtime':str(stage_runtime),
+                'runtime_proof':stage_proof,'source_environment':env,'output':str(output),'preflight':preflight,
                 'max_native_episodes':len(order),'new_native_draws':0,'benchmark_credit':0})
     return immutable(manifest,{'schema':'isg-sequential-augmentation-dispatch-v1','campaign_id':'campaign_20261110',
-        'runtime':str(runtime),'canaries':reviews,'records':rows,'new_native_draws':0,'benchmark_credit':0,'production_released':False})
+        'runtime':str(runtime),'render_runtime':str(render_runtime),'canaries':reviews,'records':rows,'new_native_draws':0,'benchmark_credit':0,'production_released':False})
+
+
+def render_runtime_proof(path,native,runtime):
+    changed={}
+    for folder in ('ispatialgym','scripts'):
+        paths={str(p.relative_to(tree))for tree in (native,runtime)for p in(tree/folder).rglob('*.py')}
+        for relative in paths:
+            a,b=native/relative,runtime/relative
+            if not a.is_file()or not b.is_file()or file_digest(a)!=file_digest(b):changed[relative]=file_digest(b)
+    return immutable(path,{'schema':'isg-render-cleanup-runtime-compatibility-v1',
+        'native_runtime':ref(native/'.snapshot_commit'),'cleanup_runtime':ref(runtime/'.snapshot_commit'),
+        'physical_code_changes':0,'changed_payloads':changed,'permitted_execution_kinds':['kinematic_observation_rendering']})
 
 
 def prepare_render_cleanup(root,batch,reviews,native,runtime,source_environment):
@@ -71,15 +88,7 @@ def prepare_render_cleanup(root,batch,reviews,native,runtime,source_environment)
     directory=batch/'renderer_cleanup_r1';manifest=directory/'requests.json'
     if manifest.exists():
         saved=read(manifest);require(saved['canaries']==reviews and saved['runtime']==str(runtime),'renderer cleanup source changed');return ref(manifest)
-    changed={}
-    for folder in ('ispatialgym','scripts'):
-        paths={str(p.relative_to(tree))for tree in (native,runtime)for p in(tree/folder).rglob('*.py')}
-        for relative in paths:
-            a,b=native/relative,runtime/relative
-            if not a.is_file()or not b.is_file()or file_digest(a)!=file_digest(b):changed[relative]=file_digest(b)
-    proof=immutable(directory/'runtime_compatibility.json',{'schema':'isg-render-cleanup-runtime-compatibility-v1',
-        'native_runtime':ref(native/'.snapshot_commit'),'cleanup_runtime':ref(runtime/'.snapshot_commit'),
-        'physical_code_changes':0,'changed_payloads':changed})
+    proof=render_runtime_proof(directory/'runtime_compatibility.json',native,runtime)
     rows=[]
     for name,control,boundary in [('failure','RENDER_FAILURE_A','writer'),('interruption','RENDER_INTERRUPT_A','post_render')]:
         D=directory/name;request=immutable(D/'request.json',{'schema':'isg-training-batch-probe-request-v1',
@@ -196,7 +205,7 @@ def run_cycle(root,configuration,state):
     if all(v['status']=='validated_canary_exported'for v in out['records'].values())and len(out['records'])==2:
         reviews=[{'path':out['records'][r['candidate_id']]['validation_review']['review'],'sha256':out['records'][r['candidate_id']]['validation_review']['sha256']}for r in requests['records']]
         try:
-            state['matrix_request']=prepare_matrix(root,batch,reviews,runtime,started);state.pop('matrix_error',None)
+            state['matrix_request']=prepare_matrix(root,batch,reviews,runtime,started,configuration.get('render_cleanup_runtime'));state.pop('matrix_error',None)
             if configuration.get('render_cleanup_runtime'):
                 env=checked(root,state['matrix_request'])['records'][0]['source_environment']
                 state['renderer_cleanup_request']=prepare_render_cleanup(root,batch,reviews,runtime,configuration['render_cleanup_runtime'],env)
