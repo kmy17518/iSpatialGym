@@ -11,6 +11,26 @@ import time
 from scripts.campaign_20261110.prepare_consumed_attachment_maps import support_identity_matches
 
 
+def native_object_height(geometry, rests):
+    """Match the axial consumer's stable-rest choice and upright threshold."""
+    import torch as th
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+    records = rests.get('rests', rests)
+    if isinstance(records, dict): records = list(records.values())
+    stable = sorted((r for r in records if r['stable'] and r.get('rest_kind', 'stable') == 'stable'), key=lambda r: r['rest_id'])
+    assert stable, 'No native stable rest'
+    rest = stable[0]
+    assert rest['contact'] and rest['scale'] == geometry['scale']
+    quat = th.tensor(rest['quat_xyzw'], dtype=th.float32)
+    if CPZ.axial_rest_upright(quat):
+        return float(geometry['coll_bbox_max'][2]) - float(geometry['coll_bbox_min'][2]), rest['rest_id'], 'upright_identity'
+    assert geometry['n_links'] == 1, 'Articulated hull needs its exact joint configuration'
+    points = th.tensor([v for piece in geometry['pieces'] for v in piece['vertices']], dtype=th.float32)
+    rotated = C.transform_points((th.zeros(3), quat), points)
+    return float(rotated[:, 2].max() - rotated[:, 2].min()), rest['rest_id'], 'native_rotated_collision_hull'
+
+
 def identity(height, pose_set, config, robot, policy, generator):
     return {'kind': 'generic', 'height': float(height), 'arm': 'right', 'pose_set': pose_set,
             'config': config, 'robot': robot, 'policy': policy, 'generator_files': generator}
@@ -25,16 +45,8 @@ def prepare(root, runtime, graph_path, geometry_path, rests_path, output, *, exi
     read = lambda p: json.loads(Path(p).read_text())
     assert not output.exists()
     graph, geometry, rests = read(graph_path), read(geometry_path), read(rests_path)
-    # Initial measured source has an upright designated rest. Other object poses
-    # must supply their own proven rotated hull height before joining this key.
     selected_identity = (geometry['category'], geometry['model'], geometry['scale'])
-    rest_rows = rests.get('rests', rests)
-    if isinstance(rest_rows, dict): rest_rows = list(rest_rows.values())
-    rest = next(r for r in rest_rows if r['rest_id'] == 'r0')
-    assert rest['stable'] and rest['contact'] and rest['scale'] == geometry['scale']
-    quat = rest['quat_xyzw']
-    assert sum(float(v) ** 2 for v in quat[:3]) < 1e-8 and abs(float(quat[3])) > .9999
-    extent = float(geometry['coll_bbox_max'][2]) - float(geometry['coll_bbox_min'][2])
+    extent, rest_id, rest_rule = native_object_height(geometry, rests)
     pose = RM.generic_pose_set(RM.generic_dz(extent))
     cfg = json.loads(json.dumps(RM.MapConfig(arm='right', twins=False).key()))
     generator = {n: sha(runtime / n) for n in ('ispatialgym/sampling/reach_maps.py', 'ispatialgym/grasping/contact_policy.py',
@@ -88,7 +100,8 @@ def prepare(root, runtime, graph_path, geometry_path, rests_path, output, *, exi
             'range': [h - .00005, h + .00005], 'status': ['measured'], 'surfaces': sorted(unit['proofs'])}], 'max_approx_m': .00005}, indent=2) + '\n')
         selected = directory / 'consumed_inputs.json'
         selected.write_text(json.dumps({'physical_identity': physical, 'source_graph': ref(graph_path), 'geometry': ref(geometry_path),
-            'rests': ref(rests_path), 'object_height': extent, 'designated_rest_id': 'r0', 'height_proofs': list(unit['proofs'].values()),
+            'rests': ref(rests_path), 'object_height': extent, 'designated_rest_id': rest_id, 'rest_rule': rest_rule,
+            'height_proofs': list(unit['proofs'].values()),
             'configuration_ids': sorted(unit['configuration_ids']), 'dependency_ids': sorted(unit['dependency_ids']),
             'requires_grasp_library': False, 'requires_scene_query': False}, indent=2) + '\n')
         inputs = [ref(p) for p in (jobs, anchors, selected, geometry_path, rests_path, runtime / '.snapshot_commit')]
