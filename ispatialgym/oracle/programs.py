@@ -1040,7 +1040,10 @@ def program_attachment(sc: Sidecar) -> List[Action]:
     place = Place(kind="attach", arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on)
     actions.append(reorient)
     if brace is None:
-        return actions + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE)]
+        from ispatialgym.sampling import campaign_runtime
+        direction = [0.0, 0.0, 1.0] if campaign_runtime.contact_recovery('lid_vertical_final_retreat') else None
+        return actions + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE,
+                                        clear_direction=direction)]
     b = Brace(contact=brace, base_yaw=base_yaw)
     return actions + [
         b,

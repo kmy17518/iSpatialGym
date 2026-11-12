@@ -114,6 +114,7 @@ def contact_recovery(option: str) -> bool:
         'cap_capture_margin': ('configuration_matching-attachment_02',
                                 'configuration_matching-attachment'),
         'axial_magazine_contact_height': ('alignment-axial_04', 'alignment-axial'),
+        'lid_vertical_final_retreat': ('configuration_matching-attachment_04', 'configuration_matching-attachment'),
     }
     require(option in classes, 'unknown campaign contact recovery option')
     if not active():
@@ -139,6 +140,11 @@ def contact_recovery(option: str) -> bool:
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('magazine', 'tfovwy', (1.0, 1.0, 1.0))],
                     'axial contact height belongs to its exact canonical magazine')
+        if option == 'lid_vertical_final_retreat':
+            require(template.split == 'eval_standard' and
+                    [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
+                    [('lid', 'pbmsji', (.65, .65, .65))],
+                    'vertical lid retreat belongs to its exact canonical model and scale')
     return value
 
 

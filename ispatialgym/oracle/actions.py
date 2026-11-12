@@ -1591,6 +1591,9 @@ class Retreat(Action):
     #: the preceding action's recorded end (back out through the corridor the push swept), then straight UP by ``lift_after_m``; both
     #: legs end at poses taken from that recorded end, the poses the sampler checks and records the witness of
     lift_after_m: Optional[float] = None
+    #: An explicitly checked world-space direction for a single clear leg.
+    #: The distance and recorded start remain the ordinary retreat's.
+    clear_direction: Optional[List[float]] = None
     TARGET_KEYS = ("retreat",)
 
     def __post_init__(self):
@@ -1599,6 +1602,11 @@ class Retreat(Action):
         super().__post_init__()
         if self.lift_after_m is not None and (self.slide_dir is None or self.lift_first_m is not None):
             raise ValueError("retreat: lift_after_m needs slide_dir and excludes lift_first_m")
+        if self.clear_direction is not None:
+            if (self.lift_first_m is not None or self.lift_after_m is not None or self.slide_dir is not None or
+                    len(self.clear_direction) != 3 or not all(math.isfinite(float(v)) for v in self.clear_direction) or
+                    sum(float(v)**2 for v in self.clear_direction) <= 0):
+                raise ValueError("retreat: clear_direction needs a finite nonzero single-leg direction")
 
     def _slid_path(self, C, start: Pose, recorded: Pose) -> Optional[List[Pose]]:
         """The slide-then-lift retreat: from where the hand is to ``distance`` along ``slide_dir`` from the recorded end, at its height,
@@ -1639,6 +1647,9 @@ class Retreat(Action):
         if recorded is None:
             raise SidecarError(f"retreat: the preceding action {self.after.name} leaves no eef pose")
         clear = _pre(C, recorded, self.distance)
+        if self.clear_direction is not None:
+            direction = C.unit(_tensor(self.clear_direction).float())
+            clear = Pose((_tensor(recorded.position).float() + self.distance * direction).tolist(), list(recorded.orientation))
         start = None
         eef = getattr(state, "eef_pose", None)
         if callable(eef):
