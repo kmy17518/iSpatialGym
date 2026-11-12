@@ -40,6 +40,7 @@ def main():
     from ispatialgym.sampling import multiply_isg
     from ispatialgym.sampling.v2.core import SamplerV2
     from ispatialgym.sampling.v2.tasks.alignment_axial import AlignmentAxial
+    from ispatialgym.sampling.v2.ik import IKChecker
     import omnigibson as og
     module=sys.modules[AlignmentAxial.__module__]
     assert Path(module.__file__).resolve().is_relative_to(native)
@@ -49,13 +50,37 @@ def main():
     candidate_source=textwrap.dedent(inspect.getsource(AlignmentAxial.sample_instance))
     exec(compile(expanded_candidates(candidate_source,q.get('candidate_limit',64)),str(a.request)+'#checked-candidate-bound','exec'),namespace)
     original_scan=AlignmentAxial._scan_candidates;original_instance=AlignmentAxial.sample_instance;original_sample=SamplerV2.sample;original_writer=SamplerV2.write_instance
+    original_waypoints=IKChecker.waypoints_ok;original_exact=IKChecker.exact
     report={'schema':'isg-runtime-axial-search-probe-v1','request_sha256':sha(a.request),'started_at':time.time(),'native_runtime':str(native),'class_id':q['class_id'],'scan_limit':q['scan_limit'],'draws':[],'scans':[],'benchmark_credit':0,'eligible_for_acceptance':False,'writer_disabled':True}
     report['candidate_limit']=q.get('candidate_limit',64)
+    report['waypoint_checks']=[];contexts=[]
     def save():
         report['observed_at']=time.time();report['published_tro_files']=len(list(output.rglob('*-tro_state.json')))
         assert report['published_tro_files']==0
         temp=output/'diagnosis.tmp';temp.write_text(json.dumps(report,indent=2)+'\n');temp.replace(output/'diagnosis.json')
     class StopProbe(BaseException):pass
+    def numeric(value):
+        if hasattr(value,'detach'):return value.detach().cpu().tolist()
+        if isinstance(value,(list,tuple)):return [numeric(x) for x in value]
+        return value
+    def exact(self,poses,stance,*args,**kwargs):
+        result=original_exact(self,poses,stance,*args,**kwargs)
+        if contexts:
+            contexts[-1]['exact_calls'].append({'poses':numeric(list(poses)),
+                'ok':bool(result.ok),'reason':str(result.reason),
+                'solution':numeric(result.q) if result.q is not None else None,
+                'provided_q_first':kwargs.get('q_first') is not None,
+                'cache_allowed':kwargs.get('cache',True)})
+        return result
+    def waypoints(self,poses,stance,*args,**kwargs):
+        row={'draw':len(report['draws'])-1,'stance':getattr(stance,'name',None),
+             'poses':numeric(list(poses)),'exact_calls':[]}
+        contexts.append(row)
+        try:
+            result=original_waypoints(self,poses,stance,*args,**kwargs)
+            row.update(ok=bool(result.ok),reason=str(result.reason));return result
+        finally:
+            contexts.pop();report['waypoint_checks'].append(row);save()
     def scan(self,rng,init,order):
         result=namespace['_scan_candidates'](self,rng,init,order)
         report['scans'].append({'input_candidates':len(order),'map_feasible_candidates':len(result),'candidate_indices':[int(x[0])for x in result]});save();return result
@@ -72,6 +97,9 @@ def main():
     old_shutdown=og.shutdown
     def shutdown(*args,**kwargs):report['finished_at']=time.time();save();return old_shutdown(*args,**kwargs)
     AlignmentAxial._scan_candidates=scan;AlignmentAxial.sample_instance=namespace['sample_instance'];SamplerV2.sample=sample;SamplerV2.write_instance=no_write;og.shutdown=shutdown
+    if q.get('trace_exact_waypoints'):
+        assert sha(sys.modules[IKChecker.__module__].__file__)==q['native_ik_sha256']
+        IKChecker.waypoints_ok=waypoints;IKChecker.exact=exact
     argv=['--split','train','--template',q['template'],'--instances','1','--start-index',str(q['source_index']),'--max-attempts',str(q['max_draws']),'--customs',q['customs'],'--keep-template-scene','--no-write-back','--out',str(output/'native_prefix')]
     if q.get('bddl_root'):argv+=['--bddl-root',q['bddl_root']]
     report['sampler_arguments']=argv;save()
@@ -79,6 +107,7 @@ def main():
     except StopProbe:pass
     finally:
         AlignmentAxial._scan_candidates=original_scan;AlignmentAxial.sample_instance=original_instance;SamplerV2.sample=original_sample;SamplerV2.write_instance=original_writer;og.shutdown=old_shutdown
+        IKChecker.waypoints_ok=original_waypoints;IKChecker.exact=original_exact
         report['finished_at']=time.time();save()
 
 if __name__=='__main__':main()
