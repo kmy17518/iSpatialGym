@@ -19,7 +19,8 @@ def fixture(root):
                'run_id':'run','run_started_at':1,'required_classes':100,'frozen_runtime':runtime}
     rr = put(base/'release.json', release)
     pointer = {'schema':'isg-current-runtime-suite-pointer-v1','release':rr,
-        'manifest':put(base/'manifest.json', {'classes':[{'class_id':'class'+str(i)} for i in range(100)]}),
+        'manifest':put(base/'manifest.json', {'classes':[{'class_id':'class'+str(i),
+            'exact_configuration':{'split':'eval_standard','task':'object_scaling','class_id':'class'+str(i)}} for i in range(100)]}),
         'index_reservation':put(base/'index_reservation.json', {'proof':{'start':1000,'reserved_count':300}})}
     put(root/'runtime_validation/current.json',pointer)
     cfg={'purpose':'validation','template':{'split':'eval_standard','task':'object_scaling','class_id':'class0'},
@@ -52,6 +53,16 @@ def test_changed_bytes_and_train_purpose_denied(tmp_path):
     base,env,cfg=fixture(tmp_path)
     cfg['template']['split']='train';put(base/'config.json',cfg)
     assert not g.check_environment(tmp_path,env,start=1000,count=3)['allowed']
+
+
+def test_even_rebound_row_cannot_replace_approved_template(tmp_path):
+    base,env,cfg=fixture(tmp_path)
+    cfg['template']['room']='another_room'
+    cr=put(base/'config.json',cfg)
+    path=base/'rows/class0.json';row=json.loads(path.read_text());row['campaign_config']=cr
+    env['ISPATIALGYM_RUNTIME_SUITE_ROW_SHA256']=put(path,row)['sha256']
+    result=g.check_environment(tmp_path,env,start=1000,count=3)
+    assert not result['allowed'] and 'approved immutable' in result['reason']
     cfg['template']['split']='eval_standard';cfg['purpose']='training_production';put(base/'config.json',cfg)
     assert not g.check_environment(tmp_path,env,start=1000,count=3)['allowed']
 

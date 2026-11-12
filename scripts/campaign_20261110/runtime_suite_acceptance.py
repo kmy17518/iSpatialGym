@@ -200,7 +200,8 @@ def reconcile(root, row_ref, allocation_ref, gate_ref, *, claim=True):
             'member_replay':member_proof})
     result={'schema':'isg-current-runtime-class-acceptance-v1','campaign_id':'campaign_20261110',
         'run_id':row['run_id'],'run_started_at':row['run_started_at'],'class_id':row['class_id'],
-        'observed_at':time.time(),'status':status,'completed':True,
+        'observed_at':time.time(),'status':status,'completed':complete or quota_ineligible,
+        'physical_validation_complete':True,
         'validation_passed':complete or quota_ineligible,'physical_validation_passed':True,
         'frozen_runtime':row['frozen_runtime'],'campaign_config':row['campaign_config'],
         'group_id':row['group_id'],'fresh_start':row['fresh_start'],'fresh_count':row['fresh_count'],

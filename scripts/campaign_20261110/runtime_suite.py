@@ -52,6 +52,8 @@ def authorize(root, environment, config_path, config, *, start, count):
     require(template['split'] == 'eval_standard' and config.get('purpose') == 'validation' and
             row['class_id'] == template['class_id'] and row['class_id'] in {r['class_id'] for r in manifest['classes']},
             'suite authorization is standard regression only')
+    approved=next(entry for entry in manifest['classes'] if entry['class_id']==row['class_id'])
+    require(template == approved['exact_configuration'], 'suite template differs from approved immutable configuration')
     require(Path(row_ref['path']).resolve() == base/'rows'/(row['class_id']+'.json'), 'suite row is not canonical')
     require(Path(config_path).resolve() == Path(row['campaign_config']['path']).resolve() and
             file_digest(config_path) == row['campaign_config']['sha256'], 'suite configuration differs')
