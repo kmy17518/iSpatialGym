@@ -645,6 +645,16 @@ class InstanceLoader:
             scene_state, anchor_record = prepare_robot_anchor(self, shared, shared['sequential_augmentation'])
             self.report['sequential_robot_anchor'] = anchor_record
             anchor_callback = lambda: restore_robot_anchor_stopped(self.robot, og.sim, anchor_record)
+            # A cold world parses the original USD mass, not the preceding
+            # episode's tray override. Restore the captured native mass and USD
+            # authorship before the existing stop/play rebuild; the ordinary
+            # pre-reset check below still runs and must be idempotent.
+            from ispatialgym.oracle.campaign_restore import mass_constraint_objects, restore_pristine_mass
+            campaign = self.tro.meta.raw.get('campaign') or {}
+            self.report['pre_lifecycle_pristine_mass'] = restore_pristine_mass(
+                campaign, mass_constraint_objects(campaign, self.task.object_scope,
+                    (self.tro.meta.extras or {}).get('constraints') or [], execution=self._restoration_execution),
+                shared.get('pristine_mass0'), execution=self._restoration_execution)
         lifecycle = restart_reused_world(self.tro.meta.raw.get("campaign") or {}, og.sim,
                                          execution=self._restoration_execution, while_stopped=anchor_callback)
         if anchor_callback is not None and lifecycle is None:
