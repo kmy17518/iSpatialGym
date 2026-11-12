@@ -8,6 +8,7 @@ from pathlib import Path
 from .contracts import digest, file_digest, require
 
 ORDERS = {'FRESH_A': [0], 'FRESH_B': [1], 'AA': [0, 0], 'ABA': [0, 1, 0]}
+HANDOFF_PROTOCOL = 'clean_exit_with_exact_handoff_v1'
 
 
 def ref(path):
@@ -22,6 +23,8 @@ def checked(root, reference):
 
 
 def segment_plan(request):
+    require(request.get('child_boundary_protocol') in (None, HANDOFF_PROTOCOL),
+            'unknown loading-boundary child protocol')
     require(request.get('schema') == 'isg-retained-loading-boundary-request-v1'
             and request.get('campaign_id') == 'campaign_20261110'
             and request.get('boundary_kind') == 'room'
@@ -105,9 +108,12 @@ def validate_sequence(request, observation, children):
                     and e.get('expected_abort') is False for e in child['entries']),
                 'loading-boundary child action failed')
         pids.append(segment['process_pid']); worlds += 1; episodes += len(child['entries'])
+        if request.get('child_boundary_protocol') == HANDOFF_PROTOCOL:
+            validate_handoff(request, ordinal, segment, segment.get('invocation_epoch'))
         if ordinal+1 < len(plan):
             boundary = segment['boundary']
-            require(segment['returncode'] == 75 and boundary['required_returncode'] == 75
+            expected_exit = 0 if request.get('child_boundary_protocol') == HANDOFF_PROTOCOL else 75
+            require(segment['returncode'] == expected_exit and boundary['required_returncode'] == 75
                     and boundary['reuse_allowed'] is False
                     and boundary['physical_steps_added'] == boundary['world_mutations'] == 0
                     and (boundary['signatures'][0] != boundary['signatures'][1]
@@ -118,11 +124,34 @@ def validate_sequence(request, observation, children):
                     'final loading segment did not finish normally')
     require(len(set(pids)) == len(pids) and all(type(pid) is int and pid > 0 for pid in pids),
             'fresh-process boundary was not observed')
+    if request.get('child_boundary_protocol') == HANDOFF_PROTOCOL:
+        require(len({s['invocation_epoch'] for s in observation['segments']}) == len(plan),
+                'loading-boundary invocation epoch reused')
     require(episodes == request['max_native_episodes'] and observation['world_loads'] == worlds
             and observation['native_episodes'] == episodes, 'loading-boundary accounting differs')
     return {'world_loads': worlds, 'native_episodes': episodes, 'process_pids': pids,
             'one_world_reuse': request['control'] == 'AA',
             'room_changes': max(0, worlds-1), 'benchmark_credit': 0, 'production_released': False}
+
+
+def validate_handoff(request, ordinal, segment, epoch):
+    """A clean SDK exit and a native incompatibility decision are separate facts."""
+    plan = segment_plan(request)
+    require(request.get('child_boundary_protocol') == HANDOFF_PROTOCOL
+            and isinstance(epoch, str) and len(epoch) == 32 and all(c in '0123456789abcdef' for c in epoch)
+            and segment.get('invocation_epoch') == epoch and segment['returncode'] == 0,
+            'clean native exit or invocation epoch differs')
+    incoming = plan[ordinal+1] if ordinal+1 < len(plan) else None
+    expected = {'queue_restart_code':75, 'next_source':incoming['source'], 'next_request':incoming['request']} if incoming else None
+    require(segment.get('handoff') == expected, 'native handoff target differs')
+    if incoming:
+        boundary = segment['boundary']
+        require(boundary['required_returncode'] == 75 and boundary['reuse_allowed'] is False
+                and boundary['physical_steps_added'] == boundary['world_mutations'] == 0
+                and (boundary['signatures'][0] != boundary['signatures'][1] or boundary['template_compatible'] is False),
+                'handoff lacks a native incompatibility decision')
+    else:
+        require(segment['boundary'] is None, 'final child declared an unexpected handoff')
 
 
 def report_case(report, job_id):
@@ -208,8 +237,11 @@ def verify(root, request_ref, observation_ref, cold_references, execution, cold_
                 and str(boundary['scheduler_job_id']) == job, 'child boundary provenance differs')
         if q.get('child_exit_observation_required') or 'child_exit_observation' in segment:
             actual_exit = json.loads(checked(root, segment['child_exit_observation']).read_text())
-            require(actual_exit == {'ordinal': segment['ordinal'], 'returncode': segment['returncode'],
-                                    'request': request_ref, 'native_runtime': q['native_runtime']},
+            expected_exit = {'ordinal': segment['ordinal'], 'returncode': segment['returncode'],
+                             'request': request_ref, 'native_runtime': q['native_runtime']}
+            if q.get('child_boundary_protocol') == HANDOFF_PROTOCOL:
+                expected_exit['invocation_epoch'] = segment['invocation_epoch']
+            require(actual_exit == expected_exit,
                     'actual child process exit differs from native boundary')
     accounting = validate_sequence(q, observed, children)
     require(set(cold_references) == set(cold_executions) == {'0', '1'},

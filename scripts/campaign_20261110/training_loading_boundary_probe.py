@@ -11,12 +11,14 @@ import subprocess
 import sys
 import time
 import traceback
+import secrets
 
 from .contracts import require, write_json_atomic
-from .training_loading_boundary_contract import inputs, native_boundary, ref, validate_sequence
+from .training_loading_boundary_contract import (inputs, native_boundary, ref, validate_sequence,
+                                                  validate_handoff, HANDOFF_PROTOCOL)
 
 
-def run_segment(root, request_path, output, ordinal):
+def run_segment(root, request_path, output, ordinal, invocation_epoch=None):
     from .training_mechanism_probe import run as run_mechanism
     q, sources, plan = inputs(root, request_path)
     require(type(ordinal) is int and 0 <= ordinal < len(plan), 'invalid native segment')
@@ -35,6 +37,13 @@ def run_segment(root, request_path, output, ordinal):
                    'scheduler_job_id': os.environ.get('SLURM_JOB_ID'), 'returncode': code,
                    'boundary': boundary, 'probe': ref(Path(output)/'probe.json'),
                    'native_runtime': q['native_runtime'], 'request': ref(request_path)}
+    if q.get('child_boundary_protocol') == HANDOFF_PROTOCOL:
+        incoming = plan[ordinal+1] if ordinal+1 < len(plan) else None
+        observation.update(returncode=0, invocation_epoch=invocation_epoch,
+            handoff={'queue_restart_code':75, 'next_source':incoming['source'],
+                     'next_request':incoming['request']} if incoming else None)
+        validate_handoff(q, ordinal, observation, invocation_epoch)
+        code = 0
     write_json_atomic(Path(output)/'loading_boundary.json', observation)
     return code, observation
 
@@ -62,6 +71,8 @@ def run(root, request_path, output, *, preflight=False, runner=subprocess.run):
                        '--output', str(destination), '--segment', str(ordinal)]
             # __name__ is __main__ under CLI; always bind the exact module.
             command[2] = 'scripts.campaign_20261110.training_loading_boundary_probe'
+            epoch = secrets.token_hex(16) if q.get('child_boundary_protocol') == HANDOFF_PROTOCOL else None
+            if epoch is not None: command += ['--invocation-epoch', epoch]
             # Each fresh child gets its own retained source settings. Do not
             # carry A-only task flags into B merely because its wrapper ran first.
             environment = {key:value for key,value in os.environ.items()
@@ -72,20 +83,32 @@ def run(root, request_path, output, *, preflight=False, runner=subprocess.run):
                 completed = runner(command, stdout=log, stderr=subprocess.STDOUT, timeout=remaining,
                                    env=environment)
             exit_path = output/('segment_'+str(ordinal)+'_exit.json')
-            write_json_atomic(exit_path,
-                              {'ordinal': ordinal, 'returncode': completed.returncode,
-                               'request': ref(request_path), 'native_runtime': q['native_runtime']})
+            exit_observation = {'ordinal': ordinal, 'returncode': completed.returncode,
+                                'request': ref(request_path), 'native_runtime': q['native_runtime']}
+            if epoch is not None: exit_observation['invocation_epoch'] = epoch
+            write_json_atomic(exit_path, exit_observation)
             path = destination/'loading_boundary.json'; segment = json.loads(path.read_text())
             require(completed.returncode == segment['returncode']
                     and segment['request'] == ref(request_path)
                     and segment['native_runtime'] == q['native_runtime'], 'native child exit or identity differs')
+            if epoch is not None:
+                validate_handoff(q, ordinal, segment, epoch)
+                require(str(segment['scheduler_job_id']) == os.environ['SLURM_JOB_ID'],
+                        'handoff allocation identity differs')
             segment['boundary_observation'] = ref(path)
             segment['child_exit_observation'] = ref(exit_path)
             result['segments'].append(segment)
             child = json.loads(Path(segment['probe']['path']).read_text()); children.append(child)
+            require(child['request'] == spec['request'] and child['native_runtime'] == q['native_runtime']
+                    and child['status'] == 'native_mechanism_controls_completed'
+                    and child['world_construction'] == {'attempted':1, 'completed':1}
+                    and len(child['entries']) == spec['episodes']
+                    and all(e['returncode'] == 0 and e['result'].get('success') is True
+                            and e.get('expected_abort') is False for e in child['entries']),
+                    'child completion must be proven before advancing to another world')
             result['world_loads'] += child['world_construction']['completed']
             result['native_episodes'] += len(child['entries'])
-            require(completed.returncode == (75 if ordinal+1 < len(plan) else 0),
+            require(completed.returncode == (0 if epoch is not None else 75 if ordinal+1 < len(plan) else 0),
                     'native child failed instead of its declared loading boundary')
             write_json_atomic(output/'probe.json', result)
         result.update(status='completed', finished_at=time.time())
@@ -118,10 +141,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(); parser.add_argument('--root', required=True)
     parser.add_argument('--request', required=True); parser.add_argument('--output', required=True)
     parser.add_argument('--segment', type=int); parser.add_argument('--preflight', action='store_true')
+    parser.add_argument('--invocation-epoch')
     args = parser.parse_args(); code = 0
     try:
         if args.segment is None: value = run(args.root, args.request, args.output, preflight=args.preflight)
-        else: code, value = run_segment(args.root, args.request, args.output, args.segment)
+        else: code, value = run_segment(args.root, args.request, args.output, args.segment, args.invocation_epoch)
         print(json.dumps(value), flush=True)
     except BaseException:
         traceback.print_exc(); code = 1

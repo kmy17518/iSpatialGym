@@ -59,3 +59,36 @@ def test_unexpected_teardown_failure_cannot_be_reported_as_success(code, error):
     def shutdown(): raise error
     probe.shutdown_and_exit(code, SimpleNamespace(shutdown=shutdown), exit_process=exits.append)
     assert exits==[1]
+
+
+@pytest.mark.parametrize('corruption', [None, 'epoch', 'target', 'incomplete', 'nonzero_exit'])
+def test_clean_sdk_exit_advances_only_with_exact_completed_handoff(tmp_path,monkeypatch,corruption):
+    from copy import deepcopy
+    monkeypatch.setenv('SLURM_JOB_ID','123')
+    q,expected,children=completed();q['child_boundary_protocol']=contract.HANDOFF_PROTOCOL
+    request=tmp_path/'request.json';request.write_text(json.dumps(q));plan=contract.segment_plan(q)
+    monkeypatch.setattr(probe,'inputs',lambda *a,**k:(q,[{'environment':{}},{'environment':{}}],plan));calls=[]
+    def runner(command,**kwargs):
+        ordinal=int(command[command.index('--segment')+1]);epoch=command[command.index('--invocation-epoch')+1]
+        destination=Path(command[command.index('--output')+1]);destination.mkdir();calls.append(ordinal)
+        child=deepcopy(children[ordinal]);segment=deepcopy(expected['segments'][ordinal])
+        next_spec=plan[ordinal+1]if ordinal+1<len(plan)else None
+        segment.update(returncode=0,invocation_epoch=epoch,scheduler_job_id='123',request=contract.ref(request),
+                       native_runtime=q['native_runtime'],handoff={'queue_restart_code':75,
+                       'next_source':next_spec['source'],'next_request':next_spec['request']}if next_spec else None)
+        if ordinal==0:
+            if corruption=='epoch':segment['invocation_epoch']='0'*32
+            if corruption=='target':segment['handoff']['next_request']=q['sources'][0]
+            if corruption=='incomplete':child['status']='failed'
+        (destination/'probe.json').write_text(json.dumps(child));segment['probe']=contract.ref(destination/'probe.json')
+        (destination/'loading_boundary.json').write_text(json.dumps(segment))
+        return SimpleNamespace(returncode=2 if corruption=='nonzero_exit'and ordinal==0 else 0)
+    if corruption:
+        with pytest.raises(ValueError):probe.run(tmp_path,request,tmp_path/'output',runner=runner)
+        assert calls==[0]
+    else:
+        result=probe.run(tmp_path,request,tmp_path/'output',runner=runner)
+        assert result['status']=='completed'and calls==[0,1,2]and result['world_loads']==3
+        assert result['segments'][0]['returncode']==0
+        assert result['segments'][0]['handoff']['queue_restart_code']==75
+        assert json.loads((tmp_path/'output/segment_0_exit.json').read_text())['returncode']==0
