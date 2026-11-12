@@ -404,7 +404,14 @@ def reconcile(root, account, capacity_probe=probe, runner=subprocess.run):
         capacity = capacity_probe(); began = time.monotonic()
         if capacity.get('status') == 'observed':
             reserve_unobserved_receipts(root, capacity)
+        else:
+            result['status'] = 'blocked_capacity_unknown'
+            result['errors'].append({'owner': '/root', 'stage': 'capacity_probe',
+                                     'error': capacity.get('error', 'Fresh cluster capacity unavailable'),
+                                     'capacity_status': capacity.get('status', 'unknown')})
         for ticket in coordinator.dispatch_order(tickets):
+            if capacity.get('status') != 'observed':
+                break
             if time.monotonic()-began > 12:
                 break
             if coordinator.pending_status(ticket) != 'ready':

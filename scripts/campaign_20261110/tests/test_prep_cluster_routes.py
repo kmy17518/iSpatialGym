@@ -191,3 +191,12 @@ def test_unobserved_receipts_reserve_until_terminal_accounting(tmp_path, monkeyp
     assert not routes.reserve_unobserved_receipts(tmp_path, capacity())['_reservations']
     Path(row['submission_path']).write_text(json.dumps({'job_id': None, 'preparation_route': routing}))
     assert len(routes.reserve_unobserved_receipts(tmp_path, capacity())['_reservations']) == 1
+
+
+def test_unavailable_capacity_is_explicit_owned_error_even_without_tickets(tmp_path):
+    d = tmp_path/'infra/coordinator_dispatch'; d.mkdir(parents=True); (d/'capacity_allocation.lock').touch()
+    (d/'policy.json').write_text(json.dumps({'owner': '/root', 'production_released': False, 'prepared_manifests': []}))
+    result = routes.reconcile(tmp_path, 'minyeong', lambda: {'status': 'unavailable', 'error': 'sacctmgr unavailable'})
+    assert result['status'] == 'blocked_capacity_unknown'
+    assert result['errors'] == [{'owner': '/root', 'stage': 'capacity_probe', 'error': 'sacctmgr unavailable', 'capacity_status': 'unavailable'}]
+    assert not result['submitted']
