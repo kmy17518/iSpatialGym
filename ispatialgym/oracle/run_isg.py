@@ -578,6 +578,9 @@ class InstanceLoader:
         # the whole scene as the template file loads it, for attach(): load_tro_instance rewrites only the task objects and
         # the robot, and restore()'s update_initial_file would carry whatever a demo moved into the next instance's start
         self._scene_state0 = copy.deepcopy(self.env.scene.dump_state(serialized=False))
+        if getattr(self, '_sequential_augmentation', None) is not None:
+            from ispatialgym.oracle.campaign_batch import capture_robot_anchor
+            self._cold_robot_anchor = capture_robot_anchor(self)
         from ispatialgym.oracle.campaign_restore import capture_pristine_mass, mass_constraint_objects
 
         campaign = self.tro.meta.raw.get("campaign") or {}
@@ -594,6 +597,7 @@ class InstanceLoader:
                        "build_report": {k: v for k, v in self.report.items() if k != "trav_cells_blocked"}})
         if getattr(self, '_sequential_augmentation', None) is not None:
             shared['floor_map_before_augmentation'] = self._floor_map_before_augmentation
+            shared['cold_robot_anchor'] = self._cold_robot_anchor
 
     def attach(self, shared: Dict[str, Any]):
         """``--queue``: this instance in the world of the previous one (same template, :func:`instance_signature`) instead of
@@ -634,13 +638,25 @@ class InstanceLoader:
         self.report["pair_records_reset"] = PRED.reset_pair_records(self.env.scene)
         from ispatialgym.oracle.campaign_restore import restart_reused_world
 
+        scene_state = copy.deepcopy(shared['scene_state0'])
+        anchor_callback = None
+        if shared.get('sequential_augmentation') is not None:
+            from ispatialgym.oracle.campaign_batch import prepare_robot_anchor, restore_robot_anchor_stopped
+            scene_state, anchor_record = prepare_robot_anchor(self, shared, shared['sequential_augmentation'])
+            self.report['sequential_robot_anchor'] = anchor_record
+            anchor_callback = lambda: restore_robot_anchor_stopped(self.robot, og.sim, anchor_record)
         lifecycle = restart_reused_world(self.tro.meta.raw.get("campaign") or {}, og.sim,
-                                         execution=self._restoration_execution)
+                                         execution=self._restoration_execution, while_stopped=anchor_callback)
+        if anchor_callback is not None and lifecycle is None:
+            raise RuntimeError('sequential robot anchor requires the authorized native lifecycle')
         if lifecycle is not None:
             self.report["reuse_native_lifecycle"] = lifecycle
         # every scene object (poses, velocities, joints of doors / drawers, object states) back to the template's, so that
         # only the TRO decides where this instance starts - as in a fresh process
-        self.env.scene.load_state(copy.deepcopy(shared["scene_state0"]), serialized=False)
+        self.env.scene.load_state(scene_state, serialized=False)
+        if anchor_callback is not None:
+            from ispatialgym.oracle.campaign_batch import verify_robot_anchor
+            verify_robot_anchor(self.robot, anchor_record)
         self._scene_state0 = shared["scene_state0"]
         self._pristine_mass0 = shared.get("pristine_mass0")
         self.env.scene.trav_map.floor_map[0] = _copy_map(shared["floor_map"])

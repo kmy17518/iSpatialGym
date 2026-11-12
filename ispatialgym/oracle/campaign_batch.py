@@ -215,3 +215,80 @@ def restore_parking(loader, contract):
         restored.append(name)
     return {'schema': SCHEMA, 'source_scene': member['scene'], 'objects': restored,
             'physics_steps_added': 0}
+
+
+def _robot_spawn_pose(loader):
+    poses = {k.lower(): v for k, v in (loader.tro.robot_poses or {}).items()}
+    values = poses.get('robot') or poses.get(loader.robot.model.lower())
+    require(isinstance(values, list) and len(values) == 1, 'sequential robot spawn pose ambiguous')
+    pose = values[0]
+    require(set(pose) >= {'position', 'orientation'}, 'sequential robot spawn pose absent')
+    for name, size in [('position', 3), ('orientation', 4)]:
+        require(len(pose[name]) == size and all(math.isfinite(float(v)) for v in pose[name]),
+                'invalid sequential robot spawn ' + name)
+    return {name: [float(v) for v in pose[name]] for name in ('position', 'orientation')}
+
+
+def capture_robot_anchor(loader):
+    """Capture the cold world's native virtual-base origin before any episode."""
+    require(loader.robot.is_holonomic_base, 'sequential anchor requires a holonomic robot')
+    position, orientation = loader.robot.root_link.get_position_orientation()
+    return {'schema': 'isg-sequential-robot-anchor-v1', 'robot': loader.robot.name,
+            'model': loader.robot.model, 'spawn_pose': _robot_spawn_pose(loader),
+            'anchor_position': position.tolist(), 'anchor_orientation': orientation.tolist(),
+            'tro': {'path': loader.tro_path, 'sha256': file_digest(loader.tro_path)}}
+
+
+def prepare_robot_anchor(loader, shared, contract):
+    """Match a cold load's base origin while retaining the ordinary TRO restore.
+
+    Different spawn translations otherwise leave different virtual joint values
+    for the same world pose. Only equal spawn orientations are supported here;
+    a rotation needs its own native validation, never a relaxed comparison.
+    """
+    baseline = shared.get('cold_robot_anchor')
+    require(isinstance(baseline, dict) and baseline.get('schema') == 'isg-sequential-robot-anchor-v1',
+            'cold sequential robot anchor missing')
+    require(contract.get('schema') == SCHEMA and loader.robot.is_holonomic_base and
+            baseline['robot'] == loader.robot.name and baseline['model'] == loader.robot.model,
+            'sequential robot anchor identity differs')
+    for reference in (baseline['tro'], {'path': loader.tro_path, 'sha256': file_digest(loader.tro_path)}):
+        member = contract['members_by_tro'].get(str(Path(reference['path']).resolve()))
+        require(member is not None and member['tro'] == reference and
+                file_digest(reference['path']) == reference['sha256'], 'sequential robot source changed')
+    incoming = _robot_spawn_pose(loader); first = baseline['spawn_pose']
+    qa, qb = first['orientation'], incoming['orientation']
+    require(min(math.dist(qa, qb), math.dist(qa, [-v for v in qb])) <= 1e-7,
+            'sequential robot spawn orientation changed; anchor rotation unvalidated')
+    position = [a + b - c for a, b, c in zip(baseline['anchor_position'], incoming['position'], first['position'])]
+    orientation = baseline['anchor_orientation']
+    state = copy.deepcopy(shared['scene_state0'])
+    root = state['registry']['object_registry'][loader.robot.name]['root_link']
+    import torch
+    local_pos, local_ori = loader.env.scene.convert_world_pose_to_scene_relative(
+        torch.tensor(position, dtype=torch.float32), torch.tensor(orientation, dtype=torch.float32))
+    root['pos'], root['ori'] = local_pos, local_ori
+    record = {'schema': 'isg-sequential-robot-anchor-restoration-v1',
+              'source': baseline, 'incoming_tro': {'path': loader.tro_path, 'sha256': file_digest(loader.tro_path)},
+              'anchor_position': position, 'anchor_orientation': orientation,
+              'physics_steps_added': 0, 'source_poses_actions_goals_unchanged': True}
+    return state, record
+
+
+def restore_robot_anchor_stopped(robot, sim, record):
+    """Use the native stopped-world setter, including its world fixed-joint frame."""
+    require(sim.is_stopped() and record.get('schema') == 'isg-sequential-robot-anchor-restoration-v1',
+            'sequential anchor restoration requires the existing stopped lifecycle')
+    robot.set_position_orientation(position=record['anchor_position'], orientation=record['anchor_orientation'])
+
+
+def verify_robot_anchor(robot, record):
+    """Fail before task restore if native play or scene loading undid the origin."""
+    position, orientation = robot.root_link.get_position_orientation()
+    p, q = position.tolist(), orientation.tolist()
+    expected = record['anchor_orientation']
+    require(math.dist(p, record['anchor_position']) <= 1e-6 and
+            min(math.dist(q, expected), math.dist(q, [-v for v in expected])) <= 1e-6,
+            'native sequential robot anchor readback differs')
+    record['native_readback'] = {'position': p, 'orientation': q,
+                                 'boundary': 'after_existing_play_and_scene_load_before_task_restore'}

@@ -217,7 +217,7 @@ def restore_serialized_mass_before_reset(meta, physical, bindings, records, *, a
             'later_constraint_restore_unchanged': True}
 
 
-def restart_reused_world(meta, sim, *, execution=None):
+def restart_reused_world(meta, sim, *, execution=None, while_stopped=None):
     """Use the native warm-world lifecycle before restoring the saved scene."""
     from scripts.campaign_20261110.contracts import require
     options=meta.get('scene_setup',{}).get('restoration_options',{})
@@ -242,6 +242,8 @@ def restart_reused_world(meta, sim, *, execution=None):
         setattr(obj,name,observed);wrapped.append((obj,name,had,saved))
     try:
         sim.stop();require(sim.is_stopped(),'native stop did not finish')
+        if while_stopped is not None:
+            while_stopped()
         sim.play();require(sim.is_playing(),'native play did not finish')
     finally:
         for obj,name,had,saved in reversed(wrapped):

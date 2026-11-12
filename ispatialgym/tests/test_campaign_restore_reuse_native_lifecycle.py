@@ -64,3 +64,13 @@ def test_failed_play_restores_observation_wrappers():
         m.restart_reused_world(meta(), sim)
     assert 'step_physics' not in vars(sim)
     assert 'step' not in vars(sim._sim_context)
+
+
+def test_anchor_callback_uses_existing_stop_play_and_no_extra_step():
+    sim=Sim()
+    def rebase():
+        assert sim.is_stopped()
+        sim.calls.append('rebase')
+    result=m.restart_reused_world(meta(),sim,while_stopped=rebase)
+    assert sim.calls==['stop','rebase','play']
+    assert result['observed_physics_step_calls']==[]
