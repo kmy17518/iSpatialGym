@@ -4,6 +4,7 @@ set -euo pipefail
 JOBDIR=${1:?source job directory}
 SNAPSHOT=${2:?frozen snapshot}
 GATE_OUT=${3:?gate output directory}
+REQUESTED_REPLAY_MEMBER=${4:-}
 source "$JOBDIR/job.env"
 export ISGF_ROOT
 export ISGE_CODE="$SNAPSHOT"
@@ -32,10 +33,14 @@ export ISPATIALGYM_SAMPLING_CACHE="$JB/isg_cache/sampling"
 mkdir -p "$GATE_OUT"
 KIT_RC=1
 trap 'kit_appdata_teardown' EXIT
-mapfile -d '' -t INPUTS < <(python3 - "$JOBDIR" <<'PY'
-import json,pathlib,sys
+mapfile -d '' -t INPUTS < <(python3 - "$JOBDIR" "$REQUESTED_REPLAY_MEMBER" <<'PY'
+import json,pathlib,re,sys
 root=pathlib.Path(sys.argv[1])
+member=sys.argv[2]
+if member and not re.fullmatch(r'[A-Za-z0-9_-]+',member):
+    raise ValueError('unsafe exact replay member')
 for meta in sorted((root/'demo').glob('*/meta.json')):
+    if member and meta.parent.name!=member:continue
     if not json.loads(meta.read_text()).get('success'):continue
     h5=meta.parent/'demo.hdf5'
     tros=list((root/'inst').rglob(meta.parent.name+'-tro_state.json'))

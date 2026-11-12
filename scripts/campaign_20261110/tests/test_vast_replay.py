@@ -75,3 +75,37 @@ def test_transport_environment_and_queue_record_are_pinned(tmp_path):
     with pytest.raises(ValueError,match='ambiguous replay submission'):vr.enqueue(job,tmp_path)
     (job/'job.env').write_text('ISGE_CODE=/different/runtime\n')
     with pytest.raises(ValueError,match='source bytes changed'):vr.verify(job,tmp_path)
+
+
+def test_exact_member_never_falls_back_and_transport_pins_selector(tmp_path):
+    import shutil
+    source,runtime,helper,out=fixture(tmp_path)
+    shutil.copytree(source/'demo/i',source/'demo/z')
+    template=source/'inst/task/scene'
+    (template/'instances/z-tro_state.json').write_text('{"second":true}')
+    job=vr.prepare(tmp_path,source,runtime,helper,out,'second',instance_id='z')
+    value=vr.verify(job,tmp_path)
+    assert value['instance_id']=='z'
+    assert Path(value['source_demo']).parent.name=='z'
+    assert Path(value['source_tro']).name=='z-tro_state.json'
+    assert vr.read_env(job/'job.env')['ISGF_REPLAY_INSTANCE_ID']=='z'
+    with pytest.raises(ValueError,match='successful source'):
+        vr.prepare(tmp_path,source,runtime,helper,tmp_path/'validation/missing','missing',instance_id='absent')
+    with pytest.raises(ValueError,match='unsafe exact'):
+        vr.prepare(tmp_path,source,runtime,helper,tmp_path/'validation/unsafe','unsafe',instance_id='../i')
+    value['instance_id']='i';vr.write(job/'replay_inputs.json',value)
+    with pytest.raises(ValueError,match='binding differs'):vr.verify(job,tmp_path)
+
+
+def test_exact_shell_selector_matches_transport_and_never_falls_back(tmp_path):
+    import shutil,subprocess
+    source,runtime,helper,out=fixture(tmp_path)
+    shutil.copytree(source/'demo/i',source/'demo/z')
+    (source/'inst/task/scene/instances/z-tro_state.json').write_text('{}')
+    shell=(Path(vr.__file__).parent/'infra_open_loop.sh').read_text()
+    selection=shell.split('"$REQUESTED_REPLAY_MEMBER" <<\'PY\'\n',1)[1].split('\nPY\n',1)[0]
+    def run(member):return subprocess.run(['python3','-',str(source),member],input=selection,text=True,capture_output=True)
+    assert '/demo/z/demo.hdf5' in run('z').stdout and '/demo/i/' not in run('z').stdout
+    assert run('missing').stdout==''
+    assert run('../i').returncode!=0
+    assert '/demo/i/demo.hdf5' in run('').stdout

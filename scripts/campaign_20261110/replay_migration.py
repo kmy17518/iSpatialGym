@@ -83,11 +83,13 @@ def migrate(entry, root, native_snapshot, helper_snapshot, minimum_age, save):
         token = 'pending_' + entry['replay_job_id'] + '_' + entry['source_job_id']
         job = root / 'out/vast_replay' / token
         if not job.exists():
-            vast_replay.prepare(root, entry['source_job_dir'], native_snapshot, helper_snapshot, entry['output'], token)
+            vast_replay.prepare(root, entry['source_job_dir'], native_snapshot, helper_snapshot, entry['output'], token,
+                                **({'instance_id': entry['instance_id']} if entry.get('instance_id') else {}))
         manifest = vast_replay.verify(job, root)
         require(manifest['source_job'] == str(Path(entry['source_job_dir']).resolve()) and
                 manifest['snapshot'] == str(Path(native_snapshot).resolve()) and
                 manifest['canonical_output'] == entry['output'], 'existing replay transport identity differs')
+        require(manifest.get('instance_id') == entry.get('instance_id'), 'replay member transport differs')
         jid = str(vast_replay.enqueue(job, root))  # Unactivated; no worker may execute it.
         intent = {'status': 'prepared', 'original_replay_job_id': entry['replay_job_id'],
                   'vast_job_id': jid, 'job_dir': str(job), 'before': proof,

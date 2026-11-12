@@ -184,6 +184,33 @@ def sample_distribution(values):
     return {'n': len(values), 'min': values[0], 'median': (values[middle] if len(values) % 2 else (values[middle-1]+values[middle])/2), 'max': values[-1]}
 
 
+def strict_outcomes(result, row, row_ref, allocation_ref):
+    """Join the strict owner's exact evidence; regression consumes no quota."""
+    require(result.get('schema') == 'isg-current-runtime-class-acceptance-v1', 'unknown strict outcome schema')
+    for key in ('run_id', 'class_id', 'frozen_runtime', 'campaign_config', 'group_id', 'fresh_start', 'fresh_count', 'camera_exempt'):
+        require(result[key] == row[key], 'strict outcome identity differs: ' + key)
+    require(result['row'] == row_ref and result['allocation'] == allocation_ref, 'strict outcome execution reference differs')
+    review = checked(result['strict_review']); validation = checked(result['regression_audit'])
+    quota = checked(result['quota_evidence'])
+    require(quota == result['quota'], 'strict outcome quota differs')
+    require(result.get('physical_validation_passed') is True and validation.get('validation_passed') is True, 'physical validation did not pass')
+    ids = [m['instance_id'] for m in result['members']]
+    require(len(ids) == len(set(ids)) and set(ids) == {m['instance_id'] for m in review['members']}, 'strict member identity differs')
+    require(all(m.get('demo_passed') is True and m.get('physics_replay_passed') is True and
+                m.get('physics_replay_applicability') == 'own_member_replay' for m in result['members']), 'strict member replay missing')
+    require(len(ids) >= (1 if row['camera_exempt'] else 2), 'strict successful member count insufficient')
+    if result['status'] == 'regression_validation_passed':
+        require(quota['quota_ineligible'] is True and quota['eligible'] is False and quota['consumed'] == 0 and quota['accepted'] == {}, 'regression consumed benchmark quota')
+    require(result['status'] in ('accepted', 'regression_validation_passed', 'validated_pending_acceptance'), 'unknown strict outcome status')
+    return {'status': result['status'], 'validation_passed': result['validation_passed'],
+            'replay_passed_instances': len(ids), 'accepted_eval_instances': sum(v == 'eval_standard' for v in quota['accepted'].values()),
+            'accepted_training_instances': sum(v == 'train' for v in quota['accepted'].values()),
+            'completed_goal_groups': int(not row['camera_exempt'] and result['validation_passed']),
+            'regression_validation_groups': int(not row['camera_exempt'] and result['status'] == 'regression_validation_passed'),
+            'camera_validation_instances': len(ids) if row['camera_exempt'] else 0,
+            'quota_ineligible': quota['quota_ineligible'], 'source': 'strict acceptance owner; exact linked evidence checked'}
+
+
 def observe(run_dir):
     """Only explicit suite rows and job directories; no global allocation scans."""
     run_dir = Path(run_dir); records, errors, ids = [], [], []
@@ -256,8 +283,11 @@ def observe(run_dir):
         acceptance = run_dir / 'acceptance' / row_path.name
         if acceptance.exists():
             result['acceptance_owner_record'] = reference(acceptance)
-            result['strict_outcomes_status'] = 'present; acceptance-owner schema integration required before rates'
-        result['rates'] = rates(result['cost'], {'attempted_instance_slots': result['native_attempts'].get('attempted_instance_slots'), 'demo_successful_instances': len(demo_ids)})
+            try:
+                result['strict_outcomes'] = strict_outcomes(json.loads(acceptance.read_text()), row, reference(row_path), allocation_ref)
+            except Exception as exc:
+                result['errors'].append({'error': 'strict_outcome_identity: ' + str(exc)})
+        result['rates'] = rates(result['cost'], {'attempted_instance_slots': result['native_attempts'].get('attempted_instance_slots'), 'demo_successful_instances': len(demo_ids), **(result['strict_outcomes'] or {})})
         output.append(result)
     value = {'schema': 'isg-runtime-validation-measurements-v1', 'campaign_id': CAMPAIGN, 'observed_at': time.time(),
              'run_dir': str(run_dir), 'classes': output, 'errors': errors, 'scheduler_evidence': scheduler_ref,
@@ -265,7 +295,7 @@ def observe(run_dir):
     write(run_dir / 'measurements/current.json', value)
     lines = ['| Class | Native draws | Censored draws | Demo successes | Observed GPU h | Cost complete | Physical/acceptance status |', '|---|---:|---:|---:|---:|---|---|']
     for r in output:
-        n = r['native_attempts']; lines.append(f"| {r['class_id']} | {n.get('native_draws', 'unavailable')} | {n.get('censored_native_draws', 'unavailable')} | {len(r['distinct_demo_instance_ids'])} | {r['cost']['observed_allocated_gpu_hours']:.4f} | {r['cost']['cost_complete']} | separate strict owner record |")
+        n = r['native_attempts']; status = (r['strict_outcomes'] or {}).get('status', 'awaiting strict result'); lines.append(f"| {r['class_id']} | {n.get('native_draws', 'unavailable')} | {n.get('censored_native_draws', 'unavailable')} | {len(r['distinct_demo_instance_ids'])} | {r['cost']['observed_allocated_gpu_hours']:.4f} | {r['cost']['cost_complete']} | {status} |")
     (run_dir / 'measurements/current.md').write_text('\n'.join(lines)+'\n\nNative and collector process times overlap; allocation GPU time is counted once. Missing or censored costs remain explicit.\n')
     return value
 

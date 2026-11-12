@@ -47,11 +47,13 @@ def write(path, value):
     temporary.replace(path)
 
 
-def prepare(root, source_job, snapshot, helper_snapshot, canonical_output, token):
+def prepare(root, source_job, snapshot, helper_snapshot, canonical_output, token, *, instance_id=None):
     root, source = Path(root).resolve(), Path(source_job).resolve()
     snapshot, helper = Path(snapshot).resolve(), Path(helper_snapshot).resolve()
     output = Path(canonical_output).absolute()
     require(re.fullmatch(r'[A-Za-z0-9_-]+', token), 'unsafe replay token')
+    require(instance_id is None or isinstance(instance_id, str) and
+            re.fullmatch(r'[A-Za-z0-9_-]+', instance_id), 'unsafe exact replay member')
     require(source.is_relative_to(root / 'out') and (source / 'sampling.done').is_file(), 'source sampling is not closed inside campaign')
     require(snapshot.is_relative_to(root / 'code') and helper.is_relative_to(root / 'code'), 'replay runtimes must be owned snapshots')
     require(output.is_relative_to(root / 'validation') and output.parent.resolve().is_relative_to(root / 'validation')
@@ -61,6 +63,7 @@ def prepare(root, source_job, snapshot, helper_snapshot, canonical_output, token
     require(Path(environment['ISGE_CODE']).resolve() == snapshot, 'source runtime differs from pinned replay runtime')
     selected = None
     for meta in sorted((source / 'demo').glob('*/meta.json')):
+        if instance_id is not None and meta.parent.name != instance_id: continue
         report = json.loads(meta.read_text()); demo = meta.with_name('demo.hdf5')
         tros = list((source / 'inst').rglob(meta.parent.name + '-tro_state.json'))
         if report.get('success') is True and demo.is_file() and len(tros) == 1:
@@ -85,6 +88,7 @@ def prepare(root, source_job, snapshot, helper_snapshot, canonical_output, token
     job.mkdir(parents=True)
     additions = {'ISGF_REPLAY_BACKEND':'vast', 'ISGF_REPLAY_SOURCE_JOB':str(source),
                  'ISGF_REPLAY_SOURCE_SNAPSHOT':str(snapshot), 'ISGF_REPLAY_HELPER_SNAPSHOT':str(helper)}
+    if instance_id is not None: additions['ISGF_REPLAY_INSTANCE_ID'] = instance_id
     require(not set(additions) & set(environment), 'source environment already contains replay transport keys')
     (job/'job.env').write_bytes((source/'job.env').read_bytes() + b'\n' +
         ''.join(k+'='+shlex.quote(v)+'\n' for k,v in additions.items()).encode())
@@ -93,6 +97,7 @@ def prepare(root, source_job, snapshot, helper_snapshot, canonical_output, token
                 'helper_snapshot':str(helper), 'canonical_output':str(output), 'job_dir':str(job),
                 'source_demo':str(demo), 'source_tro':str(tro), 'source_template':str(template),
                 'source_scene_identity':scene_identity, 'files':files, 'prepared_at_unix':time.time()}
+    if instance_id is not None: manifest['instance_id'] = instance_id
     write(job/'replay_inputs.json', manifest)
     return job
 
@@ -106,6 +111,13 @@ def verify(job, root=None):
         path = Path(name).resolve()
         require(path.is_relative_to(owned), 'replay source input lies outside campaign')
         require(path.is_file() and sha(path) == expected, 'replay source bytes changed: ' + name)
+    if value.get('instance_id') is not None:
+        member = value['instance_id']
+        require(isinstance(member, str) and re.fullmatch(r'[A-Za-z0-9_-]+', member), 'unsafe exact replay member')
+        require(Path(value['source_demo']).parent.name == member and
+                Path(value['source_tro']).name == member + '-tro_state.json' and
+                read_env(job/'job.env').get('ISGF_REPLAY_INSTANCE_ID') == member,
+                'exact replay member binding differs')
     return value
 
 

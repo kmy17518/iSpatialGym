@@ -47,6 +47,17 @@ def prepare_intent_ledger(root, token):
             os.unlink(temporary)
     with ledger.open() as stream:
         require(stream.readline().rstrip('\n').split('\t') == LEDGER_COLS, 'intent ledger schema differs')
+    # A producer's dry run also opens this inode. Create it with the shared
+    # journal permissions before native submit_fast can inherit a private umask.
+    # Keep the inode (and any advisory lock) intact when repairing its mode.
+    lock = ledger.with_name(ledger.name + '.lock')
+    fd = os.open(lock, os.O_CREAT | os.O_WRONLY, 0o660)
+    try:
+        st = os.fstat(fd)
+        if st.st_uid == os.getuid() and st.st_mode & 0o660 != 0o660:
+            os.fchmod(fd, st.st_mode | 0o660)
+    finally:
+        os.close(fd)
     alias = root / 'manifests' / ('dispatch_' + token + '_allocations.tsv')
     if alias.is_symlink():
         require(alias.resolve() == ledger.resolve(), 'intent ledger alias differs')

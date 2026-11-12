@@ -75,6 +75,17 @@ class DispatchTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'shifted'):
                 D.verify_dry_indices(text, identity)
 
+    def test_private_dry_run_lock_repaired_without_replacing_inode(self):
+        ledger = D.prepare_intent_ledger(self.root, 'dry_lock')
+        lock = ledger.with_name(ledger.name + '.lock')
+        lock.write_text('existing lock identity')
+        lock.chmod(0o600)
+        inode = lock.stat().st_ino
+        D.prepare_intent_ledger(self.root, 'dry_lock')
+        self.assertEqual(lock.stat().st_ino, inode)
+        self.assertEqual(lock.read_text(), 'existing lock identity')
+        self.assertEqual(lock.stat().st_mode & 0o660, 0o660)
+
     def test_concurrent_ledger_preparation_publishes_one_complete_header(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             paths = list(pool.map(lambda _: D.prepare_intent_ledger(self.root, 'same'), range(32)))
