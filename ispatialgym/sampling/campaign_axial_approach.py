@@ -1,5 +1,13 @@
 """A bounded alternate pre-contact pose; every physical checker is reused."""
 from dataclasses import replace
+import os
+
+
+def short_pre_fallback_enabled():
+    # The integrated fallback has not yet reproduced the positive isolated
+    # 5 cm experiment. Keep it diagnostic-only until native/demo/replay pass.
+    return bool(os.environ.get('ISPATIALGYM_CAMPAIGN_CONFIG')) and os.environ.get(
+        'ISPATIALGYM_AXIAL_SHORT_PRE_FALLBACK', '0') == '1'
 
 
 def choose_push_with_pre_fallback(proposals, choose, pre_pose, *, enabled):

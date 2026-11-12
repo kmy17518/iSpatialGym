@@ -1,5 +1,17 @@
 from dataclasses import dataclass
-from ispatialgym.sampling.campaign_axial_approach import choose_push_with_pre_fallback
+from ispatialgym.sampling.campaign_axial_approach import choose_push_with_pre_fallback, short_pre_fallback_enabled
+
+
+def test_unverified_fallback_is_opt_in_and_campaign_scoped(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG',raising=False)
+    monkeypatch.delenv('ISPATIALGYM_AXIAL_SHORT_PRE_FALLBACK',raising=False)
+    assert not short_pre_fallback_enabled()
+    monkeypatch.setenv('ISPATIALGYM_CAMPAIGN_CONFIG','exact.json')
+    assert not short_pre_fallback_enabled()
+    monkeypatch.setenv('ISPATIALGYM_AXIAL_SHORT_PRE_FALLBACK','1')
+    assert short_pre_fallback_enabled()
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG')
+    assert not short_pre_fallback_enabled()
 
 
 @dataclass
