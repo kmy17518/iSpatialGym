@@ -37,7 +37,7 @@ mapfile -d '' -t INPUTS < <(python3 - "$JOBDIR" "$REQUESTED_REPLAY_MEMBER" <<'PY
 import json,pathlib,re,sys
 root=pathlib.Path(sys.argv[1])
 member=sys.argv[2]
-if member and (member in ('.', '..') or not re.fullmatch(r'[A-Za-z0-9_.-]+',member)):
+if member and (member in ('.', '..') or not re.fullmatch(r'[A-Za-z0-9_.~-]+',member)):
     raise ValueError('unsafe exact replay member')
 for meta in sorted((root/'demo').glob('*/meta.json')):
     if member and meta.parent.name!=member:continue
