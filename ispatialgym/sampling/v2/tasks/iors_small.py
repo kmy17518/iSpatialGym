@@ -2907,6 +2907,17 @@ class IORSSmall(SamplerV2):
                     self.sidecar.transitions.clear()
                     self.record_stance_travel(init, manip)  # the other arm idles now
                 self.apply_height_extra_to_grasp(grasp, t_pose, manip)  # A/B knob generation.contact_height_extra_m (0 = no-op)
+                from ispatialgym.sampling import campaign_inside_descent as CID
+                if getattr(self, '_campaign_pair_active', None) is not None and CID.enabled():
+                    from ispatialgym.grasping import hand_geometry as HG
+                    partner_world = self.world.hull_at(self.hull['partner'], tuple(G.t(v) for v in self._campaign_pair_active.partner))
+                    bounds = th.stack([partner_world.min(0).values, partner_world.max(0).values]).detach().cpu().numpy()
+                    sweep = CID.swept_hand_box(HG.load(grasp.arm),
+                        G.t(grasp.pre_grasp[0]).detach().cpu().numpy(), G.t(grasp.pre_grasp[1]).detach().cpu().numpy(), bounds)
+                    if sweep['overlap']:
+                        raise Reject('protected_descent_overlap',
+                            f"native {sweep['link']} vertical pre-grasp sweep overlaps the fixed partner box; propose another start")
+                    grasp.extras['campaign_pregrasp_descent_proposal'] = sweep
                 # the segment's later contacts; when they fail with the chosen arm, the whole segment is retried with the other arm if
                 # its grasp passed too (owner 2026-09-27: the fallback spans the segment)
                 tried: List[str] = []

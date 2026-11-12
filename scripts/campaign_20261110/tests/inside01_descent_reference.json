@@ -1,0 +1,55 @@
+{
+  "source_sha256": "af19f281915dd64af2262503761105eb6f5996d5e500409602f385c134bd7831",
+  "rows": [
+    {
+      "instance": "inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table__house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-bowl-belcml__target-brussels_sprouts-mbkrxe__50300336",
+      "success": false,
+      "box": [
+        8.201129913330078,
+        3.244048833847046,
+        0.8126541972160339,
+        8.366329193115234,
+        3.4092462062835693,
+        0.9169185757637024
+      ],
+      "pre": {
+        "position": [
+          8.240588188171387,
+          3.4654064178466797,
+          0.8696448802947998
+        ],
+        "orientation": [
+          -0.8296465277671814,
+          -0.1316455602645874,
+          0.5411178469657898,
+          -0.039339467883110046
+        ]
+      }
+    },
+    {
+      "instance": "inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table__house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-bowl-belcml__target-brussels_sprouts-mbkrxe__50300337",
+      "success": true,
+      "box": [
+        8.201130867004395,
+        3.2440459728240967,
+        0.8126451969146729,
+        8.36633014678955,
+        3.4092438220977783,
+        0.9169192314147949
+      ],
+      "pre": {
+        "position": [
+          8.277411460876465,
+          3.4950296878814697,
+          0.8696316480636597
+        ],
+        "orientation": [
+          -0.8164917230606079,
+          -0.1973761022090912,
+          0.5362855195999146,
+          -0.08235199749469757
+        ]
+      }
+    }
+  ]
+}
