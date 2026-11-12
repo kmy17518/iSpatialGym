@@ -9,6 +9,7 @@ import copy
 from contextlib import contextmanager
 import json
 import os
+import sys
 from pathlib import Path
 
 from .contracts import require, file_digest, write_json_atomic
@@ -240,4 +241,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('root', 'request', 'output'): parser.add_argument('--'+name, required=True)
     args = parser.parse_args()
-    run(args.root, args.request, args.output)
+    try:
+        run(args.root, args.request, args.output)
+    finally:
+        native = sys.modules.get('omnigibson')
+        if native is not None:
+            native.shutdown()
