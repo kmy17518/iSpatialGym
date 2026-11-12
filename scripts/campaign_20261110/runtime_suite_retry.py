@@ -61,10 +61,26 @@ def _row(root, row_ref, prior_ref, number, reservation, pointer, base):
 def failure(root, previous_row, allocation_ref, failed_gates):
     """Require a terminal actual attempt; absent evidence is not a failure."""
     from .runtime_suite_observer import source_stage
+    from .training_diversity import _terminal_jobs
     row,allocation,config,job=executed_scope(root,previous_row,allocation_ref)
+    terminal=checked(root,allocation['terminal_evidence'])
+    expected={(str(record['job_id']),record['backend']) for record in allocation.get('records',[])}
+    require(expected<={(j['job_id'],j['backend']) for j in terminal['jobs']},
+            'retry terminal evidence omits an owned stage job')
+    # Acceptance may select two successes early. A new attempt instead waits
+    # for every owned prior job, including optional member replays, to finish.
+    _terminal_jobs(root,{'jobs':terminal['jobs']},terminal,time.time())
+    receipt=checked(root,allocation['dispatch_receipt'])
+    if receipt.get('token'):
+        current=Path(root)/'dispatch/receipts'/(receipt['token']+'.json')
+        require(current.exists(), 'retry current dispatch owner is missing')
+        current_receipt=json.loads(current.read_text())
+        require(not current_receipt.get('migration') and current_receipt.get('allocation')==receipt['allocation'],
+                'retry must reconcile existing migration ownership first')
     stage=source_stage(root,row,allocation)
     require(stage['source_terminal_verified'], 'retry source is not terminal')
-    if stage['status'] in ('native_not_started_terminal','native_failed','demo_failed','insufficient_successful_demos'):
+    require(stage['status']!='native_not_started_terminal', 'no-start source needs routing reconciliation, not a fresh attempt')
+    if stage['status'] in ('native_failed','demo_failed','insufficient_successful_demos'):
         return {'source_stage':stage,'failure_kind':stage['status']}
     require(stage['status']=='awaiting_own_replay' and failed_gates, 'retry lacks an actual terminal failure')
     gates=[]

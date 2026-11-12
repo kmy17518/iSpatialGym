@@ -10,6 +10,7 @@ from scripts.campaign_20261110.tests.test_runtime_suite_acceptance import bound
 
 def proposed(root):
     base,prior,allocation,gate=bound(root)
+    (root/'out/job/sample.log').write_text('Native sampling executed; all placements rejected.')
     row=json.loads(Path(prior['path']).read_text());directory=base/'attempts/class0/attempt_1'
     put(root/'manifests/family_index_reservations.json',{'reservations':{
         'original':{'start':1000,'n':300},'retry':{'start':2000,'n':3}}})
@@ -18,8 +19,8 @@ def proposed(root):
     rowref=put(directory/'row.json',row)
     diagnosis=put(directory/'diagnosis.json',{'schema':'isg-runtime-suite-retry-diagnosis-v1','owner':'/root',
         'previous_row':prior,'allocation':allocation,'failed_gates':[],
-        'changed_reason':'Scheduler infrastructure failed before native initialization.',
-        'next_action':'Use the corrected bootstrap with the identical immutable native configuration.',
+        'changed_reason':'Measured sample time cap stopped a viable native placement search.',
+        'next_action':'Use a bounded measured time allowance with the identical physical goal and configuration.',
         'physical_runtime_change':False,'configuration_change':False,
         'evidence':[json.loads(Path(allocation['path']).read_text())['terminal_evidence']]})
     proposal=put(directory/'proposal.json',{'schema':'isg-runtime-suite-retry-proposal-v1','row':rowref,
@@ -106,3 +107,9 @@ def test_successful_class_cannot_be_registered_for_unchanged_retry(tmp_path):
     base,prior,allocation,rowref,proposal=proposed(tmp_path)
     put(base/'acceptance/class0.json',{'validation_passed':True,'row':prior})
     with pytest.raises(ContractError,match='validated class'):r.prepare(tmp_path,proposal)
+
+
+def test_no_start_cancel_is_routing_work_not_a_physical_retry(tmp_path):
+    base,prior,allocation,rowref,proposal=proposed(tmp_path)
+    (tmp_path/'out/job/sample.log').unlink()
+    with pytest.raises(ContractError,match='routing reconciliation'):r.prepare(tmp_path,proposal)
