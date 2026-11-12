@@ -102,8 +102,10 @@ def audit_map(path, unit):
     spec.update(arm=identity['arm'], height=float(identity['height_key']), rest_quat=rest['intended_quat_xyzw'],
                 needed_travel=0., min_open_rad=0., step_max_rad=.5)
     anchors = HA.AnchorSet(read(unit['anchors']['path'])['anchors'], max_approx_m=0)
+    # The native lookup reads JSON metadata, so tuple-valued config fields
+    # must use their serialized list representation for exact comparison.
     found = RM.find_prefix(str(path.parent), spec, anchors=anchors, policy_key=CP.DEFAULT.key(identity['arm']),
-                           robot=RM.robot_digest(), config_require=cfg.key())
+                           robot=RM.robot_digest(), config_require=json.loads(json.dumps(cfg.key())))
     assert found is not None and Path(found.path).resolve() == path.resolve(), 'native exact lookup did not select this map'
     return {'artifact': ref(path), 'npz': ref(path.with_suffix('.npz')), 'source_motion': source,
             'q_start': lib['q_start'], 'positive_travel_cells': positive, 'verified': True, 'positive': positive > 0,
