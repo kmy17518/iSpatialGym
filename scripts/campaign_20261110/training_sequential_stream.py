@@ -295,11 +295,25 @@ def run_cycle(root,configuration,state):
             progress.append({'control':row['control'],'stage':row['stage'],'probe':ref(probe)if probe.exists()else None,'execution':ref(execution)if execution.exists()else None})
             if probe.exists()and execution.exists():matrix[row['stage']][row['control']]=ref(probe);matrix['execution'][row['stage']][row['control']]=ref(execution)
         state['matrix_progress']=progress
+        current_attempt=configuration.get('physics_followup') or state['matrix_request']
+        if state.get('verification_attempt')!=current_attempt:
+            if state.get('verification_error'):
+                state.setdefault('verification_error_history',[]).append({'attempt':state.get('verification_attempt'),
+                    'error':state.pop('verification_error'),'last_observed_at':state.get('observed_at')})
+            state['verification_attempt']=current_attempt
+            state.pop('verification',None)
         if len(matrix['physics'])==len(PHYSICS)and len(matrix['rendering'])==len(RENDER)and not state.get('verification'):
+            inp=None
             try:
-                inp=immutable(verification_directory/'verification_inputs.json',matrix)
+                inp=immutable(verification_directory/'verification_attempts'/digest(matrix)/'input.json',matrix)
                 state['verification']=immutable(verification_directory/'verification.json',verify(root,inp,started));state.pop('verification_error',None)
-            except Exception as error:state['verification_error']=f'{type(error).__name__}: {error}'
+                state.pop('verification_failure',None)
+            except Exception as error:
+                state['verification_error']=f'{type(error).__name__}: {error}'
+                if inp is not None:
+                    state['verification_failure']=immutable(verification_directory/'verification_attempts'/digest(matrix)/'failure.json',
+                        {'schema':'isg-sequential-verification-failure-v1','input':inp,'attempt':current_attempt,
+                         'error':state['verification_error'],'status':'failed','production_released':False,'benchmark_credit':0})
     if state.get('renderer_cleanup_request') and not state.get('renderer_cleanup_verification'):
         try:
             m=checked(root,state['renderer_cleanup_request']);controls={}

@@ -68,3 +68,15 @@ def test_prospective_attempt_preserves_original_status_and_separate_jobs(tmp_pat
     assert len(value['controls'])==11 and len(value['prospective_controls'])==6
     assert value['controls'][0]['job_id']=='123'and value['prospective_controls'][0]['job_id']is None
     assert value['prospective_verified_controls']==0 and value['verified_controls']==0
+
+
+def test_known_failure_is_scoped_to_exact_probe(tmp_path):
+    b,d,o=fixture(tmp_path);(d/'output').mkdir();p=d/'output/probe.json';p.write_text('{"entries":[]}')
+    failure={'schema':'isg-sequential-control-failures-v1','controls':{'physics/fresh_A':{
+        'probe':status.ref(p),'status':'blocked_by_failed_matrix','reason':'other control failed',
+        'evidence':[status.ref(d/'request.json')],'next_action':'diagnose'}}}
+    path=d.parent.parent/'verification_failure_observations.json';path.write_text(json.dumps(failure))
+    row=status.control(tmp_path,b,'physics','fresh_A',{'123':{'state':'COMPLETED','exit_code':'0:0'}},o)
+    assert row['status']=='blocked_by_failed_matrix'and row['verification_status']=='blocked'
+    p.write_text('{"entries":[{}]}')
+    assert status.control(tmp_path,b,'physics','fresh_A',{},o)['status']=='evidence_error'

@@ -156,7 +156,7 @@ def _verify_stages(root, reference, started_at, stages):
     sources = {}; source_refs = None; runtimes = {}; artifacts = set(); results = {}; all_processes = set()
     augmentation_changes = {}; cold_compatibility={}
     for stage, specifications in stages:
-        cases = {}; stage_results = {}; prospective_anchor=False
+        cases = {}; stage_results = {}; prospective_anchor=False; compatibility_identity=None; compatibility=None
         expected_kind = 'physics_action_open_loop' if stage == 'physics' else 'kinematic_observation_rendering'
         for name, (control, order) in specifications.items():
             probe_ref = document[stage][name]; probe = checked(root, probe_ref)
@@ -166,14 +166,22 @@ def _verify_stages(root, reference, started_at, stages):
             prospective_anchor=prospective_anchor or request.get('sequential_anchor_rebase')is True
             require(request.get('sequential_augmentation') is True and not request.get('physical_candidate') and
                     request.get('diagnostic_control') == control and probe['kind'] == expected_kind and
-                    len(probe['entries']) == len(order), 'sequential reference/control identity differs')
+                    len(probe['entries']) == len(order),
+                    f'sequential {stage}/{name} identity differs: expected control={control!r}, '
+                    f'episodes={len(order)}; actual control={request.get("diagnostic_control")!r}, episodes={len(probe["entries"])}')
             source_refs = source_refs or request['canaries']
             require(request['canaries'] == source_refs, 'sequential controls use different validated inputs')
             identity = probe['probe_runtime']; runtimes.setdefault(stage,identity)
             require(identity == runtimes[stage] and file_digest(identity['path']) == request['probe_runtime_sha256'] == identity['sha256'],
                     'sequential matrix stage runtime differs')
-            require(verify_runtime_compatibility(root, request, records, Path(identity['path']).parent) ==
-                    probe['runtime_compatibility'], 'sequential matrix runtime proof differs')
+            # One immutable payload inventory per stage. Every control still has
+            # its own checked request, kind/order, runtime, source and probe refs.
+            common=digest({k:v for k,v in request.items() if k not in ('diagnostic_control','diagnostic_only')})
+            if compatibility_identity is None:
+                compatibility=verify_runtime_compatibility(root, request, records, Path(identity['path']).parent)
+                compatibility_identity=common
+            require(common==compatibility_identity and compatibility==probe['runtime_compatibility'],
+                    'sequential matrix runtime proof or effective request differs')
             observations = []; case = []
             for ordinal, (entry, member) in enumerate(zip(probe['entries'], order)):
                 require(entry['canary_review'] == source_refs[member], 'sequential member order differs')

@@ -75,6 +75,19 @@ def control(root,batch,stage,name,scheduler,observation,*,directory=None):
             require(out['scheduler_state']=='COMPLETED'and out['scheduler']['exit_code']=='0:0','strict proof lacks current clean terminal observation')
             out['evidence']['verification']=ref(verification)
             out.update(status='verified',verification_status='verified',next_action='Retain exact verified artifacts; no new execution')
+        failure=directory/'verification_failure_observations.json'
+        if out['verification_status']!='verified' and failure.exists():
+            value=read(failure)
+            require(value.get('schema')=='isg-sequential-control-failures-v1', 'control failure schema differs')
+            entry=value.get('controls',{}).get(stage+'/'+name)
+            if entry:
+                require(entry['probe']==out['evidence'].get('probe') and
+                        entry['status'] in ('verification_failed','blocked_by_failed_matrix'),
+                        'control failure does not bind exact probe')
+                for reference in entry['evidence']:checked(root,reference)
+                out.update(status=entry['status'],verification_status='failed' if entry['status']=='verification_failed' else 'blocked',
+                    error=entry['reason'],next_action=entry['next_action'])
+                out['evidence']['failure_observation']=ref(failure)
     except Exception as error:out.update(status='evidence_error',error=f'{type(error).__name__}: {error}',next_action='Repair exact evidence binding; never infer a verification pass')
     return out
 
