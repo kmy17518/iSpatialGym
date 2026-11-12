@@ -83,6 +83,9 @@ def snapshot(root, inventory):
         deadline_checkpoint = {}; dcs = {'available': False, 'error': 'Campaign identity mismatch'}
     capacity_recovery, crs = read_source(root / 'dashboard/capacity_recovery.json')
     recovery, rs = read_source(root / 'dashboard/standard_recovery.json')
+    runtime_suite, rvs = read_source(root / 'dashboard/runtime_validation.json')
+    if runtime_suite and runtime_suite.get('campaign_id') != 'campaign_20261110':
+        runtime_suite = {}; rvs = {'available':False,'error':'Campaign identity mismatch'}
     canonical, cvs = read_source(root / 'dashboard/canonical_validation.json')
     training, tes = read_source(root / 'dashboard/training_eligibility.json')
     production_gate, pgs = read_source(root / 'dashboard/training_production_gate.json')
@@ -192,7 +195,7 @@ def snapshot(root, inventory):
         'deadline_checkpoint': deadline_checkpoint, 'deadline_checkpoint_source': dcs,
         'capacity_recovery': capacity_recovery,
         'standard_recovery': recovery,
-        'canonical_validation': canonical,
+        'canonical_validation': canonical, 'runtime_validation':runtime_suite, 'runtime_validation_source':rvs,
         'cluster_fleet_gpu_time': {**{k:v for k,v in cluster_fleet.items() if k != 'records'}, 'allocation_count': len(cluster_fleet.get('records', []))},
         'fleet_gpu_time': {k:v for k,v in fleet.items() if k not in ('rentals','sources','attempts_missing_complete_intervals')},
         'group_yield': {k:v for k,v in group_yield.items() if k not in ('sources','groups','jobs')},
@@ -234,7 +237,7 @@ class Handler(BaseHTTPRequestHandler):
                      'required_configurations_in_index':len(rows),'matching':len(matching),
                      'offset':offset,'limit':100,'rows':matching[offset:offset+100]}
             return self.send_body(200,json.dumps(sanitize(payload)).encode(),'application/json')
-        audits = {'/reports/deadline-checkpoint':'streaming_deadline_checkpoint.json', '/reports/execution-ledger':'execution_ledger.json', '/reports/preparation':'preparation_status.json', '/reports/capacity-recovery': 'capacity_recovery.json', '/reports/heldout-recovery': 'heldout_recovery.json', '/reports/reconciliation': 'reconciliation.json',
+        audits = {'/reports/runtime-validation':'runtime_validation.json','/reports/deadline-checkpoint':'streaming_deadline_checkpoint.json', '/reports/execution-ledger':'execution_ledger.json', '/reports/preparation':'preparation_status.json', '/reports/capacity-recovery': 'capacity_recovery.json', '/reports/heldout-recovery': 'heldout_recovery.json', '/reports/reconciliation': 'reconciliation.json',
             '/reports/canonical-validation': 'canonical_validation.json',
             '/reports/training-eligibility': 'training_eligibility.json',
             '/reports/training-production-gate': 'training_production_gate.json',
@@ -256,7 +259,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/deadline-checkpoint', '/reports/execution-ledger', '/reports/preparation', '/reports/pipeline-status', '/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
+            if path in ('/reports/runtime-validation', '/reports/deadline-checkpoint', '/reports/execution-ledger', '/reports/preparation', '/reports/pipeline-status', '/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,

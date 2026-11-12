@@ -1,7 +1,7 @@
 import json
 from types import SimpleNamespace
 import pytest
-from scripts.campaign_20261110.runtime_suite_author import preserved_environment,group_range,immutable,checked
+from scripts.campaign_20261110.runtime_suite_author import preserved_environment,group_range,immutable,checked,recorded_opening_range
 
 
 def test_preserve_behavior_replace_execution():
@@ -29,3 +29,14 @@ def test_immutable_exact_hash(tmp_path):
     with pytest.raises(AssertionError):immutable(path,{"id":2})
     path.write_text(json.dumps({"id":2}))
     with pytest.raises(AssertionError):checked(r)
+
+
+def test_recorded_opening_goal_keeps_its_strict_bucket():
+    template = SimpleNamespace(task="configuration_matching-articulation_open_large_scale", objects=[SimpleNamespace(role="target",instance="fixture",joint="hinge")])
+    anchor = {"template_meta":{"template_facts":{"limits":[0.,2.]}},
+              "joint_names":{"fixture":["hinge"]},"planned_goal_joints":{"fixture":[1.8]}}
+    bounds, bucket = recorded_opening_range(template, anchor)
+    assert bounds[0] <= .9 <= bounds[1]
+    assert anchor["planned_goal_joints"]["fixture"] == [1.8]
+    anchor["planned_goal_joints"]["fixture"] = [3.]
+    with pytest.raises(AssertionError):recorded_opening_range(template, anchor)

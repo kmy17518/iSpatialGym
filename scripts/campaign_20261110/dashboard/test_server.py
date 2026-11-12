@@ -59,6 +59,20 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertFalse(snapshot(self.root,self.root/'inventory')['deadline_checkpoint_source']['available'])
         self.assertEqual(self.request('GET','/reports/deadline-checkpoint')[0],404)
 
+    def test_runtime_suite_keeps_historical_and_fresh_results_separate(self):
+        value={'campaign_id':'campaign_20261110','historical_accepted_classes':100,
+               'historical_runtime_identities':40,'validation_passed':0,'required_classes':100,
+               'rows':[{'class_id':'one','state':'failed_dispatch'}],'api_key':'HIDDEN'}
+        self.write('dashboard/runtime_validation.json',value)
+        before=self.hashes();data=json.loads(self.request('GET','/api/status')[1])
+        self.assertEqual(data['runtime_validation']['validation_passed'],0)
+        self.assertEqual(data['runtime_validation']['historical_accepted_classes'],100)
+        code,raw=self.request('GET','/reports/runtime-validation')
+        self.assertEqual(code,200);self.assertNotIn(b'HIDDEN',raw);self.assertEqual(before,self.hashes())
+        self.write('dashboard/runtime_validation.json',{'campaign_id':'old','validation_passed':100})
+        self.assertFalse(snapshot(self.root,self.root/'inventory')['runtime_validation_source']['available'])
+        self.assertEqual(self.request('GET','/reports/runtime-validation')[0],404)
+
     def test_capacity_ledger_is_read_only_and_campaign_scoped(self):
         value={'campaign_id':'campaign_20261110','observed_at':123,
                'unused_capacity_blockers':[{'owner':'root','missing_input':'exact native map','next_action':'audit'}]}

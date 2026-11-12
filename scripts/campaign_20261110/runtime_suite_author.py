@@ -64,6 +64,23 @@ def group_range(template, counts):
     return options[bucket], bucket
 
 
+def recorded_opening_range(template, anchor):
+    """Bind a fixed approved joint goal to its actual strict bucket."""
+    from scripts.campaign_20261110.controller_groups import ranges
+    targets = [obj for obj in template.objects if obj.role == "target"]
+    assert len(targets) == 1 and targets[0].joint
+    target = targets[0]
+    limits = anchor["template_meta"]["template_facts"]["limits"]
+    assert len(limits) == 2 and limits[0] < limits[1]
+    names = anchor["joint_names"][target.instance]
+    values = anchor["planned_goal_joints"][target.instance]
+    assert len(names) == len(values) and target.joint in names
+    fraction = (values[names.index(target.joint)]-limits[0])/(limits[1]-limits[0])
+    choices = [(bounds, i) for i, bounds in enumerate(ranges(template)) if bounds[0] <= fraction <= bounds[1]]
+    assert choices, "recorded approved opening goal lies outside every strict bucket"
+    return choices[0]
+
+
 def author(root, run_dir, catalog_path, ordinal):
     from scripts.campaign_20261110 import goal_groups as g
     from scripts.campaign_20261110.contracts import Template, ObjectRef
@@ -133,6 +150,8 @@ def author(root, run_dir, catalog_path, ordinal):
         anchor = g.successful_anchor(catalog["anchor_job"],campaign_root=root,ledger=catalog["anchor_ledger"],
                                     campaign_started_at=float(read(run_dir/"campaign_start.json")["campaign_started_at"]))
         anchor["goal_proposal_source"] = "approved_recorded_goal_as_input_only; fresh_current_runtime_members_required"
+        if template.task == "configuration_matching-articulation_open_large_scale":
+            magnitude, bucket = recorded_opening_range(template, anchor)
         g.prepare_group(anchor=anchor,template=template,campaign_id=root.name,group_id=token,output=destination,
                         code_sha256=runtime["snapshot_sha256"],physics_sha256=source["validation_key"]["physics_sha256"],
                         data_sha256=source["validation_key"]["data_sha256"],magnitude_range=magnitude,
@@ -155,7 +174,7 @@ def author(root, run_dir, catalog_path, ordinal):
     ledger = prepare_intent_ledger(root,token)
     if "--ledger" in command: command[command.index("--ledger")+1] = str(ledger)
     else: command += ["--ledger",str(ledger)]
-    command += ["--max-attempts",str(source_limits.get("max_attempts") or 15),"--extra-env","DEMO_LIMIT_S="+str(source_limits.get("demo_limit_s") or 3600)]
+    command += ["--extra-env","MAX_ATTEMPTS="+str(source_limits.get("max_attempts") or 15),"--extra-env","DEMO_LIMIT_S="+str(source_limits.get("demo_limit_s") or 3600)]
     row = {"schema":"isg-current-runtime-class-launch-v1","campaign_id":root.name,"run_id":release["run_id"],
            "run_started_at":release["run_started_at"],"class_id":template.class_id,"frozen_runtime":runtime,
            "release":ref(run_dir/"release.json"),"author":ref(__file__),"quota_observation":ref(run_dir/"quota_observation.json"),"catalog_row":ref(catalog_path),"campaign_config":ref(config_path),

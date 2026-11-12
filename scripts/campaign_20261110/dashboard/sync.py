@@ -14,7 +14,7 @@ REMOTE = '/vision/u/minyeong/projects/isg_home/campaign_20261110/infra'
 FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group_yield.json', 'goal_group_yield_error.json')
 FLEET_FILE = 'vast_fleet_gpu_time.json'
 CLUSTER_FLEET_FILE = 'cluster_fleet_gpu_time.json'
-AUDIT_FILES = {'execution_ledger.json':'infra/execution_ledger.json','preparation_status.json':'training_preparation/status.json','pipeline_status.json': 'training_pipeline_canaries/pipeline_status.json', 'ik_observation.json': 'ik_exchange/observation.json', 'capacity_recovery.json': 'infra/capacity_recovery/ledger.json', 'heldout_recovery.json': 'infra/heldout_recovery/ledger.json','canonical_validation.json': 'infra/standard_recovery/canonical_validation.json','gate_quality_audit.json': 'validation/gate_quality_audit.json',
+AUDIT_FILES = {'runtime_validation.json':'runtime_validation/status.json','execution_ledger.json':'infra/execution_ledger.json','preparation_status.json':'training_preparation/status.json','pipeline_status.json': 'training_pipeline_canaries/pipeline_status.json', 'ik_observation.json': 'ik_exchange/observation.json', 'capacity_recovery.json': 'infra/capacity_recovery/ledger.json', 'heldout_recovery.json': 'infra/heldout_recovery/ledger.json','canonical_validation.json': 'infra/standard_recovery/canonical_validation.json','gate_quality_audit.json': 'validation/gate_quality_audit.json',
                'training_eligibility.json': 'accounting/training_eligibility.json',
                'training_production_gate.json': 'controllers/training_production_gate.json',
                'training_containment.json': 'infra/training_production_gate/containment_status.json',
@@ -192,9 +192,17 @@ def return_report(output):
         if canonical.get('campaign_id')=='campaign_20261110':
             lines += ['','CANONICAL TEMPLATE VALIDATION', 'Observed: '+chicago(canonical.get('observed_at')),
                 str(canonical.get('validated'))+' / 100 exact canonical classes verified; states: '+json.dumps(canonical.get('state_counts')),
-                'This artifact audit is distinct from historical accepted class coverage. The under_large_01 owner update is merged; fresh exact validation remains required.',
+                'Historical exact chains span recorded runtimes; this does not establish the separate current-runtime 100-class suite.',
                 'Proof: http://127.0.0.1:8765/reports/canonical-validation']
-    recovery_path=output/'standard_recovery.json'
+    suite=output/'runtime_validation.json'
+    if suite.exists():
+        value=json.loads(suite.read_text())
+        lines += ['', 'CURRENT FROZEN RUNTIME VALIDATION', 'Observed: '+chicago(value.get('observed_at')),
+                  'Runtime: '+str((value.get('frozen_runtime') or {}).get('commit')),
+                  str(value.get('validation_passed'))+' / 100 classes passed on this one runtime; states: '+json.dumps(value.get('state_counts')),
+                  'Historical accepted coverage and existing-sample reconciliation remain separate.',
+                  'Proof: http://127.0.0.1:8765/reports/runtime-validation']
+    recovery_path=output/'standard_recovery.json' 
     if recovery_path.exists():
         recovery=json.loads(recovery_path.read_text())
         if recovery.get('campaign_id')=='campaign_20261110':
