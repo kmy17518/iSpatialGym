@@ -117,6 +117,9 @@ def contact_recovery(option: str) -> bool:
                                      'configuration_matching-articulation_close_large_scale'),
         'cap_capture_margin': ('configuration_matching-attachment_02',
                                 'configuration_matching-attachment'),
+        'cap_source_stance_proposal': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
+        'inside_top_grasp_proposal': ('inter_object_relation_satisfaction-inside_01',
+                                      'inter_object_relation_satisfaction-inside_small_scale'),
         'axial_magazine_contact_height': ('alignment-axial_04', 'alignment-axial'),
         'nextto_native_base_hulls': ('inter_object_relation_satisfaction-nextto_large_scale_01',
                                    'inter_object_relation_satisfaction-nextto_large_scale'),
@@ -147,7 +150,7 @@ def contact_recovery(option: str) -> bool:
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('hinged_jar', 'jnjtrl', (1.0, 1.0, 1.0))],
                     'held jar brace belongs to its exact ready default-scale category model')
-        if option in ('cap_capture_margin', 'cap_vertical_final_retreat'):
+        if option in ('cap_capture_margin', 'cap_vertical_final_retreat', 'cap_source_stance_proposal'):
             require(template.split == 'eval_standard' and
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('cap', 'xxqyrt', (1.0, 1.0, 1.0))],

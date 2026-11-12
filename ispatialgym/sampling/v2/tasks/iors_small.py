@@ -1489,6 +1489,16 @@ class IORSSmall(SamplerV2):
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
         kinds: List[Optional[str]] = [None] * len(tiers)
+        from ispatialgym.sampling import campaign_runtime
+        if self.relation == 'inside' and campaign_runtime.contact_recovery('inside_top_grasp_proposal'):
+            # The successful bowl insertion used top_7. Flush side grasps can
+            # pass the pick and consume a stance before failing its place IK.
+            # Try the full library's top-down tier first; preserve both former
+            # tiers as fallback and keep all pick/place/approach checks.
+            top = [g for g in self.grasps if top_down_grasp(getattr(g, 'pose', None), self.rest.get('target'))]
+            if top:
+                tiers.insert(0, top)
+                kinds.insert(0, 'inside_top')
         if self.relation == "nextto" and nextto_top_first_on():
             # i7-nextto (ISPATIALGYM_NEXTTO_TOP_FIRST): each tier's top-down grasps first, its other grasps after them
             split, kinds = [], []

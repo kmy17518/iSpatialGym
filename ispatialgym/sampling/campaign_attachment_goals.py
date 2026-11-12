@@ -83,7 +83,9 @@ def order_source_stances(plan, class_id, order, candidates):
     Four ordinary proposals remain ahead of two source-near proposals. No
     stance is synthesized, discarded, or exempted from native checks.
     """
-    if class_id not in {'configuration_matching-attachment_03', 'configuration_matching-attachment_04'} or plan.anchor_manipulation_stance is None:
+    from ispatialgym.sampling import campaign_runtime
+    cap = class_id == 'configuration_matching-attachment_02' and campaign_runtime.contact_recovery('cap_source_stance_proposal')
+    if (not cap and class_id not in {'configuration_matching-attachment_03', 'configuration_matching-attachment_04'}) or plan.anchor_manipulation_stance is None:
         return order
     from ispatialgym.sampling.campaign_tabletop_starts import prioritize_written_stances
     return prioritize_written_stances(order, candidates, [plan.anchor_manipulation_stance])
