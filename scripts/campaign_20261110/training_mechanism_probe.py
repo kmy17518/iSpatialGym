@@ -35,6 +35,10 @@ def physical_delta(request):
     require(full in (None, True), 'unknown native snapshot scope')
     if full:
         value['complete_native_snapshots'] = 'existing loader update_initial_file calls include every initialized actor; prior recording filter restored'
+    fixed = request.get('idempotent_fixed_pose_sets')
+    require(fixed in (None, True), 'unknown fixed-pose setter experiment')
+    if fixed:
+        value['idempotent_fixed_pose_sets'] = 'during attach/restore only, skip world-frame fixed/kinematic pose writes iff requested and current native float32 poses are bit-identical; no reference copies or tolerance'
     return value
 
 
@@ -220,6 +224,9 @@ def run(root, request_path, output, *, preflight=False):
                          'runtime_compatibility':q['runtime_proof']}, output, restart=restart)
     if q.get('complete_native_snapshots'):
         install_complete_snapshots(runner)
+    if q.get('idempotent_fixed_pose_sets'):
+        from .training_fixed_pose_probe import install
+        install(runner, output)
     types = {'A_FAILURE_A':ControlledEpisodeFailure,'A_INTERRUPT_A':ControlledEpisodeInterrupt}
     tro = source['source_tro']['path']; demo = source['collector_demo']['path']
     signature = runner.instance_signature(tro); directory = runner.resolve_instance(tro)[1]
