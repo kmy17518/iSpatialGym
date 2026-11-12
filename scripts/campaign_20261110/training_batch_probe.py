@@ -40,6 +40,9 @@ def verify_runtime_compatibility(root, request, records, runtime):
     require(proof_path.is_relative_to(root) and proof_path.is_file() and
             file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
     proof=json.loads(proof_path.read_text())
+    if proof.get('schema') == 'isg-fixed-mass-baseline-runtime-compatibility-v1':
+        from .training_fixed_mass_probe import verify_fixed_mass_runtime
+        return verify_fixed_mass_runtime(root,request,records,runtime,verify_runtime_compatibility)
     if proof.get('schema') == 'isg-sequential-mass-restart-runtime-compatibility-v1':
         from .training_mass_restart_probe import verify_mass_restart_runtime
         return verify_mass_restart_runtime(root,request,records,runtime,verify_runtime_compatibility)
@@ -447,6 +450,11 @@ def _run(root,request,output,kind,construction):
         # prebuild checks compare their content and recorded scene, not paths.
         os.environ['ISPATIALGYM_FAST_COLLECTOR_PREBUILD']='1'
         from ispatialgym.oracle import run_isg
+        if value.get('fixed_mass_baseline') is True:
+            from .training_fixed_mass_probe import install_fixed_mass_baseline, DELTA
+            install_fixed_mass_baseline(run_isg,value,output)
+            common['physical_delta']=DELTA
+            common['fixed_mass_audit']=str(output/'fixed_mass_audit.json')
         if value.get('physical_candidate'):
             from .training_pristine_probe import install_override
             install_override(run_isg, value)
