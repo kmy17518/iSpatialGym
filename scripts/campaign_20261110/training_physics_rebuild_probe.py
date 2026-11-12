@@ -85,15 +85,17 @@ def install(runner, request, output):
     require(request.get('explicit_physics_sdk_rebuild_v1') is True,
             'SDK reconstruction was not requested')
     from ispatialgym.oracle import campaign_restore as CR
-    from omni.physx import get_physx_simulation_interface
-    from omni.physx.bindings import _physx
-    import omnigibson.lazy as lazy
     proof = json.loads(Path(request['runtime_compatibility']['path']).read_text())
-    require(Path(_physx.__file__).resolve() == Path(proof['installed_api_bindings']['path']).resolve()
-            and file_digest(_physx.__file__) == proof['installed_api_bindings']['sha256'],
-            'loaded SDK API differs from reviewed installed bindings')
     restart = CR.restart_reused_world; events = []; output = Path(output)
     def rebuilt(meta, sim, *, execution=None, while_stopped=None):
+        # Kit loads the extension while constructing Environment; the installer
+        # intentionally runs before that construction and must not import it.
+        from omni.physx import get_physx_simulation_interface
+        from omni.physx.bindings import _physx
+        import omnigibson.lazy as lazy
+        require(Path(_physx.__file__).resolve() == Path(proof['installed_api_bindings']['path']).resolve()
+                and file_digest(_physx.__file__) == proof['installed_api_bindings']['sha256'],
+                'loaded SDK API differs from reviewed installed bindings')
         stage_id = lazy.pxr.UsdUtils.StageCache.Get().Insert(sim.stage).ToLongInt()
         require(stage_id > 0, 'retained USD stage is not registered in its native cache')
         event = {'ordinal': len(events), 'stage_id': stage_id, 'status': 'started'}

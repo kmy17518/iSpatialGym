@@ -47,3 +47,22 @@ def test_replacing_loaded_world_is_rejected():
     def changed(stage): sim.scenes.append(object()); return attach(stage)
     api.attach_stage = changed
     with pytest.raises(ContractError, match='replaced'): reconstruct_stopped(sim, api, 7)
+
+
+def test_installer_does_not_require_kit_extension_before_environment(tmp_path, monkeypatch):
+    import builtins
+    import json
+    from ispatialgym.oracle import campaign_restore
+    from scripts.campaign_20261110.training_physics_rebuild_probe import install
+    native_import = builtins.__import__
+    def before_environment(name, *args, **kwargs):
+        if name.startswith('omni.physx'):
+            raise ModuleNotFoundError('Kit extension is not loaded before Environment')
+        return native_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, '__import__', before_environment)
+    original = campaign_restore.restart_reused_world
+    monkeypatch.setattr(campaign_restore, 'restart_reused_world', original)
+    proof = tmp_path/'proof.json'; proof.write_text(json.dumps({}))
+    install(None, {'explicit_physics_sdk_rebuild_v1': True,
+                   'runtime_compatibility': {'path': str(proof)}}, tmp_path)
+    assert campaign_restore.restart_reused_world is not original
