@@ -35,6 +35,23 @@ def test_marker_contact_closure_is_bounded_and_does_not_change_handles(monkeypat
     assert EX.grasp_closure(NS(kind='handle'), .014, cfg) == (cfg.gripper_close_rate, None, False)
 
 
+def test_cap_capture_margin_keeps_rate_and_rejects_wrong_model_scope(monkeypatch):
+    t=bind(monkeypatch,'configuration_matching-attachment_02','configuration_matching-attachment',{'cap_capture_margin':True})
+    t.split='eval_standard'; target=NS(role='target',category='cap',model='xxqyrt',default_scale=(1.,1.,1.));t.objects=[target]
+    cfg=MotionsConfig(); action=NS(kind='library',grasp=NS(grasp_key='cap__xxqyrt'))
+    assert EX.grasp_closure(action,.0508,cfg)==(cfg.gripper_close_rate,.0015,False)
+    for width in [None,.002,.029,.071,float('nan')]:
+        assert EX.grasp_closure(action,width,cfg)==EX.closure_for_width(width,cfg)
+    for other in [NS(kind='handle',grasp=action.grasp),NS(kind='library',grasp=NS(grasp_key='cap__other'))]:
+        assert EX.grasp_closure(other,.0508,cfg)==(cfg.gripper_close_rate,None,False)
+    for field,value in [('model','other'),('default_scale',(.9,.9,.9))]:
+        previous=getattr(target,field);setattr(target,field,value)
+        with pytest.raises(ContractError):EX.grasp_closure(action,.0508,cfg)
+        setattr(target,field,previous)
+    t.class_id='configuration_matching-attachment_04'
+    with pytest.raises(ContractError):EX.grasp_closure(action,.0508,cfg)
+
+
 def test_mass_center_option_uses_existing_physical_constructor(monkeypatch):
     from ispatialgym.sampling.v2.tasks import iors_small as IS
     monkeypatch.delenv(IS.PUSH_LINE_COM_ENV, raising=False)

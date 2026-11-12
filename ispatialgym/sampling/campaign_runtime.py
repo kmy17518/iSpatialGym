@@ -111,6 +111,8 @@ def contact_recovery(option: str) -> bool:
                                    'inter_object_relation_satisfaction-touching_small_scale'),
         'marker_gentle_pinch': ('inter_object_relation_satisfaction-nextto_01',
                                 'inter_object_relation_satisfaction-nextto_small_scale'),
+        'cap_capture_margin': ('configuration_matching-attachment_02',
+                                'configuration_matching-attachment'),
     }
     require(option in classes, 'unknown campaign contact recovery option')
     if not active():
@@ -126,6 +128,11 @@ def contact_recovery(option: str) -> bool:
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('hinged_jar', 'jnjtrl', (1.0, 1.0, 1.0))],
                     'held jar brace belongs to its exact ready default-scale category model')
+        if option == 'cap_capture_margin':
+            require(template.split == 'eval_standard' and
+                    [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
+                    [('cap', 'xxqyrt', (1.0, 1.0, 1.0))],
+                    'cap capture margin belongs to its exact default-scale canonical model')
     return value
 
 

@@ -1742,7 +1742,16 @@ def grasp_closure(action: Grasp, width: Optional[float], cfg) -> Tuple[Optional[
         # template's measured width, without squeezing through the cylinder.
         # Opening remains the same single full-open command.
         return float(cfg.thin_pinch_close_rate), float(cfg.thin_pinch_squeeze_m), True
-    return closure_for_width(width, cfg, library=action.kind == "library")
+    closure = closure_for_width(width, cfg, library=action.kind == "library")
+    if (action.kind == "library" and not closure[2] and width is not None
+            and math.isfinite(float(width)) and .03 <= float(width) <= .07
+            and getattr(getattr(action, "grasp", None), "grasp_key", None) == 'cap__xxqyrt'
+            and campaign_runtime.contact_recovery('cap_capture_margin')):
+        # Native replay measured near-tangent contact on one pad (12 um),
+        # compared with 296 um in its successful demo. Add only 0.5 mm to
+        # this wide cap's contact squeeze; normal contact/AG checks remain.
+        return closure[0], .0015, False
+    return closure
 
 
 def closure_for_width(width: Optional[float], cfg, library: bool = True) -> Tuple[Optional[float], Optional[float], bool]:
@@ -2556,6 +2565,8 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     rate, squeeze, thin = grasp_closure(action, width, motions.cfg)
     yield from motions.gripper(arm, close=True, rate=rate, squeeze=squeeze)
     ctx["closure_rate_m_per_step"] = rate
+    if squeeze is not None:
+        ctx["closure_squeeze_m"] = squeeze
     if thin:
         ctx["thin_pinch"] = {"width_m": round(float(width), 4), "rate_m_per_step": rate, "squeeze_m": squeeze}
     if action.kind == "handle":
