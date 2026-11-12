@@ -2,12 +2,43 @@
 from __future__ import annotations
 import copy
 import json
+import os
 from pathlib import Path
+import stat
+import tempfile
 import time
-from .contracts import digest, require, write_json_atomic
+from .contracts import canonical_json, digest, require
 from .runtime_suite import active, checked, registered_rows, timestamp
 from .runtime_suite_acceptance import executed_scope, immutable, reference
 from .storage import atomic_directory_lock
+
+
+def _replace_pointer(path, value):
+    """Retain the existing pointer's access mode across an atomic update.
+
+    NamedTemporaryFile starts with mode0600 regardless of umask. Apply the
+    existing regular file's mode before publication, without widening it or
+    changing the canonical JSON representation.
+    """
+    path = Path(path)
+    previous = path.lstat()
+    require(stat.S_ISREG(previous.st_mode), 'suite pointer must be a regular file')
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile('w', dir=path.parent, prefix=path.name+'.',
+                                         delete=False) as stream:
+            temporary = Path(stream.name)
+            if os.fstat(stream.fileno()).st_gid != previous.st_gid:
+                os.fchown(stream.fileno(), -1, previous.st_gid)
+            os.fchmod(stream.fileno(), stat.S_IMODE(previous.st_mode))
+            stream.write(canonical_json(value)+'\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def _reservation(root, proof, row, initial):
@@ -214,5 +245,5 @@ def register(root, prepared_ref, approval_ref):
         registry['attempts'].setdefault(row['class_id'],[]).append(entry)
         registry_ref=immutable(base/'attempt_registries'/(digest(registry)+'.json'),registry)
         immutable(base/'pointer_history'/(digest(pointer)+'.json'),pointer)
-        write_json_atomic(root/'runtime_validation/current.json',{**pointer,'attempt_registry':registry_ref})
+        _replace_pointer(root/'runtime_validation/current.json',{**pointer,'attempt_registry':registry_ref})
         return {'registered':entry,'registry':registry_ref,'dispatch_performed':False}
