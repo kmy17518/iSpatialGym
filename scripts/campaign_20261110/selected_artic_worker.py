@@ -98,13 +98,15 @@ def resolve_output(path, wave, unit, output_root=None):
 def audit_library(path, unit):
     from ispatialgym.grasping import schema as S
     from ispatialgym.grasping import validate_artic as VA
+    from ispatialgym.grasping import artic_motions as AM
     lib = read(path)
     identity = unit['identity']
     assert lib['schema'] == VA.LIBRARY_V2 and lib['alias'] == unit['alias']
     assert (lib['category'], lib['model'], lib['joint']) == (identity['category'], identity['model'], identity['joint'])
     assert S.canonical_scale(lib['scale']) == S.canonical_scale(identity['scale'])
     assert lib['arm_validated'] == identity['arm'] and lib['n_segments'] == len(lib['segments'])
-    assert lib['motion'] == ('push_close' if identity['generation']['direction'] == 'close' else 'pull_open')
+    expected_motion = AM.motion_kind(identity['generation'], identity['generation']['direction'])
+    assert expected_motion is not None and lib['motion'] == expected_motion
     assert lib['config'] == json.loads(json.dumps(__import__('dataclasses').asdict(VA.MotionConfig())))
     for segment in lib['segments']:
         assert segment['arm_validated'] == identity['arm'] and segment['joint'] == identity['joint']

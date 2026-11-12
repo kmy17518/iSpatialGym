@@ -38,6 +38,27 @@ def test_positive_motion_is_distinct_from_contact_only(tmp_path):
     assert not check(tmp_path, unit, lib)['positive']
 
 
+@pytest.mark.parametrize('preparation', ['two_flap_v2', 'two_flap_v4'])
+def test_exact_two_flap_motion_kind_is_not_plain_pull(tmp_path, preparation):
+    unit, lib = fixture(tmp_path)
+    unit['identity']['generation']['prep_push'] = preparation
+    lib['motion'] = 'v2_ajar_pull'
+    assert check(tmp_path, unit, lib)['positive']
+    lib['motion'] = 'pull_open'
+    with pytest.raises(AssertionError):
+        check(tmp_path, unit, lib)
+
+
+def test_free_hinge_close_cannot_claim_push_component(tmp_path):
+    unit, lib = fixture(tmp_path)
+    unit['identity']['generation']['direction'] = 'close'
+    lib['motion'] = 'push_close'
+    with pytest.raises(AssertionError):
+        check(tmp_path, unit, lib)
+    unit['identity']['generation']['close_push'] = True
+    assert check(tmp_path, unit, lib)['positive']
+
+
 @pytest.mark.parametrize('change', [
     {'scale': [1, 1, 1]}, {'arm_validated': 'left'}, {'motion': 'push_close'},
     {'alias': 'other'}, {'model': 'eyedvd'}, {'joint': 'other'}, {'n_segments': 2},
