@@ -7,7 +7,7 @@ from .training_restoration import checked
 from .training_fixed_mass_probe import DELTA, matches
 
 
-def audit_persistence(root, references, probe_ref, request, records, episodes):
+def audit_persistence(root, references, probe_ref, request, records, episodes, *, additional_reconstruction_reference=None):
     probe = checked(root, probe_ref)
     directory = Path(probe_ref['path']).resolve().parent
     require(set(references) == {'audit', 'baseline'}, 'exact mass audit and baseline required')
@@ -71,8 +71,32 @@ def audit_persistence(root, references, probe_ref, request, records, episodes):
             require(pending_episode == event['instance_id'], 'restore completion identity differs')
             restores.append(pending_episode); pending_episode=None
     expected_ids = [checked(root, entry['report'])['instance_id'] for entry in probe['entries']]
-    require(len(expected_ids) == episodes and restores == expected_ids and restarts == episodes-1 and
+    additional = 0
+    if additional_reconstruction_reference is not None:
+        from .training_late_rebuild_probe import DELTA as LATE_DELTA
+        require(request.get('late_incoming_physics_rebuild_v1') is True and
+                Path(additional_reconstruction_reference['path']).resolve() == directory/'late_rebuild_audit.json',
+                'additional reconstruction requires its exact native diagnostic audit')
+        late = checked(root, additional_reconstruction_reference)
+        require(late['physical_delta'] == LATE_DELTA and late['production_released'] is False and
+                late['benchmark_credit'] == 0 and late['explicit_sdk_reconstructions'] == episodes and
+                [event['instance_id'] for event in late['events']] == expected_ids,
+                'additional reconstruction count or source identities differ')
+        for event in late['events']:
+            lifecycle = event['lifecycle']
+            require(event['status'] == 'completed' and event['static_body_properties_bit_identical'] is True and
+                    event['before_static_bodies'] and event['before_static_bodies'] == event['after_static_bodies'] and
+                    event['whole_boundary_physics_step_calls'] == [] and event['reference_state_copied'] is False and
+                    event['sdk']['explicit_sdk_reconstructions'] == event['sdk']['release_calls'] ==
+                    event['sdk']['force_load_calls'] == 1 and event['sdk']['manual_attached_stage'] == 0 and
+                    lifecycle['native_calls'] == ['stop','play'] and lifecycle['observed_physics_step_calls'] == [] and
+                    lifecycle['physics_steps_requested'] == 0 and
+                    lifecycle['time_step_settings_before'] == lifecycle['time_step_settings_after'],
+                    'additional reconstruction physical persistence or no-step proof failed')
+        additional = episodes
+    require(len(expected_ids) == episodes and restores == expected_ids and restarts == episodes-1+additional and
             not pending_restart and pending_episode is None, 'incomplete episode/reconstruction persistence matrix')
     return {'status':'verified','references':references,'actors':sorted(expected),
             'episodes':episodes,'initial_actor_reconstructions':1,'reused_actor_reconstructions':restarts,
+            'additional_declared_reconstructions':additional,
             'physics_steps_added':0,'production_released':False,'benchmark_credit':0}

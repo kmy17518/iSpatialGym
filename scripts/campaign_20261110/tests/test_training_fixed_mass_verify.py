@@ -37,10 +37,14 @@ def fixture(tmp_path):
                runtime_compatibility=compat,physics_steps_added=0,production_released=False,
                expected=expected,events=events)
     probe=put('probe.json',dict(entries=entries,runtime_compatibility=compat))
-    def run(value=audit):
+    def run(value=audit,late=None):
         refs={'audit':put('fixed_mass_audit.json',value),'baseline':put('fixed_mass_baseline_config.json',baseline)}
-        return audit_persistence(tmp_path,refs,probe,{'fixed_mass_baseline':True,'runtime_compatibility':compat},
-                                 [{'artifacts':{'tro':tro}}],3)
+        request={'fixed_mass_baseline':True,'runtime_compatibility':compat}
+        extra={}
+        if late is not None:
+            request['late_incoming_physics_rebuild_v1']=True
+            extra['additional_reconstruction_reference']=put('late_rebuild_audit.json',late)
+        return audit_persistence(tmp_path,refs,probe,request,[{'artifacts':{'tro':tro}}],3,**extra)
     return audit,run
 
 
@@ -63,3 +67,23 @@ def test_exact_initial_and_reconstructed_baseline(tmp_path):
 def test_persistence_proof_rejects_missing_or_inconsistent_evidence(tmp_path,mutation):
     audit,run=fixture(tmp_path);mutation(audit)
     with pytest.raises(ContractError):run(audit)
+
+
+def test_separately_declared_late_reconstructions_require_exact_native_evidence(tmp_path):
+    from scripts.campaign_20261110.training_late_rebuild_probe import DELTA as LATE_DELTA
+    audit,run=fixture(tmp_path);template=audit['events'][0]
+    for _ in range(3):
+        audit['events'] += [dict(stage=s,passed=True,native=copy.deepcopy(audit['expected']))
+                            for s in ['before_existing_stop_play','after_existing_stop_play']]
+    with pytest.raises(ContractError):run(audit)
+    late={'physical_delta':LATE_DELTA,'production_released':False,'benchmark_credit':0,
+          'explicit_sdk_reconstructions':3,'events':[]}
+    for iid in ['A','B','A']:
+        late['events'].append(dict(instance_id=iid,status='completed',static_body_properties_bit_identical=True,
+            before_static_bodies={'all':'native'},after_static_bodies={'all':'native'},
+            whole_boundary_physics_step_calls=[],reference_state_copied=False,
+            sdk=dict(explicit_sdk_reconstructions=1,release_calls=1,force_load_calls=1,manual_attached_stage=0),
+            lifecycle=copy.deepcopy(template['initial_actor_reconstruction'])))
+    result=run(audit,late);assert result['additional_declared_reconstructions']==3
+    late['events'][1]['whole_boundary_physics_step_calls']=['step']
+    with pytest.raises(ContractError):run(audit,late)
