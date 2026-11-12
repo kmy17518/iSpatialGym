@@ -50,6 +50,9 @@ def verify_inputs(root, request, records):
 
 
 def verify_runtime(root, request, records, runtime):
+    if request.get('pool_exact_source_anchor_v1') is True:
+        from .training_pool_source_anchor_probe import verify_runtime as verify_anchor_runtime
+        return verify_anchor_runtime(root, request, records, runtime, verify_runtime)
     source, contract = verify_inputs(root, request, records)
     proof = checked(root, request['runtime_compatibility'])
     base = Path(source['native_runtime']['path']).resolve().parent
@@ -208,7 +211,11 @@ def run(root, request_path, output):
     from ispatialgym.oracle import run_isg
     import omnigibson as og
     order = {'FRESH_A': [0], 'FRESH_B': [1], 'ABA': [0, 1, 0]}[value['diagnostic_control']]
-    install(run_isg, contract, output)
+    if value.get('pool_exact_source_anchor_v1') is True:
+        from .training_pool_source_anchor_probe import install as install_source_anchor
+        install_source_anchor(run_isg, contract, output, install, value)
+    else:
+        install(run_isg, contract, output)
     shared = {'compatible_template_dirs': {os.path.abspath(run_isg.resolve_instance(r['artifacts']['tro']['path'])[1])
                                            for r in records}}
     result = {'schema': 'isg-selected-pool-native-load-v1', 'request_sha256': file_digest(request_path),
