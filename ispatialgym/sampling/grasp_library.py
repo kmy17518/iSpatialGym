@@ -490,13 +490,41 @@ def default_key(category: str, model: str, task_kind: str) -> str:
 
 
 def resolve_key(category: str, model: str, preferred: Optional[str], kinds: List[str]) -> str:
-    """First existing key among ``preferred`` and the conventional keys for ``kinds``."""
+    """First compatible key among the preferred and conventional keys.
+
+    An insert consumer must not inherit an ordinary tabletop entry through an
+    explicit selected-model hint or the unsuffixed fallback. ``insert`` is the
+    existing role family for both insert and flower-stem libraries; an explicit
+    constraint narrows it further. Inspect library metadata, never key suffixes.
+    Other role families retain their existing resolution behavior.
+    """
     root = library_root()
-    tried = []
+    specialized = {"insert": {"tabletop_insert", "flower_stem_top"},
+                   "i": {"tabletop_insert", "flower_stem_top"},
+                   "fl": {"tabletop_insert", "flower_stem_top"},
+                   "tabletop_insert": {"tabletop_insert"}, "flower_stem_top": {"flower_stem_top"}}
+    allowed = set().union(*(specialized[k] for k in kinds)) if kinds and all(k in specialized for k in kinds) else None
+    tried, incompatible = [], []
     for key in ([preferred] if preferred else []) + [default_key(category, model, k) for k in kinds] + [f"{category}__{model}"]:
         if key in tried:
             continue
         tried.append(key)
-        if os.path.exists(os.path.join(root, "results", f"{key}.json")) or v2_entry(key) is not None:
+        legacy_path = os.path.join(root, "results", f"{key}.json")
+        lib = v2_entry(key)
+        if allowed is not None and (lib is not None or os.path.exists(legacy_path)):
+            if lib is not None:
+                constraint = lib.data.get("constraint") or "tabletop"
+            else:
+                with open(legacy_path) as f:
+                    constraint = json.load(f).get("constraint")
+                if not constraint:
+                    try:
+                        constraint = (_candidates(key).get("ispatialgym") or {}).get("constraint")
+                    except FileNotFoundError:
+                        pass
+            if constraint not in allowed:
+                incompatible.append(f"{key}:{constraint or 'unrecorded constraint'}")
+                continue
+        if os.path.exists(legacy_path) or lib is not None:
             return key
-    raise FileNotFoundError(f"no grasp library entry for {category}/{model}; tried {tried}")
+    raise FileNotFoundError(f"no compatible grasp library entry for {category}/{model}; tried {tried}; incompatible {incompatible}")
