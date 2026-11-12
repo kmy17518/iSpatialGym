@@ -57,7 +57,14 @@ def observe(root, run_dir):
     state=json.loads(state_path.read_text()) if state_path.exists() else {'schema':'isg-runtime-suite-acceptance-observer-v1','classes':{}}
     with atomic_directory_lock(base/'acceptance_observer.lockdir'):
         state.update(run_id=release['run_id'],cycle_started_at=time.time(),owner='/root/dataset_contract')
-        for entry in manifest['classes']:
+        # A known completed dependency must not wait behind a full cohort's
+        # still-starting native directories on NFS.
+        def priority(entry):
+            prior=state['classes'].get(entry['class_id'],{})
+            return (0 if prior.get('gate') and not prior.get('validation_passed') else
+                    1 if prior.get('status') in ('awaiting_own_replay','awaiting_member_replay','awaiting_terminal_evidence') else 2,
+                    entry['class_id'])
+        for entry in sorted(manifest['classes'],key=priority):
             cls=entry['class_id'];row_path=base/'rows'/(cls+'.json');allocation_path=base/'allocations'/(cls+'.json')
             status={'observed_at':time.time(),'status':'awaiting_authored_row','validation_passed':False}
             try:
@@ -99,6 +106,9 @@ def observe(root, run_dir):
                 result=reconcile(root,row_ref,allocation_ref,gate_ref)
                 status.update(status=result['status'],validation_passed=result['validation_passed'],
                     result=reference(base/'acceptance'/(cls+'.json')),input_signature=signature)
+            except FileExistsError as error:
+                status.update(status='awaiting_acceptance_lock',error=repr(error),
+                    next_action='Retry normal coherent validation after its live lock releases; preserve source and all member replay proofs.')
             except (OSError,ValueError,KeyError,TypeError) as error:
                 status.update(status='audit_blocked',error=repr(error),next_action='Inspect exact missing/failed binding; preserve original source and do not resample unchanged.')
             state['classes'][cls]=status
