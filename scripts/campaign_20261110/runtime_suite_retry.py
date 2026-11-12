@@ -55,20 +55,27 @@ def _share_registered_controls(root, base, entry, registry_ref):
                   prepared['diagnosis'], row['campaign_config'], row.get('goal_plan'),
                   row.get('catalog_row'), prepared.get('input_correction'),
                   *diagnosis['evidence']]
+    group_id = row.get('group_id')
+    exact_group_goal = (Path(root)/'groups'/group_id/'goal_plan.json'
+                        if isinstance(group_id, str) and Path(group_id).name == group_id
+                        else None)
     planned = {}
     for ref in references:
         if ref is None:
             continue
         path = Path(ref['path'])
-        # Source/binary evidence outside this suite retains its existing access.
-        if not path.resolve().is_relative_to(base) or path.suffix != '.json':
+        # The one external control exception is this row's canonical group goal.
+        group_goal = (ref == row.get('goal_plan') and path == exact_group_goal and
+                      path.resolve() == exact_group_goal)
+        if (not path.resolve().is_relative_to(base) and not group_goal) or path.suffix != '.json':
             continue
         info = path.lstat()
         require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid(),
                 'registered control must be an owned regular file')
         require(file_digest(path) == ref['sha256'], 'registered control bytes changed')
         for parent in path.parents:
-            if parent == base or parent.is_relative_to(base):
+            boundary = Path(root) if group_goal else base
+            if parent == boundary or parent.is_relative_to(boundary):
                 require(parent.stat().st_mode & stat.S_IXGRP,
                         'registered control directory is not group traversable')
         planned[str(path)] = (path, ref, stat.S_IMODE(info.st_mode))

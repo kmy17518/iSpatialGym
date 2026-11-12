@@ -92,3 +92,44 @@ def test_private_control_directory_fails_without_broadening_it(tmp_path):
         retry.register(tmp_path, prepared, approval)
     assert pointer.read_bytes() == before
     assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+
+
+def test_exact_external_group_goal_is_shared_but_other_evidence_is_private(tmp_path):
+    tmp_path.chmod(0o750)
+    from scripts.campaign_20261110.tests.test_runtime_suite import put
+    base, _, _, rowref, proposal = proposed(tmp_path)
+    row = json.loads(retry.Path(rowref['path']).read_text())
+    goal = tmp_path/'groups'/row['group_id']/'goal_plan.json'
+    row['goal_plan'] = put(goal, {'group_id': row['group_id']})
+    rowref = put(retry.Path(rowref['path']), row)
+    body = json.loads(retry.Path(proposal['path']).read_text())
+    body['row'] = rowref
+    proposal = put(retry.Path(proposal['path']), body)
+    prepared = retry.prepare(tmp_path, proposal)
+    approval = approve(tmp_path, prepared)
+    private = goal.parent/'unrelated.json'
+    private.write_bytes(b'{}\n'); private.chmod(0o600)
+    goal.chmod(0o600); before = goal.read_bytes()
+    result = retry.register(tmp_path, prepared, approval)
+    assert goal.read_bytes() == before
+    assert stat.S_IMODE(goal.stat().st_mode) == 0o640
+    assert stat.S_IMODE(private.stat().st_mode) == 0o600
+    assert row['goal_plan'] in [r['reference'] for r in result['control_access']]
+
+
+def test_external_goal_private_parent_is_not_widened(tmp_path):
+    from scripts.campaign_20261110.tests.test_runtime_suite import put
+    base, _, _, rowref, proposal = proposed(tmp_path)
+    row = json.loads(retry.Path(rowref['path']).read_text())
+    goal = tmp_path/'groups'/row['group_id']/'goal_plan.json'
+    row['goal_plan'] = put(goal, {'group_id': row['group_id']})
+    rowref = put(retry.Path(rowref['path']), row)
+    body = json.loads(retry.Path(proposal['path']).read_text()); body['row'] = rowref
+    prepared = retry.prepare(tmp_path, put(retry.Path(proposal['path']), body))
+    approval = approve(tmp_path, prepared)
+    goal.parent.chmod(0o700)
+    pointer = tmp_path/'runtime_validation/current.json'; before = pointer.read_bytes()
+    with pytest.raises(ContractError, match='group traversable'):
+        retry.register(tmp_path, prepared, approval)
+    assert pointer.read_bytes() == before
+    assert stat.S_IMODE(goal.parent.stat().st_mode) == 0o700
