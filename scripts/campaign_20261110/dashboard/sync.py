@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import hashlib
 from pathlib import Path
 import subprocess
 import time
@@ -66,6 +67,46 @@ def sync(output, ssh_options=()):
         target=output.parent/'GOAL_GROUP_YIELD.md';temporary=target.with_suffix('.tmp')
         temporary.write_text(bundle['goal_yield_report']);temporary.replace(target)
     return evidence['observed_at']
+
+
+def deadline_checkpoint(output, now=None):
+    """Derive the forecast from the execution ledger without advancing source clocks."""
+    now = now or datetime.now(timezone.utc)
+    source = output/'execution_ledger.json'
+    raw = source.read_bytes(); ledger = json.loads(raw)
+    if ledger.get('campaign_id') != 'campaign_20261110':
+        raise ValueError('Deadline ledger campaign differs')
+    counts = ledger['accepted']['counts']; prep = ledger['preparation']['source_summary']
+    canonical = ledger['canonical']; gate = ledger['release_decisions']['decision']
+    deadline = datetime(2026,11,12,19,tzinfo=timezone.utc)
+    hours = max(0, (deadline-now).total_seconds()/3600)
+    statuses = prep['dependency_statuses']
+    remaining = prep['required_unique_logical_requests']-statuses.get('verified',0)-statuses.get('not_applicable',0)
+    full_reason = (f"{statuses.get('verified',0):,}/{prep['required_unique_logical_requests']:,} logical dependencies verified; "
+        f"{remaining:,} unresolved. {prep['selected_configuration_slots']:,} selected slots are a lower bound. "
+        "Remaining unique artifact count and per-family runtime/yield model are incomplete; logical counts are not GPU jobs.")
+    initial_reason = (f"Canonical validation {canonical['validated']}/{canonical['total']}. "
+        f"{prep['configuration_slots_with_declared_dependencies_complete']} slots have declared dependencies complete; "
+        f"{prep['fully_served_configurations']} fully served configurations. "
+        "Unresolved class-specific inputs and applicable pipeline checks prevent a reliable balanced-set ETA.")
+    allowed = gate.get('standalone_training_allowed') is True
+    production_reason = ("Shared/applicable-path/exact-configuration release checks remain closed. " if not allowed else
+        "Release decisions remain per exact configuration. ") + "Per-family accepted production yields do not yet support a completion ETA."
+    value = {'schema':'isg-streaming-deadline-checkpoint-v1','campaign_id':'campaign_20261110',
+        'observed_at':ledger['observed_at'],'computed_at':now.isoformat(),
+        'acceptance_observed_at':ledger['accepted']['source']['observed_at'],
+        'sources':ledger['sources'],'execution_ledger':{'path':str(source),'sha256':hashlib.sha256(raw).hexdigest()},
+        'counts':counts,'canonical':canonical,'preparation':prep,'deadline':deadline.isoformat(),
+        'hours_remaining':hours,'unresolved_logical_requirements':remaining,'remaining_unique_artifacts':None,
+        'forecasts':{
+            'initial_balanced_set':{'status':'engineering_blocked_eta_unavailable','reason':initial_reason,'eta_range':None},
+            'full_selected_preparation':{'status':'incomplete_denominator_and_runtime_model','reason':full_reason,'eta_range':None},
+            'accepted_production':{'status':'yield_model_unavailable' if allowed else 'gate_closed_eta_unavailable',
+                'reason':production_reason,'eta_range':None,
+                'required_training_accepted_per_hour':max(0,100000-counts['train'])/hours if hours else None}},
+        'complete_by_deadline_supported':False,'deadline_is_automatic_shutdown':False}
+    atomic(output/'streaming_deadline_checkpoint.json',value)
+    return value
 
 
 def return_report(output):
@@ -262,6 +303,7 @@ def main():
             status.update(ok=False, error=type(exc).__name__ + ': ' + str(exc), previous_evidence_preserved=True)
         atomic(args.output / 'sync_status.json', status)
         try:
+            deadline_checkpoint(args.output)
             return_report(args.output)
         except (OSError, ValueError, KeyError, TypeError) as exc:
             print(json.dumps({'report_error': type(exc).__name__ + ': ' + str(exc)}), flush=True)
