@@ -208,20 +208,24 @@ class ClientInputs:
     """One-call cache for hash-bound immutable inputs, never mutable receipts."""
     def __init__(self, root):
         self.policy = read(Path(root)/'infra/coordinator_dispatch/policy.json')
-        self.payloads = {}; self.values = {}
+        self.verified = set(); self.values = {}
 
     def verify(self, reference):
         path = reference['path']; expected = reference['sha256']
         key = (path, expected)
-        if key not in self.payloads:
+        if key not in self.verified:
             payload = Path(path).read_bytes()
             require(hashlib.sha256(payload).hexdigest() == expected, 'Immutable input changed: '+path)
-            self.payloads[key] = payload
-        return self.payloads[key]
+            # Retain identities, not potentially large native binary inputs.
+            self.verified.add(key)
 
     def checked(self, reference):
         key = (reference['path'], reference['sha256'])
-        if key not in self.values:self.values[key] = json.loads(self.verify(reference))
+        if key not in self.values:
+            payload = Path(reference['path']).read_bytes()
+            require(hashlib.sha256(payload).hexdigest() == reference['sha256'],
+                    'Immutable input changed: '+reference['path'])
+            self.values[key] = json.loads(payload); self.verified.add(key)
         return self.values[key]
 
 
