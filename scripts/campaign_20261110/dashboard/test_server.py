@@ -284,6 +284,21 @@ class ReadOnlyDashboardTests(unittest.TestCase):
             self.write('dashboard/'+name+'.json',{'campaign_id':'older'})
             self.assertEqual(self.request('GET','/reports/'+route)[0],404)
 
+    def test_eligibility_projection_preserves_rate_history_and_full_report(self):
+        history = [{'observed_at': '2026-11-12T10:00:00Z',
+                    'eligible_counts': {'eval_standard': 12},
+                    'tasks': [{'task': 'inside', 'current_eligible': 2}],
+                    'classes': [{'class_id': 'inside_01', 'current_eligible': 2}]}]
+        value = {'campaign_id': 'campaign_20261110', 'history': history,
+                 'classes': [{'class_id': 'inside_01', 'current_eligible': 3}]}
+        self.write('dashboard/current_eligibility.json', value)
+        before = self.hashes()
+        result = json.loads(self.request('GET', '/api/status')[1])['current_eligibility']
+        self.assertEqual(result['classes'], value['classes'])
+        self.assertEqual(result['history'], [{k: v for k, v in history[0].items() if k != 'classes'}])
+        self.assertEqual(json.loads(self.request('GET', result['detail_report'])[1]), value)
+        self.assertEqual(before, self.hashes())
+
     def test_new_quality_and_denominator_reports_are_scoped_sanitized_and_read_only(self):
         for route,name in [('/reports/replay-quality','gate_quality_audit.json'),
                            ('/reports/gpu-denominator-coverage','cohort_rental_denominator_coverage.json')]:

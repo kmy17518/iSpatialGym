@@ -74,6 +74,16 @@ def compact_execution(value):
     return {**{k:v for k,v in value.items() if k not in ('rows','capacity')},'rows':rows,'detail_report':'/reports/execution-ledger'}
 
 
+def eligibility_view(value):
+    """Keep measured task-rate history; leave full class history in its report."""
+    result = {k:v for k,v in value.items() if k not in ('records','groups','decisions')}
+    if isinstance(result.get('history'), list):
+        result['history'] = [{k:v for k,v in row.items() if k != 'classes'}
+                             if isinstance(row, dict) else row for row in result['history']]
+    result['detail_report'] = '/reports/current-eligibility'
+    return result
+
+
 def snapshot(root, inventory):
     live, ls = read_source(root / 'live.json')
     cluster, cs = read_source(root / 'infra/cluster_snapshot.json')
@@ -201,7 +211,7 @@ def snapshot(root, inventory):
         'ik_observation_source': iks,
         'existing_native_reviews': existing_reviews,
         'existing_native_reviews_source': ers,
-        'current_eligibility': {k:v for k,v in current_eligibility.items() if k not in ('records','groups','decisions')},
+        'current_eligibility': eligibility_view(current_eligibility),
         'change_impact': {k:v for k,v in change_impact.items() if k not in ('decisions','inventory')},
         'heldout_recovery': heldout,
         'deadline_checkpoint': deadline_checkpoint, 'deadline_checkpoint_source': dcs,
