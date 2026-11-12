@@ -155,6 +155,25 @@ def validate_handoff(value, handoff, root):
     return {'path':str(p),'sha256':sha(p)}
 
 
+def dispatch_identity(job, root):
+    """Resolve real consumers of a typed dependency; never fabricate a template."""
+    value = verify(job, root)
+    unit = value['unit']
+    selected = json.loads(Path(unit['selected_manifest']['path']).read_text())
+    require(selected.get('campaign_id') == value['campaign_id'], 'selected consumer campaign differs')
+    consumers = unit.get('consumers')
+    require(isinstance(consumers, list) and consumers and len(set(consumers)) == len(consumers),
+            'exact contact consumers missing or duplicated')
+    rows = [row for row in selected['configurations'] if row.get('id') in consumers]
+    require(len(rows) == len(consumers) and {row['id'] for row in rows} == set(consumers),
+            'contact consumer absent from pinned selected manifest')
+    require(all(isinstance(row.get('class_id'), str) and row['class_id'] for row in rows),
+            'contact consumer class identity missing')
+    return {'typed_kind': 'contact_maps', 'class_ids': sorted({row['class_id'] for row in rows}),
+            'configuration_ids': sorted(consumers), 'selected_manifest': unit['selected_manifest'],
+            'native_inputs_sha256': sha(Path(job)/'native_inputs.json'), 'benchmark_credit': 0}
+
+
 def enqueue(job, root, handoff, capacity, gpu='RTX 4090'):
     job, root = Path(job).resolve(), Path(root).resolve(); value = verify(job, root)
     owner = validate_handoff(value, handoff, root)

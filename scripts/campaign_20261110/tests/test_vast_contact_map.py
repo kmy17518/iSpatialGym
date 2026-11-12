@@ -20,14 +20,16 @@ def fixture(tmp_path):
     obj = {'source':str(model), 'entry':model.name, 'scale':[1.1]*3, 'rest_id':'r0', 'geometry':'exact'}
     lib = base/'brace/models'/model.name/'library.json'; v.write(lib, {'object':obj, 'entries':[{'pose':'original'}]})
     audit, manifest = base/'audit.json', base/'manifest.json'
-    v.write(audit, {'positive':True}); v.write(manifest, {'selected':True})
+    v.write(audit, {'positive':True}); v.write(manifest, {'campaign_id':root.name,
+        'configurations':[{'id':'configuration_one','class_id':'alignment-axial_02'}]})
     ref = lambda p: {'path':str(p),'sha256':v.sha(p)}
     unit = {'id':0,'native_runtime':str(native),'state':'ready_exact_map_dependency','positive_entries':1,
             'production_authorization':False,'configuration_validated':False,'arm':'left',
             'expected_map_config':{'arm':'left','lattice_m':.08,'seeds':8},'height':.5734,'height_key':'0.5734',
             'pose_set':{'digest':'exact-pose'},'entry_id':model.name,'map_kind':'axial_brace','library_kind':'brace',
             'source_files':{str(p):v.sha(p) for p in model.iterdir()},'source_library':ref(lib),
-            'source_physics_audit':ref(audit),'selected_manifest':ref(manifest),'object':obj,'model_dir':str(model)}
+            'source_physics_audit':ref(audit),'selected_manifest':ref(manifest),'object':obj,'model_dir':str(model),
+            'consumers':['configuration_one']}
     request = base/'request.json'
     v.write(request, {'campaign_id':root.name,'production_authorization':False,'native_runtime':str(native),'units':[unit]})
     return root, request, native, helper, lib
@@ -130,3 +132,29 @@ def test_both_accounts_observed_but_only_one_has_pending_overflow(tmp_path):
     assert v.validate_capacity(capacity,root)['sha256'] == v.sha(capacity)
     cap['accounts']['minyeong']['pending_gpu_jobs'] = 0; v.write(capacity,cap)
     with pytest.raises(ValueError,match='no pending GPU overflow'):v.validate_capacity(capacity,root)
+
+
+def test_typed_contact_identity_dispatches_as_dependency_without_training_release(tmp_path, monkeypatch):
+    from scripts.campaign_20261110 import production_gate as gate
+    root, job, _ = prepared(tmp_path)
+    assert 'original_entry' not in v.verify(job)
+    decision = gate.check_job(root, job, kind='native_dependency')
+    assert decision['allowed'] and decision['category'] == 'native_dependency'
+    assert decision['class_ids'] == ['alignment-axial_02'] and decision['benchmark_credit'] == 0
+    assert decision['configuration_ids'] == ['configuration_one']
+    assert not gate.check_job(root, job, kind='collection')['allowed']
+    monkeypatch.setattr(gate, 'PARKED_CLASSES', {'alignment-axial_02'})
+    assert gate.check_job(root, job, kind='native_dependency')['category'] == 'owner_blocked'
+
+
+@pytest.mark.parametrize('change', ['missing_consumer', 'changed_manifest', 'production_credit'])
+def test_typed_dependency_gate_rejects_unverifiable_identity(tmp_path, change):
+    from scripts.campaign_20261110 import production_gate as gate
+    root, job, _ = prepared(tmp_path); value = v.verify(job)
+    if change == 'changed_manifest':
+        v.write(value['unit']['selected_manifest']['path'], {'campaign_id':root.name,'configurations':[]})
+    elif change == 'missing_consumer':
+        value['unit']['consumers'] = ['not_selected']; v.write(job/'native_inputs.json',value)
+    else:
+        value['benchmark_credit'] = 1; v.write(job/'native_inputs.json',value)
+    assert not gate.check_job(root, job, kind='native_dependency')['allowed']

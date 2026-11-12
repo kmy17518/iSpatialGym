@@ -267,12 +267,18 @@ def check_job(root, job_dir, *, kind='collection', submission_script=None):
     try:
         if kind == 'native_dependency':
             value = json.loads((Path(job_dir) / 'native_inputs.json').read_text())
-            cls = value['original_entry']['class_id']
             if value['campaign_root'] != str(Path(root).resolve()):
                 raise ValueError('native validation campaign differs')
-            if cls in PARKED_CLASSES:
+            identity = {}
+            if value.get('schema') == 'isg-vast-contact-map-prebuild-v1':
+                from scripts.campaign_20261110.vast_contact_map import dispatch_identity
+                identity = dispatch_identity(job_dir, root)
+                classes = identity['class_ids']
+            else:
+                classes = [value['original_entry']['class_id']]
+            if any(cls in PARKED_CLASSES for cls in classes):
                 return {'allowed': False, 'category': 'owner_blocked', 'reason': 'owner artifact dependency remains parked'}
-            return check_environment(root, {}, kind=kind)
+            return {**check_environment(root, {}, kind=kind), **identity}
         if kind == 'physics_replay':
             value = json.loads((Path(job_dir) / 'replay_inputs.json').read_text())
             source = _owned(root, value['source_job'])
