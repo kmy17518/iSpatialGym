@@ -75,6 +75,10 @@ def project(root, scheduled, now, previous=None):
             complete = False
             errors.append({'kind': 'preparation_ready_count_unknown', 'owner': '/root', 'source': ref['path']})
             continue
+        if not source['required_for_readiness']:
+            # Optional historical builders are not preparation readiness gates
+            # and must not generate a new verification campaign or stall alert.
+            continue
         manifest = read(ref['path'], errors, digest=ref['sha256'])
         if 'tickets' not in manifest:
             complete = False
@@ -184,6 +188,7 @@ def project(root, scheduled, now, previous=None):
             'admitted_queue_enumeration': 'complete' if complete else 'unknown',
             'campaign_ready_count': len(ready) if inventory_complete and complete else None,
             'campaign_inventory_enumeration': 'incomplete; independent ready batches continue',
+            'optional_builders_excluded_from_required_flow': True,
             'ready_count': len(ready) if complete else None, 'known_ready_count': len(ready),
             'oldest_ready_age_seconds': max(waiting, default=None),
             'completed_awaiting_verification': sum(r['awaiting_verification'] for r in required),

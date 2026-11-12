@@ -88,3 +88,12 @@ def test_report_published_during_monitor_read_is_not_a_missed_cycle(tmp_path):
     p=d/'status_minyeong.json';s=json.loads(p.read_text());s['last_reconciliation_at']=1001;p.write_text(json.dumps(s))
     value=project(tmp_path,[],1000)
     assert not any(e['kind']=='preparation_dispatcher_missed_two_cycles' for e in value['exceptions'])
+
+
+def test_optional_historical_work_does_not_create_required_verification_gate(tmp_path):
+    d,_,_=fixture(tmp_path,submitted=True)
+    p=tmp_path/'scope.json';s=json.loads(p.read_text());s['approved_manifests'][0]['required_for_readiness']=False
+    new_ref=put(p,s);policy=json.loads((d/'policy.json').read_text());policy['preparation_scope']['policy_ref']=new_ref;put(d/'policy.json',policy)
+    value=project(tmp_path,[{'job_id':'123','execution_state':'COMPLETED','ended_at':600}],1000)
+    assert value['completed_awaiting_verification']==0 and value['items']==[]
+    assert not any(e['kind']=='preparation_terminal_unreviewed'for e in value['exceptions'])
