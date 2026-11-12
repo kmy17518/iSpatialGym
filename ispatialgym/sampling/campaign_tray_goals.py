@@ -62,7 +62,7 @@ def reference_start_proposal(template):
     hint = template.scene_setup.get('reference_start_proposal')
     if hint is None:
         return None
-    standard_reference = template.class_id == 'disembedding_01' and template.split == 'eval_standard'
+    standard_reference = template.class_id in ('disembedding_01', 'disembedding_10') and template.split == 'eval_standard'
     native_reference = template.class_id == 'disembedding_07' and template.split == 'eval_model'
     _require(template.task == 'disembedding' and (standard_reference or native_reference),
              'reference tray proposal has wrong scope')
@@ -86,7 +86,27 @@ def reference_start_proposal(template):
         value = manip.get(key)
         _require(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value),
                  'invalid reference manipulation torso')
-    return {'initial_base_pose2d': initial, 'manipulation': manip}
+    exact = hint.get('initial_lateral_exact_first', False)
+    _require(isinstance(exact, bool) and (not exact or template.class_id == 'disembedding_10'),
+             'exact initial lateral proposal has wrong scope')
+    return {'initial_base_pose2d': initial, 'manipulation': manip, 'initial_lateral_exact_first': exact}
+
+
+def initial_lateral_proposal(reference, anchor, bounds, preferred, draw, rng):
+    """Try the proven D10 viewpoint first; ordinary checked draws remain next.
+
+    The exact proposal is neither clamped nor admitted without phase-1c checks.
+    A goal-plan anchor differing from the audited reference is an author error.
+    """
+    from ispatialgym.sampling.campaign_tabletop_starts import near_lateral
+    if reference is not None and reference.get('initial_lateral_exact_first'):
+        _require(tuple(float(x) for x in anchor) == tuple(reference['initial_base_pose2d']),
+                 'exact viewpoint differs from audited initial anchor')
+        if draw == 0:
+            _require(math.isfinite(preferred) and bounds[0] <= preferred <= bounds[1],
+                     'exact initial lateral outside native bounds')
+            return float(preferred)
+    return near_lateral(rng, float(bounds[0]), float(bounds[1]), preferred)
 
 
 def configured_reference_start():

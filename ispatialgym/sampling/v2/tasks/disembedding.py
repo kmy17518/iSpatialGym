@@ -942,7 +942,7 @@ class Disembedding(SamplerV2):
             # that clears the floor. Retry native start draws, bounded by the
             # group deadline, while retaining every phase-1/phase-2 check.
             draws = 4 if getattr(self, "_campaign_tray_active", None) is not None else 1
-            for _ in range(draws):
+            for draw in range(draws):
                 if draws > 1:
                     self.campaign_group_remaining_s()
                 try:
@@ -951,7 +951,7 @@ class Disembedding(SamplerV2):
                     lateral = None
                     if anchor is not None:
                         bounds, _, _ = TT.phase1c_bounds(self, init, margins, top=self.top, strict=True)
-                        lateral = CTS.near_lateral(rng, float(bounds[0]), float(bounds[1]), CTS.edge_lateral(edge, anchor))
+                        lateral = CTG.initial_lateral_proposal(reference, anchor, bounds, CTS.edge_lateral(edge, anchor), draw, rng)
                     init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands, lateral=lateral)
                     init.name = "init"
                     # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm's
