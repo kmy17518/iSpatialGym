@@ -25,6 +25,14 @@ def bound(root):
         'observed_at':now,'jobs':[{'job_id':'123','backend':'cluster','stage':'collection','raw':raw}]})
     ar=put(base/'allocations/class0.json',{'row':row,'allocation':allocation,'dispatch_receipt':receipt,'terminal_evidence':terminal})
     gate=put(root/'validation/gate.json',{'source_job':str(job),'snapshot':env['ISGE_CODE'],'success':True,'replay_rc':0,'instance':str(job/'inst/member__1000-tro_state.json')})
+    raw_replay=put(base/'raw_replay.json',{'schema':'isg-training-ticket-slurm-observation-v1','campaign_id':'campaign_20261110',
+        'job_id':'456','observed_at':now,'squeue_returncode':0,'sacct_returncode':0,'squeue_stdout':'',
+        'sacct_stdout':'456|COMPLETED|2026-11-12T04:30:00|0:0\n'})
+    terminal_value=json.loads(Path(terminal['path']).read_text());terminal_value['jobs'].append({'job_id':'456','backend':'cluster','stage':'replay','raw':raw_replay})
+    wrapper=json.loads(Path(ar['path']).read_text());wrapper['terminal_evidence']=put(Path(terminal['path']),terminal_value)
+    owner=put(base/'replay_owner.json',{'replay_job_id':'456','output':str(root/'validation')})
+    wrapper['records']=[{'job_id':'456','backend':'cluster','stage':'physics_replay','job_dir':str(root/'validation'),'submission_ref':owner}]
+    ar=put(Path(ar['path']),wrapper)
     return base,row,ar,gate
 
 
@@ -45,6 +53,22 @@ def test_scope_rejects_active_scheduler_despite_status_label(tmp_path):
     wrapper=json.loads(Path(allocation['path']).read_text());wrapper['terminal_evidence']=terminalref
     allocation=put(Path(allocation['path']),wrapper)
     with pytest.raises(ContractError,match='active'):a.scope(tmp_path,row,allocation,gate)
+
+
+def test_optional_other_replay_does_not_block_selected_terminal_member(tmp_path):
+    base,row,allocation,gate=bound(tmp_path)
+    wrapper=json.loads(Path(allocation['path']).read_text());terminal=json.loads(Path(wrapper['terminal_evidence']['path']).read_text())
+    pending=put(base/'pending.json',{'schema':'isg-training-ticket-slurm-observation-v1','campaign_id':'campaign_20261110',
+        'job_id':'789','observed_at':time.time(),'squeue_returncode':0,'sacct_returncode':0,
+        'squeue_stdout':'789|RUNNING','sacct_stdout':'789|RUNNING|2026-11-12T04:30:00|0:0\n'})
+    terminal['jobs'].append({'job_id':'789','backend':'cluster','stage':'replay','raw':pending})
+    wrapper['terminal_evidence']=put(Path(wrapper['terminal_evidence']['path']),terminal)
+    allocation=put(Path(allocation['path']),wrapper)
+    assert a.scope(tmp_path,row,allocation,gate)[0]['class_id']=='class0'
+    # Moving that active job into the selected member's exact owner still fails.
+    owner=put(base/'active_owner.json',{'replay_job_id':'789','output':str(tmp_path/'validation')})
+    wrapper['records']=[{'job_id':'789','backend':'cluster','stage':'physics_replay','job_dir':str(tmp_path/'validation'),'submission_ref':owner}]
+    with pytest.raises(ContractError,match='active'):a.scope(tmp_path,row,put(Path(allocation['path']),wrapper),gate)
 
 
 def test_regression_full_quota_has_no_claim_and_is_reaudited(tmp_path,monkeypatch):

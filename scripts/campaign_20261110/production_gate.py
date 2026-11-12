@@ -192,7 +192,7 @@ def check_environment(root, environment, *, kind='collection', start=None, count
         if split in ('eval_standard', 'eval_model', 'eval_category'):
             if any(k.startswith('ISPATIALGYM_RUNTIME_SUITE_') for k in environment):
                 from .runtime_suite import authorize
-                proof = authorize(root, environment, path, config, start=start, count=count)
+                proof = authorize(root, environment, path, config, start=start, count=count, kind=kind)
                 return {**result, 'allowed': True, 'category': 'runtime_suite_validation',
                         'reason': 'exact registered current-runtime regression; no training authorization',
                         'runtime_suite': proof}

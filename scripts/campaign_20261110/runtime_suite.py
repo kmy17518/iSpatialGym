@@ -40,7 +40,21 @@ def active(root):
     return pointer, release, manifest, reservation, base
 
 
-def authorize(root, environment, config_path, config, *, start, count):
+def registered_rows(root, pointer, base, class_id):
+    initial = base/'rows'/(class_id+'.json')
+    rows = [{'path':str(initial), 'sha256':file_digest(initial)}]
+    if pointer.get('attempt_registry'):
+        registry = checked(root,pointer['attempt_registry'])
+        require(registry.get('schema')=='isg-runtime-suite-attempt-registry-v1' and
+                registry['release']==pointer['release'], 'suite retry registry differs')
+        for entry in registry['attempts'].get(class_id,[]):
+            from .runtime_suite_retry import verify_registered
+            verify_registered(root,entry,rows[-1],len(rows),pointer,base)
+            rows.append(entry['row'])
+    return rows
+
+
+def authorize(root, environment, config_path, config, *, start, count, kind='collection'):
     """Require the registered immutable run, class row, goal and disjoint range."""
     pointer, release, manifest, reservation, base = active(root)
     row_ref = {'path': environment['ISPATIALGYM_RUNTIME_SUITE_ROW'],
@@ -54,7 +68,10 @@ def authorize(root, environment, config_path, config, *, start, count):
             'suite authorization is standard regression only')
     approved=next(entry for entry in manifest['classes'] if entry['class_id']==row['class_id'])
     require(template == approved['exact_configuration'], 'suite template differs from approved immutable configuration')
-    require(Path(row_ref['path']).resolve() == base/'rows'/(row['class_id']+'.json'), 'suite row is not canonical')
+    rows=registered_rows(root,pointer,base,row['class_id'])
+    require(row_ref in rows, 'suite row is not canonical or a registered retry')
+    require(kind in ('collection','source_validation'), 'unsupported suite operation')
+    require(kind!='collection' or row_ref==rows[-1], 'suite attempt retired from dispatch')
     require(Path(config_path).resolve() == Path(row['campaign_config']['path']).resolve() and
             file_digest(config_path) == row['campaign_config']['sha256'], 'suite configuration differs')
     require(config['validation_key']['code_sha256'] == release['frozen_runtime']['snapshot_sha256'],
@@ -62,10 +79,12 @@ def authorize(root, environment, config_path, config, *, start, count):
     require(type(start) is int and type(count) is int and 1 <= count <= 3 and
             (start, count) == (row['fresh_start'], row['fresh_count']), 'suite exact range differs')
     reserved = reservation['proof']; lo = int(reserved['start']); size = int(reserved['reserved_count'])
-    require(size == 300 and lo <= start and start+count <= lo+size and (start-lo)%3 == 0,
-            'suite range is outside its disjoint reservation')
-    ordinal = (start-lo)//3
-    require(manifest['classes'][ordinal]['class_id'] == row['class_id'], 'suite range belongs to another class')
+    require(size == 300, 'original suite reservation changed')
+    if row_ref==rows[0]:
+        require(lo <= start and start+count <= lo+size and (start-lo)%3 == 0,
+                'suite range is outside its disjoint reservation')
+        ordinal = (start-lo)//3
+        require(manifest['classes'][ordinal]['class_id'] == row['class_id'], 'suite range belongs to another class')
     camera = template['task'].startswith('camera_relocalization')
     require(row['camera_exempt'] is camera, 'camera exemption differs')
     if camera:

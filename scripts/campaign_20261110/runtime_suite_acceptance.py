@@ -30,7 +30,7 @@ def template_from(config):
     return Template(**value)
 
 
-def scope(root, row_ref, allocation_ref, gate_ref):
+def executed_scope(root, row_ref, allocation_ref):
     from .production_gate import read_environment
     from .training_diversity import _terminal_jobs
     root = Path(root).resolve(); row = checked(root,row_ref); wrapper = checked(root,allocation_ref)
@@ -54,19 +54,47 @@ def scope(root, row_ref, allocation_ref, gate_ref):
             Path(environment['ISPATIALGYM_RUNTIME_SUITE_ROW']).resolve() == Path(row_ref['path']).resolve(),
             'worker environment belongs to another row')
     authorize(root,environment,row['campaign_config']['path'],config,
-              start=int(environment['START']),count=int(environment['N']))
+              start=int(environment['START']),count=int(environment['N']),kind='source_validation')
     terminal = checked(root,wrapper['terminal_evidence'])
     require(terminal['observed_at'] >= timestamp(row['run_started_at']), 'suite terminal evidence predates run')
-    inventory = terminal['jobs']
-    require(any(j['job_id'] == str(allocation['jobid']) and j['stage'] in ('native','collection') for j in inventory),
+    inventory = [j for j in terminal['jobs'] if j['job_id']==str(allocation['jobid']) and j['stage'] in ('native','collection')]
+    require(len(inventory)==1,
             'terminal evidence omits the actual collection allocation')
-    _terminal_jobs(root,{'jobs':inventory},terminal,terminal['observed_at'])
+    _terminal_jobs(root,{'jobs':inventory},{**terminal,'jobs':inventory},terminal['observed_at'])
+    return row,wrapper,config,job
+
+
+def scope(root, row_ref, allocation_ref, gate_ref):
+    row,wrapper,config,job=executed_scope(root,row_ref,allocation_ref)
     gate = checked(root,gate_ref)
     require(Path(gate['source_job']).resolve() == job, 'suite requires its own newly executed replay gate')
     require(Path(gate['snapshot']).resolve() == Path(row['frozen_runtime']['path']).resolve(),
             'suite replay used another frozen runtime')
     require(gate.get('success') is True and gate.get('replay_rc') == 0, 'suite replay did not pass with clean native exit')
+    selected_replay_terminal(root,wrapper,[gate_ref])
     return row, wrapper, config, job, gate
+
+
+def selected_replay_terminal(root, wrapper, gate_refs):
+    """Optional third-member work remains in cost history without blocking two passes."""
+    from .training_diversity import _terminal_jobs
+    terminal=checked(root,wrapper['terminal_evidence']);selected=[]
+    for gate_ref in gate_refs:
+        output=Path(gate_ref['path']).resolve().parent;matches=[]
+        for record in wrapper.get('records',[]):
+            if record['stage']!='physics_replay' or Path(record['job_dir']).resolve()!=output:continue
+            owner=checked(root,record['submission_ref'])
+            if str(owner.get('replay_job_id'))==str(record['job_id']) and Path(owner['output']).resolve()==output:
+                matches.append(record)
+        require(len(matches)==1,'selected member lacks exact current replay allocation owner')
+        record=matches[0]
+        jobs=[j for j in terminal['jobs'] if j['job_id']==str(record['job_id']) and
+              j['backend']==record['backend'] and j['stage']=='replay']
+        require(len(jobs)==1,'selected member lacks its actual terminal replay proof')
+        selected.extend(jobs)
+    selected=list({(j['backend'],j['job_id'],j['stage']):j for j in selected}.values())
+    _terminal_jobs(root,{'jobs':selected},{**terminal,'jobs':selected},terminal['observed_at'])
+    return selected
 
 
 def audit(root, row_ref, allocation_ref, gate_ref):
@@ -88,6 +116,7 @@ def audit(root, row_ref, allocation_ref, gate_ref):
         review = audit_job(job,gate_ref['path'],root=root,started_at=since,group_closed=True,group_id=row['group_id'])
         require(2 <= len(review['members']) <= 3, 'suite needs at least two distinct successful members')
         replay_proofs=member_replays(root,row,allocation,review)
+        selected_replay_terminal(root,allocation,list(allocation['member_gates']))
         review=audit_job(job,gate_ref['path'],root=root,started_at=since,group_closed=True,
                          group_id=row['group_id'],member_ids=sorted(replay_proofs))
         validation = claim_group(review,template,policy[1],reservation_hashes=policy[2],root=root,
@@ -140,6 +169,7 @@ def verify_claim_context(root,review,context):
             review['validation_key']==config['validation_key'] and review['group_id']==row['group_id'],
             'suite claim review differs from exact executed row')
     proofs=member_replays(root,row,allocation,review)
+    selected_replay_terminal(root,allocation,list(allocation['member_gates']))
     require(review.get('selected_member_ids')==sorted(proofs), 'suite claim includes a member without its actual successful replay')
     return proofs
 
@@ -180,7 +210,8 @@ def reconcile(root, row_ref, allocation_ref, gate_ref, *, claim=True):
     from .group_lane import claim_group
     from .reservation_policy import active_policy
     row,allocation,template,review,validation = audit(root,row_ref,allocation_ref,gate_ref)
-    base=Path(row_ref['path']).resolve().parent.parent
+    from .runtime_suite import active
+    base=active(root)[4]
     work=base/'evidence'/row['class_id']/digest({'row':row_ref,'allocation':allocation_ref,'gate':gate_ref})
     review_ref=immutable(work/'review.json',review); validation_ref=immutable(work/'regression.json',validation)
     quota,_,_=quota_snapshot(root,template,validation['members'])

@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 import time
 from .contracts import digest, file_digest, require, write_json_atomic
-from .runtime_suite import active, checked
-from .runtime_suite_acceptance import reconcile, reference
+from .runtime_suite import active, checked, registered_rows
+from .runtime_suite_acceptance import reconcile, reference, immutable
 from .storage import atomic_directory_lock
 
 
@@ -31,9 +31,10 @@ def source_stage(root,row,wrapper):
     terminal=False
     if wrapper.get('terminal_evidence'):
         proof=checked(root,wrapper['terminal_evidence'])
-        require(any(j['job_id']==str(wrapper['allocation']['jobid']) and j['stage'] in ('native','collection') for j in proof['jobs']),
+        jobs=[j for j in proof['jobs'] if j['job_id']==str(wrapper['allocation']['jobid']) and j['stage'] in ('native','collection')]
+        require(len(jobs)==1,
                 'source terminal proof refers to another allocation')
-        try:_terminal_jobs(root,{'jobs':proof['jobs']},proof,proof['observed_at']);terminal=True
+        try:_terminal_jobs(root,{'jobs':jobs},{**proof,'jobs':jobs},proof['observed_at']);terminal=True
         except (OSError,ValueError,KeyError,TypeError):pass
     needed=1 if row['camera_exempt'] else 2
     if len(successful)>=needed:status='awaiting_own_replay'
@@ -50,7 +51,7 @@ def source_stage(root,row,wrapper):
 
 def observe(root, run_dir):
     root=Path(root).resolve();base=Path(run_dir).resolve()
-    _,release,manifest,_,current=active(root)
+    pointer,release,manifest,_,current=active(root)
     require(base==current,'acceptance observer is not the active immutable suite')
     state_path=base/'acceptance_observer.json'
     state=json.loads(state_path.read_text()) if state_path.exists() else {'schema':'isg-runtime-suite-acceptance-observer-v1','classes':{}}
@@ -62,11 +63,16 @@ def observe(root, run_dir):
             try:
                 if not row_path.exists():
                     state['classes'][cls]=status;continue
-                row_ref=reference(row_path);row=checked(root,row_ref)
+                row_ref=registered_rows(root,pointer,base,cls)[-1];row=checked(root,row_ref)
+                if row.get('attempt_number'):
+                    allocation_path=Path(row_ref['path']).parent/'allocation.json'
                 status.update(row=row_ref,status='awaiting_allocation')
                 if not allocation_path.exists():
                     state['classes'][cls]=status;continue
-                allocation_ref=reference(allocation_path);allocation=checked(root,allocation_ref)
+                # The publisher updates its pointer while physical re-audit may
+                # take minutes. Pin one complete atomic version before audit.
+                allocation=json.loads(allocation_path.read_text())
+                allocation_ref=immutable(base/'evidence/acceptance_inputs'/(digest(allocation)+'.json'),allocation)
                 status.update(allocation=allocation_ref,status='awaiting_native_and_demo')
                 if not allocation.get('allocation'):
                     state['classes'][cls]=status;continue
