@@ -661,7 +661,8 @@ class ArticulationSmall(SamplerV2):
                     self.left_bands = TT.load_left_contact_band(self, H_max, top=self.top, edge=edge, compute=TT.left_band_compute())
                     if self.left_bands is None:
                         log.info("%s: no left contact band for height %.2f: brace by the exact IK alone", self.gp.variant, H_max)
-                init = TT.phase1b_init_trunk(self, st, H_max, bands=self.bands, top=self.top, left_bands=self.left_bands)
+                init = TT.phase1b_init_trunk(self, st, H_max, bands=self.bands, top=self.top, left_bands=self.left_bands,
+                                           workspace_laterals=self.gen("init_workspace_laterals_m", None))
                 lateral = None
                 if anchor is not None:
                     bounds, _, _ = TT.phase1c_bounds(self, init, margins, top=self.top, strict=True)

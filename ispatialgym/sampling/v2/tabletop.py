@@ -3427,17 +3427,36 @@ def phase1_edge_and_standoff(s, top, rng=None, stand_off: float = STAND_OFF) -> 
 
 
 def phase1b_init_trunk(s, init: Stance, H_max: float, *, bands: Optional[RB.ReachBands] = None, top=None, margin: float = IN_FRAME_MARGIN,
-                       left_bands: Optional[RB.ReachBands] = None) -> Stance:
+                       left_bands: Optional[RB.ReachBands] = None, workspace_laterals: Optional[Sequence[float]] = None) -> Stance:
     """§4.3: the init trunk (translate t*, tilt 0) from the camera FK: Δ = clamp(Δ_aim, Δ_min, Δ_max), t* = z_c⁻¹(h + Δ)
     clamped to [0, 0.95]; records ``b`` (image border lateral at the workspace centre depth), ``R_img`` (centre line),
     the workspace depths, the band union extent [λ_min, λ_max] and the translate range of [Δ_min, Δ_max] in
     ``stance.extras`` for Phase 1c. With ``left_bands`` (A1: the left contact band of a two-arm task) the lateral extent
-    is the union of both bands' workspaces on this top (§4.4 margins use the union; the depths stay the work arm's)."""
+    is the union of both bands' workspaces on this top (§4.4 margins use the union; the depths stay the work arm's).
+    Optional ``workspace_laterals`` retries an empty midpoint workspace at explicitly requested lateral starts. Each
+    start keeps the Phase-1a end margin, free-floor and whole-body collision gates; Phase 1c still performs its normal
+    lateral draw, margins and trunk-sweep checks. The default midpoint path is unchanged."""
     top = _top(s, top)
     bands = bands or ensure_bands(s, top=top, edge=init.edge)
     fk = camera_fk(s)
     ws = workspace(s, bands, init, top)
     if len(ws["cells_world"]) == 0:
+        half = 0.5 * float(init.edge.length) - 0.30
+        for lateral in workspace_laterals or ():
+            lateral = float(lateral)
+            if not math.isfinite(lateral) or abs(lateral) > half or abs(lateral - init.lateral) < 1e-9:
+                continue
+            candidate = init.shifted(lateral=lateral, name="init")
+            if not s.kit.trav_free(candidate.base_xy) or not s.ikc.stance_collision_free(candidate):
+                continue
+            if len(workspace(s, bands, candidate, top)["cells_world"]) == 0:
+                continue
+            result = phase1b_init_trunk(s, candidate, H_max, bands=bands, top=top,
+                                       margin=margin, left_bands=left_bands)
+            result.extras["workspace_initial_lateral_m"] = lateral
+            log.info("phase 1b: edge %s empty midpoint workspace; checked lateral start %+.3f m",
+                     init.edge.name, lateral)
+            return result
         _reject("no_workspace", f"{top.name} edge {init.edge.name}: no band cell of {bands.path or 'the band'} falls on the top at s = {init.stand_off:.2f}")
     if left_bands is not None:
         ws_l = workspace(s, left_bands, init, top)
