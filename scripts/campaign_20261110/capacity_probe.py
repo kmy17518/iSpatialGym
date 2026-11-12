@@ -104,22 +104,20 @@ def main():
         vast_campaign=json.loads((campaign_root/'vast/metrics.json').read_text())
     except (OSError,ValueError):
         vast_campaign={}
+    # Explicit submission/ownership mapping; the existing monitor remains sole writer.
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('campaign_monitor_projection',campaign_root/'tools/monitor_projection.py')
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    monitor_status=module.publish(campaign_root,jobs,dict(capacity))
+    mappings={row['job_id']:row for row in monitor_status['jobs']}
     for job in jobs:
-        source=validation.get('gates',{}).get(job['id'],{})
-        if not source:
-            source=next((g for g in validation.get('gates',{}).values() if str(g.get('replay_job_id'))==job['id']),{})
-        job['class_id']=source.get('key')
-        job['task']=job['class_id'] or job['name']
-        name=job['name'].lower()
-        if any(x in name for x in ('changed_physics','batch_probe','canary','restoration')): stream='pipeline canaries'
-        elif any(x in name for x in ('geometry','float','map','grasp','prebuild','prepare')): stream='training preparation'
-        elif 'held' in name: stream='heldout eval'
-        elif any(x in name for x in ('axial','close','replay','current100','native')): stream='validation/recovery'
-        else: stream='unclassified'
-        job['workstream']=stream
-        job['workstream_source']='job_name' if not source else 'validation_ownership_and_job_name'
-        job['owner']=source.get('owner')
-        job['owner_status']='observed' if job['owner'] else 'unavailable'
+        row=mappings.get(job['id'],{})
+        for key in ('class_id','task','stage','workstream','owner','evidence','mapping_status',
+                    'mapping_remediation_owner','execution_state','execution_observed_at',
+                    'observation_status','last_useful_progress_at'):
+            job[key]=row.get(key)
+        job['workstream_source']='explicit_submission_and_ownership_records'
+        job['owner_status']='observed' if job.get('owner') else 'unavailable'
         job['utilization_percent']=None
     observation_path=campaign_root/'infra/current_gpu_jobs.json'
     compact={'schema':'isg-current-gpu-jobs-v1','observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -172,7 +170,7 @@ def main():
     except (OSError,ValueError,KeyError):pass
     try:throughput=json.loads((campaign_root/'infra/throughput.json').read_text())
     except (OSError,ValueError):throughput={}
-    print(json.dumps(dict(annotated_coverage=annotated_coverage,acceptance=acceptance,family_controller=family_controller,throughput=throughput,data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,by_user_partition=by_user_partition,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))
+    print(json.dumps(dict(monitor_status=monitor_status,annotated_coverage=annotated_coverage,acceptance=acceptance,family_controller=family_controller,throughput=throughput,data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,by_user_partition=by_user_partition,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))
 
 
 if __name__ == '__main__':

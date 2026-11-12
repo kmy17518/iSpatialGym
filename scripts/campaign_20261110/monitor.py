@@ -6,6 +6,7 @@ import json
 import pathlib
 import subprocess
 import time
+import urllib.request
 
 HERE = pathlib.Path(__file__).resolve().parent
 
@@ -33,6 +34,7 @@ def refresh(output, host, ssh_options=()):
         if result.returncode:
             raise RuntimeError('SSH capacity probe failed (rc=%s)'%result.returncode)
         cluster=json.loads(result.stdout)
+        atomic(infra/'monitor_status.json',json.dumps(cluster.get('monitor_status',{}),indent=2)+'\n')
         atomic(infra/'cluster_snapshot.json',json.dumps(cluster,indent=2)+'\n')
         atomic(infra/'current_gpu_jobs.json',json.dumps({'schema':'isg-current-gpu-jobs-v1',
             'observed_at':cluster.get('checked_at'),'status':'observed',
@@ -104,10 +106,20 @@ def refresh(output, host, ssh_options=()):
         'family_controller':cluster.get('family_controller',{}),'throughput':cluster.get('throughput',{}),
         'pending':runtime.get('pending',['Freeze split/perturbation contracts','Launch fresh template demo and open-loop replay validation','Apply owner updates for five pending aliases']),
         'new_campaign_vast_budget_usd':runtime.get('vast_budget_usd',3000),
+        'total_campaign_budget_usd':3000,
+        'budget_scope':'Includes all prior campaign spending and commitments',
         'automatically_stop_at_deadline':False,
     }
+    health={'observed_at':now(),'owner':'existing local campaign monitor','url':'http://127.0.0.1:8765/','method':'GET'}
+    try:
+        with urllib.request.urlopen('http://127.0.0.1:8765/api/status',timeout=5) as response:
+            health.update(status='healthy' if response.status==200 else 'failed',http_status=response.status)
+    except (OSError,ValueError) as exc:
+        health.update(status='unavailable',error_type=type(exc).__name__)
+    state['dashboard_health']=health
+    atomic(infra/'dashboard_health.json',json.dumps(health,indent=2)+'\n')
     atomic(output/'live.json',json.dumps(state,indent=2)+'\n')
-    lines=['# Fresh dataset campaign — live state','',f"Updated: {state['updated_at']} (UTC). Cluster observed: {state['cluster_observed_at']}.",'',f"Current phase: **{state['phase']}**.",'','| GPU usage | Count |','|---|---:|',f"| This campaign: cluster running | {state['campaign_cluster_running_gpus']} |",f"| This campaign: cluster pending jobs | {state['campaign_cluster_pending_jobs']} |",f"| Other work: cluster running | {state['unrelated_cluster_running_gpus']} |",f"| This campaign: Vast running | {state['campaign_vast_running_gpus'] if state['campaign_vast_running_gpus'] is not None else 'not verified'} |",f"| All accounts: Vast running | {state['all_vast_running_gpus'] if state['all_vast_running_gpus'] is not None else 'not verified'} |",'',f"Vast observation: {state['vast_observed_at'] or 'not yet checked'}. New campaign cap: ${state['new_campaign_vast_budget_usd']}; prior campaign resources are separate.",'','| Fresh campaign result | Count |','|---|---:|']
+    lines=['# Fresh dataset campaign — live state','',f"Updated: {state['updated_at']} (UTC). Cluster observed: {state['cluster_observed_at']}.",'',f"Current phase: **{state['phase']}**.",'','| GPU usage | Count |','|---|---:|',f"| This campaign: cluster running | {state['campaign_cluster_running_gpus']} |",f"| This campaign: cluster pending jobs | {state['campaign_cluster_pending_jobs']} |",f"| Other work: cluster running | {state['unrelated_cluster_running_gpus']} |",f"| This campaign: Vast running | {state['campaign_vast_running_gpus'] if state['campaign_vast_running_gpus'] is not None else 'not verified'} |",f"| All accounts: Vast running | {state['all_vast_running_gpus'] if state['all_vast_running_gpus'] is not None else 'not verified'} |",'',f"Vast observation: {state['vast_observed_at'] or 'not yet checked'}. Total campaign cap: ${state['total_campaign_budget_usd']}, including all prior spending and commitments.",'','| Fresh campaign result | Count |','|---|---:|']
     lines.extend([f"| Baseline canaries: demo passed | {state['baseline_validation']['demo_passed']} |",f"| Baseline canaries: open-loop passed | {state['baseline_validation']['open_loop_passed']} |"])
     if state['annotated_coverage']:
         lines.extend([f"| Annotated templates: demo passed | {state['annotated_coverage']['demo_passed']} |",f"| Annotated templates: true replay passed | {state['annotated_coverage']['replay_passed']} |"])
