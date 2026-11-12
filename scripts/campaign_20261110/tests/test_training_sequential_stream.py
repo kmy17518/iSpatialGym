@@ -32,6 +32,44 @@ def test_snapshot_preserves_previous_exact_bytes(tmp_path):
     assert json.loads(p.read_text())['phase']=='replay'
 
 
+def test_replay_failure_retains_task_success_and_measured_qa_failure(tmp_path):
+    report=tmp_path/'meta.json';metric={'measured':True,'triggered':True,'report':{'max_occluded':.6301,'threshold':.5}}
+    stream.immutable(report,{'qa':{'metrics':{'goal_occlusion':metric}}})
+    gate={'success':False,'validated_at':'2026-11-12T07:19:45Z','replay_rc':0,
+          'native_quality':{'reasons':['native_hard_qa:goal_occlusion'],'native_report':str(report),'native_report_sha256':stream.file_digest(report)},
+          'result':{'qa_hard':['goal_occlusion'],'geometric_success':True,'symbolic_success':True,'n_action_steps':738}}
+    path=tmp_path/'gate.json';stream.immutable(path,gate)
+    evidence=stream.replay_failure(tmp_path,path,gate)
+    assert evidence['geometric_success'] is True and evidence['hard_qa']==['goal_occlusion']
+    assert evidence['goal_occlusion']==metric and evidence['gate']==stream.ref(path)
+    report.write_text('{}')
+    with pytest.raises(ContractError,match='changed'):stream.replay_failure(tmp_path,path,gate)
+
+
+def test_failed_own_replay_cannot_publish_or_author_matrix(tmp_path,monkeypatch):
+    batch=tmp_path/'batch';batch.mkdir();author=tmp_path/'author.py';author.write_text('never run')
+    prepared=tmp_path/'prepared';prepared.mkdir();auth=tmp_path/'auth';runtime=tmp_path/'runtime'
+    rows=[];allocations=[]
+    for i,cid in enumerate(('A','B'),1):
+        job=tmp_path/cid;job.mkdir();(job/'demo/member').mkdir(parents=True)
+        stream.immutable(job/'demo/member/meta.json',{'success':True})
+        row={'candidate_id':cid,'start':i,'count':1,'class_id':'disembedding_07','config_path':str(tmp_path/(cid+'.json')),'config_sha256':cid,'native_runtime':str(runtime),'output':str(job/'native')};rows.append(row)
+        allocations.append({'candidate':cid,'job_dir':str(job),'original_index':i,'job_id':str(i)})
+    request=batch/'requests.json';stream.immutable(request,{'campaign_id':'campaign_20261110','records':rows})
+    for row,allocation in zip(rows,allocations):
+        cid=row['candidate_id'];p=prepared/(cid+'.json')
+        stream.immutable(p,{'candidate_id':cid,'start':row['start'],'count':1,'configuration':{'path':row['config_path'],'sha256':cid},'runtime':str(runtime),'source_request':stream.ref(request),'job_dir':allocation['job_dir']})
+        stream.immutable(auth/cid/'authorization_receipt.json',{'prepared':stream.ref(p),'job_dir':allocation['job_dir']})
+        stream.immutable(tmp_path/'validation/open_loop/disembedding_07'/allocation['job_id']/'gate.json',{'success':False,'native_quality':{'reasons':['goal_occlusion']},'result':{'qa_hard':['goal_occlusion']}})
+    stream.immutable(prepared/'launched.json',{'jobs':allocations})
+    monkeypatch.setattr(stream,'native_evidence',lambda *args:{'native':'passed'})
+    monkeypatch.setattr(stream,'publish_canary',lambda *a,**kw:pytest.fail('failed replay cannot publish'))
+    monkeypatch.setattr(stream,'prepare_matrix',lambda *a,**kw:pytest.fail('failed replay cannot author matrix'))
+    cfg={'batch':str(batch),'requests':stream.ref(request),'prepared':str(prepared),'authorizer':stream.ref(author),'authorizations':str(auth),'runtime':str(runtime),'campaign_started_at':0}
+    state=stream.run_cycle(tmp_path,cfg,{})
+    assert all(r['status']=='failed_own_replay' and r['failure_evidence']['hard_qa']==['goal_occlusion'] for r in state['records'].values())
+
+
 def test_prospective_pair_retains_A_and_exact_new_B_without_relabeling_failure(tmp_path):
     old=tmp_path/'old.json';new=tmp_path/'new.json'
     stream.immutable(old,{'campaign_id':'campaign_20261110','records':[{'candidate_id':'A','start':1},{'candidate_id':'failed_B','start':2}]})

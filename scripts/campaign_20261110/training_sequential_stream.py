@@ -118,6 +118,22 @@ def publish_snapshot(path,value):
     write_json_atomic(path,value)
 
 
+def replay_failure(root,gate_path,gate):
+    """Retain a failed gate's measured reason without converting task success to QA success."""
+    require(gate.get('success') is False,'expected explicit failed own replay')
+    quality=gate.get('native_quality',{});result=gate.get('result',{})
+    evidence={'gate':ref(gate_path),'validated_at':gate.get('validated_at'),
+        'reasons':quality.get('reasons',[]),'hard_qa':result.get('qa_hard',[]),
+        'geometric_success':result.get('geometric_success'),
+        'symbolic_success':result.get('symbolic_success'),
+        'action_steps':result.get('n_action_steps'),'replay_returncode':gate.get('replay_rc')}
+    if quality.get('native_report'):
+        reference={'path':quality['native_report'],'sha256':quality['native_report_sha256']}
+        report=checked(root,reference)
+        evidence.update(native_report=reference,goal_occlusion=report.get('qa',{}).get('metrics',{}).get('goal_occlusion'))
+    return evidence
+
+
 def selected_requests(root,configuration):
     """A prospective pair can retain passed A and select one explicit B retry."""
     if not configuration.get('members'):
@@ -182,7 +198,13 @@ def run_cycle(root,configuration,state):
             if reports:value['status']='awaiting_own_replay'if value['demo_successful']else'failed_demo'
             gate=root/'validation/open_loop'/row['class_id']/str(allocation['job_id'])/'gate.json';value['own_replay_gate']=str(gate)
             if gate.exists():
-                g=read(gate);require(g.get('success')is True,'own physics replay failed')
+                g=read(gate)
+                if g.get('success') is False:
+                    value.update(status='failed_own_replay',failure_evidence=replay_failure(root,gate,g),
+                        next_action='Diagnose this exact failed QA or replay evidence before a changed bounded input; no automatic native retry')
+                    out['records'][cid]=value
+                    continue
+                require(g.get('success')is True,'own physics replay has no explicit verdict')
                 previous=state.get('records',{}).get(cid,{})
                 if previous.get('gate_sha256')==file_digest(gate) and previous.get('validation_review'):
                     review=previous['validation_review'];checked(root,{'path':review['review'],'sha256':review['sha256']})
