@@ -45,6 +45,10 @@ def test_vertical_retreat_policy_is_exact_and_default_off(monkeypatch):
                 objects=[obj],scene_setup={'recovery_options':{'lid_vertical_final_retreat':True}})
     monkeypatch.setattr(CR,'configuration',lambda:(None,template,None,None))
     assert CR.contact_recovery('lid_vertical_final_retreat')
+    obj.default_scale=(0.6499999761581421,)*3  # Exact source float32 serialization.
+    assert CR.contact_recovery('lid_vertical_final_retreat')
+    obj.default_scale=(.65001,)*3
+    with pytest.raises(ContractError):CR.contact_recovery('lid_vertical_final_retreat')
     obj.default_scale=(1.,1.,1.)
     with pytest.raises(ContractError):CR.contact_recovery('lid_vertical_final_retreat')
     obj.default_scale=(.65,.65,.65);template.class_id='configuration_matching-attachment_02'

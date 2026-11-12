@@ -147,8 +147,9 @@ def contact_recovery(option: str) -> bool:
                     'axial contact height belongs to its exact canonical magazine')
         if option == 'lid_vertical_final_retreat':
             require(template.split == 'eval_standard' and
-                    [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
-                    [('lid', 'pbmsji', (.65, .65, .65))],
+                    [(o.category, o.model) for o in template.objects if o.role == 'target'] == [('lid', 'pbmsji')] and
+                    all(len(o.default_scale) == 3 and all(abs(float(v)-.65) <= 1e-7 for v in o.default_scale)
+                        for o in template.objects if o.role == 'target'),
                     'vertical lid retreat belongs to its exact canonical model and scale')
     return value
 
