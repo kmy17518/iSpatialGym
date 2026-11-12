@@ -78,11 +78,30 @@ def test_measured_small_pair_scope_preserves_unmeasured_and_large_classes():
             assert not source_stance_hint_enabled(relation, 'large', cls)
             assert not source_stance_hint_enabled('touching', 'small', cls)
     assert source_stance_hint_enabled('nextto','small','inter_object_relation_satisfaction-nextto_03')
-    for relation, suffix in [('ontop','03')]:
+    for relation, suffix in [('ontop','unreviewed_pair')]:
         cls='inter_object_relation_satisfaction-'+relation+'_small_scale_'+suffix
         assert not source_stance_hint_enabled(relation,'small',cls)
     assert not source_stance_hint_enabled('under','small',
         'inter_object_relation_satisfaction-under_small_scale-unreviewed_pair')
+
+
+def test_soap_shelf_exact_success_stance_can_enter_checked_shortlist():
+    from ispatialgym.sampling.campaign_tabletop_starts import (
+        prioritize_written_stances, source_stance_hint_enabled)
+    cls='inter_object_relation_satisfaction-ontop_small_scale_03'
+    assert source_stance_hint_enabled('ontop','small',cls)
+    assert not source_stance_hint_enabled('ontop','large',cls)
+    # Source50146600 passes with the deeper torso angle. The new45failed
+    # draws only tried other stances; use the hash-bound source as a ranking
+    # hint, preserving all native candidates, exploration and physical checks.
+    source={'base_pose2d':[.938766837,3.169962406,-1.570796164],
+            'focus':[.938766956,2.419962406,.667067468],
+            'translate':0.,'tilt':-.916299999}
+    candidates=[SimpleNamespace(**{**source,'tilt':-.61}) for _ in range(8)]
+    candidates.append(SimpleNamespace(**source))
+    ranked=prioritize_written_stances(list(range(9)),candidates,[source])
+    assert ranked[:4]==[0,1,2,3] and ranked[4]==8
+    assert sorted(ranked)==list(range(9))
 
 
 def test_category_under_source_torso_enters_checked_shortlist_only_for_exact_class():
