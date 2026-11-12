@@ -1,5 +1,6 @@
 """Verify an explicitly diagnosed authoring correction, never a goal relaxation."""
 from dataclasses import asdict
+import math
 from pathlib import Path
 from .contracts import digest, require
 from .runtime_suite import checked
@@ -63,7 +64,9 @@ def recorded_range(root, correction_ref, prior_ref, proposed):
             and evidence['native_coverage_profile_sha256'] == digest(profile)
             and digest(evidence['active_objects']) == digest(active)
             and evidence['active_objects_sha256'] == measured['active_objects_sha256']
-            and evidence['measured_coverage'] == measured['coverage']
+            # Two independently ordered float64 sums can differ by an ULP.
+            # Geometry/profile hashes and the strict bucket remain exact.
+            and abs(evidence['measured_coverage'] - measured['coverage']) <= 2*math.ulp(measured['coverage'])
             and evidence['measured_bucket'] == measured['bucket'],
             'correction audit disagrees with independently measured active geometry')
     pool = config['template']['scene_setup']['binding_pool']

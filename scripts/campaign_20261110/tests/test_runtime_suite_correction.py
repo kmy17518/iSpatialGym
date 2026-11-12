@@ -83,6 +83,16 @@ def test_source_mutation_and_bucket_only_relabel_rejected(tmp_path):
     with pytest.raises(ContractError,match='bytes changed'):c.recorded_range(tmp_path,audit,prior,new)
 
 
+def test_only_float64_sum_roundoff_is_allowed_in_audit_scalar(tmp_path):
+    import math
+    audit,prior,new=correction_fixture(tmp_path)
+    body=json.loads(Path(audit['path']).read_text())
+    body['rows'][0]['measured_coverage']=math.nextafter(.32,1.)
+    assert c.recorded_range(tmp_path,put(Path(audit['path']),body),prior,new)
+    body['rows'][0]['measured_coverage']=.32+1e-12
+    with pytest.raises(ContractError):c.recorded_range(tmp_path,put(Path(audit['path']),body),prior,new)
+
+
 def test_correction_terminal_path_accepts_no_worker_only_with_complete_terminal_proof(tmp_path):
     base,prior,allocation,rowref,proposal=proposed(tmp_path)
     # This private phase is reached only after recorded_range checked all inputs.
