@@ -28,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import uuid
 from collections import Counter
@@ -208,10 +209,47 @@ def s5(*args, check=True, timeout=7200):
 
 
 def tar_put(listfile, key, level=3):
-    """tar (rooted at /, --no-recursion: the list names every dir and file; mtimes kept) | zstd -> R2 key under JOB_S3."""
-    cmd = (f"tar -C / --format=posix --no-recursion -cf - -T {shlex.quote(listfile)} | zstd -q -T{STAGE_COMPRESSION_THREADS} -{level} | "
-           f"s5cmd --endpoint-url {shlex.quote(os.environ['S3_ENDPOINT_URL'])} pipe {shlex.quote(JOB_S3 + '/' + key)}")
-    subprocess.run(["bash", "-o", "pipefail", "-c", cmd], check=True, timeout=7200, stdout=subprocess.DEVNULL)
+    """Ship the fixed closure, allowing only parent-directory timestamp races.
+
+    Other jobs may create siblings while GNU tar records an explicitly listed
+    parent directory. Its exit 1 then says nothing about this archive's payload.
+    Retain directory entries/mtimes, verify every non-directory before and after
+    packing, and accept only that precise diagnostic. Payload read errors,
+    mutations, removals and compressor/uploader failures still fail staging.
+    """
+    import stat
+
+    def fingerprint(path):
+        s = os.lstat('/' + path)
+        identity = (s.st_dev, s.st_ino, s.st_mode, s.st_uid, s.st_gid)
+        # A directory's children are never recursively included here.
+        if stat.S_ISDIR(s.st_mode):
+            return True, identity
+        return False, identity + (s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+
+    names = Path(listfile).read_text().splitlines()
+    if not names or any(not name or name.startswith('/') or '..' in Path(name).parts for name in names):
+        raise ValueError('archive closure must contain nonempty paths relative to /')
+    before = {name: fingerprint(name) for name in names}
+    with tempfile.TemporaryDirectory(prefix='isg-vast-pack-') as temporary:
+        directory = Path(temporary)
+        listing, errors, statuses = (directory / name for name in ('files', 'stderr', 'statuses'))
+        listing.write_bytes(b'\0'.join(os.fsencode(name) for name in names) + b'\0')
+        cmd = (f"LC_ALL=C tar -C / --format=posix --quoting-style=literal --no-recursion --null --verbatim-files-from "
+               f"-cf - -T {shlex.quote(str(listing))} 2>{shlex.quote(str(errors))} | "
+               f"zstd -q -T{STAGE_COMPRESSION_THREADS} -{level} | "
+               f"s5cmd --endpoint-url {shlex.quote(os.environ['S3_ENDPOINT_URL'])} pipe {shlex.quote(JOB_S3 + '/' + key)}\n"
+               f"printf '%s\\n' \"${{PIPESTATUS[@]}}\" > {shlex.quote(str(statuses))}\n")
+        subprocess.run(['bash', '-o', 'pipefail', '-c', cmd], check=True, timeout=7200, stdout=subprocess.DEVNULL)
+        changed = [name for name, original in before.items() if fingerprint(name) != original]
+        if changed:
+            raise RuntimeError('archive input changed during packing: ' + repr(changed[:5]))
+        codes = [int(value) for value in statuses.read_text().splitlines()]
+        diagnostics = errors.read_text()
+        allowed = {f'tar: {name}: file changed as we read it' for name, (is_dir, _) in before.items() if is_dir}
+        directory_race = bool(diagnostics) and all(line in allowed for line in diagnostics.splitlines())
+        if len(codes) != 3 or codes[1:] != [0, 0] or not (codes[0] == 0 or (codes[0] == 1 and directory_race)):
+            raise RuntimeError(f'archive pipeline failed {codes}: {diagnostics[-2000:]}')
 
 
 # ---------------------------------------------------------------------------------------------------------------- staging
