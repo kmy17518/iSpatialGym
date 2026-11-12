@@ -22,6 +22,20 @@ def verify_runtime_compatibility(root, request, records, runtime):
     require(proof_path.is_relative_to(root) and proof_path.is_file() and
             file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
     proof=json.loads(proof_path.read_text())
+    if proof.get('schema') == 'isg-exact-native-runtime-compatibility-v1':
+        stamp = runtime/'.snapshot_commit'
+        require(runtime.is_relative_to(root/'code') and proof.get('native_runtime') ==
+                {'path':str(stamp), 'sha256':file_digest(stamp)} and
+                all(r['validation_key']['code_sha256'] == file_digest(stamp) for r in records),
+                'exact observation runtime differs from native source')
+        payloads = proof.get('python_payloads')
+        paths = {str(p.relative_to(runtime)): p for folder in ('ispatialgym', 'scripts')
+                 for p in (runtime/folder).rglob('*.py') if p.is_file()}
+        require(proof.get('physical_code_changes') == 0 and isinstance(payloads, dict) and
+                payloads and set(payloads) == set(paths), 'exact native payload inventory differs')
+        require(all(p.resolve().is_relative_to(runtime) and file_digest(p) == payloads[name]
+                    for name,p in paths.items()), 'exact native payload changed')
+        return {'path':str(proof_path), 'sha256':ref['sha256']}
     require(proof.get('schema')=='isg-observational-runtime-compatibility-v1', 'invalid observational runtime proof')
     base=root/'code'/('trunk_'+proof['base_commit'][:12])
     require(runtime.is_relative_to(root/'code') and
@@ -31,7 +45,8 @@ def verify_runtime_compatibility(root, request, records, runtime):
             'observational runtime does not preserve these canaries native runtime')
     allowed={'ispatialgym/sampling/campaign_runtime.py','ispatialgym/multienv/campaign_rendering.py',
              'scripts/campaign_20261110/training_batch_probe.py'}
-    require(set(proof['changed_files'])==allowed and set(proof['changed_payloads'])==allowed,
+    declared = set(proof['changed_files'])
+    require(declared and declared <= allowed and set(proof['changed_payloads']) == declared,
             'observational runtime changes exceed the approved instrumentation')
     changed=set()
     for folder in ('ispatialgym','scripts'):
@@ -39,8 +54,8 @@ def verify_runtime_compatibility(root, request, records, runtime):
         for relative in paths:
             a,b=base/relative,runtime/relative
             if not a.is_file() or not b.is_file() or file_digest(a)!=file_digest(b):changed.add(relative)
-    require(changed==allowed,'native implementation changed outside observation-only files')
-    for relative in allowed:
+    require(changed == declared, 'native implementation changed outside observation-only files')
+    for relative in declared:
         require(file_digest(runtime/relative)==proof['changed_payloads'][relative],'observational payload changed')
     def physical_ast(path):
         tree=ast.parse(path.read_text())
