@@ -160,6 +160,24 @@ def input_identity(root, command):
             'tag': option(command, '--tag', 'fast'), 'files': files}
 
 
+def public_snapshot_dataset_leaf(root, original, resolved):
+    """Recognize an already readable provider leaf; never change its metadata."""
+    try:
+        relative = Path(original).relative_to(root)
+    except ValueError:
+        return False
+    parts = relative.parts
+    if len(parts) < 5 or parts[0] != 'code' or not parts[1].startswith('trunk_') or parts[2:4] != ('Behavior-1K','datasets'):
+        return False
+    snapshot = root/'code'/parts[1]
+    dataset = (snapshot/'Behavior-1K/datasets').resolve()
+    if not (snapshot/'.snapshot_commit').is_file() or not resolved.is_relative_to(dataset):
+        return False
+    if not resolved.is_file() or not resolved.stat().st_mode & 0o004:
+        return False
+    return all(parent.stat().st_mode & 0o001 for parent in resolved.parents)
+
+
 def enqueue(root, token, command, priority=50, backends=BACKENDS, migration_routing=None):
     root = Path(root).resolve()
     require(token and token.replace('_', '').replace('-', '').isalnum(), 'unsafe dispatch token')
@@ -176,13 +194,17 @@ def enqueue(root, token, command, priority=50, backends=BACKENDS, migration_rout
     # Grant the already-authorized private lab group read access without changing
     # bytes. The queue's writable event journal is staged inside the fresh job.
     if any(backend.startswith('shiyuc_') for backend in backends):
-        inputs = list(identity['files'])
+        inputs = [(name,False) for name in identity['files']]
         seen = set()
         while inputs:
-            path = Path(inputs.pop()).resolve()
+            original, nested = inputs.pop()
+            path = Path(original).resolve()
             if path in seen: continue
             seen.add(path)
-            require(path.is_relative_to(root), 'shared input outside owned campaign')
+            if not path.is_relative_to(root):
+                require(nested and public_snapshot_dataset_leaf(root, original, path),
+                        'shared input outside owned campaign: '+str(original))
+                continue
             stat = path.stat()
             # A no-op chmod still changes ctime and invalidates immutable-input
             # audit caches. Preserve metadata when the requested bit exists.
@@ -198,7 +220,7 @@ def enqueue(root, token, command, priority=50, backends=BACKENDS, migration_rout
                     elif isinstance(item, str) and item.startswith(str(root) + '/'):
                         candidate = Path(item)
                         if candidate.suffix == '.json' and candidate.is_file(): yield str(candidate)
-                inputs.extend(paths(value))
+                inputs.extend((name,True) for name in paths(value))
     path = root / 'dispatch/ready' / (token + '.json')
     payload = {'schema': 'isg-ready-command-v1', 'token': token, 'command': command,
                'command_sha256': digest(command), 'identity': identity, 'priority': int(priority), 'backends': list(backends)}

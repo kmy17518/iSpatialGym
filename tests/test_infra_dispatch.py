@@ -37,6 +37,32 @@ class DispatchTests(unittest.TestCase):
         cmd = self.command.copy(); cmd[-1] = 'ISGF_COLLECT_EXTRA='
         with self.assertRaises(ValueError): D.enqueue(self.root, 'override', cmd)
 
+    def test_nested_public_snapshot_dataset_is_read_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            provider=Path(directory);provider.chmod(0o755)
+            data=provider/'datasets';data.mkdir();leaf=data/'scene.json';leaf.write_text('{"scene":"exact"}');leaf.chmod(0o644)
+            (self.code/'Behavior-1K').symlink_to(provider,target_is_directory=True)
+            logical=self.code/'Behavior-1K/datasets/scene.json'
+            value=json.loads(self.config.read_text());value['source_scene']=str(logical);self.config.write_text(json.dumps(value))
+            before=leaf.stat().st_ctime_ns
+            D.enqueue(self.root,'public_dataset',self.command,backends=['shiyuc_svl'])
+            self.assertEqual(leaf.stat().st_ctime_ns,before)
+            self.assertEqual(leaf.read_text(),'{"scene":"exact"}')
+            leaf.chmod(0o600)
+            with self.assertRaisesRegex(ValueError,'shared input outside'):
+                D.enqueue(self.root,'private_dataset',self.command,backends=['shiyuc_svl'])
+            leaf.chmod(0o644);provider.chmod(0o700)
+            with self.assertRaisesRegex(ValueError,'shared input outside'):
+                D.enqueue(self.root,'unsearchable_dataset',self.command,backends=['shiyuc_svl'])
+
+    def test_arbitrary_external_symlink_is_not_a_shared_dataset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            leaf=Path(directory)/'private.json';leaf.write_text('{}');leaf.chmod(0o644)
+            link=self.root/'external.json';link.symlink_to(leaf)
+            value=json.loads(self.config.read_text());value['source_scene']=str(link);self.config.write_text(json.dumps(value))
+            with self.assertRaisesRegex(ValueError,'shared input outside'):
+                D.enqueue(self.root,'external',self.command,backends=['shiyuc_svl'])
+
     def test_ambiguous_submission_is_not_retried(self):
         path = D.enqueue(self.root, 'fresh', self.command, backends=['vast_5090'])
         D.shared_json(self.root / 'dispatch/receipts/fresh.json', {'status': 'submitting'})
