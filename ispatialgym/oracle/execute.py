@@ -3152,7 +3152,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             # support place sets the object down
             if drop and cfg.drop_lower_max_m > 0:
                 yield from lower_drop(action, motions, state, ctx, cfg)
-            yield from motions.gripper(arm, close=False)
+            release_clear = action.kind == "support" and os.environ.get("ISPATIALGYM_PLACE_RELEASE_CLEAR_RETREAT") == "1"
+            yield from motions.gripper(arm, close=False, **({'release_when_clear': True} if release_clear else {}))
             yield from _release(motions, state, arm)
     ctx["place_motion_stage"] = "retreat"
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))

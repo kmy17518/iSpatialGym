@@ -751,7 +751,7 @@ class Motions:
             yield self._emit()
 
     def gripper(self, arm: str, close: bool, steps: Optional[int] = None, rate: Optional[float] = None,
-                squeeze: Optional[float] = None) -> Iterator[th.Tensor]:
+                squeeze: Optional[float] = None, release_when_clear: bool = False) -> Iterator[th.Tensor]:
         """Open / close the gripper and wait until the fingers stop moving (or an assisted grasp engages).
 
         Closing: ``rate`` (m per control step; ``execute_grasp`` passes ``cfg.gripper_close_rate``) ramps the smooth-mode
@@ -827,9 +827,29 @@ class Motions:
         still_exit = oracle_still_exit() and not (close and rate)
         q_fingers = self.robot.get_joint_positions()[idx].float().clone() if still_exit else None
         n_still = 0
+        release_clear_steps = 0
         for i in range(steps):
             yield self._emit(settling=exempt)
             exempted += int(exempt)
+            if release_when_clear and not close and held_before is not None and i >= 11:
+                # A full-open hand can keep pressing the support while its finger
+                # velocity never settles. Retreat once the released target has
+                # cleared both pads; retain the full-open command throughout.
+                from ispatialgym.oracle.campaign_place_release import target_clear
+                try:
+                    from omnigibson.utils.usd_utils import RigidContactAPI
+                    pairs = RigidContactAPI.get_contact_pairs(self.robot.scene.idx, [self.robot], None, current_only=True)
+                    clear = target_clear(self.robot.prim_path, held_before.prim_path, arm,
+                                         self.held_object(arm) is not None, pairs)
+                except Exception:  # unavailable contact evidence cannot authorize early retreat
+                    clear = False
+                release_clear_steps = release_clear_steps + 1 if clear else 0
+                if release_clear_steps >= 2:
+                    self.release_events.append({'arm': arm, 'event': 'target_clear_retreat',
+                                                'object': held_before.name, 'open_steps': i + 1,
+                                                'clear_observations': release_clear_steps,
+                                                'gripper_command': 1.0, 'held': False})
+                    return
             if still_exit:
                 q_now_f = self.robot.get_joint_positions()[idx].float()
                 n_still = n_still + 1 if float((q_now_f - q_fingers).abs().max()) < STILL_EXIT_MOVE else 0
