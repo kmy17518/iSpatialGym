@@ -295,7 +295,7 @@ def backend_capacity(backend, rows):
     part = [row for row in own if partition in row[1].split(',')]
     gpus = sum(int(row[3].rsplit(':', 1)[1]) for row in part if 'gpu:' in row[3])
     running = sum(row[2] in ('RUNNING','COMPLETING') for row in part)
-    limits = [8, (48 if partition == 'svl' else 30) - gpus]
+    limits = [(48 if partition == 'svl' else 30) - gpus]
     if partition == 'svl': limits.extend([100 - len(part), 56 - running])
     return max(0, min(limits))
 
