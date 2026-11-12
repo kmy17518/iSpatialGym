@@ -18,6 +18,7 @@ SOURCES = {
     'configurations': 'training_preparation/configuration_index.json',
     'dependencies': 'training_preparation/dependency_index.json',
     'preparation_status': 'training_preparation/status.json',
+    'corrected_inventory': 'training_preparation/model_variant_inventory_r2/current.json',
     'canonical': 'infra/standard_recovery/canonical_validation.json',
     'standard': 'infra/standard_recovery/ledger.json',
     'heldout': 'infra/heldout_recovery/ledger.json',
@@ -250,6 +251,7 @@ def build(root, now=None):
                     'native':stage(r.get('native')), 'accepted':{'status':'excluded_zero_credit'}},
             next_action=r.get('next_action') or 'Owner reconciles completed stages into own physics replay, hard QA and batched restoration; no benchmark credit.'))
     counts = values['eligibility'].get('counts',{}).get('current_eligible')
+    corrected = values['corrected_inventory'].get('summary')
     gaps = status.get('scope_gaps', manifest.get('scope_gaps', ['Full selected configuration expansion has not been observed.']))
     return {'schema':'isg-campaign-execution-ledger-v1','campaign_id':CAMPAIGN,
         'observed_at':datetime.fromtimestamp(now,timezone.utc).isoformat(),'owner':'/root',
@@ -258,9 +260,14 @@ def build(root, now=None):
         'canonical':{k:values['canonical'].get(k) for k in ('validated','total','state_counts')},
         'current_runtime':{k:current.get(k) for k in ('run_id','frozen_runtime','required_classes',
                            'validation_passed','state_counts','observed_at')},
-        'preparation':{'required_configurations':len(configs) if manifest else None,'verified_configurations':served if manifest else None,
-            'denominator_complete':status.get('summary',{}).get('denominator_complete') is True and not gaps,'scope_gaps':gaps,
-            'dependency_status_counts':dict(Counter(d.get('status','unobserved') for d in deps)),
+        'preparation':{'required_configurations':corrected.get('configuration_choices') if corrected else len(configs) if manifest else None,
+            'verified_configurations':corrected.get('verified_configurations') if corrected else served if manifest else None,
+            'corrected_inventory':{'source':refs['corrected_inventory'],'summary':corrected,
+                'checkpoint':values['corrected_inventory'].get('checkpoint')},
+            'legacy_index_coverage':{'required_configurations':len(configs) if manifest else None,
+                'verified_configurations':served if manifest else None,'scope':'superseded selection; historical evidence only'},
+            'denominator_complete':(corrected.get('full_dependency_denominator_complete') is True if corrected else status.get('summary',{}).get('denominator_complete') is True) and not gaps,'scope_gaps':gaps,
+            'dependency_status_counts':corrected.get('dependency_statuses',{}) if corrected else dict(Counter(d.get('status','unobserved') for d in deps)),
             'source_summary':status.get('summary',manifest.get('summary')), 'per_class':status.get('per_class',[]), 'dispatch':status.get('execution',status.get('dispatch',status.get('active_jobs',[])))},
         'queue':values['queue'],'capacity':values['capacity'],
         'requirement_status_counts':dict(Counter(r.get('status','untested') for r in requirements)),

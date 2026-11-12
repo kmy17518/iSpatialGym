@@ -26,6 +26,18 @@ class ExecutionLedgerTests(unittest.TestCase):
         self.assertEqual(x['preparation']['verified_configurations'],0)
         self.assertFalse(x['preparation']['denominator_complete'])
         self.assertTrue(x['indexed_sources']['configurations']['sha256'])
+    def test_corrected_inventory_never_borrows_old_selection_coverage(self):
+        self.put('configurations',{'configurations':[{'id':'old','dependencies':['dep']}]})
+        self.put('corrected_inventory',{'summary':{'configuration_choices':13372,
+            'selected_object_model_variants':617,'variant_support_pairs':4371,
+            'full_dependency_denominator_complete':False,'dependency_statuses':{'verified':8092}}})
+        result=build(self.root,1001)['preparation']
+        self.assertEqual(result['required_configurations'],13372)
+        self.assertIsNone(result['verified_configurations'])
+        self.assertEqual(result['legacy_index_coverage']['required_configurations'],1)
+        self.assertFalse(result['denominator_complete'])
+        self.assertEqual(result['dependency_status_counts'],{'verified':8092})
+
     def test_completed_native_never_implies_demo_replay_or_acceptance(self):
         self.put('pipeline',{'records':[{'candidate_id':'A','native':{'written':1,'sha256':'native'},'status':'native_passed'}]})
         x=build(self.root,1001);r=x['rows'][0]
