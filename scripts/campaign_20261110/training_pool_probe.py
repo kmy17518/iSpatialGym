@@ -50,6 +50,9 @@ def verify_inputs(root, request, records):
 
 
 def verify_runtime(root, request, records, runtime):
+    if request.get('pool_preserve_native_anchor_v1') is True:
+        from .training_pool_native_anchor_probe import verify_runtime as verify_native_anchor
+        return verify_native_anchor(root, request, records, runtime, verify_runtime)
     if request.get('pool_exact_source_anchor_v1') is True:
         from .training_pool_source_anchor_probe import verify_runtime as verify_anchor_runtime
         return verify_anchor_runtime(root, request, records, runtime, verify_runtime)
@@ -211,7 +214,10 @@ def run(root, request_path, output):
     from ispatialgym.oracle import run_isg
     import omnigibson as og
     order = {'FRESH_A': [0], 'FRESH_B': [1], 'ABA': [0, 1, 0]}[value['diagnostic_control']]
-    if value.get('pool_exact_source_anchor_v1') is True:
+    if value.get('pool_preserve_native_anchor_v1') is True:
+        from .training_pool_native_anchor_probe import install as install_native_anchor
+        install_native_anchor(run_isg, contract, output, install, value)
+    elif value.get('pool_exact_source_anchor_v1') is True:
         from .training_pool_source_anchor_probe import install as install_source_anchor
         install_source_anchor(run_isg, contract, output, install, value)
     else:
