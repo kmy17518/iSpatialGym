@@ -1514,6 +1514,16 @@ class IORSSmall(SamplerV2):
         else:
             yaws = self.widest_faces_target_yaws(manip) if self.widest_faces() else self.support_aligned_yaws("target", manip) if self.init_align_support() else None
         yaw_kw = {"yaws": yaws, "jitter": 0.0} if yaws is not None else {}
+        plan = getattr(self, '_campaign_pair_active', None)
+        if plan is not None and os.environ.get('ISPATIALGYM_UNDER04_START_GAP_PROPOSAL', '0') == '1':
+            from ispatialgym.sampling import campaign_runtime
+            if campaign_runtime.configuration()[1].class_id == 'inter_object_relation_satisfaction-under_small_scale_04':
+                # The fixed paper partner rejected most fresh starts only after
+                # their grasp had been solved. Apply the identical 3cm footprint
+                # gap while proposing starts; never relax the later check.
+                partner_fp = self.world.footprint(self.hull['partner'], tuple(G.t(v) for v in plan.partner))
+                yaw_kw['pose_allowed'] = lambda pose: TT.polygon_gap(
+                    self.world.footprint(self.hull['target'], pose), partner_fp) >= self.gap_min
         if self.pair_goal_align() is not None and getattr(self, "_campaign_pair_active", None) is None:
             yaw_kw["margin"] = self.margin_support  # the long axis across the edge may need the support's whole depth (the partner keeps it too)
         last = None

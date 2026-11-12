@@ -4792,7 +4792,8 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                   arm: str = "right", object_name: Optional[str] = None, scale_key: Any = None, eef_of_grasp: Optional[Callable[[Any], Pose]] = None,
                   bands: Optional[RB.ReachBands] = None, jitter: float = YAW_JITTER, n_positions: int = 5, arms: Optional[Sequence[str]] = None,
                   arm_bands: Optional[Dict[str, RB.ReachBands]] = None, fixed: Optional[Tuple[Any, float]] = None,
-                  grasp_allowed: Optional[Callable[[str], bool]] = None) -> Tuple[Pose, GraspRecord]:
+                  grasp_allowed: Optional[Callable[[str], bool]] = None,
+                  pose_allowed: Optional[Callable[[Pose], bool]] = None) -> Tuple[Pose, GraspRecord]:
     """§4.6 step 1: screen the 8 fixed yaws x ``grasps`` at the focus cell (12-seed IK from ``manip``, support ignored for
     the grasp pose only) -> feasible set F (stored in the band cache under (trunk, cell); empty F removes the cell);
     draw (yaw, grasp) uniformly from F, jitter ±22.5°, place the object within 5 cm of the focus with its footprint on
@@ -5063,7 +5064,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     while F:
         out = _phase3_draw(s, F, rng, jitter * sc, n_positions, focus_radius * sc, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins,
                            band_of, name, offered, arm, manip, fails, ev_of if ev_on else None, gname, tried, verify=task_objs if refine else None,
-                           grasp_allowed=grasp_allowed)
+                           grasp_allowed=grasp_allowed, pose_allowed=pose_allowed)
         if isinstance(out, tuple):
             if mf_key is not None:
                 MF.width_of(s).update(mf_key, True)
@@ -5410,7 +5411,7 @@ def allowed_grasp_turns(grasp, twins, allowed=None):
 
 
 def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins, band_of,
-                 name, offered, arm, manip, fails, ev_of, gname, tried, verify=None, grasp_allowed=None):
+                 name, offered, arm, manip, fails, ev_of, gname, tried, verify=None, grasp_allowed=None, pose_allowed=None):
     """:func:`phase3_target`'s draw over F (without replacement): ``(pose, GraspRecord)`` on the first exact-IK confirmation, else the last
     IK failure reason. With ``ev_of`` (BAND_EVIDENCE) each tried pair's outcome is counted in its arm's evidence (a pair whose positions
     all left the support counts nothing); ``tried`` collects the pairs drawn."""
@@ -5438,6 +5439,13 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
                 fails["support"] += 1
                 continue
             pose, z_here = (pose, z) if support_z is not None else NB.rest_on(top, pose, fp, NB.z_at(top, xy))
+            if pose_allowed is not None and not pose_allowed(pose):
+                # A fixed partner can invalidate this start before grasp IK.
+                # Continue drawing from the same bounded native proposal set;
+                # the later partner, goal and program checks still run.
+                fails['caller_pose'] = fails.get('caller_pose', 0) + 1
+                last_reason = 'target start rejected by caller pose predicate'
+                continue
             eef = IK.grasp_pose(pose, eef_of(g))
             pre = IK.pre_pose(eef)
             # i7-split 2026-11-07 (a measurement, nothing rejected): pre-shaped fingers inside a kept protrusion of the support (a rim / wall
