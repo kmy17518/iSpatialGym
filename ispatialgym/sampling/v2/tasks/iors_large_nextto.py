@@ -1160,6 +1160,16 @@ def _complete(s, rng, cands: List[Tuple[Stance, Dict[str, Any]]], chain_of, side
         count(stats, "stance_collision")
         raise Reject("no_push_stance", f"face {face}: every push stance collides (target placed)")
     cands.sort(key=lambda c: -min(round(c[1]["reach_margin"] / 0.05) * 0.05, 0.25))
+    from ispatialgym.sampling.campaign_nextto_contact_proposal import (
+        CheckedInitialStance, configured_hint, initial_stance_batches, prioritize,
+    )
+    hint = configured_hint()
+    cands = prioritize(cands, face, hint)
+    batches = 1
+    if hint is not None:
+        from ispatialgym.sampling.campaign_runtime import configuration
+        batches = initial_stance_batches(configuration()[1])
+    checked_initial = CheckedInitialStance(batches)
     why: List[str] = []
     from ispatialgym.sampling.campaign_large_recovery import ottoman_candidate_program_screen, ottoman_candidate_program_rejection
     screen_candidates = ottoman_candidate_program_screen(s)
@@ -1198,7 +1208,7 @@ def _complete(s, rng, cands: List[Tuple[Stance, Dict[str, Any]]], chain_of, side
             count(stats, "push_end_collision")
             continue
         try:
-            init = _stance_a(s, rng, init_pose, yaw, goal_pose, d2)
+            init = checked_initial.get(lambda: _stance_a(s, rng, init_pose, yaw, goal_pose, d2), Reject)
             s.sidecar.add_stance(init)
             s.sidecar.add_stance(st)
             leg = s.record_leg_a_b(init, st)
@@ -1360,6 +1370,7 @@ def _stance_a(s, rng: np.random.Generator, init_pose: G.Pose, yaw: float, goal_p
     back = math.atan2(-float(d2[1]), -float(d2[0]))
     c_xy = th.tensor([float(ctr[0]), float(ctr[1])])
     for _ in range(30):
+        s._check_deadline("nextto initial stance")
         bearing = back + float(rng.uniform(-bmax, bmax))
         dist = float(rng.uniform(d_lo, d_hi))
         xy = c_xy + th.tensor([math.cos(bearing), math.sin(bearing)]) * dist
