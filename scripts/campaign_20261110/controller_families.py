@@ -60,12 +60,23 @@ def reconcile(rows, *, key, index, count, snapshot, tag):
 
 
 def _allocation_signature(root):
+    # Resolve the shared directory once. Resolving every ordinary filename walks
+    # the same NFS ancestors thousands of times during each reservation check.
+    # Keep symlink destinations and fresh inode/timestamp evidence in the key.
+    directory = root / "manifests"
+    if not directory.exists():
+        return ()
+    resolved = directory.resolve(strict=True)
     rows = []
-    for path in sorted((root / "manifests").glob("*allocations.tsv")):
-        target = path.resolve(strict=True)
-        stat = target.stat()
-        rows.append((str(path), str(target), stat.st_dev, stat.st_ino,
-                     stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns))
+    with os.scandir(directory) as entries:
+        for entry in sorted(entries, key=lambda item: item.name):
+            if not entry.name.endswith("allocations.tsv"):
+                continue
+            path = directory / entry.name
+            target = path.resolve(strict=True) if entry.is_symlink() else resolved / entry.name
+            stat = target.stat() if entry.is_symlink() else entry.stat()
+            rows.append((str(path), str(target), stat.st_dev, stat.st_ino,
+                         stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns))
     return tuple(rows)
 
 
