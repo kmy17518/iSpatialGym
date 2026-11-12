@@ -32,6 +32,12 @@ DELTA = {'fixed_initialized_actor_union': True, 'source_recordings_unchanged': T
 def ref(path): return {'path': str(path), 'sha256': file_digest(path)}
 
 
+def capture_scene_input(document):
+    """Native restore converts nested JSON state to tensors in place."""
+    saved = copy.deepcopy(document)
+    return saved, digest(saved)
+
+
 def checked(root, reference):
     path = Path(reference['path']).resolve()
     require(path.is_relative_to(root) and ref(path) == reference, 'changed pool renderer input')
@@ -194,6 +200,10 @@ def run(root,request_path,output,preflight=False):
         for key in ('ISPATIALGYM_HEAD_CAMERA_ONLY','ISPATIALGYM_PHYSICS_ONLY'):os.environ.pop(key,None)
         require(digest(saved)==digest(documents[member]),'native loaded recorded scene differs')
         private,parking=member_scene(contract,saved,active)
+        private_input,private_sha=capture_scene_input(private)
+        private_path=output/('private_scene_'+str(index)+'.json')
+        require(not private_path.exists(),'preserve reviewed native renderer scene input')
+        write_json_atomic(private_path,private_input)
         if guard is None:
             identities={o.name:id(o) for o in slot.scene.objects};scene_identity=id(slot.scene)
             require(set(identities)==set(contract['initialized_actors']),'preloaded native actor inventory differs')
@@ -218,7 +228,8 @@ def run(root,request_path,output,preflight=False):
         native=slot.campaign_restoration['native_observation'];projected=project_active_loaded(native['loaded_state'],contract,active)
         original=cold[member]['rendered_observations'][0]['campaign_restoration']['native_observation']['loaded_state']
         result['entries'].append({'member':member,'active':active,'source_demo':records[member]['artifacts']['demo'],
-            'source_scene':records[member]['artifacts']['recorded_scene'],'private_scene_sha256':digest(private),
+            'source_scene':records[member]['artifacts']['recorded_scene'],'private_scene_sha256':private_sha,
+            'private_scene_input':ref(private_path),
             'visibility':visibility,'parking':parking,'native_restoration':slot.campaign_restoration,
             'active_loaded_state':projected,'cold_state_strict_match':False,'object_identities':dict(identities),'scene_identity':scene_identity})
         def publish_comparison(evidence):

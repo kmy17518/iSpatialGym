@@ -3,7 +3,8 @@ from types import SimpleNamespace as N
 import pytest
 from scripts.campaign_20261110.contracts import ContractError
 from scripts.campaign_20261110.training_pool_renderer_probe import (
-    selected_pool_records, project_active_loaded, source_state_expected, prohibit_native_mutation, record_comparison)
+    selected_pool_records, project_active_loaded, source_state_expected, prohibit_native_mutation, record_comparison,
+    capture_scene_input)
 from scripts.campaign_20261110.training_restoration import same_loaded_state
 
 
@@ -62,3 +63,12 @@ def test_first_strict_native_mismatch_retains_exact_cold_and_actual_evidence():
     with pytest.raises(ContractError):record_comparison(expected,actual,same_loaded_state,saved.append)
     assert len(saved)==1 and saved[0]['strict_match']is False and 'error'in saved[0]
     assert saved[0]['cold_native_expected']==expected and saved[0]['native_observed']==actual
+
+
+def test_native_in_place_tensor_conversion_cannot_change_or_break_reviewed_input_hash():
+    import torch
+    from scripts.campaign_20261110.contracts import digest
+    private={'state':{'root':{'position':[1.,2.,3.]}}}
+    saved,sha=capture_scene_input(private)
+    private['state']['root']['position']=torch.tensor(private['state']['root']['position'])
+    assert saved=={'state':{'root':{'position':[1.,2.,3.]}}} and digest(saved)==sha
