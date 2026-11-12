@@ -26,7 +26,7 @@ def test_registered_attempt_paths_preserve_original_and_bind_registry(tmp_path):
 
 
 def record(rowid,jobs):
-    return {'class_id':'c','row':{'path':rowid},'jobs':jobs,'native_attempts':{'native_draws':1,'attempted_instance_slots':1},
+    return {'class_id':'c','row':{'path':rowid},'jobs':jobs,'native_attempts':{'native_draws':1,'attempted_instance_slots':1,'native_draw_elapsed_seconds':[10 if rowid=='old' else 20]},
             'distinct_demo_instance_ids':[rowid],'strict_outcomes':None,'errors':[]}
 
 
@@ -39,6 +39,7 @@ def test_cost_rollup_keeps_failed_original_and_optional_replay():
     assert out['cost']['observed_allocated_gpu_hours']==328/3600
     assert out['native_attempts']['native_draws']==2
     assert len(out['jobs'])==3
+    assert out['native_elapsed_distribution']==M.sample_distribution([10,20])
 
 
 def test_shared_allocation_cannot_be_double_charged_or_conflict():

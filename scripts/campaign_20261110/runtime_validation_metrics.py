@@ -320,6 +320,7 @@ def rollup_attempts(records):
                 jobs[key]=job
         latest['jobs']=list(jobs.values());latest['cost']=accounting(latest['jobs'])
         latest['current_attempt_native_attempts']=latest['native_attempts']
+        latest['current_attempt_native_elapsed_distribution']=latest.get('native_elapsed_distribution')
         combined={}
         for key in ('attempted_instance_slots','native_draws','native_finished_draws','censored_native_draws','native_process_seconds','failed_native_process_seconds'):
             combined[key]=sum(row['native_attempts'].get(key,0) for row in rows)
@@ -327,6 +328,7 @@ def rollup_attempts(records):
         counts=Counter()
         for row in rows:counts.update(row['native_attempts'].get('native_rejections',{}))
         combined['native_rejections']=dict(counts);latest['native_attempts']=combined
+        latest['native_elapsed_distribution']=sample_distribution(combined['native_draw_elapsed_seconds'])
         latest['distinct_demo_instance_ids']=sorted({iid for row in rows for iid in row['distinct_demo_instance_ids']})
         latest['errors']=[error for row in rows for error in row['errors']]
         if latest['errors']:latest['cost']['cost_complete']=False
