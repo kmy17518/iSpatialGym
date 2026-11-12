@@ -1541,6 +1541,9 @@ class IORSSmall(SamplerV2):
                 partner_fp = self.world.footprint(self.hull['partner'], tuple(G.t(v) for v in plan.partner))
                 yaw_kw['pose_allowed'] = lambda pose: TT.polygon_gap(
                     self.world.footprint(self.hull['target'], pose), partner_fp) >= self.gap_min
+        if plan is not None and campaign_runtime.contact_recovery('inside_goal_grasp_proposal'):
+            from ispatialgym.sampling.campaign_inside_goal_grasp import fixed_goal_grasp_predicate
+            yaw_kw['grasp_record_allowed'] = fixed_goal_grasp_predicate(self)
         if self.pair_goal_align() is not None and getattr(self, "_campaign_pair_active", None) is None:
             yaw_kw["margin"] = self.margin_support  # the long axis across the edge may need the support's whole depth (the partner keeps it too)
         last = None

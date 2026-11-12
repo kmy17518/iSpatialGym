@@ -4814,7 +4814,8 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                   grasp_allowed: Optional[Callable[[str], bool]] = None,
                   pose_allowed: Optional[Callable[[Pose], bool]] = None,
                   grasp_pose_allowed: Optional[Callable[[str, Pose], bool]] = None,
-                  grasp_segment_allowed: Optional[Callable[[str, Pose, Pose], bool]] = None) -> Tuple[Pose, GraspRecord]:
+                  grasp_segment_allowed: Optional[Callable[[str, Pose, Pose], bool]] = None,
+                  grasp_record_allowed: Optional[Callable[[Stance, Pose, GraspRecord], bool]] = None) -> Tuple[Pose, GraspRecord]:
     """§4.6 step 1: screen the 8 fixed yaws x ``grasps`` at the focus cell (12-seed IK from ``manip``, support ignored for
     the grasp pose only) -> feasible set F (stored in the band cache under (trunk, cell); empty F removes the cell);
     draw (yaw, grasp) uniformly from F, jitter ±22.5°, place the object within 5 cm of the focus with its footprint on
@@ -5085,7 +5086,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     while F:
         out = _phase3_draw(s, F, rng, jitter * sc, n_positions, focus_radius * sc, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins,
                            band_of, name, offered, arm, manip, fails, ev_of if ev_on else None, gname, tried, verify=task_objs if refine else None,
-                           grasp_allowed=grasp_allowed, pose_allowed=pose_allowed, grasp_pose_allowed=grasp_pose_allowed, grasp_segment_allowed=grasp_segment_allowed)
+                           grasp_allowed=grasp_allowed, pose_allowed=pose_allowed, grasp_pose_allowed=grasp_pose_allowed, grasp_segment_allowed=grasp_segment_allowed, grasp_record_allowed=grasp_record_allowed)
         if isinstance(out, tuple):
             if mf_key is not None:
                 MF.width_of(s).update(mf_key, True)
@@ -5432,7 +5433,7 @@ def allowed_grasp_turns(grasp, twins, allowed=None):
 
 
 def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins, band_of,
-                 name, offered, arm, manip, fails, ev_of, gname, tried, verify=None, grasp_allowed=None, pose_allowed=None, grasp_pose_allowed=None, grasp_segment_allowed=None):
+                 name, offered, arm, manip, fails, ev_of, gname, tried, verify=None, grasp_allowed=None, pose_allowed=None, grasp_pose_allowed=None, grasp_segment_allowed=None, grasp_record_allowed=None):
     """:func:`phase3_target`'s draw over F (without replacement): ``(pose, GraspRecord)`` on the first exact-IK confirmation, else the last
     IK failure reason. With ``ev_of`` (BAND_EVIDENCE) each tried pair's outcome is counted in its arm's evidence (a pair whose positions
     all left the support counts nothing); ``tried`` collects the pairs drawn."""
@@ -5520,6 +5521,15 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
                 fails['caller_grasp_segment'] = fails.get('caller_grasp_segment', 0) + 1
                 last_reason = 'grasp approach rejected by caller segment predicate'
                 continue
+            if res.ok and grasp_record_allowed is not None:
+                proposed = GraspRecord(name, arm_c, getattr(g_rec, "key", None), getattr(g_rec, "name", None), yaw, pre, eef,
+                                       finger_q=list(getattr(g_rec, "finger_q", []) or []) or None, eef_in_object=eef_in_object)
+                if not grasp_record_allowed(st_of[arm_c], pose, proposed):
+                    # A goal-dependent rejection must try another bounded pick
+                    # proposal, without marking this reachable map pair bad.
+                    fails['caller_grasp_record'] = fails.get('caller_grasp_record', 0) + 1
+                    last_reason = 'grasp rejected by caller goal predicate'
+                    continue
             n_ik += 1
             if not res.ok:
                 fails["ik"] += 1
