@@ -122,6 +122,14 @@ def apply(expansion, proof, jobs, source_verification):
                            next_action='Verify revised exact input dependency; scene scale evidence does not prove physical readiness')
                 dependency_revisions.append({'configuration_id':row['configuration_id'], 'old':dependency_id, 'new':dep['id']})
             key = dep['id']
+            # A revised query can converge on an already verified physical
+            # request. Preserve that exact request's audit instead of letting
+            # configuration iteration order replace it with an unverified copy.
+            if key != dependency_id and key in original_jobs:
+                cached = original_jobs[key]
+                if cached['kind'] != dep['kind'] or cached['inputs'] != dep['inputs']:
+                    raise ValueError('dependency identity collision')
+                dep = deepcopy(cached)
             if key not in result_jobs:
                 dep['consumers'] = []
                 dep['required_by_classes'] = []

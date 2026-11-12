@@ -76,3 +76,16 @@ def test_target_profile_does_not_resolve_replacement_or_other_scale(bad):
     if bad == 'class': row['class_id'] = 'configuration_matching-articulation_open_large_scale_01'
     if bad == 'unverified': args[3]['verified_profile_roles'] = []
     with pytest.raises(ValueError): apply(*args)
+
+
+def test_revised_query_reuses_identical_verified_request_independent_of_order():
+    args = fixture()
+    changed = deepcopy(args[2]['rows'][0]); changed['inputs']['target']['applied_scale'] = [1,2,3]
+    changed['inputs']['target']['scale_rule'] = 'literal_exact_scene_initialization'
+    changed['id'] = 'request_' + digest({'kind':changed['kind'],'inputs':changed['inputs']})
+    changed.update(unresolved_inputs=[], artifact='exact-positive-native-proof', evidence=['exact-positive-native-proof'])
+    args[2]['rows'].append(changed)
+    jobs = apply(*args)[1]['rows']
+    query = next(r for r in jobs if r['kind'] == 'query')
+    assert query['id'] == changed['id']
+    assert query['status'] == 'verified' and query['artifact'] == 'exact-positive-native-proof'
