@@ -26,6 +26,12 @@ async function refreshEvidence(){
       const p=document.createElement('p');p.className=row.verification_status==='verified'?'':'pending';
       p.textContent=`${row.control}: ${row.status||'status unavailable'}; job ${row.job_id||'unavailable'}; scheduler ${row.scheduler_state||'unavailable'}; verification ${row.verification_status||'not verified'}. ${row.next_action||''}`;return p;
     }));
+    const targeted=matrix?.targeted_controls||[];
+    byId('targeted-observation').textContent=targeted.length?`${targeted.length} targeted controls on the mass-restoration candidate. Full cleanup/matrix verification remains separate. Observed ${observedText(matrix.observed_at)}.`:'UNAVAILABLE: targeted control observations not published.';
+    byId('targeted-controls').replaceChildren(...targeted.map(row=>{
+      const p=document.createElement('p');p.className=row.verification_status==='verified'?'':'pending';
+      p.textContent=`${row.control}: ${row.status||'status unavailable'}; job ${row.job_id||'unavailable'}; scheduler ${row.scheduler_state||'unavailable'}; verification ${row.verification_status||'not verified'}. ${row.next_action||''}`;return p;
+    }));
     for(const episode of value.episodes){
       let card=byId(episode.id);
       if(!card){card=document.createElement('article');card.id=episode.id;const h=document.createElement('h2');const p=document.createElement('p');const video=document.createElement('video');video.controls=true;video.preload='metadata';video.playsInline=true;video.src=episode.url;const link=document.createElement('a');link.href=episode.url;link.textContent='Open video';card.append(h,p,video,document.createElement('br'),link);byId('episodes').append(card);}
