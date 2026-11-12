@@ -97,20 +97,30 @@ def run(root, request_path, output):
     source, contract = pool.verify_inputs(root, request, records)
     runtime = Path(__file__).resolve().parents[2]
     require(file_digest(runtime/'.snapshot_commit') == request['probe_runtime_sha256'], 'pool replay runtime changed')
-    verify_runtime(root, request, records, runtime, pool.verify_runtime)
-    proof = json.loads(Path(request['runtime_compatibility']['path']).read_text())
+    pool.verify_runtime(root, request, records, runtime)
+    action_request = request
+    recovery = None
+    if request.get('pool_recovery_v1') is True:
+        from . import training_pool_recovery_probe as recovery
+        action_request = recovery.parent_request(request,
+            json.loads(Path(request['runtime_compatibility']['path']).read_text()))
+    proof = json.loads(Path(action_request['runtime_compatibility']['path']).read_text())
     output.mkdir(parents=True)
     os.environ['ISPATIALGYM_TRAINING_OBSERVATION_REQUEST'] = str(Path(request_path).resolve())
     os.environ['ISPATIALGYM_TRAINING_OBSERVATION_REQUEST_SHA256'] = file_digest(request_path)
     from ispatialgym.oracle import run_isg as runner
     import omnigibson as og
-    install_anchor(runner, contract, output, pool.install, load_request(request, proof))
+    install_anchor(runner, contract, output, pool.install, load_request(action_request, proof))
     current = {}; planner = []
+    cleanups = []
+    if recovery is not None:
+        recovery.install(runner, request['diagnostic_control'], current, cleanups)
     def observed(value):
         planner.append(value)
         write_json_atomic(output/'pool_planner_audit.json', {'observations': planner, 'physical_delta': DELTA})
     install_planner(runner, set(contract['initialized_actors']), current, observed)
-    order = {'FRESH_A': [0], 'FRESH_B': [1], 'ABA': [0, 1, 0]}[request['diagnostic_control']]
+    orders = recovery.ORDERS if recovery is not None else {'FRESH_A': [0], 'FRESH_B': [1], 'ABA': [0, 1, 0]}
+    order = orders[request['diagnostic_control']]
     shared = {'compatible_template_dirs': {os.path.abspath(runner.resolve_instance(r['artifacts']['tro']['path'])[1])
                                            for r in records}}
     result = {'schema': 'isg-selected-pool-native-action-replay-v1',
@@ -120,6 +130,7 @@ def run(root, request_path, output):
               'exportable': False, 'active_only_export_verified': False,
               'scope': 'Native source action replay and planner exclusion only. Full-union diagnostic recording; '
                        'active-only export and cold/reused rendering are not verified.', 'entries': []}
+    if recovery is not None: result['recovery_delta'] = recovery.DELTA
     final_isolation = []
     try:
         with pool.world_construction_counter(og) as construction:
@@ -134,14 +145,23 @@ def run(root, request_path, output):
                 argv = ['--instance', row['artifacts']['tro']['path'], '--mode', 'replay',
                         '--replay', row['artifacts']['demo']['path'], '--record', 'hdf5',
                         '--no-goal-override', '--out', str(destination)]
-                code, entry = runner.run_instance(runner.parse_args(argv), argv[1], shared)
+                try:
+                    code, entry = runner.run_instance(runner.parse_args(argv), argv[1], shared)
+                finally:
+                    while cleanups: cleanups.pop()()
                 report = destination/row['instance_id']/'meta.json'
                 result['entries'].append({'source_index': index, 'canary_review': request['canaries'][index],
                     'returncode': code, 'result': entry,
                     'report': {'path': str(report), 'sha256': file_digest(report)}})
                 write_json_atomic(output/'probe.json', result)
                 require(current.get('planner_observed') is True, 'native pool planner boundary missing')
-                require(code == 0 and entry.get('success') is True, 'native pool action replay failed')
+                aborted = recovery is not None and recovery.verify_expected_abort(
+                    request['diagnostic_control'], ordinal, code, entry, json.loads(report.read_text()))
+                if aborted:
+                    result['entries'][-1]['expected_controlled_abort'] = True
+                    write_json_atomic(output/'probe.json', result)
+                else:
+                    require(code == 0 and entry.get('success') is True, 'native pool action replay failed')
                 scene = shared['env'].scene
                 _, expected = pool.isolated_member_scene(contract,
                     json.loads(Path(member['scene']['path']).read_text()), member['active'])

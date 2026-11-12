@@ -33,6 +33,9 @@ ALLOWED = {'scripts/campaign_20261110/training_batch_probe.py',
 
 
 def verify_inputs(root, request, records):
+    if request.get('pool_recovery_v1') is True:
+        from .training_pool_recovery_probe import parent_request
+        return verify_inputs(root, parent_request(request), records)
     if request.get('pool_action_replay_v1') is True:
         from .training_pool_replay_probe import load_request
         return verify_inputs(root, load_request(request), records)
@@ -53,6 +56,9 @@ def verify_inputs(root, request, records):
 
 
 def verify_runtime(root, request, records, runtime):
+    if request.get('pool_recovery_v1') is True:
+        from .training_pool_recovery_probe import verify_runtime as verify_recovery
+        return verify_recovery(root, request, records, runtime, verify_runtime)
     if request.get('pool_action_replay_v1') is True:
         from .training_pool_replay_probe import verify_runtime as verify_action_runtime
         return verify_action_runtime(root, request, records, runtime, verify_runtime)
