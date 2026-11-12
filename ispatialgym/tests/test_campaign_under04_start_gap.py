@@ -9,7 +9,7 @@ from ispatialgym.sampling import campaign_runtime
 from ispatialgym.sampling.sim_utils import Reject
 
 
-def draw(monkeypatch, predicate=None):
+def draw(monkeypatch, predicate=None, **kw):
     exact=[]
     class IK:
         def feasible_sets(self,cells,yaws,grasps,*args):
@@ -24,7 +24,7 @@ def draw(monkeypatch, predicate=None):
     manip=NS(focus=th.tensor([1.,2.,.8]),translate=.3,tilt=0.,name='manipulation',working_arms=['right'])
     g=NS(name='g0',key='spatula__hkvsep',pose=(th.zeros(3),C.IDENTITY_QUAT.clone()),finger_q=None)
     out=TT.phase3_target(s,manip,np.random.default_rng(0),[g],th.zeros(8,3),C.IDENTITY_QUAT,[],
-                        top=top,support_z=.8,pose_allowed=predicate)
+                        top=top,support_z=.8,pose_allowed=predicate,**kw)
     return out,exact
 
 

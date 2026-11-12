@@ -1515,9 +1515,15 @@ class IORSSmall(SamplerV2):
             yaws = self.widest_faces_target_yaws(manip) if self.widest_faces() else self.support_aligned_yaws("target", manip) if self.init_align_support() else None
         yaw_kw = {"yaws": yaws, "jitter": 0.0} if yaws is not None else {}
         plan = getattr(self, '_campaign_pair_active', None)
-        if plan is not None and os.environ.get('ISPATIALGYM_UNDER04_START_GAP_PROPOSAL', '0') == '1':
+        from ispatialgym.sampling import campaign_inside_descent as CID
+        inside_descent = plan is not None and CID.enabled()
+        if inside_descent:
+            partner_world = self.world.hull_at(self.hull['partner'], tuple(G.t(v) for v in plan.partner))
+            bounds = th.stack([partner_world.min(0).values, partner_world.max(0).values]).detach().cpu().numpy()
+            yaw_kw['grasp_pose_allowed'] = CID.pregrasp_predicate(bounds)
+        if plan is not None and (inside_descent or os.environ.get('ISPATIALGYM_UNDER04_START_GAP_PROPOSAL', '0') == '1'):
             from ispatialgym.sampling import campaign_runtime
-            if campaign_runtime.configuration()[1].class_id == 'inter_object_relation_satisfaction-under_small_scale_04':
+            if inside_descent or campaign_runtime.configuration()[1].class_id == 'inter_object_relation_satisfaction-under_small_scale_04':
                 # The fixed paper partner rejected most fresh starts only after
                 # their grasp had been solved. Apply the identical 3cm footprint
                 # gap while proposing starts; never relax the later check.

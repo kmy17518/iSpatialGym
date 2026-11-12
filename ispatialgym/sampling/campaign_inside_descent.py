@@ -11,6 +11,20 @@ def enabled():
     return campaign_runtime.configuration()[1].class_id == 'inter_object_relation_satisfaction-inside_01'
 
 
+def pregrasp_predicate(bounds):
+    """Use the same conservative screen while drawing, before losing a stance."""
+    from ispatialgym.grasping import hand_geometry as HG
+    hands = {}
+
+    def allowed(arm, pre):
+        if arm not in hands:
+            hands[arm] = HG.load(arm)
+        p, q = (value.detach().cpu().numpy() for value in pre)
+        return not swept_hand_box(hands[arm], p, q, bounds)['overlap']
+
+    return allowed
+
+
 def swept_hand_box(hand, position, orientation, bounds, *, rise=.12):
     """Conservative continuous vertical sweep of native hand convex pieces.
 

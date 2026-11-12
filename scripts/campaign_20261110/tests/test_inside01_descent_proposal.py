@@ -41,3 +41,37 @@ def test_invalid_or_non_native_geometry_is_not_a_pass():
     hand=load('right')
     with pytest.raises(ValueError):swept_hand_box(hand,[0,0,0],[0,0,0,0],np.zeros((2,3)))
     with pytest.raises(ValueError):swept_hand_box(NS(source='urdf_visual'),[0,0,0],[0,0,0,1],np.zeros((2,3)))
+
+
+def test_blocked_approach_uses_remaining_bounded_start_draws(monkeypatch):
+    from ispatialgym.tests.test_campaign_under04_start_gap import draw
+    from ispatialgym.sampling.sim_utils import Reject
+    seen=[]
+    def allowed(arm,pre):
+        seen.append((arm,pre))
+        return len(seen)==4
+    (_,rec),calls=draw(monkeypatch,grasp_pose_allowed=allowed)
+    assert rec.arm=='right' and len(calls)==len(seen)==4
+    rejected=[]
+    with pytest.raises(Reject,match='caller_grasp_pose'):
+        draw(monkeypatch,grasp_pose_allowed=lambda arm,pre:rejected.append(pre) or False)
+    assert len(rejected)==5
+
+
+def test_no_approach_predicate_preserves_original_random_draw(monkeypatch):
+    import torch as th
+    from ispatialgym.tests.test_campaign_under04_start_gap import draw
+    (a,_),ac=draw(monkeypatch)
+    (b,_),bc=draw(monkeypatch,grasp_pose_allowed=lambda arm,pre:True)
+    assert len(ac)==len(bc)==1
+    assert all(th.equal(x,y) for x,y in zip(a,b))
+
+
+def test_draw_predicate_keeps_the_exact_native_descent_geometry():
+    import torch as th
+    from ispatialgym.sampling.campaign_inside_descent import pregrasp_predicate
+    evidence=json.loads(Path(__file__).with_name('inside01_descent_reference.json').read_text())
+    for row in evidence['rows']:
+        pred=pregrasp_predicate(np.array(row['box']).reshape(2,3))
+        pre=(th.tensor(row['pre']['position']),th.tensor(row['pre']['orientation']))
+        assert pred('right',pre) is row['success']
