@@ -28,8 +28,13 @@ def fixture(root):
 
 
 @pytest.mark.parametrize('timeout',[False,True])
-def test_member_projection_preserves_parent_bytes_and_passes_existing_singleton_validator(tmp_path,monkeypatch,timeout):
+@pytest.mark.parametrize('legacy_credit_omitted',[False,True])
+def test_member_projection_preserves_parent_bytes_and_passes_existing_singleton_validator(tmp_path,monkeypatch,timeout,legacy_credit_omitted):
     qr,review=fixture(tmp_path); parent_hash=m.reference(review); original=json.loads(review.read_text())
+    if legacy_credit_omitted:
+        parent=Path(qr['path']);q=json.loads(parent.read_text());q.pop('current100_r1_credit')
+        parent.write_text(json.dumps(q));qr=m.reference(parent);original['request']=qr
+        review.write_text(json.dumps(original));parent_hash=m.reference(review)
     if timeout:
         original.update(returncode=124,native_artifacts_complete=False,requested_count=3,written_count=2,
                         members=original['members'][:2],artifacts=original['artifacts'][:6])
@@ -39,6 +44,7 @@ def test_member_projection_preserves_parent_bytes_and_passes_existing_singleton_
     projection=json.loads(Path(value['source_request']['path']).read_text())
     assert projection['count']==1 and projection['start_index']==102 and projection['projection_only']
     assert projection['native_generation_request']==qr and projection['native_runtime']==original['native_runtime']
+    assert projection['current100_r1_credit']==0 and m.reference(Path(qr['path']))==qr
     assert m.reference(review)==parent_hash
     projected=json.loads(Path(value['source_review']['path']).read_text())
     assert projected['returncode']==original['returncode']
@@ -83,3 +89,10 @@ def test_member_projection_rejects_unbound_or_incomplete_evidence(tmp_path,chang
     elif change=='runtime':v['native_runtime']='another';review.write_text(json.dumps(v))
     else:v['returncode']=124;review.write_text(json.dumps(v))
     with pytest.raises(ContractError):m.member_projection(tmp_path,qr,review,index,tmp_path/'projection')
+
+
+@pytest.mark.parametrize('key,value',[('current100_r1_credit',1),('quota_credit',1),('benchmark_credit',1),('production_released',True)])
+def test_missing_legacy_label_cannot_authorize_credit_or_production(tmp_path,key,value):
+    qr,review=fixture(tmp_path);p=Path(qr['path']);q=json.loads(p.read_text());q.pop('current100_r1_credit');q[key]=value
+    p.write_text(json.dumps(q));qr=m.reference(p);v=json.loads(review.read_text());v['request']=qr;review.write_text(json.dumps(v))
+    with pytest.raises(ContractError):m.member_projection(tmp_path,qr,review,102,tmp_path/'projection')

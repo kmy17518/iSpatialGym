@@ -44,7 +44,7 @@ def checked_member_source(root, request_ref, review_path, index):
     v = json.loads(checked(root, review_ref).read_text())
     require(q['schema'] == 'isg-bounded-canonical-group-request-v1' and
             q['campaign_id'] == 'campaign_20261110' and q['purpose'] == 'canonical_recovery_bounded_canary' and
-            q['count'] == 3 and q['benchmark_credit'] == q['quota_credit'] == q['current100_r1_credit'] == 0 and
+            q['count'] == 3 and q['benchmark_credit'] == q['quota_credit'] == q.get('current100_r1_credit', 0) == 0 and
             q['production_released'] is False, 'not an authorized bounded engineering group')
     require(v['request'] == request_ref and parent_has_complete_members(v) and
             v['native_runtime'] == q['native_runtime'] and v['benchmark_credit'] == 0 and
@@ -72,6 +72,12 @@ def member_projection(root, request_ref, review_path, index, output):
     q, v, review_ref, artifacts, selected, members = checked_member_source(root, request_ref, review_path, index)
     member = {**q, 'schema': 'isg-bounded-canonical-member-projection-v2',
               'start_index': index, 'count': 1,
+              # Some independently authored bounded requests omit the retired
+              # R1 accounting label. The guard above still requires explicit
+              # zero benchmark/quota credit and no production authorization.
+              # Make the zero explicit in the projection, preserving parent
+              # bytes and their bound identity for every consumer.
+              'current100_r1_credit': 0,
               'native_generation_request': request_ref, 'native_generation_review': review_ref,
               'projection_only': True, 'new_native_draws': 0,
               'projection_meaning': 'Exact existing member of parent group; no new native execution or identity change.'}
