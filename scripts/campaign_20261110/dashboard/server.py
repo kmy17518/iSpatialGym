@@ -85,6 +85,9 @@ def eligibility_view(value):
 
 
 def snapshot(root, inventory):
+    inventory_current, inventory_current_source = read_source(root / 'dashboard/model_variant_inventory_current.json')
+    if inventory_current and inventory_current.get('campaign_id') != 'campaign_20261110':
+        inventory_current = {}; inventory_current_source = {'available': False, 'error': 'Campaign identity mismatch'}
     activity, activity_source = read_source(root / 'dashboard/interactive_activity.json')
     if activity and activity.get('campaign_id') != 'campaign_20261110':
         activity = {}; activity_source = {'available': False, 'error': 'Campaign identity mismatch'}
@@ -198,6 +201,7 @@ def snapshot(root, inventory):
     cluster_view['jobs'] = jobs
     return sanitize({'campaign_id': 'campaign_20261110', 'served_at': datetime.now(timezone.utc).isoformat(),
         'targets': TARGETS, 'deadline': '2026-11-12T19:00:00Z', 'refresh_seconds': 30,
+        'inventory_current': inventory_current, 'inventory_current_source': inventory_current_source,
         'interactive_activity': activity, 'interactive_activity_source': activity_source,
         'sources': {'capacity_recovery': crs, 'heldout_recovery': hrs, 'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss, 'group_yield': ys, 'fleet_gpu_time': fs, 'cluster_fleet_gpu_time': cfs, 'standard_recovery': rs, 'training_eligibility': tes, 'training_production_gate': pgs, 'training_requirements': reqs, 'canonical_validation': cvs, 'training_containment': cts, 'training_stream': tss, 'change_impact': cis, 'current_eligibility': ces},
         'training_eligibility': {**{k:v for k,v in training.items() if k not in ('records','inputs','cohorts')},
@@ -279,7 +283,7 @@ class Handler(BaseHTTPRequestHandler):
                      'required_configurations_in_index':len(rows),'matching':len(matching),
                      'offset':offset,'limit':100,'rows':matching[offset:offset+100]}
             return self.send_body(200,json.dumps(sanitize(payload)).encode(),'application/json')
-        audits = {'/reports/runtime-validation-r2-startup':'runtime_validation_r2_startup.json','/reports/runtime-validation':'runtime_validation.json','/reports/deadline-checkpoint':'streaming_deadline_checkpoint.json', '/reports/execution-ledger':'execution_ledger.json', '/reports/preparation':'preparation_status.json', '/reports/capacity-recovery': 'capacity_recovery.json', '/reports/heldout-recovery': 'heldout_recovery.json', '/reports/reconciliation': 'reconciliation.json',
+        audits = {'/reports/corrected-inventory':'model_variant_inventory_current.json','/reports/runtime-validation-r2-startup':'runtime_validation_r2_startup.json','/reports/runtime-validation':'runtime_validation.json','/reports/deadline-checkpoint':'streaming_deadline_checkpoint.json', '/reports/execution-ledger':'execution_ledger.json', '/reports/preparation':'preparation_status.json', '/reports/capacity-recovery': 'capacity_recovery.json', '/reports/heldout-recovery': 'heldout_recovery.json', '/reports/reconciliation': 'reconciliation.json',
             '/reports/dependency-readiness':'dependency_readiness.json',
             '/reports/canonical-validation': 'canonical_validation.json',
             '/reports/training-eligibility': 'training_eligibility.json',
@@ -302,7 +306,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/runtime-validation-r2-startup', '/reports/runtime-validation', '/reports/deadline-checkpoint', '/reports/execution-ledger', '/reports/preparation', '/reports/pipeline-status', '/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
+            if path in ('/reports/corrected-inventory', '/reports/runtime-validation-r2-startup', '/reports/runtime-validation', '/reports/deadline-checkpoint', '/reports/execution-ledger', '/reports/preparation', '/reports/pipeline-status', '/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,
