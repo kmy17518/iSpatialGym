@@ -88,7 +88,7 @@ class JointGoalPlan:
                 _require(abs(float(q0)-float(q1)) <= tolerance, f"another joint changes initial-to-goal: {name}")
 
     def closing_probe_values(self, *, direction, lower, upper, stable, count=7):
-        """Propose untested closing starts when the legacy stable grid misses an eval bucket.
+        """Fill missing closing-start grid points within the strict eval bucket.
 
         Every returned value still needs the native passive-stability probe and
         all later contact/reach/path checks. Training retains its soft bucket.
@@ -97,10 +97,11 @@ class JointGoalPlan:
             return []
         _require(upper > lower and isinstance(count, int) and 1 <= count <= 31, "invalid stable probe range/count")
         lo, hi = self.fraction_range
-        if any(v > lower+1e-6 and lo <= (v-lower)/(upper-lower) <= hi
-               and (lo == 0 or (v-lower)/(upper-lower) > lo) for v in stable):
-            return []
-        return [lower + (lo+(hi-lo)*k/(count+1))*(upper-lower) for k in range(1, count+2)]
+        # A legacy low-angle grid often includes the fully-open endpoint. That
+        # single endpoint must not suppress every interior high-bucket probe.
+        # Deduplication skips a probe, never substitutes or admits an angle.
+        values = [lower + (lo+(hi-lo)*k/(count+1))*(upper-lower) for k in range(1, count+2)]
+        return [value for value in values if not any(abs(value-v) <= 1e-6 for v in stable)]
 
     def eligible_pairs(self, pairs, *, direction, lower, upper):
         """Keep already physically probed angle pairs with this exact goal."""

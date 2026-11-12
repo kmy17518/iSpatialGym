@@ -109,9 +109,33 @@ def test_missing_eval_bucket_proposes_values_for_native_physical_testing_only():
     p = replace(plan(), fraction_range=(.5, 1.))
     values = p.closing_probe_values(direction='close', lower=0, upper=2, stable=[.36, .42])
     assert len(values) == 8 and all(1 < v <= 2 for v in values) and values[-1] == 2
-    assert p.closing_probe_values(direction='close', lower=0, upper=2, stable=[1.2]) == []
+    assert p.closing_probe_values(direction='close', lower=0, upper=2, stable=[1.2]) == values
     assert replace(p, split='train').closing_probe_values(direction='close', lower=0, upper=2, stable=[.4]) == []
     assert p.closing_probe_values(direction='open', lower=0, upper=2, stable=[]) == []
+
+
+@pytest.mark.parametrize('upper,legacy_range', [(1.908, (.30, .45)), (1.571, (.18, .25))])
+def test_fully_open_legacy_endpoint_does_not_suppress_high_bucket_probes(upper, legacy_range):
+    p = replace(plan(), fraction_range=(.5, 1.))
+    stable = [upper * legacy_range[0], upper * legacy_range[1], upper]
+    proposed = p.closing_probe_values(direction='close', lower=0, upper=upper, stable=stable)
+    assert len(proposed) == 7 and all(.5 < q / upper < 1 for q in proposed)
+    # Merely proposing new values does not make them eligible: only the
+    # physically verified stable list is consumed by initial().
+    rng = SimpleNamespace(integers=lambda n: 0)
+    assert p.initial(direction='close', lower=0, upper=upper, stable=stable, rng=rng) == (upper, 0.)
+    passed = stable + proposed
+    assert p.closing_probe_values(direction='close', lower=0, upper=upper, stable=passed) == []
+
+
+def test_closing_grid_deduplication_preserves_exact_stable_values_and_strict_boundaries():
+    p = replace(plan(), fraction_range=(.5, 1.))
+    near = 1.125 + 5e-7
+    stable = [1., near, 2.]
+    before = list(stable)
+    values = p.closing_probe_values(direction='close', lower=0, upper=2, stable=stable)
+    assert stable == before and len(values) == 6 and 1.125 not in values
+    assert p.eligible_pairs([(1., 0.), (near, 0.)], direction='close', lower=0, upper=2) == [(near, 0.)]
 
 
 def test_carton_viewpoint_hint_requires_audited_source_and_preserves_goal():
