@@ -261,47 +261,53 @@ def cycle(root, account, capacity_probe=probe):
                     tickets.append({**ticket,'_prepared_manifest':reference})
         except (OSError,ValueError,KeyError,TypeError) as exc:
             errors.append({'source':reference['path'],'error':str(exc),'owner':'/root'})
-    capacity=capacity_probe()
-    allowance=min(capacity.get('compatible_available_slots',0),capacity.get('account_slots',{}).get(account,0)) if capacity.get('status')=='observed' else 0
-    preparation_allowance=preparation_capacity(capacity,account,int(policy.get('critical_reserved_physical_slots',4)))
-    critical={'pipeline','canonical recovery'}
-    pending=set(map(str,capacity.get('pending_job_ids',[])));known_pending=set()
-    for ticket in tickets:
-        if ticket.get('workstream') in critical and Path(ticket['submission_path']).exists():
-            jid=str(read(ticket['submission_path']).get('job_id'))
-            if jid in pending:known_pending.add(jid)
-    queue_allowance=max(0,int(policy.get('critical_pending_limit',6))-len(known_pending)) if capacity.get('status')=='observed' else 0
-    rows=[]
-    # Distribute independent consumed-data builders across classes. Existing
-    # claim receipts still prevent duplicate work across both backends.
-    for ticket in dispatch_order(tickets):
-        try:
-            state=pending_status(ticket)
-            if state=='ready' and ticket.get('workstream')=='training preparation':
-                ticket['preparation_authorization']=authorize_preparation(ticket,policy)
-            slots=int(ticket.get('gpu_slots',1));is_critical=ticket.get('workstream') in critical
-            is_preparation=ticket.get('workstream')=='training preparation'
-            within_reserve=not is_preparation or preparation_allowance>=slots
-            if state=='ready' and within_reserve and (allowance>=slots or is_critical and queue_allowance>=slots):
-                result=submit(ticket,capacity)
-                if result:
-                    allowance=max(0,allowance-slots);state=result['status']
-                    preparation_allowance=max(0,preparation_allowance-slots)
-                    if is_critical:queue_allowance=max(0,queue_allowance-slots)
-            rows.append({'id':ticket['id'],'workstream':ticket['workstream'],'owner':ticket['owner'],
-                         'class_id':ticket.get('class_id'),'state':state,'ready_since':ticket.get('ready_since'),
-                         'submission_path':ticket['submission_path'],'claim_path':ticket['claim_path'],
-                         'blocker':('Physical headroom reserved for recovery/pipeline; eligible consumed data may use Vast'
-                                    if state=='ready' and is_preparation and not within_reserve else
-                                    'No currently available account/physical slots' if state=='ready' and allowance<=0 else None)})
-        except (OSError,ValueError,KeyError,subprocess.SubprocessError) as exc:
-            rows.append({'id':ticket['id'],'state':'needs_reconciliation','owner':ticket['owner'],'error':str(exc)})
-    report={'schema':'isg-coordinator-dispatch-status-v1','campaign_id':root.name,'owner':'/root',
-            'account':account,'pid':os.getpid(),'observed_at':time.time(),'last_reconciliation_at':time.time(),
-            'cadence_seconds':30,'capacity':{k:v for k,v in capacity.items() if k!='probe'},'requests':rows,'errors':errors,
-            'production_released':False,'automatic_retry_ambiguous_submission':False}
-    shared_json(directory/('status_'+account+'.json'),report)
-    return report
+    # Both accounts share one physical reserve; probe and submit under the same
+    # lock so they cannot each spend the same observed free GPUs.
+    with (directory/'capacity_allocation.lock').open('a') as allocation_lock:
+        if os.fstat(allocation_lock.fileno()).st_uid==os.geteuid():
+            os.fchmod(allocation_lock.fileno(),0o660)
+        fcntl.flock(allocation_lock,fcntl.LOCK_EX)
+        capacity=capacity_probe()
+        allowance=min(capacity.get('compatible_available_slots',0),capacity.get('account_slots',{}).get(account,0)) if capacity.get('status')=='observed' else 0
+        preparation_allowance=preparation_capacity(capacity,account,int(policy.get('critical_reserved_physical_slots',4)))
+        critical={'pipeline','canonical recovery'}
+        pending=set(map(str,capacity.get('pending_job_ids',[])));known_pending=set()
+        for ticket in tickets:
+            if ticket.get('workstream') in critical and Path(ticket['submission_path']).exists():
+                jid=str(read(ticket['submission_path']).get('job_id'))
+                if jid in pending:known_pending.add(jid)
+        queue_allowance=max(0,int(policy.get('critical_pending_limit',6))-len(known_pending)) if capacity.get('status')=='observed' else 0
+        rows=[]
+        # Distribute independent consumed-data builders across classes. Existing
+        # claim receipts still prevent duplicate work across both backends.
+        for ticket in dispatch_order(tickets):
+            try:
+                state=pending_status(ticket)
+                if state=='ready' and ticket.get('workstream')=='training preparation':
+                    ticket['preparation_authorization']=authorize_preparation(ticket,policy)
+                slots=int(ticket.get('gpu_slots',1));is_critical=ticket.get('workstream') in critical
+                is_preparation=ticket.get('workstream')=='training preparation'
+                within_reserve=not is_preparation or preparation_allowance>=slots
+                if state=='ready' and within_reserve and (allowance>=slots or is_critical and queue_allowance>=slots):
+                    result=submit(ticket,capacity)
+                    if result:
+                        allowance=max(0,allowance-slots);state=result['status']
+                        preparation_allowance=max(0,preparation_allowance-slots)
+                        if is_critical:queue_allowance=max(0,queue_allowance-slots)
+                rows.append({'id':ticket['id'],'workstream':ticket['workstream'],'owner':ticket['owner'],
+                             'class_id':ticket.get('class_id'),'state':state,'ready_since':ticket.get('ready_since'),
+                             'submission_path':ticket['submission_path'],'claim_path':ticket['claim_path'],
+                             'blocker':('Physical headroom reserved for recovery/pipeline; eligible consumed data may use Vast'
+                                        if state=='ready' and is_preparation and not within_reserve else
+                                        'No currently available account/physical slots' if state=='ready' and allowance<=0 else None)})
+            except (OSError,ValueError,KeyError,subprocess.SubprocessError) as exc:
+                rows.append({'id':ticket['id'],'state':'needs_reconciliation','owner':ticket['owner'],'error':str(exc)})
+        report={'schema':'isg-coordinator-dispatch-status-v1','campaign_id':root.name,'owner':'/root',
+                'account':account,'pid':os.getpid(),'observed_at':time.time(),'last_reconciliation_at':time.time(),
+                'cadence_seconds':30,'capacity':{k:v for k,v in capacity.items() if k!='probe'},'requests':rows,'errors':errors,
+                'production_released':False,'automatic_retry_ambiguous_submission':False}
+        shared_json(directory/('status_'+account+'.json'),report)
+        return report
 
 
 def main():

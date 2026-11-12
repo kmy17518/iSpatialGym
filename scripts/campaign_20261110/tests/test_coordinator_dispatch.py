@@ -177,3 +177,34 @@ def test_preparation_reserves_physical_capacity_without_erasing_small_account_qu
     assert preparation_capacity(cap,'shiyuc',4)==2
     assert preparation_capacity({**cap,'compatible_available_slots':4},'minyeong',4)==0
     assert preparation_capacity({**cap,'status':'unavailable'},'minyeong',4)==0
+
+
+def test_two_accounts_cannot_spend_the_same_physical_reserve(tmp_path,monkeypatch):
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from scripts.campaign_20261110 import coordinator_dispatch as module
+    directory=tmp_path/'infra/coordinator_dispatch';directory.mkdir(parents=True)
+    rows=[]
+    for account in ['minyeong','shiyuc']:
+        for i in range(2):
+            child=tmp_path/(account+str(i));child.mkdir();row=ticket(child)
+            row.update(id=child.name,workstream='training preparation',owner='/root/templates_assets',expected_account=account)
+            rows.append(row)
+    manifest=tmp_path/'prepared.json';manifest.write_text(json.dumps({'tickets':rows}))
+    (directory/'policy.json').write_text(json.dumps({'owner':'/root','production_released':False,
+        'critical_reserved_physical_slots':4,'prepared_manifests':[{'path':str(manifest),'sha256':module.sha(manifest)}]}))
+    free=[6];calls=[]
+    def capacity():
+        observed=free[0];time.sleep(.03)
+        return {'status':'observed','observed_at':1,'accounts_checked':['minyeong','shiyuc'],
+                'compatible_available_slots':observed,'account_slots':{'minyeong':6,'shiyuc':6},'pending_job_ids':[]}
+    def run(command,**kwargs):
+        time.sleep(.02);calls.append(command);free[0]-=1
+        return SimpleNamespace(stdout=str(100+len(calls)),stderr='',returncode=0)
+    original=module.submit
+    monkeypatch.setattr(module,'submit',lambda t,c:original(t,c,run))
+    monkeypatch.setattr(module,'authorize_preparation',lambda t,p:{'reviewed':True})
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results=list(executor.map(lambda account:module.cycle(tmp_path,account,capacity),['minyeong','shiyuc']))
+    assert len(calls)==2 and free[0]==4
+    assert sum(r['state']=='ready' for report in results for r in report['requests'])==2
