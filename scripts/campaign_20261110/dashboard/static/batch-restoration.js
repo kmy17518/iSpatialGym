@@ -11,6 +11,10 @@ async function refreshEvidence(){
     byId('checks').replaceChildren(...value.checks.map(check=>{const p=document.createElement('p');p.textContent=`${check.name}: ${check.status.replaceAll('_',' ')}. ${check.detail}`;if(check.status!=='verified')p.className='pending';return p;}));
     const matrix=value.matrix;
     byId('matrix-observation').textContent=matrix?`Control observations: ${observedText(matrix.observed_at)}. Submitted, completed, and verified remain separate.`:'UNAVAILABLE: no authoritative control observation; no restoration result inferred.';
+    byId('matrix-summary').textContent=matrix?`${matrix.verified_controls ?? 'Unavailable'} / ${matrix.required_controls ?? 'unavailable'} controls strictly verified. Benchmark credit: ${matrix.benchmark_credit ?? 'unavailable'}.`:'Verification count unavailable.';
+    byId('matrix-errors').replaceChildren(...Object.entries(matrix?.strict_errors||{}).map(([stage,error])=>{
+      const p=document.createElement('p');p.className='pending';p.textContent=`Failed verification / ${stage}: ${error}. Evidence observed ${observedText(matrix.strict_source_observed_at)}. Owner: ${matrix.owner||'unavailable'}.`;return p;
+    }));
     byId('matrix-controls').replaceChildren(...(matrix?.controls||[]).map(row=>{
       const p=document.createElement('p');
       p.textContent=`${row.stage||row.kind||'stage unavailable'} / ${row.control}: ${row.status||'status unavailable'}; job ${row.job_id||'unavailable'}; scheduler ${row.scheduler_state||'unavailable'}; verification ${row.verification_status||'not verified'}. ${row.next_action||''} Observed ${observedText(row.observed_at||matrix.observed_at)}.`;
