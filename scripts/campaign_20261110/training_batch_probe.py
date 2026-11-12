@@ -43,6 +43,9 @@ def verify_runtime_compatibility(root, request, records, runtime):
     require(proof_path.is_relative_to(root) and proof_path.is_file() and
             file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
     proof=json.loads(proof_path.read_text())
+    if proof.get('schema') == 'isg-physics-sdk-rebuild-runtime-compatibility-v1':
+        from .training_physics_rebuild_probe import verify_runtime
+        return verify_runtime(root, request, records, runtime, verify_runtime_compatibility)
     if proof.get('schema') == 'isg-reset-contact-cache-runtime-compatibility-v1':
         from .training_contact_reset_probe import verify_runtime
         return verify_runtime(root, request, records, runtime, verify_runtime_compatibility)
@@ -459,6 +462,10 @@ def _run(root,request,output,kind,construction):
         # prebuild checks compare their content and recorded scene, not paths.
         os.environ['ISPATIALGYM_FAST_COLLECTOR_PREBUILD']='1'
         from ispatialgym.oracle import run_isg
+        if value.get('explicit_physics_sdk_rebuild_v1') is True:
+            from .training_physics_rebuild_probe import install as install_sdk_rebuild, DELTA as SDK_DELTA
+            install_sdk_rebuild(run_isg, value, output)
+            common['physics_sdk_reconstruction_delta'] = SDK_DELTA
         if value.get('fixed_mass_baseline') is True:
             from .training_fixed_mass_probe import install_fixed_mass_baseline, DELTA
             install_fixed_mass_baseline(run_isg,value,output)
