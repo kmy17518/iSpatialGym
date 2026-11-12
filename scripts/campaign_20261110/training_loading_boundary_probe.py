@@ -61,9 +61,15 @@ def run(root, request_path, output, *, preflight=False, runner=subprocess.run):
                        '--output', str(destination), '--segment', str(ordinal)]
             # __name__ is __main__ under CLI; always bind the exact module.
             command[2] = 'scripts.campaign_20261110.training_loading_boundary_probe'
+            # Each fresh child gets its own retained source settings. Do not
+            # carry A-only task flags into B merely because its wrapper ran first.
+            environment = {key:value for key,value in os.environ.items()
+                           if not key.startswith(('ISPATIALGYM_', 'ISG_'))}
+            environment.update(sources[spec['source']]['environment'])
+            environment['HDF5_USE_FILE_LOCKING'] = 'FALSE'
             with (output/('segment_'+str(ordinal)+'.log')).open('w') as log:
                 completed = runner(command, stdout=log, stderr=subprocess.STDOUT, timeout=remaining,
-                                   env={**os.environ, 'HDF5_USE_FILE_LOCKING': 'FALSE'})
+                                   env=environment)
             path = destination/'loading_boundary.json'; segment = json.loads(path.read_text())
             require(completed.returncode == segment['returncode']
                     and segment['request'] == ref(request_path)
