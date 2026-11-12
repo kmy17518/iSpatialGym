@@ -5,12 +5,28 @@ import json
 import time
 import uuid
 import sys
+import os
+import importlib.util
+from functools import lru_cache
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from scripts.campaign_20261110.immutable_file_audit import ImmutableFileAudit
 
 
 SCHEMA = 'isg-map-cluster-return-request-v1'
+
+
+@lru_cache(maxsize=1)
+def consumed_return_reader():
+    """An immutable optional extension, installed only by a reviewed handoff."""
+    path = os.environ.get('ISG_VAST_CONSUMED_RETURN_HELPER')
+    if not path:
+        return None
+    if digest(path) != os.environ.get('ISG_VAST_CONSUMED_RETURN_HELPER_SHA256'):
+        raise ValueError('Consumed-map return helper identity differs')
+    spec = importlib.util.spec_from_file_location('isg_consumed_map_return', path)
+    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+    return module
 
 
 def prepared_targets(root, account, source_plan):
@@ -131,6 +147,9 @@ def reconcile(root, states, active_staging, heartbeats, remote_jobs, save_state,
     from scripts.campaign_20261110.infra_vast import cluster_return_release
     releases = cluster_return_release.reconcile(root, states, active_staging, heartbeat_jobs, remote_jobs, save_state)
     report = {'observed_at': now, 'acknowledged': [], 'rejected': [], 'deferred': [], 'releases': releases}
+    consumed = consumed_return_reader()
+    if consumed is not None and consumed.has_pending(root):
+        report['consumed_maps'] = consumed.reconcile(root, states, active_staging, heartbeats, remote_jobs, save_state, now=now)
     audit = ImmutableFileAudit()
     for path in sorted((base / 'requests').glob('*.json')):
         acknowledgement = base / 'acknowledgements' / path.name
@@ -172,6 +191,8 @@ def reconcile(root, states, active_staging, heartbeats, remote_jobs, save_state,
 
 def has_pending(root):
     base = Path(root) / 'vast/cluster_return'
-    return (any(not (base / 'acknowledgements' / p.name).exists() and not (base / 'rejected' / p.name).exists()
+    legacy = (any(not (base / 'acknowledgements' / p.name).exists() and not (base / 'rejected' / p.name).exists()
                 for p in (base / 'requests').glob('*.json'))
             or any(not (base / 'released' / p.name).exists() for p in (base / 'releases').glob('*.json')))
+    consumed = consumed_return_reader()
+    return legacy or consumed is not None and consumed.has_pending(root)
