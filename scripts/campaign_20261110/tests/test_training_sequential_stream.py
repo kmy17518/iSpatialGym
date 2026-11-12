@@ -91,8 +91,8 @@ def test_prospective_pair_retains_A_and_exact_new_B_without_relabeling_failure(t
 
 
 def test_matrix_binds_normal_and_cleanup_rendering_to_one_renderer(tmp_path,monkeypatch):
-    native=tmp_path/'code/native';renderer=tmp_path/'code/renderer'
-    for directory,label in ((native,'native'),(renderer,'render')):
+    native=tmp_path/'code/native';renderer=tmp_path/'code/renderer';checker=tmp_path/'code/checker'
+    for directory,label in ((native,'native'),(renderer,'render'),(checker,'checker')):
         (directory/'scripts').mkdir(parents=True);(directory/'ispatialgym').mkdir();(directory/'.snapshot_commit').write_text(label)
     job=tmp_path/'job';job.mkdir();(job/'job.env').write_text('source bytes')
     reviews=[stream.immutable(tmp_path/(name+'.json'),{'identity':name})for name in ('A','B')]
@@ -105,11 +105,12 @@ def test_matrix_binds_normal_and_cleanup_rendering_to_one_renderer(tmp_path,monk
         audited.append((request.get('sequential_render_only'),runtime))
         return request['runtime_compatibility']
     monkeypatch.setattr(stream,'verify_runtime_compatibility',audit)
-    batch=tmp_path/'batch';manifest=stream.read(stream.prepare_matrix(tmp_path,batch,reviews,native,0,renderer)['path'])
+    batch=tmp_path/'batch';manifest=stream.read(stream.prepare_matrix(tmp_path,batch,reviews,native,0,renderer,checker)['path'])
     assert len(manifest['records'])==9
-    assert {r['runtime']for r in manifest['records']if r['stage']=='physics'}=={str(native)}
+    assert {r['runtime']for r in manifest['records']if r['stage']=='physics'}=={str(checker)}
     assert {r['runtime']for r in manifest['records']if r['stage']=='rendering'}=={str(renderer)}
     assert sum(flag is True for flag,runtime in audited)==3
+    assert all(stream.read(r['request']['path'])['sequential_checker_only'] is True for r in manifest['records']if r['stage']=='physics')
     cleanup=stream.read(stream.prepare_render_cleanup(tmp_path,batch,reviews,native,renderer,stream.ref(job/'job.env'))['path'])
     assert len(cleanup['records'])==2 and {r['runtime']for r in cleanup['records']}=={str(renderer)}
     proof=stream.read(manifest['records'][-1]['runtime_proof']['path'])

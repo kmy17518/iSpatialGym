@@ -26,13 +26,15 @@ def immutable(path,value):
     return ref(path)
 
 
-def prepare_matrix(root,batch,reviews,runtime,started_at,render_runtime=None):
+def prepare_matrix(root,batch,reviews,runtime,started_at,render_runtime=None,physics_probe_runtime=None):
     root,batch,runtime=Path(root),Path(batch),Path(runtime)
     render_runtime=Path(render_runtime)if render_runtime else runtime
+    physics_probe_runtime=Path(physics_probe_runtime)if physics_probe_runtime else runtime
     directory=batch/'sequential_verification_r1';manifest=directory/'requests.json'
     if manifest.exists():
         saved=read(manifest)
-        require(saved['canaries']==reviews and saved['runtime']==str(runtime)and saved.get('render_runtime',str(runtime))==str(render_runtime),'matrix source identity changed')
+        require(saved['canaries']==reviews and saved['runtime']==str(runtime)and saved.get('render_runtime',str(runtime))==str(render_runtime)and
+                saved.get('physics_probe_runtime',str(runtime))==str(physics_probe_runtime),'matrix source identity changed')
         for row in saved['records']:
             checked(root,row['request']);checked(root,row['preflight'])
         return ref(manifest)
@@ -40,13 +42,16 @@ def prepare_matrix(root,batch,reviews,runtime,started_at,render_runtime=None):
     require(len(sources)==2 and sources[0]['instance_id']!=sources[1]['instance_id'],'matrix needs two own-passed inputs')
     stamp=runtime/'.snapshot_commit';native_hash=file_digest(stamp)
     require(all(s['export_record']['validation_key']['code_sha256']==native_hash for s in sources),'matrix native source differs')
-    payloads={str(p.relative_to(runtime)):file_digest(p) for folder in ('ispatialgym','scripts') for p in sorted((runtime/folder).rglob('*.py')) if p.is_file()}
-    proof=immutable(directory/'runtime_compatibility.json',{'schema':'isg-exact-native-runtime-compatibility-v1','native_runtime':ref(stamp),'python_payloads':payloads,'physical_code_changes':0})
+    if physics_probe_runtime!=runtime:
+        proof=render_runtime_proof(directory/'runtime_compatibility.json',runtime,physics_probe_runtime,physics_checker=True)
+    else:
+        payloads={str(p.relative_to(runtime)):file_digest(p) for folder in ('ispatialgym','scripts') for p in sorted((runtime/folder).rglob('*.py')) if p.is_file()}
+        proof=immutable(directory/'runtime_compatibility.json',{'schema':'isg-exact-native-runtime-compatibility-v1','native_runtime':ref(stamp),'python_payloads':payloads,'physical_code_changes':0})
     render_proof=render_runtime_proof(directory/'renderer_runtime_compatibility.json',runtime,render_runtime)if render_runtime!=runtime else proof
-    env=ref(Path(sources[1]['source_job'])/'job.env');rows=[]
+    env=ref(Path(sources[0]['source_job'])/'job.env');rows=[]
     for stage,specs in [('physics',PHYSICS),('rendering',RENDER)]:
         kind='physics_action_open_loop'if stage=='physics'else'kinematic_observation_rendering'
-        stage_runtime=runtime if stage=='physics'else render_runtime
+        stage_runtime=physics_probe_runtime if stage=='physics'else render_runtime
         stage_proof=proof if stage=='physics'else render_proof
         for name,(control,order)in specs.items():
             destination=directory/stage/name;request=destination/'request.json';output=destination/'output'
@@ -58,6 +63,7 @@ def prepare_matrix(root,batch,reviews,runtime,started_at,render_runtime=None):
                 'scope':'Changed lighting and one fixed non-task actor parking; exact independent references and native cleanup controls; one actual world constructor, no added physics steps.'}
             if control:value.update(diagnostic_control=control,diagnostic_only=True)
             if stage=='rendering'and render_runtime!=runtime:value['sequential_render_only']=True
+            if stage=='physics'and physics_probe_runtime!=runtime:value['sequential_checker_only']=True
             request_ref=immutable(request,value)
             actual,records=inputs(root,request);verify_runtime_compatibility(root,actual,records,stage_runtime)
             preflight=immutable(destination/'preflight.json',{'passed':True,'request':request_ref,'runtime':str(stage_runtime),
@@ -68,19 +74,22 @@ def prepare_matrix(root,batch,reviews,runtime,started_at,render_runtime=None):
                 'runtime_proof':stage_proof,'source_environment':env,'output':str(output),'preflight':preflight,
                 'max_native_episodes':len(order),'new_native_draws':0,'benchmark_credit':0})
     return immutable(manifest,{'schema':'isg-sequential-augmentation-dispatch-v1','campaign_id':'campaign_20261110',
-        'runtime':str(runtime),'render_runtime':str(render_runtime),'canaries':reviews,'records':rows,'new_native_draws':0,'benchmark_credit':0,'production_released':False})
+        'runtime':str(runtime),'physics_probe_runtime':str(physics_probe_runtime),'render_runtime':str(render_runtime),'canaries':reviews,'records':rows,'new_native_draws':0,'benchmark_credit':0,'production_released':False})
 
 
-def render_runtime_proof(path,native,runtime):
+def render_runtime_proof(path,native,runtime,*,physics_checker=False):
     changed={}
     for folder in ('ispatialgym','scripts'):
         paths={str(p.relative_to(tree))for tree in (native,runtime)for p in(tree/folder).rglob('*.py')}
         for relative in paths:
             a,b=native/relative,runtime/relative
             if not a.is_file()or not b.is_file()or file_digest(a)!=file_digest(b):changed[relative]=file_digest(b)
-    return immutable(path,{'schema':'isg-render-cleanup-runtime-compatibility-v1',
-        'native_runtime':ref(native/'.snapshot_commit'),'cleanup_runtime':ref(runtime/'.snapshot_commit'),
-        'physical_code_changes':0,'changed_payloads':changed,'permitted_execution_kinds':['kinematic_observation_rendering']})
+    value={'schema':'isg-sequential-checker-runtime-compatibility-v1'if physics_checker else'isg-render-cleanup-runtime-compatibility-v1',
+        'native_runtime':ref(native/'.snapshot_commit'),('checker_runtime'if physics_checker else'cleanup_runtime'):ref(runtime/'.snapshot_commit'),
+        'physical_code_changes':0,'changed_payloads':changed,'permitted_execution_kinds':['physics_action_open_loop'if physics_checker else'kinematic_observation_rendering']}
+    relative='ispatialgym/oracle/campaign_batch.py'
+    if relative in changed:value['saved_scene_checker']={'base_sha256':file_digest(native/relative),'runtime_sha256':file_digest(runtime/relative)}
+    return immutable(path,value)
 
 
 def prepare_render_cleanup(root,batch,reviews,native,runtime,source_environment):
@@ -238,7 +247,7 @@ def run_cycle(root,configuration,state):
     if all(v['status']=='validated_canary_exported'for v in out['records'].values())and len(out['records'])==2:
         reviews=[{'path':out['records'][r['candidate_id']]['validation_review']['review'],'sha256':out['records'][r['candidate_id']]['validation_review']['sha256']}for r in requests['records']]
         try:
-            state['matrix_request']=prepare_matrix(root,batch,reviews,runtime,started,configuration.get('render_cleanup_runtime'));state.pop('matrix_error',None)
+            state['matrix_request']=prepare_matrix(root,batch,reviews,runtime,started,configuration.get('render_cleanup_runtime'),configuration.get('physics_probe_runtime'));state.pop('matrix_error',None)
             if configuration.get('render_cleanup_runtime'):
                 env=checked(root,state['matrix_request'])['records'][0]['source_environment']
                 state['renderer_cleanup_request']=prepare_render_cleanup(root,batch,reviews,runtime,configuration['render_cleanup_runtime'],env)
