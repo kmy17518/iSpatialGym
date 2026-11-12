@@ -76,6 +76,21 @@ def test_regression_rejects_singleton_and_invalid_bucket(tmp_path):
     with pytest.raises(c.ContractError,match='outside task buckets'):regression(tmp_path,f2,review)
 
 
+def test_regression_releases_writer_lock_before_readonly_evidence_join(tmp_path,monkeypatch):
+    from scripts.campaign_20261110 import current_eligibility
+    f,review=candidate(tmp_path,0);claim(tmp_path,f,review)
+    path=tmp_path/'dataset/quotas.sqlite3';before=path.read_bytes();calls=[]
+    original=current_eligibility.install_quota_view
+    def joined(root,db):
+        assert not path.with_suffix('.lockdir').exists()
+        calls.append(True)
+        return original(root,db)
+    monkeypatch.setattr(current_eligibility,'install_quota_view',joined)
+    f2,review2=candidate(tmp_path,1)
+    assert regression(tmp_path,f2,review2)['validation_passed'] and calls
+    assert path.read_bytes()==before
+
+
 def test_suite_marked_source_cannot_enter_legacy_single_gate_claim(tmp_path):
     f,review=candidate(tmp_path,0)
     (f.job/'job.env').write_text('ISPATIALGYM_RUNTIME_SUITE_RUN=current100\n')

@@ -301,24 +301,26 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
             import shutil
             import tempfile
             from scripts.campaign_20261110.current_eligibility import install_quota_view
-            with atomic_directory_lock(state_path.with_suffix('.lockdir')):
-                with tempfile.TemporaryDirectory(prefix='isg-suite-history-', dir='/tmp') as directory:
-                    local = Path(directory)/'history.sqlite'
+            with tempfile.TemporaryDirectory(prefix='isg-suite-history-', dir='/tmp') as directory:
+                local = Path(directory)/'history.sqlite'
+                # Pin a coherent immutable database under its writer lock;
+                # slow evidence joins below operate only on that local copy.
+                with atomic_directory_lock(state_path.with_suffix('.lockdir')):
                     shutil.copyfile(state_path, local)
-                    with sqlite3.connect(f'file:{local}?mode=ro', uri=True) as db:
-                        install_quota_view(root, db)
-                        pins = {v[0] for v in db.execute('SELECT DISTINCT template FROM current_members WHERE split=? AND task=? AND class_id=?',
-                            (template.split,template.task,template.class_id))}
-                        require(not pins or pins == {conceptual}, 'evaluation class changed its pinned conceptual template')
-                        for obj in audit_objects(template,root=root):
-                            if obj.semantic_kind in ('wall','floor'): continue
-                            for split,model,sha,category,kind in db.execute('SELECT split,model,sha,category,kind FROM assets WHERE model=? OR sha=? OR category=?',
-                                    (obj.model_key,obj.asset_sha256,obj.category)):
-                                if split in ('train','eval_standard'): continue
-                                require(model != obj.model_key and sha != obj.asset_sha256, 'asset model/hash leaked across held-out splits')
-                                if split == 'eval_category':
-                                    require(category != obj.category or obj.semantic_kind in ('tray','board') or kind in ('tray','board'),
-                                            'asset category leaked across held-out splits')
+                with sqlite3.connect(f'file:{local}?mode=ro', uri=True) as db:
+                    install_quota_view(root, db)
+                    pins = {v[0] for v in db.execute('SELECT DISTINCT template FROM current_members WHERE split=? AND task=? AND class_id=?',
+                        (template.split,template.task,template.class_id))}
+                    require(not pins or pins == {conceptual}, 'evaluation class changed its pinned conceptual template')
+                    for obj in audit_objects(template,root=root):
+                        if obj.semantic_kind in ('wall','floor'): continue
+                        for split,model,sha,category,kind in db.execute('SELECT split,model,sha,category,kind FROM assets WHERE model=? OR sha=? OR category=?',
+                                (obj.model_key,obj.asset_sha256,obj.category)):
+                            if split in ('train','eval_standard'): continue
+                            require(model != obj.model_key and sha != obj.asset_sha256, 'asset model/hash leaked across held-out splits')
+                            if split == 'eval_category':
+                                require(category != obj.category or obj.semantic_kind in ('tray','board') or kind in ('tray','board'),
+                                        'asset category leaked across held-out splits')
         return {'schema': 'isg-group-regression-audit-v1', 'accepted': {},
                 'validation_passed': True, 'quota_consumed': 0,
                 'members': rows, 'canonical_goal_sha256': goals[0],
