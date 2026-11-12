@@ -895,21 +895,40 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
     # each assignment boundary still perform their normal authorization checks.
     eligible = (None if eligibility is None else sum(
         s['status'] == 'queued' and str(s['id']) in eligibility['job_ids'] for s in states.values()))
-    instance_metrics = [{**{k:i.get(k) for k in ("id","label","gpu_name","num_gpus","actual_status","dph_total")},
-                         "account":SHORT.get(i.get('_key_name'),'unknown'),
-                         "worker_phase":(hbs.get(iid) or {}).get('phase'),
-                         "heartbeat_age_seconds":t-hbs[iid]['time'] if (hbs.get(iid) or {}).get('time') else None,
-                         "assigned_jobs":assigned_to.get(iid,[]), 'staging_jobs':staging.get(iid,[])} for iid,i in live.items()]
+    # A recent mirror write does not make the original worker heartbeat fresh.
+    # Preserve stopped providers and their assignments for recovery, but never
+    # report their retained heartbeat phases as usable worker capacity.
+    heartbeat_max_age_seconds = 300
+    instance_metrics = []
+    for iid, instance in live.items():
+        heartbeat = hbs.get(iid) or {}
+        heartbeat_time = heartbeat.get('time')
+        age = (t - heartbeat_time if type(heartbeat_time) in (int, float)
+               and heartbeat_time > 0 else None)
+        fresh = age is not None and 0 <= age <= heartbeat_max_age_seconds
+        instance_metrics.append({
+            **{key: instance.get(key) for key in
+               ('id', 'label', 'gpu_name', 'num_gpus', 'actual_status', 'dph_total')},
+            'account': SHORT.get(instance.get('_key_name'), 'unknown'),
+            'worker_phase': heartbeat.get('phase'),
+            'heartbeat_age_seconds': age,
+            'heartbeat_observation_status': ('fresh' if fresh else 'missing' if age is None
+                                             else 'future' if age < 0 else 'stale'),
+            'worker_observation_current': instance.get('actual_status') == 'running' and fresh,
+            'heartbeat_running_jobs': sorted((heartbeat.get('running') or {}).keys()),
+            'assigned_jobs': assigned_to.get(iid, []), 'staging_jobs': staging.get(iid, [])})
+    current_workers = [instance for instance in instance_metrics if instance['worker_observation_current']]
     metrics = {"observed_at_unix": t, "assignments_observed_at_unix": now(), "coordinator_phase": phase, "account_listing_complete": list_ok, "running_gpus": sum(int(i.get("num_gpus") or 1) for i in live.values() if i.get("actual_status") == "running") if list_ok else None,
                "instances": instance_metrics,
                "staging_scheduler": {**STAGER.metrics(now()),
                     'compression_threads_per_stage': staging_compression_threads(C)} if STAGER else None,
-               "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='boot') if list_ok else None,
-               "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] in ('ready','run')) if list_ok else None,
-               "worker_running_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['assigned_jobs'] and i['actual_status']=='running') if list_ok else None,
-               "worker_idle_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='ready' and not i['assigned_jobs'] and not i['staging_jobs']) if list_ok else None,
-               'worker_staging_gpus':sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['staging_jobs']) if list_ok else None,
-               "worker_unknown_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] is None) if list_ok else None,
+               'worker_heartbeat_max_age_seconds': heartbeat_max_age_seconds,
+               "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in current_workers if i['worker_phase']=='boot') if list_ok else None,
+               "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in current_workers if i['worker_phase'] in ('ready','run')) if list_ok else None,
+               "worker_running_gpus":sum(int(i.get('num_gpus') or 1) for i in current_workers if i['assigned_jobs']) if list_ok else None,
+               "worker_idle_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in current_workers if i['worker_phase']=='ready' and not i['assigned_jobs'] and not i['staging_jobs'] and not i['heartbeat_running_jobs']) if list_ok else None,
+               'worker_staging_gpus':sum(int(i.get('num_gpus') or 1) for i in current_workers if i['staging_jobs']) if list_ok else None,
+               "worker_unknown_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status']=='running' and (not i['worker_observation_current'] or i['worker_phase'] is None)) if list_ok else None,
                "rental_pending_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status'] not in ('running','stopped','exited')) if list_ok else None,
                "preserved_stopped_instances": sorted(preserved_instances(F)),
                "max_instances":C['max_instances'],
