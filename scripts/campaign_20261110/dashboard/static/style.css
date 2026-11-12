@@ -8,3 +8,13 @@
 
 /* Long proof identifiers must wrap inside cards, including narrow mobile grids. */
 .grid>*{min-width:0}.panel,.metric{overflow-wrap:anywhere}#training-gate p{overflow-wrap:anywhere}#training-production .table-wrap{max-height:520px}
+/* Three compact views; original evidence sections remain directly addressable. */
+main > section:not(.selected-view){display:none}
+nav a[aria-current="page"]{background:#e2f2ef;color:#00675f;border-radius:6px}
+.compact-view{padding-top:20px}.compact-view .metric,.compact-view .panel{padding:16px}
+.compact-view .value{font-size:28px}.compact-view td{font-size:12px;max-width:260px;overflow-wrap:anywhere}
+.compact-view .grid{margin-bottom:16px}.report-links{display:flex;flex-wrap:wrap;gap:12px;font-size:13px}
+.compact-view .observation{font-size:12px}.compact-view progress{width:100%}
+.compact-view h3{margin-top:12px}.compact-view .table-wrap{max-width:100%;overflow:auto}
+.array-members{margin:8px 0;min-width:650px}.compact-view .metric p{margin:8px 0 0}
+@media(max-width:750px){.compact-view .grid{grid-template-columns:1fr}.compact-view .filters{flex-wrap:wrap}nav{flex-wrap:wrap}main{min-width:0}}

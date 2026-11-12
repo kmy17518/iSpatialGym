@@ -85,6 +85,9 @@ def eligibility_view(value):
 
 
 def snapshot(root, inventory):
+    activity, activity_source = read_source(root / 'dashboard/interactive_activity.json')
+    if activity and activity.get('campaign_id') != 'campaign_20261110':
+        activity = {}; activity_source = {'available': False, 'error': 'Campaign identity mismatch'}
     live, ls = read_source(root / 'live.json')
     cluster, cs = read_source(root / 'infra/cluster_snapshot.json')
     evidence, es = read_source(root / 'dashboard/dashboard_evidence.json')
@@ -195,6 +198,7 @@ def snapshot(root, inventory):
     cluster_view['jobs'] = jobs
     return sanitize({'campaign_id': 'campaign_20261110', 'served_at': datetime.now(timezone.utc).isoformat(),
         'targets': TARGETS, 'deadline': '2026-11-12T19:00:00Z', 'refresh_seconds': 30,
+        'interactive_activity': activity, 'interactive_activity_source': activity_source,
         'sources': {'capacity_recovery': crs, 'heldout_recovery': hrs, 'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss, 'group_yield': ys, 'fleet_gpu_time': fs, 'cluster_fleet_gpu_time': cfs, 'standard_recovery': rs, 'training_eligibility': tes, 'training_production_gate': pgs, 'training_requirements': reqs, 'canonical_validation': cvs, 'training_containment': cts, 'training_stream': tss, 'change_impact': cis, 'current_eligibility': ces},
         'training_eligibility': {**{k:v for k,v in training.items() if k not in ('records','inputs','cohorts')},
             'cohorts': [{k:v for k,v in row.items() if k!='instance_ids'} for row in training.get('cohorts',[])]} if training else {},
