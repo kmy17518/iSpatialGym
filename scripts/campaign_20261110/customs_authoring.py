@@ -9,12 +9,16 @@ import os
 import tempfile
 
 
+def validate_role_order(entry, expected, *, alias):
+    if list(entry['roles']) != list(expected):
+        raise ValueError(f'Native role order differs for {alias}')
+
+
 def write_customs_atomic(path, value, *, role_orders):
     if set(value) != set(role_orders):
         raise ValueError('Every customs alias needs its expected native role order')
     for alias, entry in value.items():
-        if list(entry['roles']) != list(role_orders[alias]):
-            raise ValueError(f'Native role order differs for {alias}')
+        validate_role_order(entry, role_orders[alias], alias=alias)
     payload = json.dumps(value, indent=2, allow_nan=False) + '\n'
     restored = json.loads(payload)
     for alias, order in role_orders.items():

@@ -59,7 +59,12 @@ def main():
         alias = metadata['variant']
         assert alias == config['template']['scene_setup']['customs_alias'], 'native customs alias differs from contract'
         assert Path(metadata['customs']).resolve() == customs, 'explicit customs differs from the native source'
-        assert alias in json.loads(customs.read_text()), 'private customs lacks the native alias'
+        entries = json.loads(customs.read_text())
+        assert alias in entries, 'private customs lacks the native alias'
+        expected_order = config['template']['scene_setup'].get('runtime_role_order')
+        if expected_order is not None:
+            from scripts.campaign_20261110.customs_authoring import validate_role_order
+            validate_role_order(entries[alias], expected_order, alias=alias)
         env['ISG_CUSTOMS'] = str(customs)
         env['ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256'] = hashlib.sha256(customs.read_bytes()).hexdigest()
     if a.bddl_root:
