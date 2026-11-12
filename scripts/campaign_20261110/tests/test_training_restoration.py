@@ -6,6 +6,22 @@ from scripts.campaign_20261110.training_restoration import same_loaded_state
 from scripts.campaign_20261110.training_batch_probe import inputs,verify_runtime_compatibility,shared_world_proof
 
 
+def test_legacy_canary_policy_projection_keeps_original_unknown_and_exact_physics():
+    from scripts.campaign_20261110.training_restoration import same_canary_export
+    from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
+    saved={'artifacts':{'tro':{'sha256':'original'}},'accepted':False,'model':'original'}
+    current={**deepcopy(saved),'generation_bucket_policy':None,'acceptance_bucket_policy':None,
+             'release_bucket_policy':BUCKET_POLICY}
+    assert same_canary_export(saved,current) and set(saved)=={'artifacts','accepted','model'}
+    for key,value in [('generation_bucket_policy',BUCKET_POLICY),('acceptance_bucket_policy',BUCKET_POLICY),
+                      ('release_bucket_policy',{}),('accepted',True),('model','other'),
+                      ('artifacts',{'tro':{'sha256':'changed'}}),('unknown_extra_field',True)]:
+        changed={**current,key:value}
+        assert not same_canary_export(saved,changed),key
+    known={**saved,'generation_bucket_policy':{'version':1}}
+    assert not same_canary_export(known,current)
+
+
 def state():
     return {'objects':{'o':{'category':'book','model':'abc','fixed_base':False,'kinematic_only':False,'root_prim_type':'RigidDynamicPrim','scale':[1,1,1],
         'position':[1,2,3],'orientation':[0,0,0,1],'joint_positions':[.2],'joint_velocities':[0],

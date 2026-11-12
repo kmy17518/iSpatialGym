@@ -30,10 +30,28 @@ def validated_canary(root,reference,started_at):
             and value['accepted'] is False and value['eligible_for_benchmark'] is False,
             'release needs a separately audited canary, not a label')
     actual=audit_canary(value['source_job'],value['source_proof']['source_gate']['path'],root=root,started_at=started_at)
-    require(digest(actual['export_record'])==digest(value['export_record']) and
+    require(same_canary_export(value['export_record'],actual['export_record']) and
             digest(actual['scale_provenance'])==digest(value['scale_provenance']),
             'canary physical or export evidence changed')
     return actual
+
+
+def same_canary_export(saved, current):
+    """Allow only newly explicit policy observations on a legacy canary export.
+
+    Legacy unknown generation/acceptance policy stays unknown. The current
+    release policy is a separate observation; it never changes source runtime,
+    artifacts, configuration, acceptance or physical validation evidence.
+    """
+    from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
+    observed=dict(current)
+    additions={'generation_bucket_policy':None,'acceptance_bucket_policy':None,
+               'release_bucket_policy':BUCKET_POLICY}
+    for key,expected in additions.items():
+        if key not in saved and key in observed:
+            if observed[key]!=expected:return False
+            observed.pop(key)
+    return digest(saved)==digest(observed)
 
 
 def same_loaded_state(first,last):
