@@ -56,6 +56,32 @@ def archive_diagnosed_launcher_gate(entry, request, root, active):
         log=folder/'scene_verify.log'
         if sha(log)!=request.get('scene_verify_log_sha256') or 'source template metadata changed' not in log.read_text():
             raise ValueError('metadata race diagnosis changed')
+    elif request['failure_kind']=='missing_campaign_root':
+        log=folder/'replay.log'
+        if not (result.get('status')=='error' and result.get('success') is False
+                and result.get('exit_code')==4 and result.get('error')=="KeyError('ISGF_ROOT')"
+                and 0 <= result.get('wall_time_s',float('inf')) < 5
+                and not result.get('n_action_steps') and gate.get('replay_meta_paths')==[]
+                and sha(log)==request.get('replay_log_sha256')
+                and 'restoration_execution' in log.read_text()
+                and "KeyError: 'ISGF_ROOT'" in log.read_text()):
+            raise ValueError('missing-root retry is not a proved pre-simulation launcher failure')
+        audit=pathlib.Path(request['preflight_audit']).resolve()
+        if not audit.is_relative_to(root) or sha(audit)!=request.get('preflight_audit_sha256'):
+            raise ValueError('missing-root preflight changed')
+        proof=json.loads(audit.read_text());execution=proof.get('restoration_execution',{})
+        wrapper=root/'tools/infra_open_loop.sh'
+        if not (proof.get('passed') is True and proof.get('exported_root')==str(root)
+                and proof.get('wrapper')=={'path':str(wrapper),'sha256':sha(wrapper)}
+                and '\nexport ISGF_ROOT\n' in wrapper.read_text()
+                and execution.get('authorization_checked') is True
+                and execution.get('source_job')==entry['source_job_dir']
+                and execution.get('native_runtime')==gate['snapshot']
+                and execution.get('source_tro_sha256')==gate['tro_sha256']
+                and proof.get('demo_sha256')==gate['demo_sha256']
+                and sha(pathlib.Path(gate['instance']))==gate['tro_sha256']
+                and sha(pathlib.Path(gate['demo']))==gate['demo_sha256']):
+            raise ValueError('missing-root repair lacks exact source/environment authorization proof')
     else:
         log=folder/'replay.log';foreign=request.get('foreign_cache_path','')
         expected='/vision/u/shiyuc/minyeong/campaign_20261110/isaacsim_overlay/apps/omnigibson_5_1_0.kit'
@@ -91,7 +117,7 @@ def apply_retry_request(entry, request, root, active):
     if not request or request.get('request_id') in entry.get('applied_retry_requests', []):return False
     token=request.get('request_id','')
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*',token):raise ValueError('unsafe retry request id')
-    diagnosed_retry=entry['status']=='replay_failed' and request.get('failure_kind') in ('mutable_source_metadata','foreign_replay_cache')
+    diagnosed_retry=entry['status']=='replay_failed' and request.get('failure_kind') in ('mutable_source_metadata','foreign_replay_cache','missing_campaign_root')
     if entry['status'] not in ('replay_missing','submit_failed') and not diagnosed_retry:return False
     if entry.get('replay_job_id') in active:return False
     if request.get('expected_replay_job_id') != entry.get('replay_job_id'):raise ValueError('retry replay identity differs')

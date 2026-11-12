@@ -107,6 +107,44 @@ class ReplayRecoveryTests(unittest.TestCase):
         request={'request_id':'02','expected_replay_job_id':'456','reason':'audited native room-filter preflight repair'}
         return folder,entry,request
 
+    def test_missing_root_recovery_requires_exact_prephysics_source_and_export(self):
+        for defect in (None,'physics','demo','runtime','wrapper','root','authorization','log'):
+            with self.subTest(defect=defect),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);folder,entry,request=self.metadata_fixture(root)
+                sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+                job=Path(entry['source_job_dir']);tro=job/'input-tro_state.json';tro.write_text('{}')
+                demo=job/'demo.hdf5';demo.write_bytes(b'exact demo')
+                wrapper=root/'tools/infra_open_loop.sh';wrapper.parent.mkdir();wrapper.write_text('source "$JOBDIR/job.env"\nexport ISGF_ROOT\n')
+                log=folder/'replay.log';log.write_text("restoration_execution\nKeyError: 'ISGF_ROOT'\n")
+                gate=json.loads((folder/'gate.json').read_text());gate.update(snapshot=str(root/'code/native'),instance=str(tro),demo=str(demo),tro_sha256=sha(tro),demo_sha256=sha(demo),replay_meta_paths=[])
+                gate['result']={'status':'error','success':False,'exit_code':4,'error':"KeyError('ISGF_ROOT')",'wall_time_s':.5}
+                audit=Path(request['preflight_audit']);proof={'passed':True,'exported_root':str(root),'wrapper':{'path':str(wrapper),'sha256':sha(wrapper)},'demo_sha256':sha(demo),'restoration_execution':{'authorization_checked':True,'source_job':str(job),'native_runtime':gate['snapshot'],'source_tro_sha256':sha(tro)}}
+                if defect=='physics':gate['result']['n_action_steps']=1
+                if defect=='demo':proof['demo_sha256']='changed'
+                if defect=='runtime':proof['restoration_execution']['native_runtime']='other'
+                if defect=='wrapper':wrapper.write_text('source "$JOBDIR/job.env"\n')
+                if defect=='root':proof['exported_root']='other'
+                if defect=='authorization':proof['restoration_execution']['authorization_checked']=False
+                if defect=='log':log.write_text('different failure')
+                audit.write_text(json.dumps(proof));(folder/'gate.json').write_text(json.dumps(gate))
+                request.update(failure_kind='missing_campaign_root',expected_failed_gate_sha256=sha(folder/'gate.json'),replay_log_sha256=sha(log),preflight_audit_sha256=sha(audit))
+                if defect:
+                    with self.assertRaisesRegex(ValueError,'missing-root'):apply_retry_request(entry,request,root,{})
+                    self.assertTrue((folder/'gate.json').exists())
+                else:
+                    self.assertTrue(apply_retry_request(entry,request,root,{}))
+                    self.assertTrue((folder/'failed_gate_before_02.json').exists())
+
+    def test_replay_wrapper_exports_campaign_root_to_native_children(self):
+        import os,subprocess
+        wrapper=Path(__file__).resolve().parents[1]/'infra_open_loop.sh'
+        prefix=wrapper.read_text().split('export ISGE_CODE=',1)[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            job=Path(tmp);(job/'job.env').write_text('ISGF_ROOT='+str(job)+'\n')
+            env={k:v for k,v in os.environ.items()if k!='ISGF_ROOT'}
+            result=subprocess.run(['bash','-c',prefix+'\nenv',str(wrapper),str(job),'native','gate'],env=env,capture_output=True,text=True,check=True)
+            self.assertIn('ISGF_ROOT='+str(job),result.stdout.splitlines())
+
     def test_retry_preserves_old_evidence_and_publishes_only_success(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);folder,entry,request=self.fixture(root)

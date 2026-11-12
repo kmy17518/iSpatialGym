@@ -5,6 +5,7 @@ JOBDIR=${1:?source job directory}
 SNAPSHOT=${2:?frozen snapshot}
 GATE_OUT=${3:?gate output directory}
 source "$JOBDIR/job.env"
+export ISGF_ROOT
 export ISGE_CODE="$SNAPSHOT"
 # Replay is submitted by the primary campaign account, including demos collected
 # by shiyuc. Its writable caches must belong to the replay account; inheriting
