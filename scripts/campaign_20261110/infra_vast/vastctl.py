@@ -500,6 +500,23 @@ def library_prebuild_reader():
     return module
 
 
+def map_prebuild_reader():
+    """Use the reviewed consumed-map reader even if older helpers are cached."""
+    import hashlib
+    import importlib.util
+    path = os.environ.get('ISG_VAST_MAP_READER')
+    if not path:
+        from scripts.campaign_20261110 import vast_map_prebuild
+        return vast_map_prebuild
+    source = Path(path)
+    if hashlib.sha256(source.read_bytes()).hexdigest() != os.environ.get('ISG_VAST_MAP_READER_SHA256'):
+        raise ValueError('Pinned consumed-map reader changed')
+    spec = importlib.util.spec_from_file_location('isg_pinned_map_reader', source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def stage_native_dependency(s3, rec, state):
     """Use the existing private worker transport for an exact native canary."""
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
@@ -515,7 +532,7 @@ def stage_native_dependency(s3, rec, state):
     elif contact_map:
         from scripts.campaign_20261110 import vast_contact_map as native
     elif map_prebuild:
-        from scripts.campaign_20261110 import vast_map_prebuild as native
+        native = map_prebuild_reader()
     else:
         from scripts.campaign_20261110 import vast_native_dependency as native
     jd=rec['job_dir'];value=native.verify(jd,OFH)
