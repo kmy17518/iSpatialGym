@@ -240,6 +240,9 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
     root, state_path = Path(root).resolve(), Path(state_path).resolve()
     require(state_path.is_relative_to(root), "quota database outside campaign")
     require(review.get("group_closed") is True, "cannot allocate an open goal group")
+    if not validation_only:
+        from .prospective_source_validation import require_no_quota
+        require_no_quota(root, review['source_job'], [m['instance_id'] for m in review['members']])
     environment_path=Path(review['source_job'])/'job.env'
     if environment_path.exists():
         from scripts.campaign_20261110.production_gate import read_environment

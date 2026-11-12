@@ -302,6 +302,9 @@ def check_job(root, job_dir, *, kind='collection', submission_script=None):
         if kind in ('collection','source_validation'):
             try:policy,_=read_policy(root)
             except (OSError,ValueError,TypeError):policy={}
+            from scripts.campaign_20261110.prospective_source_validation import check_review
+            prospective=check_review(root,job_dir,environment,policy,kind=kind,submission_script=submission_script)
+            if prospective is not None:return prospective
             from scripts.campaign_20261110.training_existing_canaries import check_existing_review
             existing=check_existing_review(root,job_dir,environment,policy,kind=kind,submission_script=submission_script)
             if existing is not None:
