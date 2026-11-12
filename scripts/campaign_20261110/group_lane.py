@@ -280,6 +280,14 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                              "perturbations": canonical_pool_perturbations(template, perturb) if pool else asdict(perturb)}))
         rows.append({**member, "bucket": bucket, "sampling_split": template.split})
     require(len(set(goals)) == 1, "goal group changes goal/base/template/perturbations")
+    production = None
+    if template.split == 'train':
+        from scripts.campaign_20261110.training_release import acceptance_proof
+        try:
+            production = acceptance_proof(root, review)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            return {'accepted': {}, 'deferred': [row['instance_id'] for row in rows],
+                    'reason': 'training production gate: ' + str(error)}
     policy = {key: reservations[key] for key in ("model_holdout_models", "category_holdout_models", "category_holdout_categories",
               "category_holdout_rooms", "train_exclude_models", "pending_custom_hard_reservations_not_ready")}
     state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -303,9 +311,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                 split, task = template.split, template.task
                 from scripts.campaign_20261110.current_eligibility import install_quota_view
                 install_quota_view(root,db)
-                if split == "train":
-                    return {"accepted": {}, "deferred": [row["instance_id"] for row in rows],
-                            "reason": "training production gate: standalone eligibility not validated"}
+                require(split != 'train' or production is not None, 'standalone production proof missing')
                 scope = task if split == "eval_category" else template.class_id
                 counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM current_members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                                                   (split, task, scope))))
@@ -358,6 +364,8 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                               "room":room,"validation_key": review["validation_key"], "gate": review["gate"], "evidence": review["evidence"],
                               "physical_template_sha256": physical, "conceptual_template_sha256": conceptual,
                               "binding_pool": template.scene_setup.get("binding_pool")}
+                    if final == 'train' and production is not None:
+                        record.update(production)
                     db.execute("INSERT INTO members VALUES (?,?,?,?,?,?,?,?)",
                                (iid, gid, final, task, scope, row["bucket"], conceptual, canonical_json(record)))
                 record = {"schema": "isg-group-assignment-v1", "campaign_id": review["campaign_id"], "group_id": gid,
@@ -380,6 +388,11 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
 
     with atomic_directory_lock(state_path.with_suffix(".lockdir")):
         require_active_policy(root,reservations)
+        if production is not None:
+            from scripts.campaign_20261110.training_diversity import check_ticket
+            ticket_ref = production['training_diversity_ticket']
+            ticket = read(Path(ticket_ref['path']))
+            check_ticket(root, production['training_config_sha256'], ticket['start'], ticket['count'], ticket_ref)
         with local_sqlite_transaction(state_path) as local_path:
             record = transact(local_path)
             db = _db(local_path)
@@ -397,6 +410,9 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                 db.close()
         # Counts cannot advertise a transaction until its database is durable.
         write_json_atomic(root / "dataset/group_counts.json", summary)
+        if production is not None and record.get('accepted'):
+            from scripts.campaign_20261110.training_diversity import claim_capacity
+            claim_capacity(root, production['training_diversity_ticket'], list(record['accepted']))
         return record
 
 

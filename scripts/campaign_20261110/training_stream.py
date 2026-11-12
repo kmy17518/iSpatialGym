@@ -47,7 +47,9 @@ def register(root,entry):
     root=Path(root);path=root/'controllers/training_production_gate.json'
     with atomic_directory_lock(path.with_suffix('.lockdir')):
         policy=read(path)
-        require(policy['mode']=='blocked' and policy['standalone_training_allowed'] is False,'canary registration cannot change production release')
+        require((policy['mode']=='blocked' and policy['standalone_training_allowed'] is False)
+                or (policy['mode']=='scoped_releases' and policy['standalone_training_allowed'] is True),
+                'unrecognized production policy; canary registration cannot change release')
         same=[a for a in policy.get('allowed_canaries',[]) if (a['config_sha256'],a['start'],a['count'])==(entry['config_sha256'],entry['start'],entry['count'])]
         if same:require(same==[entry],'canary authorization conflicts');return
         history=root/'infra/training_production_gate/canary_stream_history';history.mkdir(parents=True,exist_ok=True)

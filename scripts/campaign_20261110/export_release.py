@@ -222,6 +222,12 @@ def normalize_record(row, *, root, started_at, templates, reservations, reservat
               "perturbations": block["perturbations"], "runtime_augmentation": runtime.get("augmentation", {}),
               "recorded_scene_identity": crop_identity,
               "render_compatibility_sha256": digest(render_config)}
+    if row.get('training_production_receipt'):
+        from scripts.campaign_20261110.training_release import accepted_record_identity
+        accepted_record_identity(root, row)
+        for field in ('training_production_receipt', 'training_release', 'training_diversity_ticket',
+                      'training_config_path', 'training_config_sha256'):
+            result[field] = row[field]
     return result, template
 
 

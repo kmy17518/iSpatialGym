@@ -226,6 +226,9 @@ def check_environment(root, environment, *, kind='collection', start=None, count
             proof = json.loads(evidence.read_text())
             if proof.get('purpose') != 'training_pipeline_canary' or proof.get('config_sha256') != result['config_sha256']: continue
             if (proof.get('start'), proof.get('count')) != (int(start), int(count)): continue
+            from .training_canary_scope import validate_scope
+            if config.get('purpose') == 'training_production':
+                result['canary_scope'] = validate_scope(config, proof)
             from scripts.campaign_20261110.execution_dependencies import verify_execution_dependencies
             result['execution_dependencies'] = verify_execution_dependencies(root,result['config_sha256'],
                 'native_generation' if kind=='collection' else 'physics_replay',start=start,count=count)
@@ -235,7 +238,11 @@ def check_environment(root, environment, *, kind='collection', start=None, count
                     'reason': 'exact bounded pipeline canary', 'authorization': authorization}
         if not canonical_training_ready(root):
             return {**result,'category':'eval_validation_hold','reason':'bulk standalone training requires all100 exact canonical eval classes; only separately authorized bounded pipeline canaries may run earlier'}
-        return result
+        from scripts.campaign_20261110.training_release import check_production
+        release = check_production(root, path, environment, policy, start=start, count=count)
+        return {**result, 'allowed': True, 'category': 'released_training',
+                'reason': 'exact registered production proof and reserved diversity capacity',
+                'production_release': release}
     except (OSError, ValueError, TypeError, KeyError, StopIteration, sqlite3.Error) as exc:
         return {**result, 'allowed': False, 'reason': 'unverified collection scope: ' + str(exc)}
 

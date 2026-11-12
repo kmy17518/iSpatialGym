@@ -37,6 +37,9 @@ def check_existing_review(root,job,environment,policy,*,kind,submission_script=N
         and Path(submission_script).resolve()==script),'existing canary cannot authorize a sampler script')
     original=checked({'path':entry['authorization_path'],'sha256':entry['authorization_sha256']})
     auth=json.loads(original.read_text())
+    if config.get('purpose') == 'training_production':
+        from .training_canary_scope import validate_scope
+        validate_scope(config, auth)
     require(all(auth.get(k)==entry[k]for k in ('purpose','config_sha256','start','count')),'original canary authorization differs')
     expiry=datetime.fromisoformat(entry['expires_at'].replace('Z','+00:00')).timestamp()
     copied=set()

@@ -1,10 +1,21 @@
 """Explicit canary-only restoration of serialized task root motion."""
 from __future__ import annotations
 import math
-from scripts.campaign_20261110.contracts import require
+from scripts.campaign_20261110.contracts import require, digest
 
 
-def pristine_mass_enabled(meta):
+def _purpose_allowed(meta, execution):
+    purpose = meta.get('runtime', {}).get('purpose')
+    if purpose == 'training_pipeline_canary':
+        return True
+    return purpose == 'training_production' and isinstance(execution, dict) and \
+        execution.get('schema') == 'isg-training-restoration-execution-v1' and \
+        execution.get('authorization_checked') is True and \
+        execution.get('category') in ('validation_canary', 'released_training') and \
+        execution.get('metadata_sha256') == digest(meta)
+
+
+def pristine_mass_enabled(meta, execution=None):
     options = meta.get('scene_setup', {}).get('restoration_options', {})
     enabled = options.get('pristine_mass_before_reset_v1')
     if enabled is None or enabled is False:
@@ -12,7 +23,7 @@ def pristine_mass_enabled(meta):
     require(enabled is True and not options.get('serialized_mass_before_reset_v1')
             and meta.get('campaign_id') == 'campaign_20261110' and meta.get('split') == 'train'
             and meta.get('class_id') == 'disembedding_07' and meta.get('task') == 'disembedding'
-            and meta.get('runtime', {}).get('purpose') == 'training_pipeline_canary',
+            and _purpose_allowed(meta, execution),
             'pristine mass restoration requires its exact bounded canary scope')
     return True
 
@@ -26,8 +37,8 @@ def _mass_state(link):
             'usd_mass_authored': authored, 'usd_mass': attr.Get() if authored else None}
 
 
-def mass_constraint_objects(meta, scope, records):
-    if not pristine_mass_enabled(meta):
+def mass_constraint_objects(meta, scope, records, *, execution=None):
+    if not pristine_mass_enabled(meta, execution):
         return []
     names = sorted({r['object'] for r in records if r.get('type') == 'mass'})
     require(names and all(scope.get(name) is not None and hasattr(scope[name], 'links') for name in names),
@@ -35,9 +46,9 @@ def mass_constraint_objects(meta, scope, records):
     return [scope[name] for name in names]
 
 
-def capture_pristine_mass(meta, objects, *, read_state=None):
+def capture_pristine_mass(meta, objects, *, read_state=None, execution=None):
     """Capture once in build_env, before any episode constraints can mutate actors."""
-    if not pristine_mass_enabled(meta):
+    if not pristine_mass_enabled(meta, execution):
         return None
     read_state = read_state or _mass_state
     rows = {}
@@ -76,9 +87,9 @@ def _write_mass_state(link, state):
     view.set_inertias(torch.as_tensor(state['inertia'], dtype=existing.dtype, device=existing.device))
 
 
-def restore_pristine_mass(meta, objects, baseline, *, read_state=None, write_state=None):
+def restore_pristine_mass(meta, objects, baseline, *, read_state=None, write_state=None, execution=None):
     """Undo previous episode mass overrides; retain the original cold-load order."""
-    if not pristine_mass_enabled(meta):
+    if not pristine_mass_enabled(meta, execution):
         return None
     require(isinstance(baseline, dict) and baseline.get('captured_at') == 'build_env_before_first_restore'
             and baseline.get('revision') == 'pristine_mass_before_reset_v1',
@@ -112,13 +123,13 @@ def vector(value, label):
     return [float(v) for v in value]
 
 
-def restore_serialized_root_motion(meta, physical, object_states):
+def restore_serialized_root_motion(meta, physical, object_states, *, execution=None):
     option=meta.get('scene_setup',{}).get('restoration_options',{}).get('serialized_root_motion_v1')
     if option is None or option is False:
         return None
     require(option is True and meta.get('campaign_id')=='campaign_20261110' and meta.get('split')=='train'
             and meta.get('class_id')=='disembedding_07' and meta.get('task')=='disembedding'
-            and meta.get('runtime',{}).get('purpose')=='training_pipeline_canary',
+            and _purpose_allowed(meta, execution),
             'serialized root motion is restricted to its exact bounded canary scope')
     import torch
     # Validate every serialized field before mutating any physical object.
@@ -150,7 +161,7 @@ def restore_serialized_root_motion(meta, physical, object_states):
             'pose_or_goal_changes':False,'source':'exact immutable TRO root_link lin_vel/ang_vel'}
 
 
-def restore_serialized_mass_before_reset(meta, physical, bindings, records, *, apply_mass_fn=None):
+def restore_serialized_mass_before_reset(meta, physical, bindings, records, *, apply_mass_fn=None, execution=None):
     """Apply only recorded mass constraints before the loader's existing first step.
 
     On first load the scene has dataset masses; on reuse the previous instance's
@@ -162,7 +173,7 @@ def restore_serialized_mass_before_reset(meta, physical, bindings, records, *, a
         return None
     require(option is True and meta.get('campaign_id') == 'campaign_20261110' and meta.get('split') == 'train'
             and meta.get('class_id') == 'disembedding_07' and meta.get('task') == 'disembedding'
-            and meta.get('runtime', {}).get('purpose') == 'training_pipeline_canary',
+            and _purpose_allowed(meta, execution),
             'pre-reset serialized mass is restricted to its exact bounded canary scope')
     pending = []
     seen = set()

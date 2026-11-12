@@ -24,7 +24,8 @@ def prepare(root, requests, index):
         require(path.is_relative_to(root) and file_digest(path)==row[sha_field], 'canary input identity changed: '+field)
     config=json.loads(Path(row['config_path']).read_text())
     authorization=json.loads(Path(row['authorization_path']).read_text())
-    require(config['purpose']=='training_pipeline_canary' and config['split']==config['template']['split']=='train', 'not a training canary')
+    from .training_canary_scope import validate_scope
+    validate_scope(config, authorization)
     require(file_digest(Path(row['native_runtime'])/'.snapshot_commit')==config['validation_key']['code_sha256']==authorization['native_runtime_sha256'], 'native runtime changed')
     job=json.loads(Path(row['input_manifest']).read_text())['jobs'][row['manifest_index']]
     require(job['candidate_id']==row['candidate_id'] and job['class_id']==row['class_id'], 'candidate identity changed')

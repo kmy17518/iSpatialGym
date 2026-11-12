@@ -68,3 +68,18 @@ def test_pristine_capture_lifecycle_precedes_constraint_mutation():
     assert "shared.get('pristine_mass0')" in source('attach')
     restore=source('restore')
     assert restore.index('restore_pristine_mass(')<restore.index('task.load_tro_instance(')<restore.index('self._restore_constraints(')
+
+
+def test_production_purpose_cannot_enable_restore_without_bound_execution():
+    from scripts.campaign_20261110.contracts import digest
+    meta,obj,values,writes,read,write=inputs();meta['runtime']['purpose']='training_production'
+    with pytest.raises(ContractError,match='exact bounded'):
+        capture_pristine_mass(meta,[obj],read_state=read)
+    execution={'schema':'isg-training-restoration-execution-v1','authorization_checked':True,
+        'category':'validation_canary','metadata_sha256':digest(meta)}
+    baseline=capture_pristine_mass(meta,[obj],read_state=read,execution=execution)
+    assert restore_pristine_mass(meta,[obj],baseline,read_state=read,write_state=write,execution=execution)['actors_restored']==[]
+    altered=copy.deepcopy(meta);altered['scene_setup']['unexpected']=True
+    with pytest.raises(ContractError,match='exact bounded'):
+        capture_pristine_mass(altered,[obj],read_state=read,execution=execution)
+    assert writes==[]

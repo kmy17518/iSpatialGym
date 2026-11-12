@@ -107,6 +107,9 @@ def _audit_canary(job, gate_path, *, root, started_at, policy, policy_sha):
     authorization_path=artifact(authorization['authorization_path'],root,started_at)
     require(file_digest(authorization_path)==authorization['authorization_sha256'],'canary authorization changed')
     declared=read(authorization_path)
+    from .training_canary_scope import validate_scope
+    if config.get('purpose') == 'training_production':
+        validate_scope(config, declared)
     require(all(declared.get(k)==authorization[k] for k in ('purpose','config_sha256','start','count')),
             'canary authorization identity differs')
     # This is an explicitly authorized canary audit, not generic queue

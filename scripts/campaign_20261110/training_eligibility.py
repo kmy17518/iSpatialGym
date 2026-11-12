@@ -16,6 +16,19 @@ def classify_record(row, group=None, *, root=None):
         return {'status': 'not_training', 'category': row.get('split'), 'reasons': []}
     source = row.get('sampling_split')
     if source == 'train':
+        if root is not None and row.get('training_production_receipt'):
+            try:
+                from scripts.campaign_20261110.training_release import accepted_record_identity
+                accepted_record_identity(root, row)
+                if not group or group.get('accepted', {}).get(row.get('instance_id')) != 'train':
+                    raise ValueError('committed production group assignment missing')
+                actual = {k:v for k,v in row.items() if k != 'allocation_source'}
+                if not any(digest(member) == digest(actual) for member in group.get('members', [])):
+                    raise ValueError('committed production member differs')
+                return {'status': 'eligible', 'category': 'released_standalone_training',
+                        'reasons': ['exact_production_release_and_diversity_ticket']}
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                return {'status': 'unverified', 'category': 'standalone_training', 'reasons': [str(error)]}
         return {'status': 'excluded', 'category': 'standalone_training',
                 'reasons': ['complete_training_pipeline_not_validated', 'distribution_compliance_not_established']}
     if root is not None:
@@ -76,7 +89,7 @@ def eligible_training_records(db, task=None, *, root=None, class_id=None):
     result = []
     for value, in db.execute(query, parameters):
         row = json.loads(value)
-        if row.get('sampling_split') != 'eval_standard' or row.get('split') != 'train': continue
+        if row.get('sampling_split') not in ('eval_standard', 'train') or row.get('split') != 'train': continue
         projected = projection.get(row.get('instance_id'))
         if projected and (projected.get('status') != 'eligible' or projected.get('accepted_record_sha256') != digest(row)): continue
         gid = row.get('group_id')

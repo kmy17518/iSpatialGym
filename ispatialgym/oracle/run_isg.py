@@ -464,6 +464,11 @@ class InstanceLoader:
         # 2026-11-01 train-fast (PARTIAL_SCENE): the sampler's cropped world when the template was sampled in one (None: the full template)
         self.scene_crop = scene_crop_of(self.tmeta)
         self.tro = load_tro(self.tro_path)
+        from pathlib import Path
+        from scripts.campaign_20261110.training_canary_scope import restoration_execution
+
+        self._restoration_execution = restoration_execution(
+            self.tro.meta.raw.get("campaign") or {}, self.tro_path, Path(__file__).resolve().parents[2])
         self.robot_name = robot_name or robot_name_from_tro(self.tro)
         self.image_size = int(image_size)
         self.head_aperture = float(head_aperture)
@@ -575,7 +580,8 @@ class InstanceLoader:
 
         campaign = self.tro.meta.raw.get("campaign") or {}
         self._pristine_mass0 = capture_pristine_mass(campaign, mass_constraint_objects(
-            campaign, self.task.object_scope, (self.tro.meta.extras or {}).get("constraints") or []))
+            campaign, self.task.object_scope, (self.tro.meta.extras or {}).get("constraints") or [],
+            execution=self._restoration_execution), execution=self._restoration_execution)
         return self.env
 
     def share(self, shared: Dict[str, Any]) -> None:
@@ -651,13 +657,14 @@ class InstanceLoader:
 
             campaign = self.tro.meta.raw["campaign"]
             pristine_mass = restore_pristine_mass(campaign, mass_constraint_objects(
-                campaign, task.object_scope, (self.tro.meta.extras or {}).get("constraints") or []),
-                getattr(self, "_pristine_mass0", None))
+                campaign, task.object_scope, (self.tro.meta.extras or {}).get("constraints") or [],
+                execution=self._restoration_execution),
+                getattr(self, "_pristine_mass0", None), execution=self._restoration_execution)
             if pristine_mass is not None:
                 self.report["pre_reset_pristine_mass"] = pristine_mass
             early_mass = restore_serialized_mass_before_reset(
                 self.tro.meta.raw["campaign"], task.object_scope, self.tro.meta.object_bindings or {},
-                (self.tro.meta.extras or {}).get("constraints") or [])
+                (self.tro.meta.extras or {}).get("constraints") or [], execution=self._restoration_execution)
             if early_mass is not None:
                 self.report["pre_reset_serialized_mass"] = early_mass
         task.load_tro_instance(env, tro=self.tro, settle_steps=0)
@@ -713,7 +720,8 @@ class InstanceLoader:
         if self.tro.meta.raw.get("campaign"):
             from ispatialgym.oracle.campaign_restore import restore_serialized_root_motion
 
-            restored = restore_serialized_root_motion(self.tro.meta.raw["campaign"], self.physical, self.tro.object_states)
+            restored = restore_serialized_root_motion(self.tro.meta.raw["campaign"], self.physical,
+                                                      self.tro.object_states, execution=self._restoration_execution)
             if restored is not None:
                 self.report["campaign_restoration"]["serialized_root_motion"] = restored
         return obs, info

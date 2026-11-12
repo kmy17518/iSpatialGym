@@ -272,6 +272,10 @@ def run(root,request,output,kind):
     runtime=Path(__file__).resolve().parents[2]/'.snapshot_commit'
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
     compatibility=verify_runtime_compatibility(root,value,records,runtime.parent)
+    # Exact production-purpose sources retain their original native identity;
+    # the loader independently rechecks this narrow observational proof.
+    os.environ['ISPATIALGYM_TRAINING_OBSERVATION_REQUEST']=str(Path(request).resolve())
+    os.environ['ISPATIALGYM_TRAINING_OBSERVATION_REQUEST_SHA256']=file_digest(request)
     require(not value.get('physical_candidate') or kind=='physics_action_open_loop',
             'pristine physical candidate is physics-only')
     os.environ['ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE']='1'
