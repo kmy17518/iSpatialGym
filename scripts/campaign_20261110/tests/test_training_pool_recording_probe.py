@@ -16,15 +16,18 @@ def metadata(active):
 def test_native_metadata_wrapper_is_explicitly_verified_before_current_source_projection():
     a, b = metadata('A'), metadata('B')
     native = {'metadata': {'task': {**a, 'inst_to_name': {'target': 'B'}, 'robot_poses': {'robot': ['currentB']}}},
+              'init_info': {'args': {'scene_file': 'private_union_A.json'}},
               'objects_info': {'init_info': {'A': {}, 'B': {}, 'background': {}}},
               'state': {'registry': {'object_registry': {'A': {}, 'B': {}, 'background': {}}}}}
     source = {'metadata': b}
-    args = [source, [a,b], {'A','B'}, 'B', {'model':'B'}, {'target':'B'}, {'robot':['currentB']}]
+    args = [source, [a,b], {'A','B'}, 'B', {'model':'B'}, {'target':'B'}, {'robot':['currentB']},
+            'private_union_A.json', 'recorded_active_scene_1.json']
     result = active_document(native, *args)
     assert set(result['objects_info']['init_info']) == {'B','background'}
     assert result['metadata']['task']['robot_poses'] == {'robot':['currentB']}
     assert result['metadata']['ispatialgym']['model_pool']['active_names'] == ['B']
     assert native['metadata']['task']['ispatialgym']['model_pool']['active_names'] == ['A']
+    assert result['init_info']['args']['scene_file'] == 'recorded_active_scene_1.json'
     unknown = copy.deepcopy(native); unknown['metadata']['task']['unknown'] = 'must retain or reject'
     with pytest.raises(ContractError, match='known source'): active_document(unknown, *args)
     inactive_ref = copy.deepcopy(native); inactive_ref['objects_info']['unknown_reference'] = 'A'
@@ -111,8 +114,10 @@ def test_installed_recording_scope_keeps_full_internal_snapshots_and_refreshes_e
         def start(self,obs0,info0=None,state0=None):self.initial=state0;self._snapshot_scene()
         def _snapshot_scene(self):
             self.scene_file=json.dumps({'metadata':{'task':{**known[0],'inst_to_name':{'target':'B'},'robot_poses':{'robot':['currentB']}}},
+                'init_info':{'args':{'scene_file':str(tmp_path/'private_union_A.json')}},
                 'objects_info':{'init_info':{n:{}for n in objects}},'state':states[int(owner.dump_state(True)[0])]})
-            self.env_config={'env':{'device':None},'task':{'tro_path':'oldA'},'robots':[{}]}
+            self.env_config={'env':{'device':None},'task':{'tro_path':'oldA'},'robots':[{}],
+                             'scene':{'scene_file':str(tmp_path/'private_union_A.json')}}
     class Executor:
         def __init__(self,recorder):self.env=env;self.recorder=recorder;self.state_owner=owner
         def _dump_state(self,full):

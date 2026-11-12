@@ -92,7 +92,8 @@ def verify_serialized(owner, flat, initialized, active, all_scene_names, initial
             'object_names': sorted(names), 'inactive_names_absent': True}
 
 
-def active_document(document, source, source_metadata, initialized, active, properties, bindings, robot_poses):
+def active_document(document, source, source_metadata, initialized, active, properties, bindings, robot_poses,
+                    initial_scene_path, exported_scene_path):
     from ispatialgym.sampling.model_pool import active_scene
     result = copy.deepcopy(document)
     # This native Scene.save wraps its whole loaded metadata in metadata.task,
@@ -120,6 +121,9 @@ def active_document(document, source, source_metadata, initialized, active, prop
             'native scene metadata or current task binding differs')
     target.update(active_names=[active], inactive_omitted=len(initialized)-1,
                   active_properties={active: copy.deepcopy(properties)})
+    require(result['init_info']['args']['scene_file'] == str(initial_scene_path),
+            'native initialization scene differs from recorded environment')
+    result['init_info']['args']['scene_file'] = str(exported_scene_path)
     return active_scene(result, initialized, {active})
 
 
@@ -207,9 +211,13 @@ def install(runner, contract, current, output, native_build):
         source = json.loads(Path(member['scene']['path']).read_text())
         bindings = {k: v.name for k, v in current['loader'].task.object_scope.items() if hasattr(v, 'name')}
         scene = recorder.env.scene; actor = scene.object_registry('name', current['active'])
-        projected = active_document(document, source, known_metadata, initialized, current['active'],
-                                    native_properties(actor), bindings, current['loader'].tro.robot_poses)
+        initial_scene = Path(recorder.env_config['scene']['scene_file']).resolve()
+        require(initial_scene.parent == output and initial_scene.name in {
+            'private_union_'+name+'.json' for name in initialized}, 'native union source is outside this diagnostic')
         destination = output/('recorded_active_scene_'+str(current['ordinal'])+'.json')
+        projected = active_document(document, source, known_metadata, initialized, current['active'],
+                                    native_properties(actor), bindings, current['loader'].tro.robot_poses,
+                                    initial_scene, destination)
         require(not destination.exists(), 'preserve prior active recording scene')
         write_json_atomic(destination, projected)
         config = recorded_config(current['recording_config'], destination, member['tro']['path'],
