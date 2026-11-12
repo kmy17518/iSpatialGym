@@ -190,6 +190,12 @@ def check_environment(root, environment, *, kind='collection', start=None, count
         if template['class_id'] in PARKED_CLASSES:
             return {**result, 'reason': 'owner artifact dependency remains parked', 'category': 'owner_blocked'}
         if split in ('eval_standard', 'eval_model', 'eval_category'):
+            if any(k.startswith('ISPATIALGYM_RUNTIME_SUITE_') for k in environment):
+                from .runtime_suite import authorize
+                proof = authorize(root, environment, path, config, start=start, count=count)
+                return {**result, 'allowed': True, 'category': 'runtime_suite_validation',
+                        'reason': 'exact registered current-runtime regression; no training authorization',
+                        'runtime_suite': proof}
             if kind == 'collection' and split == 'eval_standard' and not template['task'].startswith('camera_relocalization') and count is not None and count > 3:
                 from scripts.campaign_20261110.training_eligibility import standard_group_proof
                 proof = standard_group_proof(root, template['class_id'], config['validation_key'])
@@ -238,6 +244,10 @@ def check_environment(root, environment, *, kind='collection', start=None, count
                     'reason': 'exact bounded pipeline canary', 'authorization': authorization}
         if not canonical_training_ready(root):
             return {**result,'category':'eval_validation_hold','reason':'bulk standalone training requires all100 exact canonical eval classes; only separately authorized bounded pipeline canaries may run earlier'}
+        from .runtime_suite import current_training_ready
+        if not current_training_ready(root):
+            return {**result, 'category':'current_runtime_validation_hold',
+                    'reason':'fresh exact current-runtime100 validation is incomplete'}
         from scripts.campaign_20261110.training_release import check_production
         release = check_production(root, path, environment, policy, start=start, count=count)
         return {**result, 'allowed': True, 'category': 'released_training',
@@ -256,6 +266,10 @@ def check_dispatch(root, command, *, kind='collection'):
                 if key in environment and environment[key] != value: raise ValueError('conflicting environment')
                 environment[key] = value
         start = int(command[command.index('--base-index')+1]) if '--base-index' in command else None
+        if '--code' in command:
+            runtime = command[command.index('--code')+1]
+            if environment.get('ISGE_CODE', runtime) != runtime: raise ValueError('conflicting code runtime')
+            environment['ISGE_CODE'] = runtime
         pos = command.index('submit')
         count = int(command[pos+2])
         return check_environment(root, environment, kind=kind, start=start, count=count)

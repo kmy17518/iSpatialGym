@@ -571,6 +571,8 @@ def check_production(root, config_path, environment, policy, *, start, count):
     from .training_diversity import check_ticket
     require(type(start) is int and start > 0 and type(count) is int and count > 0, 'production range missing')
     require(canonical_training_ready(root), 'all100 exact canonical classes required for bulk production')
+    from .runtime_suite import current_training_ready
+    require(current_training_ready(root), 'fresh exact current-runtime100 required for bulk production')
     reference = {'path': environment['ISPATIALGYM_TRAINING_RELEASE'],
                  'sha256': environment['ISPATIALGYM_TRAINING_RELEASE_SHA256']}
     require(policy.get('mode') == 'scoped_releases' and policy.get('standalone_training_allowed') is True,
@@ -689,7 +691,8 @@ def bind_refill(root, queue_path, command, *, release, plan, cell_id, request_id
     start = int(command[command.index('--base-index')+1]); count = int(command[command.index('submit')+2])
     policy, _ = read_policy(root)
     from .production_gate import canonical_training_ready
-    require(canonical_training_ready(root) and policy.get('mode') == 'scoped_releases' and
+    from .runtime_suite import current_training_ready
+    require(canonical_training_ready(root) and current_training_ready(root) and policy.get('mode') == 'scoped_releases' and
             policy.get('standalone_training_allowed') is True, 'bulk production remains held')
     require({'config_sha256': proof['config_sha256'], 'release': release} in policy.get('configuration_releases', []),
             'refill configuration has no registered release')

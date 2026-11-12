@@ -28,6 +28,7 @@ def test_no_flag_or_release_registry_bypasses_exact100(tmp_path,monkeypatch):
 def test_missing_exact_registry_and_changed_ticket_are_rejected(tmp_path,monkeypatch):
     config,release,env,policy=production_inputs(tmp_path)
     monkeypatch.setattr('scripts.campaign_20261110.production_gate.canonical_training_ready',lambda root:True)
+    monkeypatch.setattr('scripts.campaign_20261110.runtime_suite.current_training_ready',lambda root:True)
     proof={'release':release,'task':'task','class_id':'class'}
     monkeypatch.setattr(r,'verify_configuration',lambda *a:copy.deepcopy(proof))
     monkeypatch.setattr(r,'verify_diversity_cell',lambda *a:{})
