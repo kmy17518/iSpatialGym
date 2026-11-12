@@ -165,3 +165,52 @@ def test_cleanup_audit_rejects_invalid_native_evidence(tmp_path,monkeypatch,faul
             observation['loaded_state']['lights']['lamp']=1500
             observation['loaded_state_sha256']=digest(observation['loaded_state'])
     with pytest.raises(ContractError):cleanup_fixture(tmp_path,monkeypatch,mutate)
+
+
+def rendering_stage_fixture(tmp_path,monkeypatch,fault=None):
+    import json
+    from scripts.campaign_20261110 import training_sequential_augmentation as m
+    from scripts.campaign_20261110.contracts import file_digest
+    def put(name,value):
+        p=tmp_path/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(value));return {'path':str(p),'sha256':file_digest(p)}
+    stamp=tmp_path/'runtime/.snapshot_commit';stamp.parent.mkdir();stamp.write_text('exact')
+    runtime={'path':str(stamp),'sha256':file_digest(stamp)}
+    reviews=[put('A.json',{}),put('B.json',{})];sources=[{'instance_id':name,'export_record':{'validation_key':{'exact':name},'perturbations':{'exact':name}}}for name in ('A','B')]
+    requests={};document={'schema':'isg-sequential-rendering-verification-input-v1','rendering':{},'execution':{'rendering':{}}}
+    for name,(control,order)in m.RENDER.items():
+        value={'canaries':reviews,'sequential_augmentation':True,'diagnostic_control':control,'probe_runtime_sha256':runtime['sha256']}
+        request=put(name+'/request.json',value);requests[request['path']]=value
+        probe={'request':request,'probe_runtime':runtime,'runtime_compatibility':{},'kind':'kinematic_observation_rendering',
+            'world_construction':{'attempted':1,'completed':1,'method':'omnigibson.Environment'},'entries':[]}
+        for ordinal,index in enumerate(order):
+            source=sources[index];observation=observed(ordinal+1);observation.update(process_session=name,scheduler_job_id='123',simulator_module='omnigibson.sim',validation_key=source['export_record']['validation_key'],perturbations_sha256=digest(source['export_record']['perturbations']))
+            if fault=='wrong_reused_light'and name=='ABA'and ordinal==1:observation['loaded_state']['lights']['lamp']=999.
+            observation['loaded_state_sha256']=digest(observation['loaded_state'])
+            report={'tag':'REPLAY_DEMO','kept':True,'demo':'/native/'+source['instance_id'],'episode_index':ordinal,
+                'campaign_restoration':{'scale_verified':True,'native_observation':observation}}
+            video=tmp_path/(name+f'/video{ordinal}.mp4');video.write_bytes(b'hashed-output')
+            probe['entries'].append({'canary_review':reviews[index],'report':put(name+f'/meta{ordinal}.json',report),
+                'outputs':[{'path':str(video),'sha256':file_digest(video)}]})
+        if fault=='missing_episode'and name=='ABA':probe['entries'].pop()
+        document['rendering'][name]=put(name+'/probe.json',probe);document['execution']['rendering'][name]=put(name+'/execution.json',{})
+    monkeypatch.setattr(m,'inputs',lambda root,path:(requests[path],sources))
+    monkeypatch.setattr(m,'validated_canary',lambda root,reference,started:sources[reviews.index(reference)])
+    monkeypatch.setattr(m,'verify_runtime_compatibility',lambda *a:{})
+    monkeypatch.setattr(m,'verify_probe_execution',lambda *a:{})
+    monkeypatch.setattr(m,'observed_augmentation_change',lambda *a:{'separately_tested':True})
+    return m,put('rendering_inputs.json',document)
+
+
+def test_rendering_stage_does_not_certify_missing_physics_or_cleanup(tmp_path,monkeypatch):
+    m,reference=rendering_stage_fixture(tmp_path,monkeypatch)
+    result=m.verify_rendering(tmp_path,reference,0)
+    assert result['status']=='verified'and result['verified_stages']==['rendering']
+    assert result['full_matrix_verified']is False and result['production_released']is False
+    assert 'failed A/A cleanup'not in result['checks']
+    with pytest.raises(ContractError,match='complete independent'):m.verify(tmp_path,reference,0)
+
+
+@pytest.mark.parametrize('fault',['wrong_reused_light','missing_episode'])
+def test_rendering_stage_retains_exact_state_and_episode_checks(tmp_path,monkeypatch,fault):
+    m,reference=rendering_stage_fixture(tmp_path,monkeypatch,fault)
+    with pytest.raises(ContractError):m.verify_rendering(tmp_path,reference,0)

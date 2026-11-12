@@ -105,16 +105,26 @@ def observed_augmentation_change(root, records, first, second):
 
 
 def verify(root, reference, started_at):
+    return _verify_stages(root,reference,started_at,(('physics',PHYSICS),('rendering',RENDER)))
+
+
+def verify_rendering(root,reference,started_at):
+    """Audit the complete rendering stage without claiming physics clearance."""
+    return _verify_stages(root,reference,started_at,(('rendering',RENDER),))
+
+
+def _verify_stages(root, reference, started_at, stages):
     document = checked(root, reference)
-    require(document.get('schema') == 'isg-sequential-augmentation-verification-input-v1' and
-            set(document['physics']) == set(PHYSICS) and set(document['rendering']) == set(RENDER) and
-            set(document['execution']) == {'physics', 'rendering'} and
-            set(document['execution']['physics']) == set(PHYSICS) and
-            set(document['execution']['rendering']) == set(RENDER),
+    full=len(stages)==2
+    require(document.get('schema') == ('isg-sequential-augmentation-verification-input-v1'if full else
+                'isg-sequential-rendering-verification-input-v1') and
+            set(document['execution']) == {stage for stage,_ in stages} and
+            all(set(document.get(stage,{}))==set(specs)and set(document['execution'][stage])==set(specs)
+                for stage,specs in stages),
             'complete independent-reference/success/failure/interruption matrix required')
     sources = {}; source_refs = None; runtimes = {}; artifacts = set(); results = {}; all_processes = set()
     augmentation_changes = {}
-    for stage, specifications in (('physics', PHYSICS), ('rendering', RENDER)):
+    for stage, specifications in stages:
         cases = {}; stage_results = {}
         expected_kind = 'physics_action_open_loop' if stage == 'physics' else 'kinematic_observation_rendering'
         for name, (control, order) in specifications.items():
@@ -205,14 +215,16 @@ def verify(root, reference, started_at):
         augmentation_changes[stage]=observed_augmentation_change(root,
             [sources[digest(ref)]['export_record'] for ref in source_refs],loaded('fresh_A'),loaded('fresh_B'))
         results[stage] = stage_results
-    return {'schema': 'isg-sequential-augmentation-verification-v1', 'input': reference,
+    return {'schema': 'isg-sequential-augmentation-verification-v1'if full else'isg-sequential-rendering-verification-v1', 'input': reference,
             'status': 'verified', 'runtimes': runtimes, 'sources': source_refs, 'stages': results,
+            'verified_stages':[stage for stage,_ in stages],'full_matrix_verified':full,
             'independent_processes': len(all_processes), 'observed_augmentation_changes':augmentation_changes,
             'checks': ['changed lighting and fixed-actor parking',
                 'one actual Environment construction per process', 'exact native task/model/scale/room/assets',
-                'independent A and B references', 'A/B/A restoration', 'successful A/A cleanup',
-                'failed A/A cleanup', 'interrupted A/A cleanup', 'unchanged reset/first-action tolerances',
-                'exact rendered artifacts'], 'production_released': False, 'benchmark_credit': 0}
+                'independent A and B references', 'A/B/A restoration', 'exact rendered artifacts']+
+                (['successful A/A cleanup','failed A/A cleanup','interrupted A/A cleanup',
+                  'unchanged reset/first-action tolerances']if full else[]),
+            'production_released': False, 'benchmark_credit': 0}
 
 
 def verify_render_cleanup(root,reference,started_at):
