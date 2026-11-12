@@ -60,6 +60,13 @@ def control(root,batch,stage,name,scheduler,observation):
         execution=d/'execution_observation.json'
         if execution.exists():out['evidence']['execution']=ref(execution)
         verification=directory/'verification.json'
+        rendering_stage=directory/'rendering_verification.json'
+        if stage=='rendering'and not verification.exists()and rendering_stage.exists():
+            verification=rendering_stage
+            scoped=read(verification)
+            require(scoped.get('schema')=='isg-sequential-rendering-verification-v1'and
+                    scoped.get('verified_stages')==['rendering']and scoped.get('full_matrix_verified')is False,
+                    'rendering-only verification scope differs')
         if verification.exists():
             value=read(verification)
             entry=value.get('controls',{}).get(name)if cleanup else value.get('stages',{}).get(stage,{}).get(name)

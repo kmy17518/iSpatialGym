@@ -43,3 +43,16 @@ def test_all_eleven_rows_and_failed_execution_remain_explicit(tmp_path):
     assert value['controls'][-1]['status']=='awaiting_request'
     v=json.loads((d/'submission.json').read_text());v['request']['sha256']='wrong';(d/'submission.json').write_text(json.dumps(v))
     assert status.control(tmp_path,b,'physics','fresh_A',{},o)['status']=='evidence_error'
+
+
+def test_rendering_only_proof_cannot_verify_physics(tmp_path):
+    b,d,o=fixture(tmp_path);rd=b/'sequential_verification_r1/rendering/fresh_A';rd.mkdir(parents=True)
+    for name in ('request.json','preflight.json'):(rd/name).write_bytes((d/name).read_bytes())
+    request=status.ref(rd/'request.json');(rd/'submission.json').write_text(json.dumps({'request':request,'jobs':[{'request':request,'job_id':'124','returncode':0,'control':'fresh_A'}]}))
+    (rd/'output').mkdir();p=rd/'output/probe.json';p.write_text('{"entries":[{}]}')
+    value={'schema':'isg-sequential-rendering-verification-v1','status':'verified','verified_stages':['rendering'],
+           'full_matrix_verified':False,'stages':{'rendering':{'fresh_A':{'probe':status.ref(p)}}}}
+    (b/'sequential_verification_r1/rendering_verification.json').write_text(json.dumps(value))
+    scheduler={'123':{'state':'COMPLETED','exit_code':'0:0'},'124':{'state':'COMPLETED','exit_code':'0:0'}}
+    assert status.control(tmp_path,b,'rendering','fresh_A',scheduler,o)['verification_status']=='verified'
+    assert status.control(tmp_path,b,'physics','fresh_A',scheduler,o)['verification_status']=='not_verified'
