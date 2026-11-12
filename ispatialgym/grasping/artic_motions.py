@@ -89,6 +89,22 @@ def target_model(entry: Dict[str, Any]) -> Tuple[str, str, str, str]:
     return cat, model, joint, hkey or f"{cat}__{model}"
 
 
+def target_scale(entry: Dict[str, Any]) -> Optional[List[float]]:
+    """Resolve the representative's explicit scale with the sampler's own rules.
+
+    Missing scales retain the nominal validation path. An explicit scale must
+    also key the loaded geometry and motion library; scaling only the handle
+    annotation would validate a different physical object.
+    """
+    from ispatialgym.sampling.v2.problem import resolve_scale
+
+    cat, model, _, _ = target_model(entry)
+    scale = resolve_scale(entry["roles"]["target"].get("scale"), cat, model)
+    if scale is not None and (len(scale) != 3 or any(not math.isfinite(v) or v <= 0 for v in scale)):
+        raise ValueError(f"invalid articulation target scale: {scale!r}")
+    return scale
+
+
 class _Shim:
     """The attributes ``ArticulationSmall._facing_local`` / ``_build_v2_handles`` / ``_build_close_push_handle`` / ``_pinch_variants``
     read (``gen``, ``g``, ``jinfo``, ``handle``, ``hull``, ``direction``, ``facing_local``, ``q_init`` / ``q_goal``, ``gp.variant``)."""

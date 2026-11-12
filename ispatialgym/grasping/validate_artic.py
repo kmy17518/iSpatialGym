@@ -598,11 +598,17 @@ class MotionWorld:
 
         entry = AM.load_alias(alias, customs_path)
         cat, model, joint, hkey = AM.target_model(entry)
-        job = {"category": cat, "model": model, "scale": None, "dataset": "behavior-1k-assets", "id": S.entry_id(cat, model, None, "articulation")}
-        d = S.model_dir(cat, model, None, root, "articulation")
+        scale = AM.target_scale(entry)
+        job = {"category": cat, "model": model, "scale": scale, "dataset": "behavior-1k-assets", "id": S.entry_id(cat, model, scale, "articulation")}
+        d = S.model_dir(cat, model, scale, root, "articulation")
         os.makedirs(d, exist_ok=True)
         obj = self.w.load(job, d)
         try:
+            if scale is not None:
+                actual = getattr(obj, "scale", None)
+                actual = actual.tolist() if hasattr(actual, "tolist") else actual
+                if actual is None or np.shape(actual) != (3,) or not np.allclose(actual, S.canonical_scale(scale), rtol=0, atol=1e-6):
+                    raise ValueError(f"articulation target loaded at {actual!r}, requested {scale!r}")
             geom = OG.load(d)
             hull = local_hull(obj)
             jn = joint or next(iter(obj.joints))
