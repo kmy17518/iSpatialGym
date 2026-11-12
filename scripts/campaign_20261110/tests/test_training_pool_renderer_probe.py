@@ -3,7 +3,7 @@ from types import SimpleNamespace as N
 import pytest
 from scripts.campaign_20261110.contracts import ContractError
 from scripts.campaign_20261110.training_pool_renderer_probe import (
-    selected_pool_records, project_active_loaded, source_state_expected, prohibit_native_mutation)
+    selected_pool_records, project_active_loaded, source_state_expected, prohibit_native_mutation, record_comparison)
 from scripts.campaign_20261110.training_restoration import same_loaded_state
 
 
@@ -55,3 +55,10 @@ def test_no_physics_or_lifecycle_step_can_be_hidden_and_methods_restore_on_failu
     with pytest.raises(ContractError):
         with prohibit_native_mutation(sim,events):getattr(target,name)()
     assert events==[name] and getattr(target,name)is prior
+
+
+def test_first_strict_native_mismatch_retains_exact_cold_and_actual_evidence():
+    expected=observation();actual=copy.deepcopy(expected);actual['objects']['A']['position']=[10,2,3];saved=[]
+    with pytest.raises(ContractError):record_comparison(expected,actual,same_loaded_state,saved.append)
+    assert len(saved)==1 and saved[0]['strict_match']is False and 'error'in saved[0]
+    assert saved[0]['cold_native_expected']==expected and saved[0]['native_observed']==actual

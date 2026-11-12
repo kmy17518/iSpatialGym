@@ -75,6 +75,20 @@ def source_state_expected(actual, state):
     return result, observed
 
 
+def record_comparison(expected, observed, checker, publish):
+    """Retain the first mismatching native state as well as successful checks."""
+    evidence = {'cold_native_expected': expected, 'native_observed': observed, 'strict_match': False}
+    try:
+        checker(expected, observed)
+        evidence['strict_match'] = True
+    except BaseException as error:
+        evidence['error'] = repr(error)
+        raise
+    finally:
+        publish(evidence)
+    return evidence
+
+
 @contextmanager
 def prohibit_native_mutation(sim, events):
     saved = []
@@ -203,11 +217,15 @@ def run(root,request_path,output,preflight=False):
         visibility=observe_visibility(slot.scene,contract,active,parking)
         native=slot.campaign_restoration['native_observation'];projected=project_active_loaded(native['loaded_state'],contract,active)
         original=cold[member]['rendered_observations'][0]['campaign_restoration']['native_observation']['loaded_state']
-        same_loaded_state(original,projected)
         result['entries'].append({'member':member,'active':active,'source_demo':records[member]['artifacts']['demo'],
             'source_scene':records[member]['artifacts']['recorded_scene'],'private_scene_sha256':digest(private),
             'visibility':visibility,'parking':parking,'native_restoration':slot.campaign_restoration,
-            'active_loaded_state':projected,'cold_state_strict_match':True,'object_identities':dict(identities),'scene_identity':scene_identity})
+            'active_loaded_state':projected,'cold_state_strict_match':False,'object_identities':dict(identities),'scene_identity':scene_identity})
+        def publish_comparison(evidence):
+            result['entries'][-1]['cold_state_comparison']=evidence
+            result['entries'][-1]['cold_state_strict_match']=evidence['strict_match']
+            write_json_atomic(output/'observation.json',result)
+        record_comparison(original,projected,same_loaded_state,publish_comparison)
         result['frame_counts'].append(0);write_json_atomic(output/'observation.json',result);return answer
     def loaded(slot,flat,delta):
         require(delta is False,'native full state loads required');answer=load(slot,flat,delta)
@@ -222,10 +240,11 @@ def run(root,request_path,output,preflight=False):
         require(cold_frame['frame']==slot.i and cold_frame['source_flat_sha256']==source_hash,
                 'cold native readback does not belong to this exact source frame')
         expected=cold_frame['native_observation']['loaded_state']
-        observed=project_active_loaded(native,contract,active);same_loaded_state(expected,observed)
-        frame_file.write(json.dumps({'episode':len(result['entries'])-1,'frame':slot.i,
-            'source_flat_sha256':source_hash,
-            'cold_native_expected':expected,'native_observed':observed,'strict_match':True})+'\n');frame_file.flush()
+        observed=project_active_loaded(native,contract,active)
+        def publish_frame(evidence):
+            frame_file.write(json.dumps({'episode':len(result['entries'])-1,'frame':slot.i,
+                'source_flat_sha256':source_hash,**evidence})+'\n');frame_file.flush()
+        record_comparison(expected,observed,same_loaded_state,publish_frame)
         result['frame_counts'][-1]+=1;return answer
     campaign.selected_records=select;renderer.env_config=env_config;renderer.Slot.start=started;renderer.Slot.load=loaded
     try:
