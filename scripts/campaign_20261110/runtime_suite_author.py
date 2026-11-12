@@ -106,7 +106,8 @@ def author(root, run_dir, catalog_path, ordinal):
     budget = max(900, int(source_limits.get("sample_limit_s") or 2700)-1800)
     if original_env.get("ISPATIALGYM_CAMPAIGN_GOAL_PLAN"):
         budget = int(read(original_env["ISPATIALGYM_CAMPAIGN_GOAL_PLAN"])["budget_seconds"])
-    magnitude, bucket = ((None, None) if camera else group_range(template, catalog.get("accepted_bucket_counts", {})))
+    quota = read(run_dir/"quota_observation.json")["classes"][template.class_id]
+    magnitude, bucket = ((None, None) if camera else group_range(template, quota["accepted_bucket_counts"]))
     if camera:
         destination.mkdir(parents=True)
         source["purpose"] = "validation"
@@ -130,7 +131,7 @@ def author(root, run_dir, catalog_path, ordinal):
         goal_ref, count = None, 1
     else:
         anchor = g.successful_anchor(catalog["anchor_job"],campaign_root=root,ledger=catalog["anchor_ledger"],
-                                    campaign_started_at=float(read(run_dir/"campaign_start.json")["started_at"]))
+                                    campaign_started_at=float(read(run_dir/"campaign_start.json")["campaign_started_at"]))
         anchor["goal_proposal_source"] = "approved_recorded_goal_as_input_only; fresh_current_runtime_members_required"
         g.prepare_group(anchor=anchor,template=template,campaign_id=root.name,group_id=token,output=destination,
                         code_sha256=runtime["snapshot_sha256"],physics_sha256=source["validation_key"]["physics_sha256"],
@@ -157,12 +158,12 @@ def author(root, run_dir, catalog_path, ordinal):
     command += ["--max-attempts",str(source_limits.get("max_attempts") or 15),"--extra-env","DEMO_LIMIT_S="+str(source_limits.get("demo_limit_s") or 3600)]
     row = {"schema":"isg-current-runtime-class-launch-v1","campaign_id":root.name,"run_id":release["run_id"],
            "run_started_at":release["run_started_at"],"class_id":template.class_id,"frozen_runtime":runtime,
-           "release":ref(run_dir/"release.json"),"catalog_row":ref(catalog_path),"campaign_config":ref(config_path),
+           "release":ref(run_dir/"release.json"),"author":ref(__file__),"quota_observation":ref(run_dir/"quota_observation.json"),"catalog_row":ref(catalog_path),"campaign_config":ref(config_path),
            "group_id":None if camera else token,"goal_plan":goal_ref,"fresh_start":index,"fresh_count":count,
            "camera_exempt":camera,"owner":"/root","dispatch_token":token,"allocation_ledger":str(ledger),
            "selected_bucket":bucket,"effective_limits":{"group_budget_seconds":None if camera else budget,
                "sampling_limit_seconds":int(command[command.index("--sample-limit-s")+1]),"allocation_limit_seconds":int(command[command.index("--time-s")+1])},
-           "quota_ineligible_at_authoring":bool(catalog.get("current_eligible_standard",0)>=10),
+           "quota_ineligible_at_authoring":bool(quota["current_eligible_standard"]>=10),
            "source_environment_replaced_keys":replaced,
            "historical_proof_used_as_new_success":False,"production_authorization":False,"created_at":time.time()}
     row_ref = immutable(row_path,row)
