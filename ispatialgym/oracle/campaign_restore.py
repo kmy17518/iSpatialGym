@@ -284,6 +284,14 @@ def complete_scene_snapshot_scope(meta, scene, report, *, execution=None):
             and _purpose_allowed(meta, execution),
             'complete snapshot restoration requires its exact authorized source')
     pristine_mass_enabled(meta, execution)  # Validate the complete option set before changing the filter.
+    with native_snapshot_scope(scene, report):
+        yield
+
+
+@contextmanager
+def native_snapshot_scope(scene, report):
+    """Keep a recording-only filter out of a complete native restore snapshot."""
+    from scripts.campaign_20261110.contracts import require
     registry = getattr(scene, 'object_registry', None)
     require(registry is not None and hasattr(registry, '_dump_filter')
             and callable(getattr(registry, 'set_dump_filter', None)),

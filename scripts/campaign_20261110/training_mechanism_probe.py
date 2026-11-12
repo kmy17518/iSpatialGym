@@ -30,7 +30,39 @@ REBUILD_DELTA = {**DELTA, 'native_loader_changed_by_probe':True,
 def physical_delta(request):
     mode = request.get('physics_reconstruction')
     require(mode in (None, 'late_incoming_v1'), 'unknown native reconstruction')
-    return REBUILD_DELTA if mode else DELTA
+    value = dict(REBUILD_DELTA if mode else DELTA)
+    full = request.get('complete_native_snapshots')
+    require(full in (None, True), 'unknown native snapshot scope')
+    if full:
+        value['complete_native_snapshots'] = 'existing loader update_initial_file calls include every initialized actor; prior recording filter restored'
+    return value
+
+
+def install_complete_snapshots(runner):
+    from ispatialgym.oracle.campaign_restore import native_snapshot_scope
+    original = runner.InstanceLoader.restore
+    def restored(loader, *args, **kwargs):
+        scene = loader.env.scene; native = scene.update_initial_file
+        had = 'update_initial_file' in vars(scene); prior = vars(scene).get('update_initial_file')
+        events = []; loader.report['complete_native_snapshot_inventory'] = events
+        def updated(*args, **kwargs):
+            result = native(*args, **kwargs)
+            names = set(scene._initial_file['state']['registry']['object_registry'])
+            expected = {obj.name for obj in scene.objects}
+            events.append({'snapshot_objects':sorted(names), 'native_objects':sorted(expected),
+                           'complete':names == expected, 'physics_steps_added':0})
+            require(names == expected, 'native loader snapshot omitted initialized actors')
+            return result
+        with native_snapshot_scope(scene, loader.report):
+            scene.update_initial_file = updated
+            try:
+                result = original(loader, *args, **kwargs)
+                require(events, 'native restore did not publish a snapshot')
+                return result
+            finally:
+                if had: scene.update_initial_file = prior
+                else: del scene.update_initial_file
+    runner.InstanceLoader.restore = restored
 
 
 def ref(path): return {'path':str(path), 'sha256':file_digest(path)}
@@ -186,6 +218,8 @@ def run(root, request_path, output, *, preflight=False):
             return event
         install(runner, {'late_incoming_physics_rebuild_v1':True,
                          'runtime_compatibility':q['runtime_proof']}, output, restart=restart)
+    if q.get('complete_native_snapshots'):
+        install_complete_snapshots(runner)
     types = {'A_FAILURE_A':ControlledEpisodeFailure,'A_INTERRUPT_A':ControlledEpisodeInterrupt}
     tro = source['source_tro']['path']; demo = source['collector_demo']['path']
     signature = runner.instance_signature(tro); directory = runner.resolve_instance(tro)[1]

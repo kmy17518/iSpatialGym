@@ -124,3 +124,54 @@ def test_additional_source_rejects_reinterpreted_review_or_original_identity(tmp
     else:row['source_generation_and_collection_runtime']['commit']='new_execution_commit'
     row['first_party_strict_review']=put('review.json',review)
     with pytest.raises(ContractError):additional_source(tmp_path,manifest,q)
+
+
+def snapshot_runner(fail=False, omitted=False):
+    from types import SimpleNamespace as N
+    class Registry:
+        def __init__(self):self._dump_filter=lambda obj:obj.name=='target'
+        def set_dump_filter(self,value):self._dump_filter=value
+    registry=Registry();actors=[N(name='target'),N(name='background')]
+    class Scene:
+        objects=actors;object_registry=registry
+        def update_initial_file(self):
+            names=[o.name for o in actors if registry._dump_filter(o)]
+            if omitted:names.remove('background')
+            self._initial_file={'state':{'registry':{'object_registry':dict.fromkeys(names,{})}}}
+    scene=Scene()
+    class Loader:
+        def __init__(self):self.env=N(scene=scene);self.report={}
+        def restore(self):
+            scene.update_initial_file()
+            if fail:raise ValueError('native failure')
+            scene.update_initial_file();return 'native result'
+    return N(InstanceLoader=Loader),scene,registry
+
+
+def test_native_restore_snapshots_cover_background_and_restore_exact_recording_filter():
+    from scripts.campaign_20261110.training_mechanism_probe import install_complete_snapshots
+    runner,scene,registry=snapshot_runner();prior=registry._dump_filter
+    install_complete_snapshots(runner);loader=runner.InstanceLoader()
+    assert loader.restore()=='native result' and registry._dump_filter is prior
+    assert len(loader.report['complete_native_snapshot_inventory'])==2
+    assert all(e['complete'] and e['physics_steps_added']==0 for e in loader.report['complete_native_snapshot_inventory'])
+    assert 'update_initial_file' not in vars(scene)
+
+
+@pytest.mark.parametrize('fail,omitted',[(True,False),(False,True)])
+def test_snapshot_scope_keeps_failure_evidence_and_restores_native_methods(fail,omitted):
+    from scripts.campaign_20261110.training_mechanism_probe import install_complete_snapshots
+    runner,scene,registry=snapshot_runner(fail,omitted);prior=registry._dump_filter
+    install_complete_snapshots(runner);loader=runner.InstanceLoader()
+    with pytest.raises((ValueError,ContractError)):loader.restore()
+    assert registry._dump_filter is prior and 'update_initial_file'not in vars(scene)
+    assert loader.report['complete_native_snapshot_inventory']
+    assert loader.report['complete_scene_snapshot']['prior_filter_restored'] is True
+
+
+def test_complete_snapshot_request_must_declare_its_changed_physical_boundary():
+    from scripts.campaign_20261110.training_mechanism_probe import physical_delta
+    q={**request('AA'),'complete_native_snapshots':True}
+    with pytest.raises(ContractError):scope(q)
+    q['physical_delta']=physical_delta(q)
+    assert scope(q)==[0,0] and q['physical_delta']['additional_physics_steps']==0
