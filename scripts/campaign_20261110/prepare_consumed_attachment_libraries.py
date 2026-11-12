@@ -56,25 +56,34 @@ v.update(finished_at=time.time(),returncode=rc,native_validator_done=done,librar
         assert t['ready'] and is_ready(t['model']) and t['model_key'] not in reservations['train_exclude_models']
         assert t['category'] not in reservations['train_exclude_categories'] and t['asset_sha256'] not in assets['reserved_asset_hashes']
         scale = list(S.canonical_scale(t['applied_scale']))
-        assert entry == S.entry_id(t['category'], t['model'], scale, 'attachment_free', None)
+        selected_job = row.get('job')
+        constraint = selected_job['constraint'] if selected_job else 'attachment_free'
+        assert constraint in {'attachment_free', 'tabletop_insert', 'flower_stem_top'}
+        rest_hint = selected_job.get('rest_hint_wxyz') if selected_job else None
+        assert entry == S.entry_id(t['category'], t['model'], scale, constraint, rest_hint)
         asset = runtime / 'Behavior-1K/datasets' / t['dataset'] / 'objects' / t['category'] / t['model'] / 'usd' / (t['model'] + '.encrypted.usd')
         assert sha(asset) == t['asset_sha256']
-        job = {'id': entry, 'category': t['category'], 'model': t['model'], 'dataset': t['dataset'], 'scale': scale,
+        job = selected_job or {'id': entry, 'category': t['category'], 'model': t['model'], 'dataset': t['dataset'], 'scale': scale,
                'constraint': 'attachment_free', 'kind': 'attachment', 'rest_hint_wxyz': None, 'rest_pose': 'canonical',
                'legacy_key': None, 'source': 'consumed_attachment_male_scale', 'asset_sha256': t['asset_sha256']}
         physical = {'kind': 'grasp_library', 'job': job, 'generator_files': source_refs[5:], 'arm': 'right'}
         key = hashlib.sha256(json.dumps(physical, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        ident = 'attachment_glib_' + key[:20]
+        assert all(job[k] == t[k] for k in ('category', 'model', 'dataset')) and job['scale'] == scale
+        claims_root = root / 'infra/coordination/preparation_dispatch/consumed_asset_builds_r1'
+        if (claims_root / 'claims' / (key + '.json')).exists():
+            continue
+        ident = ('attachment_glib_' if constraint == 'attachment_free' else 'specialized_glib_') + key[:20]
         directory = output / ident
         directory.mkdir()
         jp = directory / 'jobs.json'
         jp.write_text(json.dumps([job], indent=2) + '\n')
         argv = ['python', '-u', '-m', 'ispatialgym.grasping.pipeline', 'all', '--jobs', str(jp), '--root', str(directory / 'glib'), '--shard', '0/1', '--workers', '8']
-        inputs = source_refs + [ref(jp), ref(asset)]
+        inputs = source_refs + row.get('source_refs', []) + [ref(jp), ref(asset)]
+        for reference in inputs: assert sha(reference['path']) == reference['sha256']
         prepared = {'id': ident, 'physical_dedup_key': key, 'physical_identity': physical, 'entry_id': entry,
                     'native_runtime': str(runtime), 'native_argv': argv, 'input_refs': inputs,
                     'configuration_ids': sorted(set(row['consumers'])), 'selected_dependency_ids': sorted(row['request_ids']),
-                    'computation_kind': 'grasp_library', 'consumer_kind': 'attachment_free', 'production_authorized': False}
+                    'computation_kind': 'grasp_library', 'consumer_kind': constraint, 'production_authorized': False}
         pp = directory / 'prepared.json'
         pp.write_text(json.dumps(prepared, indent=2) + '\n')
         (directory / 'run.py').write_text(runner)
@@ -92,13 +101,15 @@ v.update(finished_at=time.time(),returncode=rc,native_validator_done=done,librar
                          'prepared': ref(pp), 'runtime_ref': ref(runtime / '.snapshot_commit'), 'input_refs': inputs,
                          'scripts': [ref(directory / n) for n in ('run.py', 'job.sh', 'pinned.sh')], 'output': str(directory / 'glib'),
                          'dispatch_workdir': str(runtime), 'hard_time_seconds': 3600, 'native_time_seconds': 3300,
-                         'computation_kind': 'grasp_library', 'consumer_kind': 'attachment_free', 'workstream': 'training preparation',
-                         'stage': 'native attachment-free grasp library', 'owner': '/root/templates_assets',
+                         'computation_kind': 'grasp_library', 'consumer_kind': constraint, 'workstream': 'training preparation',
+                         'stage': 'native ' + constraint + ' grasp library', 'owner': '/root/templates_assets',
                          'configuration_ids': prepared['configuration_ids'], 'selected_dependency_ids': row['request_ids'],
-                         'followup': 'Strict native entry/scale/constraint/arm/physics/candidate-default and positive-versus-zero reader; link consumer aliases; feed per-height tabletop and pair/height attach maps through existing exact claims. No scene feasibility test.',
+                         'followup': 'Strict native entry/scale/constraint/rest/arm/physics/candidate-default and positive-versus-zero reader; link exact specialized consumer aliases and feed required maps through existing exact claims. No scene feasibility test.',
                          'benchmark_credit': 0, 'production_authorized': False})
     p = output / 'tickets.json'
     p.write_text(json.dumps({'schema': 'isg-preparation-dispatch-tickets-v1', 'campaign_id': root.name, 'account': 'minyeong',
+                            'source_account': 'minyeong', 'claim_namespace': str(root / 'infra/coordination/preparation_dispatch/consumed_asset_builds_r1/claims'),
+                            'receipt_namespace': str(root / 'infra/coordination/preparation_dispatch/consumed_asset_builds_r1/receipts'),
                             'observed_at': time.time(), 'owner': '/root/templates_assets', 'dispatch_owner': '/root', 'jobs': manifest,
                             'skipped_existing_entries': sorted(found & set(wanted)), 'reservation_policy': pointer,
                             'benchmark_credit': 0, 'production_authorized': False}, indent=2) + '\n')
