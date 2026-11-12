@@ -43,6 +43,8 @@ def locate_terminal(ticket, route):
 
 
 def native_read(ticket, terminal_path, maps_root, backend, route, cache):
+    if ticket['computation_kind'] == 'contact_map':
+        return native_read_contact(ticket, terminal_path, maps_root, backend, cache)
     if ticket['consumer_kind'] == 'generic':
         return native_read_generic(ticket, terminal_path, maps_root, backend, cache)
     import numpy as np
@@ -67,7 +69,7 @@ def native_read(ticket, terminal_path, maps_root, backend, route, cache):
     argv = next(iter(commands.values())); args = dict(zip(argv[7::2], argv[8::2]))
     jobs = json.loads(Path(args['--jobs']).read_text()); require(len(jobs) == 1, 'One physical map library required')
     entry = jobs[0]
-    lib = S.load_model(entry['category'], entry['model'], entry['scale'], args['--glib'], constraint=entry['constraint'])
+    lib = load_map_library(S, entry, args['--glib'])
     require(lib is not None and lib.grasps(), 'Map library must have positive native grasps')
     identity = prepared['physical_identity']
     require(lib.identity_key() == identity['library_identity'] and sha(lib.path) == identity['library_sha256'], 'Map library identity differs')
@@ -96,6 +98,68 @@ def native_read(ticket, terminal_path, maps_root, backend, route, cache):
             'downstream_computation_required': False,
             'next_action': 'Reuse exact map artifact in configuration data closure' if positive else 'Diagnose valid zero; do not repeat unchanged',
             'configuration_readiness_claimed': False, 'benchmark_credit': 0}
+
+
+def load_map_library(schema, entry, root):
+    return schema.load_model(entry['category'], entry['model'], entry['scale'], root,
+                             constraint=entry['constraint'], rest_hint_wxyz=entry.get('rest_hint_wxyz'))
+
+
+def contact_grid_proof(native, identity, library, cm, cp, rm, np):
+    """Check the exact required push-map semantics before consumer lookup."""
+    meta = native.meta
+    require(identity['kind'] == 'push_blade' and identity['arm'] == 'right', 'Unsupported required contact identity')
+    require(meta['schema'] == cm.SCHEMA and meta['key'] == cm.map_key(meta), 'Contact native map key differs')
+    require(meta['kind'] == identity['kind'] and meta['arm'] == identity['arm'] and meta['plane'] == cm.KINDS[identity['kind']]['plane'], 'Contact kind/arm/plane differs')
+    require(cm.object_key(meta['object']) == identity['object_key'] == cm.object_key(library['object']), 'Contact object identity differs')
+    require(meta['library']['digest'] == library['digest'], 'Contact library digest differs')
+    require(meta['height']['value'] == identity['height_above_floor'] and meta['pose_set'] == identity['pose_set'], 'Contact height/pose set differs')
+    normalize = lambda value: json.loads(json.dumps(value))
+    require(meta['config'] == normalize(identity['config']) and meta['edge_distances'] == normalize(identity['config']['edge_distances']), 'Contact configuration differs')
+    require(meta['policy_key'] == identity['policy_key'] == cp.DEFAULT.key('right') and meta['robot'] == identity['robot'] == rm.robot_digest(), 'Contact policy/robot differs')
+    require(np.isfinite(native.cells).all() and np.isfinite(native.yaws).all(), 'Nonfinite contact grid')
+    grids = [v for k, v in native.arrays.items() if k.startswith('s')]
+    allowed = set(cm.STATUS.values()) | {cm.STATUS_IK_MARGIN}
+    require(grids and all(set(np.unique(v)) <= allowed for v in grids), 'Invalid contact status grid')
+    require(all(v.shape == (len(native.cells), len(native.yaws), len(native.classes)) for v in grids), 'Contact grid dimensions differ')
+    return sum(int((v == cm.STATUS['feasible']).sum()) for v in grids)
+
+
+def native_read_contact(ticket, terminal_path, maps_root, backend, cache):
+    import numpy as np
+    from ispatialgym.grasping import contact_library as CL, contact_policy as CP
+    from ispatialgym.sampling import contact_maps as CM, reach_maps as RM
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+    require(backend == 'cluster', 'Required contact transport currently supports cluster artifacts only')
+    prepared = checked(ticket['prepared'], cache)
+    for ref in ticket['input_refs'] + [ticket['runtime_ref']]: checked_hash(ref, cache)
+    for module in (CL, CP, CM, RM, CPZ):
+        expected = next(r for r in ticket['input_refs'] if Path(r['path']).name == Path(module.__file__).name)
+        require(sha(module.__file__) == expected['sha256'], 'Native contact reader runtime differs')
+    terminal = json.loads(terminal_path.read_text()); identity = prepared['physical_identity']
+    require(terminal['physical_dedup_key'] == ticket['physical_dedup_key'] and terminal['prepared_sha256'] == ticket['prepared']['sha256'], 'Contact terminal physical identity differs')
+    require(terminal['returncode'] == 0 and terminal['native_done'], 'Native contact builder failed')
+    source = prepared['source_library']; checked_hash(source, cache)
+    library = CL.load_library(source['path'])
+    require(library['digest'] == CL._library_digest(library), 'Contact library payload digest differs')
+    entries = CM.select_entries(library, identity['kind'], ('valid',), arm=identity['arm'])
+    require(entries and CM.pose_set(identity['kind'], entries, ('valid',)) == identity['pose_set'], 'Contact positive entry pose set differs')
+    paths = sorted(maps_root.rglob('cmap__*.json')); require(len(paths) == 1, 'One required physical contact map expected')
+    path = paths[0]; native = CM.ContactMap(str(path))
+    positive = contact_grid_proof(native, identity, library, CM, CP, RM, np)
+    found = CM.ContactMap.find(str(maps_root), identity['kind'], identity['object_key']['entry'], identity['height_above_floor'],
+        rest_id=library['object']['rest_id'], arm=identity['arm'], policy_key=identity['policy_key'], robot=identity['robot'],
+        config_require=identity['config'], pose_set_digest=identity['pose_set']['digest'])
+    require(found is not None and Path(found.path) == path, 'Native contact consumer lookup failed')
+    declared = {r['path']: r['sha256'] for r in terminal['map_files']}
+    files = [{'path': str(p), 'sha256': sha(p)} for p in (path, path.with_suffix('.npz'))]
+    require(all(declared.get(r['path']) == r['sha256'] for r in files), 'Unbound contact map payload')
+    return {'status': 'verified_positive' if positive else 'valid_zero', 'native_reader_passed': True,
+            'positive_cells': positive, 'verified_files': files,
+            'maps': [{'arm': identity['arm'], 'pose_set': identity['pose_set'], 'files': files}],
+            'builder_elapsed_seconds': terminal['finished_at'] - terminal['started_at'],
+            'downstream_computation_required': False, 'configuration_readiness_claimed': False, 'benchmark_credit': 0,
+            'next_action': 'Reuse exact required contact map in configuration data closure' if positive else 'Diagnose valid zero; do not repeat unchanged'}
 
 
 def native_read_generic(ticket, terminal_path, maps_root, backend, cache):
@@ -244,7 +308,7 @@ def reconcile(root, manifest_ref, route_ref, output, *, max_seconds=15, max_item
                'owner': '/root/templates_assets', 'manifest_ready_at': epoch(manifest.get('observed_at')),
                'observed_at': timestamp, 'dispatch_owner': '/root'}
         try:
-            require(ticket['computation_kind'] == 'reach_map' and ticket['consumer_kind'] in {'tabletop', 'generic'}, 'Unsupported callback kind')
+            require((ticket['computation_kind'], ticket['consumer_kind']) in {('reach_map', 'tabletop'), ('reach_map', 'generic'), ('contact_map', 'push_blade')}, 'Unsupported callback kind')
             receipt = Path(ticket['submission_path'])
             if receipt.exists():
                 value = json.loads(receipt.read_text()); row['submission'] = {'path': str(receipt), 'sha256': sha(receipt)}
@@ -318,7 +382,7 @@ def verifier_registry(root, pointer):
     require(Path(ref['path']).resolve().is_relative_to(root), 'Verifier registry outside campaign')
     value = checked(ref, {})
     require(value['schema'] == 'isg-consumed-map-verifier-inputs-v1' and value['owner'] == '/root', 'Unsupported verifier registry')
-    require(len(value['manifests']) <= 32, 'Unbounded verifier registry')
+    require(len(value['manifests']) <= 64, 'Unbounded verifier registry')
     for item in value['manifests']:
         require(Path(item['manifest']['path']).resolve().is_relative_to(root), 'Additional manifest outside campaign')
         require(Path(item['output']).resolve().is_relative_to(root), 'Additional output outside campaign')
@@ -346,7 +410,7 @@ def main():
         extra = checked({'path': args.additional_manifests, 'sha256': args.additional_manifests_sha256}, {})
         require(extra['schema'] == 'isg-consumed-map-verifier-inputs-v1', 'Unsupported extra verifier inputs')
         additional = extra['manifests']
-        require(len(additional) <= 32, 'Unbounded extra verifier manifests')
+        require(len(additional) <= 64, 'Unbounded extra verifier manifests')
     def stop(signum, frame): stopped[0] = True
     signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)
 

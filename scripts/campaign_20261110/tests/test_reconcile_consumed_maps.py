@@ -97,3 +97,55 @@ def test_secondary_proof_projection_keeps_private_payload_on_owner(tmp_path, mon
     v.write(sp,{'physical_identity':{'height':.8}});receipt['prepared']=ref(sp)
     import pytest
     with pytest.raises(ValueError,match='physical input identity'):m.peer_verification(ticket,receipt,'minyeong',{})
+
+
+def test_designated_rest_is_forwarded_to_native_library_reader():
+    from types import SimpleNamespace
+    calls = []
+    schema = SimpleNamespace(load_model=lambda *a, **k: calls.append((a, k)))
+    entry = {'category': 'sunflower', 'model': 'exact_model', 'scale': [1., 1., 1.],
+             'constraint': 'flower_stem_top', 'rest_hint_wxyz': [.5, .5, .5, .5]}
+    m.load_map_library(schema, entry, '/exact/library')
+    assert calls[0][1] == {'constraint': 'flower_stem_top', 'rest_hint_wxyz': [.5, .5, .5, .5]}
+
+
+def test_contact_grid_rejects_wrong_identity_and_corrupt_status():
+    from copy import deepcopy
+    from types import SimpleNamespace
+    import numpy as np
+    import pytest
+    obj = {'entry': 'exact_model_scale', 'rest_id': 'r0'}
+    identity = {'kind': 'push_blade', 'arm': 'right', 'object_key': obj, 'height_above_floor': .8,
+                'pose_set': {'digest': 'exact_pose_set'}, 'config': {'edge_distances': [.3, .4]},
+                'policy_key': 'policy', 'robot': 'robot'}
+    meta = {'schema': 'schema', 'key': 'key', 'kind': 'push_blade', 'arm': 'right', 'plane': 'slab',
+            'object': obj, 'library': {'digest': 'lib'}, 'height': {'value': .8}, 'pose_set': identity['pose_set'],
+            'config': identity['config'], 'edge_distances': [.3, .4], 'policy_key': 'policy', 'robot': 'robot'}
+    grid = np.array([[[1], [0]]], dtype=np.uint8)
+    native = SimpleNamespace(meta=deepcopy(meta), cells=np.zeros((1, 2)), yaws=np.zeros(2), classes=['a'], arrays={'s0': grid})
+    cm = SimpleNamespace(SCHEMA='schema', map_key=lambda value: 'key', object_key=lambda value: value,
+                         KINDS={'push_blade': {'plane': 'slab'}}, STATUS={'feasible': 1, 'no_entry': 0}, STATUS_IK_MARGIN=13)
+    cp = SimpleNamespace(DEFAULT=SimpleNamespace(key=lambda arm: 'policy'))
+    rm = SimpleNamespace(robot_digest=lambda: 'robot')
+    args = (identity, {'object': obj, 'digest': 'lib'}, cm, cp, rm, np)
+    assert m.contact_grid_proof(native, *args) == 1
+    for field, bad, message in [('pose_set', {'digest': 'other'}, 'height/pose'), ('object', {'entry': 'other'}, 'object identity'),
+                                ('config', {'edge_distances': [.2]}, 'configuration'), ('robot', 'other', 'policy/robot')]:
+        native.meta = deepcopy(meta); native.meta[field] = bad
+        with pytest.raises(ValueError, match=message): m.contact_grid_proof(native, *args)
+    native.meta = deepcopy(meta); native.arrays = {'s0': np.array([[[255], [0]]])}
+    with pytest.raises(ValueError, match='status grid'): m.contact_grid_proof(native, *args)
+    native.arrays = {'s0': np.zeros((1, 1, 1))}
+    with pytest.raises(ValueError, match='dimensions'): m.contact_grid_proof(native, *args)
+
+
+def test_registry_extension_retains_old_entries_and_enforces_bound(tmp_path):
+    import pytest
+    source = tmp_path / 'registry.json'; pointer = tmp_path / 'pointer.json'
+    item = {'manifest': {'path': str(tmp_path / 'tickets.json'), 'sha256': 'fixed'}, 'output': str(tmp_path / 'output')}
+    for count in (33, 64, 65):
+        v.write(source, {'schema': 'isg-consumed-map-verifier-inputs-v1', 'owner': '/root', 'manifests': [item] * count})
+        v.write(pointer, {'path': str(source), 'sha256': v.sha(source)})
+        if count <= 64: assert len(m.verifier_registry(tmp_path, pointer)) == count
+        else:
+            with pytest.raises(ValueError, match='Unbounded'): m.verifier_registry(tmp_path, pointer)
