@@ -91,6 +91,19 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertFalse(snapshot(self.root,self.root/'inventory')['runtime_validation_source']['available'])
         self.assertEqual(self.request('GET','/reports/runtime-validation')[0],404)
 
+    def test_new_suite_startup_does_not_borrow_prior_validation(self):
+        self.write('dashboard/runtime_validation.json',{'campaign_id':'campaign_20261110','validation_passed':85})
+        self.write('dashboard/runtime_validation_r2_startup.json',{'campaign_id':'campaign_20261110',
+            'run_id':'new','authored_classes':100,'strict_validated_classes':0,'actual_source_allocations':0})
+        before=self.hashes();data=snapshot(self.root,self.root/'inventory')
+        self.assertEqual(data['runtime_validation']['validation_passed'],85)
+        self.assertEqual(data['runtime_validation_r2_startup']['strict_validated_classes'],0)
+        self.assertEqual(self.request('GET','/reports/runtime-validation-r2-startup')[0],200)
+        self.assertEqual(before,self.hashes())
+        self.write('dashboard/runtime_validation_r2_startup.json',{'campaign_id':'old','strict_validated_classes':100})
+        self.assertFalse(snapshot(self.root,self.root/'inventory')['runtime_validation_r2_startup_source']['available'])
+        self.assertEqual(self.request('GET','/reports/runtime-validation-r2-startup')[0],404)
+
     def test_capacity_ledger_is_read_only_and_campaign_scoped(self):
         value={'campaign_id':'campaign_20261110','observed_at':123,
                'unused_capacity_blockers':[{'owner':'root','missing_input':'exact native map','next_action':'audit'}]}
