@@ -240,6 +240,17 @@ class FamilyControllerTests(unittest.TestCase):
                                  Path("/tmp"), "goal_groups", "/snapshot", 3)
             submit.assert_not_called()
 
+    def test_quarantined_interval_stays_reserved_but_cannot_be_reused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'manifests').mkdir()
+            first=c.reserve_indices(root,'retired',1)
+            path=root/'manifests/family_index_reservations.json';state=json.loads(path.read_text())
+            state['reservations']['retired']['quarantined']=True
+            path.write_text(json.dumps(state))
+            with self.assertRaisesRegex(ValueError,'quarantined'):
+                c.reserve_indices(root,'retired',1)
+            self.assertGreater(c.reserve_indices(root,'replacement',1),first)
+
     def test_reconcile_after_crash_adopts_exact_ledger_allocation(self):
         row = {"key": "class", "start": "50000000", "n": "3", "code": "/snapshot", "tag": "goal_groups", "jobid": "12"}
         record = {"status": "submitting", "index": 50000000}

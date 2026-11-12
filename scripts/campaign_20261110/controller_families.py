@@ -99,6 +99,7 @@ def reserve_indices(root, token, count):
             state = read(path, {"next": 50000000, "reservations": {}})
             if token in state["reservations"]:
                 prior = state["reservations"][token]
+                require(not prior.get('quarantined'), 'index reservation quarantined; author a fresh token and preserve original evidence')
                 require(prior["n"] == count, "index reservation changed")
                 os.chmod(path, path.stat().st_mode | 0o040)
                 return prior["start"]
