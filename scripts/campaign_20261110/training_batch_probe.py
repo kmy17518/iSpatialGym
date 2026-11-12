@@ -12,6 +12,23 @@ from pathlib import Path
 from scripts.campaign_20261110.contracts import file_digest,require,write_json_atomic
 
 
+def verify_saved_checker_delta(base, runtime, proof):
+    """The reviewed checker may change metadata validation, never state restoration."""
+    relative='ispatialgym/oracle/campaign_batch.py'
+    binding=proof.get('saved_scene_checker') or {}
+    require(binding.get('base_sha256')==file_digest(base/relative) and
+            binding.get('runtime_sha256')==file_digest(runtime/relative),
+            'saved-scene checker payload differs')
+    def physical(path):
+        tree=ast.parse(path.read_text())
+        tree.body=[node for node in tree.body if not
+            (isinstance(node,ast.FunctionDef) and node.name in
+             ('checked_nested_parking_provenance','saved_world_scope'))]
+        return ast.dump(tree,include_attributes=False)
+    require(physical(base/relative)==physical(runtime/relative),
+            'saved-scene checker changed restoration or other physical operations')
+
+
 def verify_runtime_compatibility(root, request, records, runtime):
     """Recheck the narrow observation-only runtime against native source bytes."""
     root=Path(root).resolve();runtime=Path(runtime).resolve()
@@ -23,6 +40,27 @@ def verify_runtime_compatibility(root, request, records, runtime):
     require(proof_path.is_relative_to(root) and proof_path.is_file() and
             file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
     proof=json.loads(proof_path.read_text())
+    if proof.get('schema') == 'isg-sequential-checker-runtime-compatibility-v1':
+        require(request.get('sequential_checker_only') is True and request.get('sequential_augmentation') is True and
+                request.get('production_released') is False and
+                proof.get('permitted_execution_kinds')==['physics_action_open_loop'],
+                'saved-scene checker requires exact bounded physics probe scope')
+        base=Path(proof['native_runtime']['path']).resolve().parent
+        require(base.is_relative_to(root/'code') and runtime.is_relative_to(root/'code') and
+                file_digest(base/'.snapshot_commit')==proof['native_runtime']['sha256'] and
+                proof['checker_runtime']=={'path':str(runtime/'.snapshot_commit'),'sha256':file_digest(runtime/'.snapshot_commit')} and
+                all(r['validation_key']['code_sha256']==proof['native_runtime']['sha256']for r in records),
+                'saved-scene checker source runtime differs')
+        allowed={'ispatialgym/oracle/campaign_batch.py','ispatialgym/tests/test_campaign_batch.py',
+                 'scripts/campaign_20261110/training_batch_probe.py',
+                 'scripts/campaign_20261110/tests/test_training_batch_checker_compatibility.py'}
+        paths={str(p.relative_to(tree))for tree in (base,runtime)for folder in ('ispatialgym','scripts')for p in(tree/folder).rglob('*.py')}
+        changed={name for name in paths if not(base/name).is_file() or not(runtime/name).is_file() or file_digest(base/name)!=file_digest(runtime/name)}
+        require(changed==set(proof['changed_payloads']) and changed<=allowed and proof.get('physical_code_changes')==0,
+                'saved-scene checker changed native physics or unapproved code')
+        require(all(file_digest(runtime/name)==sha for name,sha in proof['changed_payloads'].items()),'saved-scene checker payload changed')
+        verify_saved_checker_delta(base,runtime,proof)
+        return {'path':str(proof_path),'sha256':ref['sha256']}
     if proof.get('schema') == 'isg-render-cleanup-runtime-compatibility-v1':
         cleanup = request.get('render_cleanup_only') is True and request.get('diagnostic_control') in ('RENDER_FAILURE_A', 'RENDER_INTERRUPT_A')
         sequential = (request.get('sequential_render_only') is True and request.get('render_cleanup_only') is not True and
@@ -41,6 +79,10 @@ def verify_runtime_compatibility(root, request, records, runtime):
                  'ispatialgym/multienv/campaign_rendering.py','scripts/campaign_20261110/training_batch_probe.py',
                  'ispatialgym/tests/test_campaign_render_cleanup.py',
                  'scripts/campaign_20261110/tests/test_training_render_cleanup_probe.py'}
+        if proof.get('saved_scene_checker'):
+            verify_saved_checker_delta(base,runtime,proof)
+            allowed.update(('ispatialgym/oracle/campaign_batch.py','ispatialgym/tests/test_campaign_batch.py',
+                            'scripts/campaign_20261110/tests/test_training_batch_checker_compatibility.py'))
         changed=set()
         for folder in ('ispatialgym','scripts'):
             paths={str(p.relative_to(tree))for tree in (base,runtime)for p in(tree/folder).rglob('*.py')}
@@ -368,6 +410,8 @@ def _run(root,request,output,kind,construction):
     value,records=inputs(root,request);output.mkdir(parents=True)
     require(not (value.get('render_cleanup_only') or value.get('sequential_render_only')) or kind=='kinematic_observation_rendering',
             'render cleanup helper cannot execute physics')
+    require(not value.get('sequential_checker_only') or kind=='physics_action_open_loop',
+            'physics saved-scene checker cannot execute rendering')
     runtime=Path(__file__).resolve().parents[2]/'.snapshot_commit'
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
     compatibility=verify_runtime_compatibility(root,value,records,runtime.parent)
