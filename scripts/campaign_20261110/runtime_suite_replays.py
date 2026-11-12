@@ -6,7 +6,7 @@ recollects or resamples and never retries a failed replay automatically.
 from pathlib import Path
 import argparse,hashlib,json,os,re,subprocess,time
 from .runtime_validation_metrics import reference,require,write,validate_row
-from .runtime_suite_allocations import immutable,allocation
+from .runtime_suite_allocations import immutable,allocation,follow_receipt
 from .production_gate import check_job
 from .storage import atomic_directory_lock
 
@@ -59,7 +59,7 @@ def cycle(root,run_dir,helper):
             if not rp.exists():continue
             receipt=json.loads(rp.read_text())
             if receipt.get('status')!='submitted':continue
-            a=allocation(row,receipt,root);source=Path(a['job_dir'])
+            receipt,a,_=follow_receipt(root,row,receipt);source=Path(a['job_dir'])
             if not (source/'sampling.done').exists():continue
             first,members=successful_members(source,row)
             if not members:continue

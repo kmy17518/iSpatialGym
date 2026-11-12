@@ -14,10 +14,10 @@ def immutable(directory,value):
     return reference(path)
 
 
-def allocation(row,receipt,root):
+def allocation(row,receipt,root,*,token=None):
     require(receipt['status']=='submitted','allocation not submitted')
     a=receipt['allocation']
-    require(receipt['token']==row['dispatch_token'],'dispatch token differs')
+    require(receipt['token']==(token or row['dispatch_token']),'dispatch token differs')
     require((int(a['start']),int(a['n']))==(row['fresh_start'],row['fresh_count']),'allocation range differs')
     require(Path(a['code']).resolve()==Path(row['frozen_runtime']['path']).resolve(),'allocation runtime differs')
     require(a['key']==row['class_id'],'allocation class differs')
@@ -26,6 +26,29 @@ def allocation(row,receipt,root):
     with ledger.open() as stream:matches=[r for r in csv.DictReader(stream,delimiter='\t') if r['jobid']==str(a['jobid'])]
     require(len(matches)==1 and all(str(matches[0][k])==str(a[k]) for k in ('job_dir','code','start','n','key')),'ledger allocation differs')
     return a
+
+
+def follow_receipt(root,row,receipt):
+    """Traverse only an exact never-started, unchanged suite replacement."""
+    from .infra_dispatch_migration import check_suite_replacement
+    history=[];token=row['dispatch_token'];seen=set()
+    while receipt.get('migration'):
+        require(token not in seen,'migration receipt cycle');seen.add(token)
+        original=allocation(row,receipt,root,token=token);migration=receipt['migration'];proof=checked(migration['proof'])
+        require(migration.get('never_started') is True and proof.get('never_started') is True and
+                proof['original_allocation']==original and proof['after']['accounting']['state']=='CANCELLED' and
+                proof['after']['accounting']['start'] in ('Unknown','None','N/A','') and
+                not proof['final_execution_proof']['nonempty_execution_artifacts'],'suite migration is not exactly never started')
+        payload=json.loads((root/'dispatch/ready'/(token+'.json')).read_text())
+        require(payload['identity']==receipt['identity'],'migration source intent differs')
+        replacement=migration['replacement'];check_suite_replacement(root,payload,replacement)
+        path=Path(replacement['dispatch_receipt']).resolve();require(path.parent==root/'dispatch/receipts','replacement receipt outside owned namespace')
+        require(path.exists(),'replacement allocation not yet submitted')
+        following=json.loads(path.read_text());next_token=Path(replacement['dispatch_intent']).stem
+        allocation(row,following,root,token=next_token)
+        history.append({'receipt':receipt,'proof':migration['proof'],'original_allocation':original})
+        receipt=following;token=next_token
+    return receipt,allocation(row,receipt,root,token=token),history
 
 
 def gate_member(path,row,source):
@@ -50,10 +73,14 @@ def observe(root,run_dir):
             if not rpath.exists():continue
             receipt=json.loads(rpath.read_text())
             if receipt.get('status')!='submitted':continue
-            a=allocation(row,receipt,root);source=Path(a['job_dir']);jid=str(a['jobid']);backend='vast' if jid.startswith('9000') else 'cluster'
+            receipt,a,history=follow_receipt(root,row,receipt);source=Path(a['job_dir']);jid=str(a['jobid']);backend='vast' if jid.startswith('9000') else 'cluster'
             value={'schema':'isg-current-runtime-class-allocation-v1','campaign_id':root.name,'row':reference(p),'allocation':a,
                    'dispatch_receipt':immutable(run_dir/'evidence/dispatch_receipts',receipt),'records':[], 'member_gates':[]}
             value['records'].append({'job_id':jid,'job_dir':str(source),'backend':backend,'stage':'generation_collection','submission_ref':value['dispatch_receipt']})
+            value['migration_history']=[]
+            for old in history:
+                old_ref=immutable(run_dir/'evidence/migration_history',old);value['migration_history'].append(old_ref);oa=old['original_allocation']
+                value['records'].append({'job_id':str(oa['jobid']),'job_dir':oa['job_dir'],'backend':'cluster','stage':'generation_collection','submission_ref':old_ref,'never_started':True})
             entries=[];c=central.get(jid)
             if c:entries.append(c)
             member_path=run_dir/'member_replays'/p.name
@@ -91,12 +118,25 @@ def observe(root,run_dir):
     terminal=None
     if changing:
         controller=immutable(run_dir/'evidence/job_inventories',{'schema':'isg-training-ticket-controller-v1','campaign_id':root.name,'owner':'compute_runtime_suite','jobs':list(all_jobs.values())})
-        terminal_ref=observe_ticket_jobs(root,controller,run_dir/'evidence/backend_observations'/str(time.time_ns()))
-        terminal=checked(terminal_ref)
+        available=[j for j in all_jobs.values() if j['backend']!='vast' or (root/'vast/state/jobs'/(j['job_id']+'.json')).is_file()]
+        if available:
+            controller=immutable(run_dir/'evidence/job_inventories',{'schema':'isg-training-ticket-controller-v1','campaign_id':root.name,'owner':'compute_runtime_suite','jobs':available})
+            terminal_ref=observe_ticket_jobs(root,controller,run_dir/'evidence/backend_observations'/str(time.time_ns()))
+            terminal=checked(terminal_ref)
+        else:terminal={'schema':'isg-training-ticket-terminal-observations-v1','campaign_id':root.name,'observed_at':time.time(),'controller':controller,'jobs':[]}
     for target,value,jobs in changing:
         keys={(r['backend'],r['job_id'],r['stage']) for r in jobs}
         selected={**terminal,'jobs':[j for j in terminal['jobs'] if (j['backend'],j['job_id'],j['stage']) in keys]}
         value['terminal_evidence']=immutable(run_dir/'evidence/class_backend_observations',selected)
+        value['observed_at']=selected['observed_at']
+        value['execution_state']='observation_unavailable'
+        for j in selected['jobs']:
+            if j['job_id']!=str(value['allocation']['jobid']):continue
+            raw=checked(j['raw'])
+            if j['backend']=='vast':value['execution_state']=checked(raw['state']).get('status','unknown')
+            else:
+                current=raw.get('squeue_stdout','').strip().split('|');accounting=raw.get('sacct_stdout','').strip().split('|')
+                value['execution_state']=current[1] if len(current)>1 else accounting[1] if len(accounting)>1 else 'unknown'
         value['terminal_sealed']=False
         try:
             _terminal_jobs(root,{'jobs':jobs},selected,selected['observed_at'])
