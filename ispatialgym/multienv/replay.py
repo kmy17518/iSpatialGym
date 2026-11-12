@@ -597,6 +597,8 @@ def main(argv=None) -> int:
     ap.add_argument("--claims", default=None, help="--watch: claim directory shared by several replayers of one demo root")
     ap.add_argument("--campaign-manifest", default=None, help="accepted campaign instances.jsonl; verify inputs and restore exact augmentations")
     ap.add_argument("--sequential-augmentation", action="store_true", help="explicit single-slot, fixed-inventory lighting/parking sequence")
+    ap.add_argument("--diagnostic-episode-fault", choices=("failure", "interruption"), default=None,
+                    help="explicit single-slot campaign test: abort first episode after one recorded action")
     ap.add_argument("--poll-s", type=float, default=5.0)
     ap.add_argument("--root", required=True, help="LeRobot root dir: one dataset per slot, <root>/<repo prefix>_slot<k>")
     ap.add_argument("--task", required=True, help="task name written into the datasets (the variant)")
@@ -651,6 +653,9 @@ def main(argv=None) -> int:
 
         campaign_records = selected_records(args.campaign_manifest, demo_dirs,
             sequential_augmentation=args.sequential_augmentation, slots=int(args.slots))
+    if args.diagnostic_episode_fault and (not args.sequential_augmentation or
+            os.environ.get("ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE") != "1"):
+        ap.error("episode-fault control requires an explicit sequential campaign probe")
     n_slots = max(1, int(args.slots) if args.watch else min(int(args.slots), len(demo_dirs)))
     tiled = args.tiled and n_slots > 1
     t_start = time.time()
@@ -730,6 +735,7 @@ def main(argv=None) -> int:
     t_ticks = defaultdict(float)
     n_occl = defaultdict(int)  # goal-occlusion verdicts: kept / dropped / not_screened
     n_ticks = n_steps = 0
+    diagnostic_fault_pending = args.diagnostic_episode_fault
     objs_in = objs_loaded = 0
     idle_s = 0.0
     r0, w0 = resource.getrusage(resource.RUSAGE_SELF), time.time()
@@ -785,10 +791,17 @@ def main(argv=None) -> int:
             obs = {key: ((v.detach().cpu() if v.is_cuda else v.clone()) if isinstance(v, th.Tensor) else v) for key, v in obs_list[s.k].items()}
             if args.proprio == "recorded":
                 obs[s.proprio_key] = th.as_tensor(d.proprio[i], dtype=th.float32)
-            if i == 0:
-                s.writer.begin(obs)
-            else:
-                s.writer.step(d.action[i - 1], obs, float(d.reward[i - 1]), bool(d.terminated[i - 1]), bool(d.truncated[i - 1]))
+            from ispatialgym.multienv.campaign_render_cleanup import write_frame
+            error, cleanup = write_frame(s.writer, d, i, obs, fault=diagnostic_fault_pending)
+            if error is not None:
+                emit("REPLAY_EPISODE_ABORTED", {"demo": d.dir, "slot": s.k, "kept": False,
+                    "campaign_restoration": s.campaign_restoration, "cleanup": cleanup,
+                    "wall_s": round(time.time()-s.t0, 2)})
+                if not cleanup["expected_controlled_failure"]:
+                    raise error
+                diagnostic_fault_pending = None
+                s.demo, s.loaded, s.last_obs = None, None, None
+                continue
             s.i += 1
             n_steps += 1
             if s.i == d.T:
@@ -832,6 +845,8 @@ def main(argv=None) -> int:
         n_ticks += 1
         if n_ticks % 200 == 0:
             gpu_peak = max(gpu_peak, process_gpu_mib() or 0)
+    if args.diagnostic_episode_fault and diagnostic_fault_pending is not None:
+        raise RuntimeError("requested renderer episode failure was not exercised")
     t_flush = time.perf_counter()
     for w in writers:
         w.close()

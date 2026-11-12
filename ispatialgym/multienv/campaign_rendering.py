@@ -16,7 +16,8 @@ def selected_records(manifest, demo_dirs, *, sequential_augmentation=False, slot
         records[directory] = row
     wanted = [str(Path(path).resolve()) for path in demo_dirs]
     probe_repeat = (os.environ.get('ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE') == '1'
-                    and len(wanted) == 3 and wanted[0] == wanted[2] and wanted[0] != wanted[1])
+                    and ((len(wanted) == 3 and wanted[0] == wanted[2] and wanted[0] != wanted[1])
+                         or (sequential_augmentation and slots == 1 and len(wanted) == 2 and wanted[0] == wanted[1])))
     require(wanted and (len(set(wanted)) == len(wanted) or probe_repeat), "empty or duplicated campaign render input")
     require(all(path in records for path in wanted), "render input is not in accepted manifest")
     selected = {path: records[path] for path in wanted}

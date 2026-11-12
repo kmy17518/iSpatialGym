@@ -23,6 +23,31 @@ def verify_runtime_compatibility(root, request, records, runtime):
     require(proof_path.is_relative_to(root) and proof_path.is_file() and
             file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
     proof=json.loads(proof_path.read_text())
+    if proof.get('schema') == 'isg-render-cleanup-runtime-compatibility-v1':
+        require(request.get('render_cleanup_only') is True and request.get('diagnostic_control') in
+                ('RENDER_FAILURE_A', 'RENDER_INTERRUPT_A'), 'render cleanup runtime is diagnostic-only')
+        base=Path(proof['native_runtime']['path']).resolve().parent
+        require(base.is_relative_to(root/'code') and runtime.is_relative_to(root/'code') and
+                file_digest(base/'.snapshot_commit')==proof['native_runtime']['sha256'] and
+                file_digest(runtime/'.snapshot_commit')==proof['cleanup_runtime']['sha256'] and
+                Path(proof['cleanup_runtime']['path']).resolve()==runtime/'.snapshot_commit' and
+                all(r['validation_key']['code_sha256']==proof['native_runtime']['sha256']for r in records),
+                'render cleanup runtime/source identity differs')
+        allowed={'ispatialgym/multienv/replay.py','ispatialgym/multienv/campaign_render_cleanup.py',
+                 'ispatialgym/multienv/campaign_rendering.py','scripts/campaign_20261110/training_batch_probe.py',
+                 'ispatialgym/tests/test_campaign_render_cleanup.py',
+                 'scripts/campaign_20261110/tests/test_training_render_cleanup_probe.py'}
+        changed=set()
+        for folder in ('ispatialgym','scripts'):
+            paths={str(p.relative_to(tree))for tree in (base,runtime)for p in(tree/folder).rglob('*.py')}
+            for relative in paths:
+                a,b=base/relative,runtime/relative
+                if not a.is_file()or not b.is_file()or file_digest(a)!=file_digest(b):changed.add(relative)
+        require(changed==set(proof['changed_payloads']) and changed<=allowed and
+                proof.get('physical_code_changes')==0,'render cleanup changed native physics or other code')
+        require(all(file_digest(runtime/name)==sha for name,sha in proof['changed_payloads'].items()),
+                'render cleanup payload changed')
+        return {'path':str(proof_path),'sha256':ref['sha256']}
     if proof.get('schema') == 'isg-exact-native-runtime-compatibility-v1':
         stamp = runtime/'.snapshot_commit'
         require(runtime.is_relative_to(root/'code') and proof.get('native_runtime') ==
@@ -292,6 +317,11 @@ def episode_order(value, kind):
     control = value.get('diagnostic_control')
     if control is None:
         return [0, 1, 0]
+    if control in ('RENDER_FAILURE_A','RENDER_INTERRUPT_A'):
+        require(kind=='kinematic_observation_rendering' and value.get('render_cleanup_only') is True and
+                value.get('sequential_augmentation') is True and value.get('diagnostic_only') is True and
+                value.get('production_released') is False,'render cleanup control is not an explicit diagnostic')
+        return [0,0]
     allowed_physics=('A_A', 'A_ABORT_A', 'A_FAILURE_A', 'A_INTERRUPT_A', 'FRESH_A', 'FRESH_B')
     require(control in allowed_physics and
             (kind == 'physics_action_open_loop' or
@@ -327,6 +357,8 @@ def _run(root,request,output,kind,construction):
     root=Path(root).resolve();output=Path(output).resolve()
     require(output.is_relative_to(root) and not output.exists(),'probe output must be new and private')
     value,records=inputs(root,request);output.mkdir(parents=True)
+    require(not value.get('render_cleanup_only') or kind=='kinematic_observation_rendering',
+            'render cleanup helper cannot execute physics')
     runtime=Path(__file__).resolve().parents[2]/'.snapshot_commit'
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
     compatibility=verify_runtime_compatibility(root,value,records,runtime.parent)
@@ -419,17 +451,23 @@ def _run(root,request,output,kind,construction):
         listing=output/'demos.txt';listing.write_text(''.join(str(Path(records[i]['artifacts']['demo']['path']).parent)+'\n'for i in order))
         results=output/'results.jsonl'
         extra=['--sequential-augmentation'] if value.get('sequential_augmentation') is True else []
+        if value.get('render_cleanup_only'):
+            extra+=['--diagnostic-episode-fault', 'failure' if value['diagnostic_control']=='RENDER_FAILURE_A' else 'interruption']
         code=replay.main(['--demos','@'+str(listing),'--campaign-manifest',str(manifest),
             '--root',str(output/'rendered'),'--task',records[0]['variant'],'--slots','1',
             '--scene','recorded','--results',str(results),'--repo-prefix','training_probe']+extra)
         rows=[(i,json.loads(line))for i,line in enumerate(results.read_text().splitlines())]
-        episodes=[(i,row)for i,row in rows if row.get('tag')=='REPLAY_DEMO']
+        episodes=[(i,row)for i,row in rows if row.get('tag') in ('REPLAY_DEMO','REPLAY_EPISODE_ABORTED')]
         outputs=[{'path':str(p),'sha256':file_digest(p)}for p in sorted((output/'rendered').rglob('*'))if p.is_file()]
         require(code==0 and len(episodes)==len(order) and outputs,'native renderer did not produce the requested episodes and files')
         for ordinal,(line,row)in enumerate(episodes):
             require(Path(row['demo']).name==records[order[ordinal]]['instance_id'],'render order differs')
+            failure=value.get('render_cleanup_only') is True and ordinal==0
+            require((row.get('tag')=='REPLAY_EPISODE_ABORTED' and row['cleanup']['expected_controlled_failure'] is True)
+                    if failure else row.get('tag')=='REPLAY_DEMO','unexpected renderer failure outcome')
             entries.append({'canary_review':value['canaries'][order[ordinal]],
-                'report':{'path':str(results),'sha256':file_digest(results),'jsonl_index':line},'outputs':outputs})
+                'report':{'path':str(results),'sha256':file_digest(results),'jsonl_index':line},'outputs':outputs,
+                **({'expected_controlled_failure':True}if failure else {})})
         write_json_atomic(output/'probe.json',common)
     # Recheck all source bytes after running; no source state or goal rewrites.
     inputs(root,request)
