@@ -1,0 +1,29 @@
+import json
+from pathlib import Path
+from scripts.campaign_20261110 import runtime_suite_observer as o
+from scripts.campaign_20261110.tests.test_runtime_suite import put
+from scripts.campaign_20261110.tests.test_runtime_suite_acceptance import bound
+
+
+def test_first_cycle_records_missing_inputs_and_awaits_two_member_gates(tmp_path,monkeypatch):
+    base,row,allocation,gate=bound(tmp_path)
+    wrapper=json.loads(Path(allocation['path']).read_text());wrapper['gate']=gate
+    put(Path(allocation['path']),wrapper)
+    monkeypatch.setattr(o,'reconcile',lambda *args:(_ for _ in ()).throw(AssertionError('must not claim before own member gates')))
+    state=o.observe(tmp_path,base)
+    assert len(state['classes'])==100
+    assert state['classes']['class0']['status']=='awaiting_member_replay'
+    assert state['classes']['class1']['status']=='awaiting_authored_row'
+    assert not (base/'acceptance/class0.json').exists()
+    assert not (base/'acceptance_observer.lockdir').exists()
+
+
+def test_failed_gate_remains_failure_without_resubmission(tmp_path,monkeypatch):
+    base,row,allocation,gate=bound(tmp_path)
+    body=json.loads(Path(gate['path']).read_text());body['success']=False
+    gate=put(Path(gate['path']),body)
+    wrapper=json.loads(Path(allocation['path']).read_text());wrapper['gate']=gate
+    put(Path(allocation['path']),wrapper)
+    state=o.observe(tmp_path,base)
+    assert state['classes']['class0']['status']=='replay_failed'
+    assert state['classes']['class0']['validation_passed'] is False
