@@ -16,6 +16,44 @@ from scripts.campaign_20261110.vast_prebuild import require, sha, write
 
 SCHEMA = 'isg-vast-map-prebuild-v1'
 DENIED_SUFFIXES = {'.pt', '.pth', '.ckpt', '.safetensors'}
+SECONDARY_PROOF_ROOT = Path('/vision/u/shiyuc/minyeong/campaign_20261110/training_preparation')
+
+
+def measured_records(unit):
+    dependencies = Path(unit['source_dependencies']['path'])
+    require(sha(dependencies) == unit['source_dependencies']['sha256'], 'map source dependencies changed')
+    source = json.loads(dependencies.read_text())
+    records = [r for r in source['requests'] if r['entry_id'] == unit['job']['id']
+               and r['actual_height_key'] == unit['height'] and r['library'] == unit['source_library']]
+    require(records, 'exact measured source missing')
+    return records
+
+
+def secondary_proof_path(path):
+    path = Path(path)
+    return (path.is_absolute() and '..' not in path.parts and path.suffix == '.json'
+            and path.is_relative_to(SECONDARY_PROOF_ROOT))
+
+
+def copy_measured_proofs(root, job, records):
+    files, relocations = [], {}
+    for record in records:
+        for key in ('probe', 'stable_scene'):
+            ref = record[key]; src = Path(ref['path'])
+            require(sha(src) == ref['sha256'], 'map proof changed: '+key)
+            if src.resolve().is_relative_to(root):
+                files.append(src)
+                continue
+            require(secondary_proof_path(src) and not src.is_symlink() and src.is_file()
+                    and src.resolve().is_relative_to(SECONDARY_PROOF_ROOT.resolve()),
+                    'measured height proof outside approved campaign preparation')
+            dst = job/'proof_inputs'/(ref['sha256']+'.json')
+            dst.parent.mkdir(exist_ok=True)
+            if not dst.exists(): shutil.copyfile(src, dst)
+            require(sha(dst) == ref['sha256'] and sha(src) == ref['sha256'], 'measured proof copy changed')
+            relocations[str(src)] = {'copy': str(dst), 'sha256': ref['sha256']}
+            files.append(dst)
+    return files, relocations
 
 
 def library_environment(root, v2_root=None):
@@ -36,9 +74,7 @@ def prepare(root, plan, index, native, helper, token):
     require(not any(c.startswith('configuration_matching-block_design') for c in row.get('campaign_classes', [])), 'selection remains under review')
     dependencies = Path(unit['source_dependencies']['path'])
     require(dependencies.is_relative_to(root) and sha(dependencies) == unit['source_dependencies']['sha256'], 'map source dependencies changed')
-    source = json.loads(dependencies.read_text())
-    matches = [r for r in source['requests'] if r['entry_id'] == row['id'] and r['actual_height_key'] == unit['height']]
-    require(matches and any(r['library'] == unit['source_library'] for r in matches), 'exact measured source missing')
+    matches = measured_records(unit)
     for record in matches:
         for key in ('library', 'probe', 'stable_scene'):
             require(sha(record[key]['path']) == record[key]['sha256'], 'map proof changed: '+key)
@@ -61,8 +97,7 @@ def prepare(root, plan, index, native, helper, token):
         relocation[str(src)] = {'copy': str(dst), 'sha256': sha(dst)}
     selected = job/'selected_jobs.json'; write(selected, [row])
     private_anchors = job/'anchors.json'; shutil.copyfile(anchors, private_anchors)
-    proof_files = [Path(r[k]['path']) for r in matches for k in ('probe', 'stable_scene')]
-    require(all(p.resolve().is_relative_to(root) for p in proof_files), 'measured height proof outside campaign')
+    proof_files, proof_relocations = copy_measured_proofs(root, job, matches)
     seed_files = {}
     for record in unit.get('existing_maps', []):
         original = Path(record['path'])
@@ -79,6 +114,7 @@ def prepare(root, plan, index, native, helper, token):
              'unit': unit, 'selected_manifest': str(selected), 'private_glib': str(copied.parent.parent),
              'seed_map_files': seed_files, 'anchors': str(private_anchors), 'files': {str(p): sha(p) for p in files},
              'library_files': {v['copy']: v['sha256'] for v in relocation.values()}, 'library_relocations': relocation,
+             'proof_relocations': proof_relocations,
              'original_entry': {**row, 'class_id': 'dependency-tabletop_maps', 'task': 'reach_map_preparation'},
              'kind': 'tabletop_maps', 'scenes': [], 'time_limit_s': 9000,
              'new_native_instances': 0, 'benchmark_credit': 0, 'production_released': False}
@@ -97,6 +133,22 @@ def verify(job, root=None):
         require(Path(name).resolve().is_relative_to(root) and sha(name) == expected, 'map input changed: '+name)
     doc = json.loads(Path(value['source_plan']).read_text()); unit = doc['units'][value['unit_index']]
     require(value['unit'] == unit and doc['runtime'] == value['snapshot'], 'map unit changed')
+    dependencies = Path(unit['source_dependencies']['path'])
+    require(dependencies.resolve().is_relative_to(root) and value['files'].get(str(dependencies))
+            == unit['source_dependencies']['sha256'], 'map measured source is not bound')
+    expected_relocations = {}
+    for record in measured_records(unit):
+        for key in ('probe', 'stable_scene'):
+            ref = record[key]; original = Path(ref['path'])
+            if original.is_relative_to(root):
+                require(value['files'].get(str(original)) == ref['sha256'], 'map measured proof is not bound')
+            else:
+                require(secondary_proof_path(original), 'map proof relocation source escaped')
+                copied = job/'proof_inputs'/(ref['sha256']+'.json')
+                expected_relocations[str(original)] = {'copy': str(copied), 'sha256': ref['sha256']}
+                require(not copied.is_symlink() and copied.resolve().is_relative_to(job/'proof_inputs')
+                        and value['files'].get(str(copied)) == ref['sha256'], 'map proof relocation is not bound')
+    require(value.get('proof_relocations', {}) == expected_relocations, 'map proof relocation differs from measured source')
     require(json.loads(Path(value['selected_manifest']).read_text()) == [unit['job']], 'map native row changed')
     require(set(unit['arms']) <= {'right','left'} and unit['arms'], 'map arms changed')
     require(all(Path(p).is_relative_to(job/'inputs/glib') and Path(p).suffix.lower() not in DENIED_SUFFIXES for p in value['library_files']), 'map library closure escaped')

@@ -51,3 +51,51 @@ def test_zero_exit_without_native_maps_is_failure(tmp_path,monkeypatch):
     monkeypatch.setattr(v.subprocess,'run',run);assert v.run(job)==2
     assert len(calls)==2 and all('--skip-existing' in a for a in calls)
     report=json.loads((job/'result/map_prebuild_result.json').read_text());assert not report['map_files'] and report['positive_native_reader_required']
+
+
+def secondary_scene(root, monkeypatch, destination=None):
+    plan,native,helper,library=fixture(root)
+    secondary=root.parent/'secondary/training_preparation'
+    monkeypatch.setattr(v,'SECONDARY_PROOF_ROOT',secondary)
+    scene=destination or secondary/'support/stable_scene.json'
+    v.write(scene,{'measured':True,'exact_scene':'original'})
+    doc=json.loads(plan.read_text());dep=Path(doc['units'][0]['source_dependencies']['path'])
+    requests=json.loads(dep.read_text());requests['requests'][0]['stable_scene']={'path':str(scene),'sha256':v.sha(scene)}
+    v.write(dep,requests);doc['units'][0]['source_dependencies']['sha256']=v.sha(dep);v.write(plan,doc)
+    return plan,native,helper,scene
+
+
+def test_secondary_measured_proof_is_exact_private_copy_and_worker_is_independent(tmp_path,monkeypatch):
+    root=tmp_path/'primary';plan,native,helper,scene=secondary_scene(root,monkeypatch)
+    before=scene.read_bytes();mode=scene.stat().st_mode
+    job=v.prepare(root,plan,0,native,helper,'one');value=v.verify(job,root)
+    copied=Path(value['proof_relocations'][str(scene)]['copy'])
+    assert copied.read_bytes()==before and scene.read_bytes()==before and scene.stat().st_mode==mode
+    assert str(scene) not in value['files'] and copied.is_relative_to(job/'proof_inputs')
+    scene.unlink()  # Workers receive the bound copy, not cross-account source access.
+    assert v.verify(job,root)['unit']['height']=='.8126'
+    copied.write_text('changed')
+    with pytest.raises(ValueError,match='input changed'):v.verify(job,root)
+
+
+@pytest.mark.parametrize('mutation',['wrong_hash','wrong_source','extra_copy','unbound_copy'])
+def test_proof_relocation_must_match_exact_measured_request(tmp_path,monkeypatch,mutation):
+    root=tmp_path/'primary';plan,native,helper,scene=secondary_scene(root,monkeypatch)
+    job=v.prepare(root,plan,0,native,helper,'one');path=job/'native_inputs.json';value=json.loads(path.read_text())
+    ref=value['proof_relocations'][str(scene)]
+    if mutation=='wrong_hash':ref['sha256']='0'*64
+    elif mutation=='wrong_source':value['proof_relocations'][str(scene)+'wrong']=value['proof_relocations'].pop(str(scene))
+    elif mutation=='extra_copy':value['proof_relocations']['/unrelated/private.json']=dict(ref)
+    else:value['files'].pop(ref['copy'])
+    v.write(path,value)
+    with pytest.raises(ValueError,match='proof relocation'):v.verify(job,root)
+
+
+def test_unrelated_external_and_symlink_proofs_are_rejected(tmp_path,monkeypatch):
+    root=tmp_path/'primary';outside=tmp_path/'unrelated/scene.json'
+    plan,native,helper,scene=secondary_scene(root,monkeypatch,outside)
+    with pytest.raises(ValueError,match='outside approved'):v.prepare(root,plan,0,native,helper,'outside')
+    allowed=v.SECONDARY_PROOF_ROOT/'support/scene.json';allowed.parent.mkdir(parents=True,exist_ok=True);allowed.symlink_to(outside)
+    doc=json.loads(plan.read_text());dep=Path(doc['units'][0]['source_dependencies']['path']);requests=json.loads(dep.read_text())
+    requests['requests'][0]['stable_scene']['path']=str(allowed);v.write(dep,requests);doc['units'][0]['source_dependencies']['sha256']=v.sha(dep);v.write(plan,doc)
+    with pytest.raises(ValueError,match='outside approved'):v.prepare(root,plan,0,native,helper,'symlink')
