@@ -40,6 +40,9 @@ def verify_runtime_compatibility(root, request, records, runtime):
     require(proof_path.is_relative_to(root) and proof_path.is_file() and
             file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
     proof=json.loads(proof_path.read_text())
+    if proof.get('schema') == 'isg-sequential-mass-restart-runtime-compatibility-v1':
+        from .training_mass_restart_probe import verify_mass_restart_runtime
+        return verify_mass_restart_runtime(root,request,records,runtime,verify_runtime_compatibility)
     if proof.get('schema') == 'isg-sequential-anchor-runtime-compatibility-v1':
         from .training_anchor_probe import verify_anchor_runtime
         return verify_anchor_runtime(root,request,records,runtime,verify_runtime_compatibility)
