@@ -128,6 +128,21 @@ def dispatch_order(states, config):
     return sorted(rows, key=rank)
 
 
+def collector_prebuild_patterns(environment, *, replay, primary_root, legacy_root):
+    """Only collection can discover a reusable sampler prebuild.
+
+    Physics replay already pins its exact source TRO/demo/template closure and
+    may legitimately omit the sampler-only TEMPLATE_ID environment field.
+    """
+    if replay:
+        return []
+    key, template_id = environment['ALIAS_KEY'], environment['TEMPLATE_ID']
+    root = environment.get('ISGF_ROOT') or primary_root
+    return ([f'{root}/out/*/{key}/g*/inst/*/{template_id}'] if root != primary_root else []) + [
+        f'{primary_root}/out/*/{key}/g*/inst/*/{template_id}',
+        f'{legacy_root}/out/{key}/g*/inst/*/{template_id}']
+
+
 def production_decision(job, config):
     """Re-read the persistent gate at each dispatch boundary, including retries."""
     # vastctl also runs as a file, without the repository on sys.path.

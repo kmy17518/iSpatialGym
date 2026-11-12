@@ -39,7 +39,7 @@ from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
-    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision, preserved_instances
+    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision, preserved_instances, collector_prebuild_patterns
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
@@ -52,7 +52,7 @@ try:
     from . import ik_transport
     from . import cluster_return
 except ImportError:
-    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision, preserved_instances
+    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, production_decision, preserved_instances, collector_prebuild_patterns
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
@@ -403,8 +403,7 @@ def stage(s3, rec, state):
         except (ValueError, OSError) as e:
             log(f"stage {rec['id']}: eval index {ei}: {e!r}")
     # COLLECTOR_PREBUILD candidates (job_fast.sh picks the newest fitting one of these on the instance, as on the cluster)
-    key, tid, root = env["ALIAS_KEY"], env["TEMPLATE_ID"], env.get("ISGF_ROOT") or F
-    pats = ([f"{root}/out/*/{key}/g*/inst/*/{tid}"] if root != F else []) + [f"{F}/out/*/{key}/g*/inst/*/{tid}", f"{T85}/out/{key}/g*/inst/*/{tid}"]
+    pats = collector_prebuild_patterns(env, replay=replay, primary_root=F, legacy_root=T85)
     n_pre = 0
     for pat in pats:
         for d in glob.glob(pat):
@@ -416,7 +415,8 @@ def stage(s3, rec, state):
                     L.add_file(os.path.join(p, "job.env"))
             n_pre += 1
     # camera relocalization: train_predemo.py compares with the earlier train instances under <predemo root>/out/<key>/*
-    if env.get("FAMILY") == "camera_relocalization":
+    if not replay and env.get("FAMILY") == "camera_relocalization":
+        key = env["ALIAS_KEY"]
         tr = env.get("ISGF_PREDEMO_ROOT") or F
         for other in glob.glob(os.path.join(tr, "out", key, "*")):
             if under(other, [jd]) or not os.path.isdir(other):
