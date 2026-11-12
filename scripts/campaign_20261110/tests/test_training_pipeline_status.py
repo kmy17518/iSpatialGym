@@ -382,3 +382,25 @@ def test_reconciled_receipt_requires_all_original_proofs_and_exclusive_member(tm
     assert 'ambiguous reconciled' in status.observe(tmp_path)['errors'][0]['error']
     second.unlink();Path(current['scheduler_proof']['path']).write_text('{}')
     assert 'evidence changed' in status.observe(tmp_path)['errors'][0]['error']
+
+
+def test_control_recovery_uses_exact_new_output_and_preserves_first_failure(tmp_path):
+    request=tmp_path/'control/fresh_A/request.json'
+    write_json_atomic(request,{'diagnostic_control':'FRESH_A','diagnostic_only':True,'production_released':False})
+    write_json_atomic(request.parent/'physics/failure.json',{'error':'prior bootstrap failed'})
+    report=request.parent/'physics_r2/episode/meta.json';write_json_atomic(report,{'success':True})
+    write_json_atomic(request.parent/'physics_r2/probe.json',{'schema':'isg-training-restoration-control-v1',
+        'request':status.ref(request),'entries':[{'report':status.ref(report),'returncode':0,'result':{'success':True}}]})
+    submission=request.parent/'repair/submission.json'
+    write_json_atomic(submission,{'request':status.ref(request),'jobs':[{'request':status.ref(request),
+        'job_id':'123','returncode':0,'output':str(request.parent/'physics_r2')}]})
+    write_json_atomic(request.parent/'submission_current.json',{'current':status.ref(submission)})
+    row=status.diagnostic_control_observation(tmp_path,request)
+    assert row['status']=='episodes_recorded' and row['successful_episodes']==1
+    assert row['original_failure']==status.ref(request.parent/'physics/failure.json')
+    assert row['release_eligible'] is False
+    wrong=status.read(submission);wrong['jobs'][0]['output']=str(tmp_path/'another_control')
+    write_json_atomic(submission,wrong)
+    write_json_atomic(request.parent/'submission_current.json',status.ref(submission))
+    with pytest.raises(ValueError,match='output escapes scope'):
+        status.diagnostic_control_observation(tmp_path,request)

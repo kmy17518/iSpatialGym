@@ -26,10 +26,30 @@ def diagnostic_control_observation(root, request):
          'scope':'Dated diagnostic observations only; physical overrides never establish exact production-config validation.'}
     if candidate:row['physical_candidate']=candidate
     submission=request.parent/'submission.json'
+    original_submission=submission
+    output=request.parent/'physics'
+    pointer=request.parent/'submission_current.json'
+    if pointer.exists():
+        selected=read(pointer);reference=selected.get('current',selected)
+        submission=Path(reference['path']).resolve()
+        require(submission.is_relative_to(request.parent.resolve()) and
+                file_digest(submission)==reference['sha256'],'control submission revision changed')
+        row['submission_current']=ref(pointer)
+        if original_submission.exists():row['original_submission']=ref(original_submission)
     if submission.exists():
         submitted=read(submission);require(submitted['request']==ref(request),'control submission identity differs')
         row.update(status='submitted',submission=ref(submission),allocations=submitted['jobs'],scheduler_state='unavailable')
-    probe=request.parent/'physics/probe.json'
+        if pointer.exists():
+            require(len(submitted['jobs'])==1,'control revision must bind one exact allocation')
+            job=submitted['jobs'][0]
+            require(job['request']==ref(request) and job.get('returncode')==0 and job.get('job_id'),
+                    'control revised allocation lacks exact request/submission proof')
+            output=Path(job['output']).resolve()
+            require(output.is_relative_to(request.parent.resolve()),'control revised output escapes scope')
+            row['current_output']=str(output)
+            prior_failure=request.parent/'physics/failure.json'
+            if output!=prior_failure.parent and prior_failure.exists():row['original_failure']=ref(prior_failure)
+    probe=output/'probe.json'
     if probe.exists():
         observed=read(probe)
         expected='isg-training-physical-diagnostic-v1' if candidate else 'isg-training-restoration-control-v1'
@@ -43,9 +63,9 @@ def diagnostic_control_observation(root, request):
                    observed_at=timestamp(probe),successful_episodes=sum(e.get('returncode')==0 and
                    e.get('result',{}).get('success') is True for e in entries),
                    controlled_interruptions=sum(e.get('expected_controlled_abort') is True for e in entries))
-    execution=request.parent/'execution_observation.json'
+    execution=submission.parent/'execution_observation.json'
     if execution.exists():row['execution_observation']=ref(execution)
-    failure=request.parent/'physics/failure.json'
+    failure=output/'failure.json'
     if failure.exists():row.update(status='diagnostic_failed',failure=ref(failure))
     return row
 
