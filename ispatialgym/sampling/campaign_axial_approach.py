@@ -11,6 +11,56 @@ def program_witness_selection_enabled():
     return campaign_runtime.configuration()[1].class_id == 'alignment-axial_04'
 
 
+def path_selection_enabled():
+    return program_witness_selection_enabled() and os.environ.get(
+        'ISPATIALGYM_AXIAL_PATH_SELECTION', '0') == '1'
+
+
+def check_program_push_path(sampler, chain, stance, direction, target, support):
+    """Reject proposals that already fail the unchanged native program path.
+
+    Axial04 r9 passed endpoint checks but failed the escape from the arc end,
+    including the alternative branch the program would actually choose. Try
+    the next existing orientation/stance instead of committing that proposal.
+    The complete settled-world program check still runs afterward.
+    """
+    from ispatialgym.sampling.v2 import program_check as PC
+    from ispatialgym.oracle.actions import RETREAT_DIST
+    from ispatialgym.oracle.execute import push_speed_of
+    from types import SimpleNamespace
+
+    checker = sampler.ikc
+    key = ('right', checker._pose_key(chain[0]))
+    q_pre = checker.solutions.get(key)
+    if q_pre is None:
+        return False, 'program path proposal has no pre-contact witness', {}
+    tol = (sampler.gp.gen('tolerances') or {}).get('orientation')
+    band = float(tol) * PC._push_stop_frac_arc() if tol else .005
+    lag = float(sampler.gp.gen('push_arc_replay_lag_rad') or 0.)
+    speed = push_speed_of(SimpleNamespace(extra={'push_speed_m_s': sampler.gp.gen('push_speed_m_s')}))
+    ignored = [support, target]
+    reports = []
+
+    def replay(q_from, line=False):
+        ok, why, report = PC.replay_arc_push(
+            sampler, 'right', q_from, chain[0], chain[1:], direction, target,
+            list(sampler.support_objects()), ignored, band, RETREAT_DIST,
+            speed_m_s=speed, line=line, lag_allowance_rad=lag)
+        reports.append({'ok': bool(ok), 'reason': why, 'report': report})
+        return ok, why, report
+
+    ok, why, _ = replay(q_pre)
+    if not ok:
+        return False, why, {'checks': reports}
+    single_q = {'pre': q_pre}
+    branch = PC._rewitness_flipped_push(sampler, chain, stance, 'right', q_pre,
+                                      0., replay, {}, single_q, 'pre', ignored)
+    if branch is not None and not branch[0]:
+        return False, branch[1], {'checks': reports}
+    checker.solutions[key] = single_q['pre'].clone()
+    return True, '', {'checks': reports, 'branch': branch}
+
+
 def polish_program_endpoints(checker, chain, *, arm, ignored):
     """Select only endpoints that survive the existing program witness check.
 

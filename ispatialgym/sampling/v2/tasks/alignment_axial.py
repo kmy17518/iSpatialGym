@@ -633,6 +633,13 @@ class AlignmentAxial(SamplerV2):
                             ok, why = polish_program_endpoints(self.ikc, p.chain, arm='right', ignored=[support, target])
                             if not ok:
                                 return False, res, None, why
+                        from ispatialgym.sampling.campaign_axial_approach import path_selection_enabled, check_program_push_path
+                        if path_selection_enabled():
+                            ok, why, report = check_program_push_path(self, p.chain, manip, d, target, support)
+                            TT._count(self, 'axial_program_path.passed' if ok else 'axial_program_path.rejected')
+                            log.info('axial program path proposal %s: %s %s', p.label, 'passed' if ok else why, report)
+                            if not ok:
+                                return False, res, None, why
                         q_pre = self.ikc.solutions.get(("right", self.ikc._pose_key(p.chain[0])))
                         q_goal = self.ikc.solutions.get(("right", self.ikc._pose_key(p.chain[-1])))
                         if q_pre is None or q_goal is None:

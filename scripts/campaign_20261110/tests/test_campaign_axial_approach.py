@@ -121,3 +121,56 @@ def test_program_endpoint_rejection_keeps_prior_solutions_and_tolerance():
     checker.polish_witness=lambda q,*a,**kw:(q+10,.00047)
     assert polish_program_endpoints(checker,['pre','goal'],arm='right',ignored=[])[0]
     assert all(torch.equal(checker.solutions[k],q+10)for k,q in original.items())
+
+
+def test_path_selection_requires_both_exact_scoped_options(monkeypatch):
+    import ispatialgym.sampling.campaign_axial_approach as A
+    monkeypatch.setenv('ISPATIALGYM_AXIAL_PATH_SELECTION', '1')
+    monkeypatch.setattr(A, 'program_witness_selection_enabled', lambda: False)
+    assert not A.path_selection_enabled()
+    monkeypatch.setattr(A, 'program_witness_selection_enabled', lambda: True)
+    assert A.path_selection_enabled()
+    monkeypatch.delenv('ISPATIALGYM_AXIAL_PATH_SELECTION')
+    assert not A.path_selection_enabled()
+
+
+def test_program_path_rejects_failed_original_and_actual_branch_without_replacing_witness(monkeypatch):
+    from types import SimpleNamespace
+    import torch
+    from ispatialgym.sampling.v2 import program_check as PC
+    from ispatialgym.oracle import execute as E
+    from ispatialgym.sampling.campaign_axial_approach import check_program_push_path
+    old = torch.tensor([1.]); alternate = torch.tensor([2.])
+    monkeypatch.setattr(E, 'push_speed_of', lambda contact: contact.extra['push_speed_m_s'])
+    monkeypatch.setattr(PC, '_push_stop_frac_arc', lambda: .2)
+    gp = {'tolerances': {'orientation': .1}, 'push_arc_replay_lag_rad': .08, 'push_speed_m_s': .03}
+    checker = SimpleNamespace(solutions={('right', 'pre'): old}, _pose_key=lambda p: p)
+    sampler = SimpleNamespace(ikc=checker, gp=SimpleNamespace(gen=lambda k: gp.get(k)), support_objects=lambda: ['support'])
+    calls = []; branches = []
+    def replay(*args, **kw):
+        calls.append((args, kw))
+        return False, 'retreat joint jump', {'retreat': {'fail_index': 1}}
+    monkeypatch.setattr(PC, 'replay_arc_push', replay)
+    monkeypatch.setattr(PC, '_rewitness_flipped_push', lambda *a, **kw: branches.append(a))
+    ok, why, report = check_program_push_path(sampler, ['pre','init','mid','goal'], 'stance', 'direction', 'target', 'support')
+    assert not ok and 'joint jump' in why and not branches
+    assert checker.solutions[('right','pre')] is old
+    args, kw = calls[0]
+    assert args[1:2] == ('right',) and args[3:8] == ('pre', ['init','mid','goal'], 'direction', 'target', ['support'])
+    assert args[8] == ['support','target'] and abs(args[9]-.02)<1e-12 and args[10]==.1
+    assert kw == {'speed_m_s':.03,'line':False,'lag_allowance_rad':.08}
+    def branch(*args):
+        assert args[3] == 'right' and args[5] == 0.
+        args[8]['pre'] = alternate
+        return False, 'stance branch retreat stalls'
+    monkeypatch.setattr(PC, 'replay_arc_push', lambda *a, **kw: (True, 'arc and retreat pass', {}))
+    monkeypatch.setattr(PC, '_rewitness_flipped_push', branch)
+    ok, why, _ = check_program_push_path(sampler, ['pre','init','mid','goal'], 'stance', 'direction', 'target', 'support')
+    assert not ok and 'stance branch' in why and checker.solutions[('right','pre')] is old
+    def passing_branch(*args):
+        args[8]['pre'] = alternate
+        return True, 'native checked replacement'
+    monkeypatch.setattr(PC, '_rewitness_flipped_push', passing_branch)
+    assert check_program_push_path(sampler, ['pre','init','mid','goal'], 'stance', 'direction', 'target', 'support')[0]
+    assert torch.equal(checker.solutions[('right','pre')], alternate)
+    assert checker.solutions[('right','pre')] is not alternate
