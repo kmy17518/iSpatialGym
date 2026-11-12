@@ -156,13 +156,19 @@ def inputs(root, request_path, *, runtime=None):
     runtime = Path(runtime).resolve() if runtime else Path(__file__).resolve().parents[2]
     parent = Path(q['parent_runtime']['path']).parent
     require(ref(runtime/'.snapshot_commit') == q['candidate_runtime']
-            and ref(parent/'.snapshot_commit') == q['parent_runtime']
-            and (parent/'.snapshot_commit').read_text().strip() == PARENT_COMMIT,
+            and ref(parent/'.snapshot_commit') == q['parent_runtime'],
             'renderer native/runtime provenance differs')
-    if q.get('integrated_renderer_candidate_v1') is True:
+    if q.get('current_recording_renderer_v1') is True:
+        from .training_integrated_runtime import verify_current_recording_renderer
+        verify_current_recording_renderer(root, q, runtime, inputs)
+    elif q.get('integrated_renderer_candidate_v1') is True:
+        require((parent/'.snapshot_commit').read_text().strip() == PARENT_COMMIT,
+                'original renderer parent runtime differs')
         from .training_integrated_runtime import verify_renderer
         verify_renderer(root, q, runtime, inputs)
     else:
+        require((parent/'.snapshot_commit').read_text().strip() == PARENT_COMMIT,
+                'original renderer parent runtime differs')
         paths = {str(p.relative_to(tree)) for tree in (parent,runtime) for folder in ('ispatialgym','scripts')
                  for p in (tree/folder).rglob('*.py') if p.is_file()}
         changed = {name for name in paths if not (parent/name).is_file() or not (runtime/name).is_file()

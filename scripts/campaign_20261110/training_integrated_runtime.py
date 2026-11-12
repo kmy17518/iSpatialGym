@@ -115,3 +115,66 @@ def verify_renderer(root, request, runtime, validate_base):
                    for name in set(previous)|set(actual) if previous.get(name) != actual.get(name)}
     require(differences == proof['changed_payloads'], 'integrated renderer changes not fully declared')
     return proof
+
+
+def current_recording_renderer_source(root, request):
+    """Bind newly verified recordings without rewriting their generation identity."""
+    root = Path(root).resolve()
+    require(request.get('current_recording_renderer_v1') is True
+            and request.get('production_released') is False
+            and type(request.get('benchmark_credit')) is int and request['benchmark_credit'] == 0
+            and not request.get('integrated_renderer_candidate_v1')
+            and 'changed_payloads' not in request and 'integration_proof' not in request,
+            'new-recording renderer scope is ambiguous')
+    proof = json.loads(checked(root, request['current_recording_proof']).read_text())
+    require(proof.get('schema') == 'isg-current-recording-renderer-proof-v1'
+            and proof.get('production_released') is False and proof.get('benchmark_credit') == 0
+            and proof.get('permitted_execution_kinds') == ['kinematic_observation_rendering'],
+            'new recordings do not authorize physical execution or release')
+    base = json.loads(checked(root, proof['base_request']).read_text())
+    require(base.get('integrated_renderer_candidate_v1') is True
+            and not base.get('current_recording_renderer_v1'), 'renderer base must be the checked common candidate')
+    changed = {'candidate_runtime','parent_runtime','cold_driver','cold_requests','cold_verification',
+               'scene_union_sha256','integrated_renderer_candidate_v1','integration_proof',
+               'current_recording_renderer_v1','current_recording_proof'}
+    require({k:v for k,v in request.items() if k not in changed} ==
+            {k:v for k,v in base.items() if k not in changed},
+            'new-recording renderer changed sequence, physics, cleanup, or source configuration')
+    physics = json.loads(checked(root, proof['source_recording_verification']).read_text())
+    require(physics.get('status') == 'matched' and physics.get('active_recording_scope_verified') is True
+            and physics.get('manifest') == proof['source_recording_manifest'],
+            'new recordings lack complete active-only native action verification')
+    checked(root, proof['source_recording_manifest'])
+    cold = json.loads(checked(root, request['cold_verification']).read_text())
+    require(cold.get('status') == 'native_cold_render_verified'
+            and set(cold['controls']) == {'FRESH_A','FRESH_B'}
+            and all(v.get('all_original_cold_frames_matched') is True and v.get('export_verification')
+                    for v in cold['controls'].values()), 'new recordings lack full original-cold frame/export proof')
+    for control, reference in zip(('FRESH_A','FRESH_B'),request['cold_requests']):
+        value = json.loads(checked(root, reference).read_text())
+        require(value['control'] == control
+                and value['recording_manifest'] == proof['source_recording_manifest']
+                and value['active_recording_verification'] == proof['source_recording_verification']
+                and value['driver'] == request['cold_driver']
+                and value['native_runtime'] == request['parent_runtime'],
+                'cold native renderer is not bound to these newly verified recordings')
+    require(len(request['cold_requests']) == 2, 'two exact new-recording cold references required')
+    return base, proof
+
+
+def verify_current_recording_renderer(root, request, runtime, validate_base):
+    root = Path(root).resolve(); runtime = Path(runtime).resolve()
+    base, proof = current_recording_renderer_source(root, request)
+    baseline = checked(root, proof['base_runtime']).parent
+    require(baseline.is_relative_to(root/'code') and runtime.is_relative_to(root/'code')
+            and base['candidate_runtime'] == proof['base_runtime']
+            and reference(runtime/'.snapshot_commit') == request['candidate_runtime'] == proof['candidate_runtime'],
+            'new-recording native runtime differs')
+    require(validate_base(root, proof['base_request']['path'], runtime=baseline)[0] == base,
+            'original common renderer checks failed')
+    before = payloads(baseline); after = payloads(runtime)
+    changes = {n:{'base':before.get(n),'candidate':after.get(n)}
+               for n in set(before)|set(after) if before.get(n) != after.get(n)}
+    require(after == proof['candidate_python_payloads'] and changes == proof['changed_payloads'],
+            'new-recording candidate has undeclared payloads')
+    return proof

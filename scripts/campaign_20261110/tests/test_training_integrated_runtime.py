@@ -112,3 +112,53 @@ def test_renderer_rechecks_original_payload_proof_and_new_payload_inventory(tmp_
     put('code/common/ispatialgym/native.py','changed again')
     with pytest.raises(ContractError,match='payload changed'):
         verify_renderer(tmp_path,q,new,lambda *args,**kwargs:(base,))
+
+
+def current_recording_fixture(tmp_path):
+    base,_,oldproof,new,put=renderer_fixture(tmp_path)
+    physics_manifest=put('physical_manifest.json',{'records':[]})
+    physics=put('physical_verified.json',{'status':'matched','active_recording_scope_verified':True,
+        'manifest':physics_manifest})
+    cold_driver=put('cold_driver.py','bound driver')
+    cold_requests=[put('cold_'+control+'.json',{'control':control,'recording_manifest':physics_manifest,
+        'active_recording_verification':physics,'driver':cold_driver,'native_runtime':base['candidate_runtime']})
+        for control in ('FRESH_A','FRESH_B')]
+    cold_verified=put('cold_verified.json',{'status':'native_cold_render_verified','controls':{
+        name:{'all_original_cold_frames_matched':True,'export_verification':{'exact':'export'}}
+        for name in ('FRESH_A','FRESH_B')}})
+    proof={'schema':'isg-current-recording-renderer-proof-v1','production_released':False,'benchmark_credit':0,
+        'permitted_execution_kinds':['kinematic_observation_rendering'],
+        'base_request':put('common_renderer_base.json',base),'base_runtime':base['candidate_runtime'],
+        'candidate_runtime':base['candidate_runtime'],'source_recording_manifest':physics_manifest,
+        'source_recording_verification':physics,'candidate_python_payloads':payloads(new),'changed_payloads':{}}
+    request={k:v for k,v in base.items()if k not in ('integrated_renderer_candidate_v1','integration_proof')}
+    request.update(current_recording_renderer_v1=True,current_recording_proof=put('current_proof.json',proof),
+        parent_runtime=base['candidate_runtime'],cold_driver=cold_driver,cold_requests=cold_requests,
+        cold_verification=cold_verified,scene_union_sha256='new verified actual scenes')
+    return request,base,proof,new,put
+
+
+def test_actual_new_recordings_require_their_own_native_chain(tmp_path):
+    from scripts.campaign_20261110.training_integrated_runtime import verify_current_recording_renderer
+    q,base,proof,new,_=current_recording_fixture(tmp_path);calls=[]
+    def validate(root,path,*,runtime):
+        assert runtime==new;calls.append(path);return (base,)
+    assert verify_current_recording_renderer(tmp_path,q,new,validate)==proof
+    assert calls==[proof['base_request']['path']]
+
+
+@pytest.mark.parametrize('field,value',[('sequence',[0,0,0]),('member_campaign_configs',['new','B']),
+    ('physical_delta',{'added_physics_steps':1}),('renderer_cleanup','failure'),('benchmark_credit',1)])
+def test_new_recordings_do_not_change_physical_sequence_or_scope(tmp_path,field,value):
+    from scripts.campaign_20261110.training_integrated_runtime import current_recording_renderer_source
+    q,*_=current_recording_fixture(tmp_path);q[field]=value
+    with pytest.raises(ContractError):current_recording_renderer_source(tmp_path,q)
+
+
+def test_new_recordings_fail_without_all_original_cold_frames(tmp_path):
+    from scripts.campaign_20261110.training_integrated_runtime import current_recording_renderer_source
+    q,base,proof,new,put=current_recording_fixture(tmp_path)
+    q['cold_verification']=put('bad_cold.json',{'status':'native_cold_render_verified','controls':{
+        name:{'all_original_cold_frames_matched':name=='FRESH_A','export_verification':{'exact':'export'}}
+        for name in ('FRESH_A','FRESH_B')}})
+    with pytest.raises(ContractError):current_recording_renderer_source(tmp_path,q)
