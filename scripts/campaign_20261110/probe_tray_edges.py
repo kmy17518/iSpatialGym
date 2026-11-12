@@ -56,8 +56,10 @@ def run(request, output):
         'started_at':time.time(),'cpu_affinity':sorted(os.sched_getaffinity(0)), 'state':'starting',
         'benchmark_credit':0,'production_authorization':False,'new_native_instances':0,'edges':[], 'draws':[],
         'historical_selected_scope_complete':False,'complete_configuration_validated':False,
-        'remaining_checks':['historical28selection_provenance','native_phase1b_phase2_grasp_queries',
+        'remaining_checks':['selected_draw_count_policy_provenance','native_phase1b_phase2_grasp_queries',
                             'exact_grasp_and_carried_path','settled_layout','demo','own_physics_replay']}
+    report['room_park_navigation_is_diagnostic_only'] = True
+    report['navigation_scope'] = 'An artificial parked pose is not the task initial stance; applicable initial-to-manipulation transitions remain unverified.'
     write(output/'result.json',report)
     sys.path.insert(0,q['native_runtime'])
     from ispatialgym.sampling.robot_utils import RobotKit
@@ -134,20 +136,27 @@ def run(request, output):
                     if not row['trunk_sweep_free']:continue
                     cam=camera(st);row['both_trays_inside_margin']=all(TT.in_frame(sampler,cam,G.local_points_world(hulls[key],pp),float(source['generation']['image_margin']))for key,pp in [(src_key,sp),(dst_key,dp)])
                     if not row['both_trays_inside_margin']:continue
+                    usable.append(st)
                     start=Stance('room_park',(float(parked[0]),float(parked[1]),edge.yaw),tr,0.)
                     try:
                         path=NAV.plan_path(kit,start,st,rooms=source['rooms']);row['navigation']={'passed':True,'path':path.to_sidecar()}
-                        usable.append(st)
                     except NAV.NavigationError as exc:row['navigation']={'passed':False,'reason':str(exc)}
                     write(output/'result.json',report)
             write(output/'result.json',report)
-        report['navigation_visible_stances']=len(usable)
+        report['native_free_support_edges']=sum(any(c.get('whole_body_free') and c.get('trunk_sweep_free') for c in e['candidates'])for e in report['edges'])
+        report['frame_and_stance_candidates']=len(usable)
+        report['diagnostic_park_navigation_passes']=sum(c.get('navigation',{}).get('passed',False)for e in report['edges']for c in e['candidates'])
+        # Cover each available edge before spending the bounded visibility budget
+        # on more trunk/lateral candidates from the same edge.
+        by_edge={}
+        for st in usable:by_edge.setdefault(st.edge.name,[]).append(st)
+        views=[rows[i]for i in range(max([len(v)for v in by_edge.values()]or[0]))for rows in by_edge.values()if i<len(rows)][:24]
         for draw in geometry['draws']:
             if time.monotonic()>deadline:report['time_bound_reached']=True;break
             park_all(); placements={src_key:sp,dst_key:dp,target_key:G.compose(sp,pose(draw['target_pose']))}
             placements.update({key:G.compose(sp,pose(pp))for key,pp in draw['distractor_poses'].items()})
             row={'index':draw['index'],'models':draw['models'],'active_alias_draw':draw['active_alias_draw'],'attempts':[],'status':'no_verified_view'}
-            for st in usable[:8]:
+            for st in views:
                 cam=camera(st)
                 if not all(TT.in_frame(sampler,cam,G.local_points_world(hulls[k],pp),float(source['generation']['image_margin']))for k,pp in placements.items()):continue
                 attempt={'stance':st.to_sidecar()};row['attempts'].append(attempt)
@@ -155,9 +164,6 @@ def run(request, output):
                     occ=Disembedding._measure_occlusion(sampler,st,placements,target_key,draw['models'],dst_key)
                     kit.sync_world();attempt['whole_body_with_layout']=ikc.stance_collision_free(st)
                     if not attempt['whole_body_with_layout']:continue
-                    start=Stance('room_park',(float(parked[0]),float(parked[1]),st.yaw),st.translate,0.)
-                    path=NAV.plan_path(kit,start,st,rooms=source['rooms'])
-                    attempt['navigation_with_layout']={'passed':True,'path':path.to_sidecar()}
                     attempt['native_occlusion']=occ;row['status']='native_frame_occlusion_and_stance_passed';break
                 except (Reject,NAV.NavigationError) as exc:attempt['rejection']=str(exc)
             report['draws'].append(row);write(output/f'draw_{draw["index"]:03d}.json',row);write(output/'result.json',report)
