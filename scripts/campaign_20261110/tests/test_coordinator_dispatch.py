@@ -37,3 +37,18 @@ def test_changed_input_fails_before_claim(tmp_path):
     row=ticket(tmp_path);p=tmp_path/'source';p.write_text('changed');row['inputs']={str(p):'0'*64}
     with pytest.raises(ValueError):submit(row,{})
     assert not (tmp_path/'launch.claim').exists()
+
+
+def test_one_pending_job_does_not_block_independent_free_slots(monkeypatch):
+    from scripts.campaign_20261110 import coordinator_dispatch as module
+    observation={'state':'available','observed_at':1000,'jobs':[
+        ['minyeong','svl','PENDING','gres/gpu:titanrtx:1','normal','(Priority)','1']],
+        'nodes':[{'NodeName':'svl8','Partitions':'svl','State':'MIXED',
+            'CfgTRES':'cpu=64,mem=500000M,gres/gpu=8,gres/gpu:titanrtx=8',
+            'AllocTRES':'cpu=0,mem=0,gres/gpu=0','CPUEfctv':'64','CPUAlloc':'0',
+            'RealMemory':'500000','AllocMem':'0'}]}
+    monkeypatch.setattr(module.dispatch_cluster_first,'probe',lambda:observation)
+    result=module.probe()
+    assert result['account_slots']['minyeong']==7
+    assert result['account_slots']['shiyuc']==8
+    assert result['compatible_available_slots']==8

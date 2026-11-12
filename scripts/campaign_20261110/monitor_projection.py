@@ -71,6 +71,35 @@ def project(root, live_jobs, capacity, now=None, accountant=accounting):
                                     'submitted_at': source.get('submitted_at', source.get('observed_at'))}
     for spec in registry.get('jobs', []):
         metadata[str(spec['job_id'])] = {**spec, 'evidence': spec.get('evidence', [])+[registry_ref]}
+    # Root dispatchers publish exact source-receipt paths, so newly admitted
+    # work is mapped automatically without a second manual classification list.
+    for account in ('minyeong','shiyuc'):
+        status_path=Path(root)/'infra/coordinator_dispatch'/('status_'+account+'.json')
+        if not status_path.exists():continue
+        status,status_ref=read_source(status_path,errors)
+        for item in status.get('requests',[]):
+            receipt_path=item.get('submission_path')
+            if not receipt_path or not Path(receipt_path).exists():continue
+            receipt,receipt_ref=read_source(receipt_path,errors)
+            if receipt.get('job_id'):
+                jid=str(receipt['job_id'])
+                metadata[jid]={key:receipt.get(key) for key in ('workstream','stage','owner','class_id','physical_dedup_key')}
+                metadata[jid].update(job_id=jid,path=receipt_path,account=account,
+                    submitted_at=receipt.get('submitted_at',receipt.get('observed_at')),evidence=[receipt_ref,status_ref])
+    followthrough=Path(root)/'infra/coordinator_dispatch/recovery_member_followthrough.json'
+    if followthrough.exists():
+        followed,followed_ref=read_source(followthrough,errors)
+        for result in followed.get('parent_results',[]):
+            for ref in result.get('prepared',[]):
+                prepared_path=Path(ref['path']);receipt_path=prepared_path.parent/'submitted.json'
+                if not receipt_path.exists():continue
+                receipt,receipt_ref=read_source(receipt_path,errors)
+                if not receipt.get('job_id'):continue
+                cfg,cfg_ref=read_source(receipt['configuration']['path'],errors)
+                jid=str(receipt['job_id']);metadata[jid]={'job_id':jid,'path':str(receipt_path),
+                    'workstream':'canonical recovery','stage':'demo','owner':'/root/dataset_contract',
+                    'class_id':cfg.get('template',{}).get('class_id'),'account':'minyeong',
+                    'evidence':[receipt_ref,followed_ref,cfg_ref]}
     # Canonical replay ownership is explicit in controller gates; class identity
     # comes from the gate key, never from the scheduler name.
     validation, validation_ref = read_source(Path(root)/'validation/controller.json', errors)

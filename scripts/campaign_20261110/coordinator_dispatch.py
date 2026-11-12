@@ -8,14 +8,44 @@ import argparse
 import fcntl
 import getpass
 import hashlib
+import itertools
 import json
 import os
 from pathlib import Path
 import subprocess
 import time
 
-from scripts.campaign_20261110.infra_vast.cluster_return_capacity import probe
+from scripts.campaign_20261110.infra_vast.cluster_return_capacity import probe as original_probe
+from scripts.campaign_20261110.infra_dispatch import backend_capacity
+from scripts.campaign_20261110 import dispatch_cluster_first
 from scripts.campaign_20261110.infra_dispatch import shared_json
+
+
+
+def probe():
+    """Count real compatible slots without holding all work behind one pending job."""
+    observation=dispatch_cluster_first.probe()
+    if observation['state']!='available':
+        return {'status':'unavailable','observed_at':observation['observed_at'],'accounts_checked':['minyeong','shiyuc'],'account_slots':{},'compatible_available_slots':0}
+    demand={'cpus':8,'memory_mb':48*1024,'excluded_nodes':['svl9']}
+    nodes=[n for n in observation['nodes'] if 'gres/gpu:titanrtx=' in n.get('CfgTRES','')]
+    physical={};routes=[];accounts={}
+    for account in ['minyeong','shiyuc']:
+        total=0
+        for partition in ['svl','viscam']:
+            quota=backend_capacity(account+'_'+partition,observation['jobs'])
+            available={n['NodeName']:dispatch_cluster_first.slots(n,partition,demand) for n in nodes}
+            pending=sum(dispatch_cluster_first.gpu_count(r[3]) for r in observation['jobs'] if r[0]==account and partition in r[1].split(',') and r[2]=='PENDING')
+            # Pending work consumes headroom and prospective physical slots; it
+            # does not make every other independently available slot unusable.
+            slots=min(quota,max(0,sum(available.values())-pending))
+            total+=slots
+            for name,count in available.items():physical[name]=max(physical.get(name,0),count)
+            routes.append({'backend':account+'_'+partition,'slots':slots,'quota_headroom':quota,'pending_gpus':pending})
+        accounts[account]=total
+    return {'status':'observed','observed_at':observation['observed_at'],'accounts_checked':['minyeong','shiyuc'],
+            'compatible_available_slots':min(sum(physical.values()),sum(accounts.values())),
+            'account_slots':accounts,'routes':routes}
 
 
 def read(path):
@@ -123,7 +153,11 @@ def cycle(root, account, capacity_probe=probe):
         except (OSError,ValueError,subprocess.SubprocessError) as exc:
             errors.append({'source':reconciler['id'],'error':str(exc),'owner':reconciler['owner']})
     if account=='minyeong':
-        for path in (root/'diagnostics').glob('**/prepared.json'):
+        # Prepared requests live one or two levels below diagnostics. Never
+        # descend through native scenes, asset trees or recorded trajectories.
+        paths=itertools.chain((root/'diagnostics').glob('*/prepared.json'),
+                              (root/'diagnostics').glob('*/*/prepared.json'))
+        for path in paths:
             try:
                 value=native_ticket(root,path,policy)
                 if value:tickets.append(value)
@@ -141,7 +175,8 @@ def cycle(root, account, capacity_probe=probe):
     rows=[]
     # Oldest ready request first; all streams get access, no final-production gate
     # is used to block these separately authorized preparation and recovery jobs.
-    for ticket in sorted(tickets,key=lambda row:row.get('ready_since',0)):
+    priority={'pipeline':0,'canonical recovery':1,'training preparation':2,'heldout eval':3}
+    for ticket in sorted(tickets,key=lambda row:(priority.get(row.get('workstream'),4),row.get('ready_since',0))):
         try:
             state=pending_status(ticket)
             if state=='ready' and allowance>=int(ticket.get('gpu_slots',1)):
