@@ -5,6 +5,23 @@ from scripts.campaign_20261110.training_sequential_augmentation import one_world
 from scripts.campaign_20261110.contracts import digest
 
 
+def test_integrated_matrix_keeps_physical_settings_and_candidate_payloads(monkeypatch):
+    from scripts.campaign_20261110 import training_integrated_runtime as integrated
+    from scripts.campaign_20261110.training_sequential_augmentation import integrated_matrix_identity
+    base={'diagnostic_control':'FRESH_A','canaries':['A','B'],'step_budget':3000}
+    proof={'candidate_runtime':{'sha256':'same'},'candidate_python_payloads':{'code.py':'hash'}}
+    monkeypatch.setattr(integrated,'source_request',lambda root,q:(q['base'],q['proof']))
+    q={'base':base,'proof':proof};first=integrated_matrix_identity(None,q)
+    changed=deepcopy(q);changed['base']['diagnostic_control']='A_A'
+    assert integrated_matrix_identity(None,changed)==first
+    for mutate in [lambda q:q['base'].__setitem__('step_budget',3001),
+                   lambda q:q['base'].__setitem__('canaries',['A','different']),
+                   lambda q:q['proof']['candidate_python_payloads'].__setitem__('code.py','changed'),
+                   lambda q:q['proof']['candidate_runtime'].__setitem__('sha256','changed')]:
+        changed=deepcopy(q);mutate(changed)
+        assert integrated_matrix_identity(None,changed)!=first
+
+
 def observed(sequence):
     state={'objects':{},'lights':{'lamp':1200.},'skybox':{'intensity':1000.,'color':[1.,1.,1.]}}
     context={'physics_steps_added':0,'dynamic_roots':{'target':{'mass':2.,'sleep_threshold':.001,'solver_position_iteration_count':16,'solver_velocity_iteration_count':1}}}
