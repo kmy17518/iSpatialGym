@@ -121,6 +121,7 @@ def contact_recovery(option: str) -> bool:
                                 'configuration_matching-attachment'),
         'cap_source_stance_proposal': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
         'cap_geometry_above_pregrasp': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
+        'cap_shallow_start_proposal': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
         'inside_goal_grasp_proposal': ('inter_object_relation_satisfaction-inside_01',
                                       'inter_object_relation_satisfaction-inside_small_scale'),
         'inside_goal_stance_proposal': ('inter_object_relation_satisfaction-inside_01',
@@ -166,12 +167,12 @@ def contact_recovery(option: str) -> bool:
                     [('hinged_jar', 'jnjtrl', (1.0, 1.0, 1.0))],
                     'held jar brace belongs to its exact ready default-scale category model')
         if option in ('cap_capture_margin', 'cap_vertical_final_retreat', 'cap_source_stance_proposal',
-                      'cap_geometry_above_pregrasp'):
+                      'cap_geometry_above_pregrasp', 'cap_shallow_start_proposal'):
             require(template.split == 'eval_standard' and
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('cap', 'xxqyrt', (1.0, 1.0, 1.0))],
                     'cap capture margin belongs to its exact default-scale canonical model')
-        if option == 'cap_geometry_above_pregrasp':
+        if option in ('cap_geometry_above_pregrasp', 'cap_shallow_start_proposal'):
             require([(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'partner'] ==
                     [('lemonade_bottle', 'yprkek', (1.0, 1.0, 1.0))],
                     'cap pregrasp geometry belongs to its exact canonical bottle')

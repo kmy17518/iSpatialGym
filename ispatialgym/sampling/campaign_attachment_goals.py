@@ -13,6 +13,21 @@ from ispatialgym.sampling.campaign_tray_goals import pose, pose_error
 
 SCHEMA = "isg-attachment-goal-plan-v1"
 
+# Cap/bottle measured controls: successful 50309402/50311400/50311402
+# start depths are 0.6505/0.6560/0.6510 m. Failed 50311401/50312000/
+# 50312001 reach 0.6973/0.6764/0.7591 m, including an approach elbow/bottle
+# contact after a fully checked pregrasp transit (r13). This opt-in proposal
+# chooses shallower fresh starts; it changes no feasibility or QA tolerance.
+CAP_START_DEPTH_M = .66
+
+
+def cap_start_within_reach(position, base_pose2d):
+    """Propose starts on the measured shallow side of the native reach pool."""
+    x, y = (float(v) for v in position[:2]); bx, by, yaw = (float(v) for v in base_pose2d)
+    _require(all(math.isfinite(v) for v in (x, y, bx, by, yaw)), 'invalid cap start proposal geometry')
+    depth = (x-bx)*math.cos(yaw) + (y-by)*math.sin(yaw)
+    return 0 < depth <= CAP_START_DEPTH_M
+
 
 @dataclass(frozen=True)
 class AttachmentGoalPlan:

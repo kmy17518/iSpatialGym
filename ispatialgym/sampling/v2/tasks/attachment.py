@@ -1299,10 +1299,19 @@ class Attachment(SamplerV2):
         cam_init = self.camera_pose_at(init)
         # step 1: the male at the focus from F (a thin male: the tilted rim pinches first, every library grasp as the fallback)
         m_pose, grasp = None, None
+        from ispatialgym.sampling import campaign_runtime
+        shallow_start = campaign_runtime.contact_recovery('cap_shallow_start_proposal')
+        pose_allowed = None
+        if shallow_start:
+            pose_allowed = lambda pose: CAG.cap_start_within_reach(pose[0], manip.base_pose2d)
+            d.summary['cap_shallow_start_proposal'] = {
+                'maximum_forward_depth_m': CAG.CAP_START_DEPTH_M,
+                'scope': 'native proposal only; placement, grasp, full-arm path and physical QA remain required'}
         for pool, label in self._grasp_pools():
             try:
                 m_pose, grasp = TT.phase3_target(self, manip, rng, pool, self.hull[self.t_role], self.rest[self.t_role], [support], object_name=tname,
-                                                 scale_key=self.choice.models[self.t_role].scale, bands=self.bands)
+                                                 scale_key=self.choice.models[self.t_role].scale, bands=self.bands,
+                                                 pose_allowed=pose_allowed)
                 break
             except Reject as e:
                 if label == "all":
