@@ -554,47 +554,54 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                             'artifact':ref(artifact),'source_ref':current_request})
                     output = Path(request['output']).resolve()
                     require(output.is_relative_to(base), 'native output outside pipeline scope')
-                    submitted_path = path.parent/'submission.json'
-                    submitted_pointer = path.parent/'submission_current.json'
-                    if submitted_pointer.exists():
-                        pointer = read(submitted_pointer)
-                        selected_ref = pointer.get('current', pointer)
-                        selected = Path(selected_ref['path']).resolve()
-                        require(selected.parent == path.parent.resolve() and
-                                file_digest(selected) == selected_ref['sha256'], 'native submission revision changed')
-                        row['native_submission_pointer'] = ref(submitted_pointer)
-                        if submitted_path.exists(): row['original_native_submission'] = ref(submitted_path)
-                        submitted_path = selected
-                    reconciled = reconciled_member_submission(root,path.parent,request,(current_request,original_request))
-                    if reconciled is not None:
-                        if submitted_path.exists(): row['original_native_submission'] = ref(submitted_path)
-                        submitted_path = reconciled
-                        row['native_submission_reconciliation'] = ref(reconciled)
-                    if submitted_path.exists():
-                        submitted = read(submitted_path)
-                        if 'jobs' in submitted:
-                            require(submitted['request'] in (current_request,original_request),
-                                    'native submission request differs')
-                            matches=[job for job in submitted['jobs'] if job.get('candidate_id')==key[0]]
-                            require(len(matches)<=1,'duplicate native member submission')
-                            submitted=matches[0] if matches else {}
-                            if submitted:
-                                require(submitted.get('config_sha256')==request['config_sha256'] and
-                                        submitted.get('count')==request['count'],
-                                        'native member configuration/count differs')
-                        if all(k in submitted for k in ('job_id','native_runtime','request')) and ('start' in submitted or 'members' in submitted):
-                            require(submitted['request'] in (current_request,original_request)
-                                    and submitted['native_runtime']==request['native_runtime']
-                                    and (int(submitted['start'])==key[1] if 'start' in submitted else
-                                         sum(m.get('candidate_id')==key[0] and int(m.get('start',-1))==key[1]
-                                             and m.get('config_sha256')==request['config_sha256']
-                                             and m.get('count')==request['count'] for m in submitted['members'])==1)
-                                    and submitted.get('returncode')==0,
-                                    'native submission does not bind this exact request/runtime/index')
-                            row['native_submission'] = {'evidence':ref(submitted_path),
-                                'job_id':str(submitted['job_id']),'observed_at':submitted.get('observed_at'),
-                                'status':'submitted','scheduler_state':'unavailable'}
-                            row['status'] = 'native_submitted'
+                    try:
+                        submitted_path = path.parent/'submission.json'
+                        submitted_pointer = path.parent/'submission_current.json'
+                        if submitted_pointer.exists():
+                            pointer = read(submitted_pointer)
+                            selected_ref = pointer.get('current', pointer)
+                            selected = Path(selected_ref['path']).resolve()
+                            require(selected.parent == path.parent.resolve() and
+                                    file_digest(selected) == selected_ref['sha256'], 'native submission revision changed')
+                            row['native_submission_pointer'] = ref(submitted_pointer)
+                            if submitted_path.exists(): row['original_native_submission'] = ref(submitted_path)
+                            submitted_path = selected
+                        reconciled = reconciled_member_submission(root,path.parent,request,(current_request,original_request))
+                        if reconciled is not None:
+                            if submitted_path.exists(): row['original_native_submission'] = ref(submitted_path)
+                            submitted_path = reconciled
+                            row['native_submission_reconciliation'] = ref(reconciled)
+                        if submitted_path.exists():
+                            submitted = read(submitted_path)
+                            if 'jobs' in submitted:
+                                require(submitted['request'] in (current_request,original_request),
+                                        'native submission request differs')
+                                matches=[job for job in submitted['jobs'] if job.get('candidate_id')==key[0]]
+                                require(len(matches)<=1,'duplicate native member submission')
+                                submitted=matches[0] if matches else {}
+                                if submitted:
+                                    require(submitted.get('config_sha256')==request['config_sha256'] and
+                                            submitted.get('count')==request['count'],
+                                            'native member configuration/count differs')
+                            if all(k in submitted for k in ('job_id','native_runtime','request')) and ('start' in submitted or 'members' in submitted):
+                                require(submitted['request'] in (current_request,original_request)
+                                        and submitted['native_runtime']==request['native_runtime']
+                                        and (int(submitted['start'])==key[1] if 'start' in submitted else
+                                             sum(m.get('candidate_id')==key[0] and int(m.get('start',-1))==key[1]
+                                                 and m.get('config_sha256')==request['config_sha256']
+                                                 and m.get('count')==request['count'] for m in submitted['members'])==1)
+                                        and submitted.get('returncode')==0,
+                                        'native submission does not bind this exact request/runtime/index')
+                                row['native_submission'] = {'evidence':ref(submitted_path),
+                                    'job_id':str(submitted['job_id']),'observed_at':submitted.get('observed_at'),
+                                    'status':'submitted','scheduler_state':'unavailable'}
+                                row['status'] = 'native_submitted'
+                    except Exception as error:
+                        row['native_submission_audit']={'state':'unverified','error':f'{type(error).__name__}: {error}',
+                            'scope':'Submission proof only; native output and downstream evidence are independently audited below.'}
+                        row['status']='evidence_identity_failed'
+                        result['errors'].append({'path':str(path),'candidate_id':key[0],'start':key[1],
+                            'stage':'native_submission','state':'unverified','error':f'{type(error).__name__}: {error}'})
                     gate_path = output/'sampling_gate.json'
                     if gate_path.exists():
                         gate = read(gate_path)

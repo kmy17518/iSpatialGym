@@ -373,7 +373,8 @@ def test_reconciled_receipt_cannot_relabel_output_identity(tmp_path,field,value)
     folder,row,path,current=reconciled_member_fixture(tmp_path)
     current[field]=value;write_json_atomic(path,current)
     got=status.observe(tmp_path)
-    assert got['errors'] and got['records'][0]['status']=='evidence_identity_failed'
+    assert got['errors'] and got['records'][0]['native_submission_audit']['state']=='unverified'
+    assert got['records'][0]['status']=='evidence_identity_failed'
 
 
 def test_reconciled_receipt_requires_all_original_proofs_and_exclusive_member(tmp_path):
@@ -404,3 +405,15 @@ def test_control_recovery_uses_exact_new_output_and_preserves_first_failure(tmp_
     write_json_atomic(request.parent/'submission_current.json',status.ref(submission))
     with pytest.raises(ValueError,match='output escapes scope'):
         status.diagnostic_control_observation(tmp_path,request)
+
+
+def test_unknown_submission_history_does_not_hide_independent_terminal_native_failure(tmp_path):
+    folder,row,path,current=reconciled_member_fixture(tmp_path)
+    Path(current['preflight']['path']).write_text('{}')
+    write_json_atomic(folder/'native/sampling_gate.json',{**row,'returncode':0,'tro_count':0})
+    observed=status.observe(tmp_path)
+    got=observed['records'][0]
+    assert got['native_submission_audit']['state']=='unverified'
+    assert got['status']=='native_failed' and got['native']['written']==0
+    assert observed['errors'][0]['stage']=='native_submission'
+    assert observed['benchmark_credit']==0
