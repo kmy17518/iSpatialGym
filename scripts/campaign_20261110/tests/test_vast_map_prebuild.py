@@ -101,10 +101,14 @@ def test_unrelated_external_and_symlink_proofs_are_rejected(tmp_path,monkeypatch
     with pytest.raises(ValueError,match='outside approved'):v.prepare(root,plan,0,native,helper,'symlink')
 
 
-def consumed_fixture(root):
+def consumed_fixture(root, constraint='attachment_free', metadata_constraint=None, rest_hint=None):
     plan,native,helper,library=fixture(root)
     base=plan.parent; old=json.loads(plan.read_text()); unit=old['units'][0]; entry=unit['job']
-    entry.update(kind='attachment',constraint='attachment_free')
+    entry.update(kind='attachment' if constraint == 'attachment_free' else 'tabletop',constraint=constraint)
+    if rest_hint is not None: entry['rest_hint_wxyz'] = rest_hint
+    value = json.loads(library.read_text())
+    value.update(category=entry['category'], model=entry['model'], scale=entry['scale'], constraint=metadata_constraint or constraint)
+    v.write(library, value)
     selected=base/'jobs.json';v.write(selected,[entry]);anchors=base/'anchors.json'
     identity={'kind':'tabletop','library_identity':'test-native-identity','library_sha256':v.sha(library),'height':.8126,'arms':['right']}
     key=v.hashlib.sha256(json.dumps(identity,sort_keys=True,separators=(',',':')).encode()).hexdigest()
@@ -134,6 +138,27 @@ def test_consumed_attachment_map_preserves_physical_claim_and_finite_bounds(tmp_
     jid=v.enqueue(job,tmp_path);queued=json.loads((tmp_path/'vast/queue'/(jid+'.json')).read_text())
     assert queued['time_s']==1800 and queued['physical_dedup_key']==ticket['dedup_key']
     assert not Path(ticket['claim_path']).exists() and not(tmp_path/'vast/config.json').exists()
+
+
+@pytest.mark.parametrize('constraint', ['tabletop_insert', 'flower_stem_top'])
+def test_consumed_specialized_map_keeps_exact_constraint(tmp_path, constraint):
+    tickets,native,helper,library,ticket=consumed_fixture(tmp_path, constraint)
+    job=v.prepare_consumed(tmp_path,tickets,0,native,helper,'specialized')
+    value=v.verify(job,tmp_path)
+    assert value['unit']['job']['constraint'] == constraint
+    assert value['physical_dedup_key'] == ticket['physical_dedup_key']
+    assert not(tmp_path/'vast/queue').exists()
+
+
+@pytest.mark.parametrize('change', ['wrong_constraint', 'unreviewed_constraint', 'designated_rest'])
+def test_consumed_specialized_map_rejects_wrong_binding(tmp_path, change):
+    kwargs = {'constraint': 'tabletop_insert'}
+    if change == 'wrong_constraint': kwargs['metadata_constraint'] = 'tabletop'
+    if change == 'unreviewed_constraint': kwargs['constraint'] = 'floating'
+    if change == 'designated_rest': kwargs['rest_hint'] = [1,0,0,0]
+    tickets,native,helper,library,ticket=consumed_fixture(tmp_path, **kwargs)
+    with pytest.raises(ValueError): v.prepare_consumed(tmp_path,tickets,0,native,helper,'wrong')
+    assert not(tmp_path/'vast/queue').exists()
 
 
 @pytest.mark.parametrize('change',['scene_command','altered_height','unbound_library','missing_payload','changed_claim'])

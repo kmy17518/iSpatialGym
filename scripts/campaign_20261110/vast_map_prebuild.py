@@ -96,9 +96,18 @@ def consumed_ticket(root, tickets, index, native):
     require(args['--jobs'] in files and args['--anchors'] in files, 'map selected inputs are unbound')
     entries = json.loads(Path(args['--jobs']).read_text()); require(len(entries) == 1, 'map must contain one library')
     entry = entries[0]
-    require((entry['kind'], entry['constraint']) in {('attachment', 'attachment_free'), ('tabletop', 'tabletop')}, 'map library kind differs')
+    require((entry['kind'], entry['constraint']) in {('attachment', 'attachment_free'), ('tabletop', 'tabletop'),
+            ('tabletop', 'tabletop_insert'), ('tabletop', 'flower_stem_top')}, 'map library kind differs')
+    # Designated rests need an independently pinned reader extension. Current
+    # consumed routes use the exact native canonical-rest entry only.
+    require(entry.get('rest_hint_wxyz') is None, 'designated-rest map route is not reviewed')
     library = Path(args['--glib']) / 'models' / entry['id'] / 'library.json'
     require(files.get(str(library)) == identity['library_sha256'] and sha(library) == identity['library_sha256'], 'map library is unbound')
+    if entry['constraint'] in {'tabletop_insert', 'flower_stem_top'}:
+        metadata = json.loads(library.read_text())
+        require(metadata.get('constraint') == entry['constraint'] and metadata.get('category') == entry['category'] and
+                metadata.get('model') == entry['model'] and metadata.get('scale') == entry['scale'],
+                'specialized map library metadata differs')
     require(args['--heights'] == prepared['height'] and float(args['--heights']) == identity['height'] and
             identity['arms'] == [arm] and any(a['key'] == args['--heights'] for a in json.loads(Path(args['--anchors']).read_text())['anchors']), 'map height/arm differs')
     require(ticket['configuration_ids'] == prepared['configuration_ids'] and bool(ticket['configuration_ids']), 'map consumer differs')

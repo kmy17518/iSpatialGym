@@ -8,6 +8,18 @@ from scripts.campaign_20261110 import vast_map_prebuild as maps
 from scripts.campaign_20261110.vast_prebuild import sha, write, require
 
 
+def registry_route(items, manifest, route, output):
+    """Attach transport to an existing physical manifest without another scan."""
+    matches = [i for i, row in enumerate(items) if row['manifest']['path'] == manifest['path']]
+    require(len(matches) <= 1, 'Duplicate verifier source')
+    if matches:
+        i = matches[0]
+        require(items[i]['manifest'] == manifest, 'Verifier source changed')
+        items[i] = {**items[i], 'route': route}
+    else:
+        items.append({'manifest': manifest, 'route': route, 'output': str(output)})
+
+
 def prepare(root, native, helper, index, admission, base_policy, output, reader_registry):
     root, native, helper, index, admission, base_policy, output, reader_registry = map(Path, (root, native, helper, index, admission, base_policy, output, reader_registry))
     require(not output.exists(), 'Transport author output already exists')
@@ -31,12 +43,13 @@ def prepare(root, native, helper, index, admission, base_policy, output, reader_
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 errors.append({'source_manifest': ref(manifest), 'source_index': i, 'physical_dedup_key': key,
                                'error': type(exc).__name__ + ': ' + str(exc), 'dispatch_authorized': False})
-        route = output / ('route_' + manifest.stem + '.json')
+        source_id = manifest.stem + '_' + sha(manifest)[:12]
+        route = output / ('route_' + source_id + '.json')
         write(route, {'schema': 'isg-consumed-map-vast-route-v1', 'observed_at': time.time(), 'source_manifest': ref(manifest),
             'jobs': rows, 'helper': str(helper), 'helper_refs': [ref(helper / 'scripts/campaign_20261110' / name) for name in ('vast_prebuild.py', 'vast_map_prebuild.py', 'job_map_prebuild.sh')],
             'physical_claim_owner': '/root', 'enqueued': False, 'benchmark_credit': 0, 'production_authorized': False})
-        sources.append({'id': 'consumed_standard_' + manifest.stem, 'enabled': True, 'route': ref(route)})
-        registry_items.append({'manifest': ref(manifest), 'route': ref(route), 'output': str(output.parent / 'native_readers' / manifest.stem)})
+        sources.append({'id': 'consumed_map_' + source_id, 'enabled': True, 'route': ref(route)})
+        registry_route(registry_items, ref(manifest), ref(route), output.parent / 'native_readers' / source_id)
         policy = output / ('intake_policy_%03d.json' % (number + 1))
         write(policy, {**base, 'sources': base['sources'] + sources, 'prepared_at': time.time(), 'transport_author': ref(__file__)})
         reg = output / ('verifier_registry_%03d.json' % (number + 1))
