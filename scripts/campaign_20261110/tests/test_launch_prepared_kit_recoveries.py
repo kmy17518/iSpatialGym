@@ -71,3 +71,13 @@ def test_ambiguous_submit_preserves_original_claim_and_receipt_lineage(tmp_path,
     assert (tmp_path / 'attempt_intent.json').exists()
     launch.submit_once({}, tmp_path, fake_routes, execute=True, runner=runner, writer=writer)
     assert len(calls) == 2
+
+
+def test_both_immutable_recovery_proof_shapes_are_bound_exactly():
+    reference = {'path': '/exact/proof.json', 'sha256': 'exact'}
+    launch.verify_prepared_recovery({'recovery': reference}, reference)
+    launch.verify_prepared_recovery({'recovery': {'proof': reference, 'maximum_attempts': 1}}, reference)
+    with pytest.raises(ValueError, match='proof differs'):
+        launch.verify_prepared_recovery({'recovery': {'path': '/other', 'sha256': 'exact'}}, reference)
+    with pytest.raises(ValueError, match='attempt bound'):
+        launch.verify_prepared_recovery({'recovery': {'proof': reference, 'maximum_attempts': 2}}, reference)

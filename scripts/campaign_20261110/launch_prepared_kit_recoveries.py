@@ -50,6 +50,12 @@ def fixed_route(ticket, capacity, routes, *, now=None):
                       'slurm_account': 'vision', 'user': 'minyeong', **demand}}
 
 
+def verify_prepared_recovery(prepared, expected):
+    recovery = prepared['recovery']
+    require(recovery.get('proof', recovery) == expected, 'Prepared recovery proof differs')
+    require(recovery.get('maximum_attempts', 1) == 1, 'Prepared attempt bound differs')
+
+
 def verify_request(request_ref):
     request = checked(request_ref); manifest = checked(request['ticket']); proof = checked(request['recovery_proof'])
     require(request['schema'] == 'isg-root-reviewed-single-recovery-v1' and len(manifest['jobs']) == 1, 'Unsupported recovery')
@@ -60,7 +66,8 @@ def verify_request(request_ref):
         require(sha(item['path']) == item['sha256'], 'Recovery input changed: ' + item['path'])
     prepared = checked(ticket['prepared'])
     identity = hashlib.sha256(json.dumps(prepared['physical_identity'], sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-    require(identity == key and prepared['recovery']['maximum_attempts'] == 1, 'Prepared identity/attempt differs')
+    require(identity == key, 'Prepared identity differs')
+    verify_prepared_recovery(prepared, request['recovery_proof'])
     terminal = checked(proof['previous_terminal']); checked(proof['previous_submission']); checked(proof['previous_claim'])
     require(terminal['physical_dedup_key'] == key and not terminal['map_files'] and not any(a['native_done'] for a in terminal['arms']), 'Prior output is not the exact startup failure')
     require(sha(proof['previous_native_log']['path']) == proof['previous_native_log']['sha256'], 'Prior native log changed')
