@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from ispatialgym.sampling.campaign_axial_approach import choose_push_with_pre_fallback, short_pre_fallback_enabled
+from ispatialgym.sampling.campaign_axial_approach import choose_push_with_pre_fallback, short_pre_fallback_enabled, short_pre_only_enabled
 
 
 def test_unverified_fallback_is_opt_in_and_campaign_scoped(monkeypatch):
@@ -62,3 +62,30 @@ def test_failed_shorter_check_remains_a_rejection():
     chosen,proof=choose_push_with_pre_fallback(proposals(),choose,
         lambda contact,distance:(distance,contact[1]),enabled=True)
     assert chosen is None and len(calls)==2 and proof['why']=='collision'
+
+
+def test_short_only_requires_explicit_campaign_opt_in(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG',raising=False)
+    monkeypatch.setenv('ISPATIALGYM_AXIAL_SHORT_PRE_ONLY','1')
+    assert not short_pre_only_enabled()
+    monkeypatch.setenv('ISPATIALGYM_CAMPAIGN_CONFIG','exact.json')
+    assert short_pre_only_enabled()
+    monkeypatch.delenv('ISPATIALGYM_AXIAL_SHORT_PRE_ONLY')
+    assert not short_pre_only_enabled()
+
+
+def test_short_only_does_not_pollute_solver_with_original_failures():
+    for winner in (object(),None):
+        rows=proposals();calls=[]
+        def choose(value):
+            calls.append(value)
+            assert all(p.chain[0][0]==.05 for p in value)
+            return winner,{'options':[{'ok':winner is not None}]}
+        chosen,proof=choose_push_with_pre_fallback(rows,choose,
+            lambda contact,distance:(distance,contact[1]),enabled=True,short_only=True)
+        assert chosen is winner and len(calls)==1
+        for old,new in zip(rows,calls[0]):
+            assert old.label==new.label and old.rank==new.rank and old.payload==new.payload
+            assert all(a is b for a,b in zip(old.chain[1:],new.chain[1:]))
+            assert new.q_first is None and old.q_first=='original witness'
+        assert proof['pre_approach_program']['original_checked_first']is False
