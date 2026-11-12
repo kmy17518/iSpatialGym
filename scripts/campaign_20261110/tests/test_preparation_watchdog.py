@@ -122,3 +122,51 @@ def test_secondary_capacity_requires_admitted_route_and_preserves_ready_clock(tm
     assert result['items'][0]['compatible_capacity_available']
     assert result['items'][0]['admitted_accounts']==['minyeong','shiyuc']
     assert any(e['kind']=='preparation_dispatch_stall' for e in result['exceptions'])
+
+
+def queued_fixture(root):
+    d,key,receipt=fixture(root)
+    p=root/'tickets.json';value=json.loads(p.read_text())
+    value['tickets'][0].update(consumer_kind='tabletop',computation_kind='reach_map')
+    updated=put(p,value);policy=json.loads((d/'policy.json').read_text())
+    policy['prepared_manifests']=[updated]
+    policy['preparation_scope']['normalized_manifests'][0]['manifest']=updated
+    put(d/'policy.json',policy)
+    put(receipt,{'backend':'vast','job_id':'9001','account':'minyeong','submitted_at':710})
+    put(root/'vast/state/jobs/9001.json',{'id':'9001','status':'queued','tries':0})
+    return d
+
+
+def test_virtual_queue_receipt_does_not_hide_available_cluster_capacity(tmp_path):
+    d=queued_fixture(tmp_path)
+    # Other recent submissions do not excuse an already queued eligible map.
+    value=project(tmp_path,[],1000)
+    assert value['known_ready_count']==0 and value['queued_unassigned_count']==1
+    assert value['queued_with_cluster_capacity_count']==1
+    alert=next(e for e in value['exceptions'] if e['kind']=='preparation_queued_capacity_stall')
+    assert alert['oldest_queued_since']==710
+    second=project(tmp_path,[],1010,value)
+    later=next(e for e in second['exceptions'] if e['kind']==alert['kind'])
+    assert later['first_raised_at']==1000 and second['oldest_queued_age_seconds']==300
+
+
+def test_assigned_or_previously_attempted_jobs_are_not_return_candidates(tmp_path):
+    queued_fixture(tmp_path)
+    for state in [{'status':'assigned','instance':'a'}, {'status':'queued','tries':1},
+                  {'status':'queued','history':[{'instance':'a'}]}]:
+        put(tmp_path/'vast/state/jobs/9001.json',{'id':'9001',**state})
+        value=project(tmp_path,[],1000)
+        assert value['queued_with_cluster_capacity_count']==0
+        assert not any(e['kind']=='preparation_queued_capacity_stall' for e in value['exceptions'])
+
+
+def test_fresh_typed_capacity_used_and_stale_capacity_never_inferred(tmp_path):
+    d=queued_fixture(tmp_path)
+    for account in ['minyeong','shiyuc']:
+        p=d/f'status_{account}.json';value=json.loads(p.read_text())
+        value['capacity']['observed_at']=800;put(p,value)
+    assert project(tmp_path,[],1000)['queued_with_cluster_capacity_count']==0
+    put(d/'prep_routes_minyeong.json',{'capacity':{'status':'observed','observed_at':990,
+        'account_slots':{'minyeong':8},'compatible_available_slots':12,'preparation_slots':8}})
+    assert project(tmp_path,[],1000)['queued_with_cluster_capacity_count']==1
+    assert project(tmp_path,[],1100)['queued_with_cluster_capacity_count']==0
