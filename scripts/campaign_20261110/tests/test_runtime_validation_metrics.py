@@ -7,6 +7,21 @@ from scripts.campaign_20261110.runtime_validation_metrics import attempts, accou
 
 
 class MetricsTest(unittest.TestCase):
+    def test_additive_destination_preserves_existing_measurements(self):
+        from unittest.mock import patch
+        from scripts.campaign_20261110.runtime_validation_metrics import observe
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);run=root/'runtime_validation/run';existing=run/'measurements'
+            existing.mkdir(parents=True);(existing/'current.json').write_text('original')
+            destination=root/'reviews/new'
+            with patch('scripts.campaign_20261110.runtime_suite_paths.all_rows',return_value=[]),patch('scripts.campaign_20261110.runtime_validation_metrics.scheduler',return_value=({}, {'jobs':[]})):
+                result=observe(run,destination)
+            self.assertEqual((existing/'current.json').read_text(),'original')
+            self.assertEqual(list(existing.iterdir()),[existing/'current.json'])
+            self.assertEqual(json.loads((destination/'current.json').read_text()),result)
+            self.assertTrue((destination/'current.md').exists())
+            self.assertTrue(Path(result['scheduler_evidence']['path']).is_relative_to(destination))
+
     def fixture(self, root, camera=False):
         def put(path, value):
             path.parent.mkdir(parents=True, exist_ok=True); path.write_text(json.dumps(value)); return reference(path)

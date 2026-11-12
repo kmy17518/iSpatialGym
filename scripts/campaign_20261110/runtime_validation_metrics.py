@@ -368,9 +368,10 @@ def rollup_attempts(records):
     return result
 
 
-def observe(run_dir):
+def observe(run_dir, output_dir=None):
     """Only explicit suite rows and job directories; no global allocation scans."""
     run_dir = Path(run_dir); records, errors, ids = [], [], []
+    destination = Path(output_dir) if output_dir is not None else run_dir/'measurements'
     from .runtime_suite_paths import all_rows, paths
     for row_path in all_rows(run_dir.parents[1],run_dir):
         try:
@@ -387,7 +388,7 @@ def observe(run_dir):
             records.append((row_path, row, jobs, reference(path) if path.exists() else None))
         except Exception as exc: errors.append({'row': str(row_path), 'error': type(exc).__name__ + ': ' + str(exc)})
     account, raw = scheduler(ids)
-    evidence_dir = run_dir / 'measurements' / 'scheduler'; evidence_dir.mkdir(parents=True, exist_ok=True)
+    evidence_dir = destination / 'scheduler'; evidence_dir.mkdir(parents=True, exist_ok=True)
     scheduler_ref = None
     if raw:
         raw_path = evidence_dir / (str(time.time_ns()) + '.json'); write(raw_path, raw); scheduler_ref = reference(raw_path)
@@ -404,7 +405,7 @@ def observe(run_dir):
                 jid = str(job['job_id']); directory = Path(job['job_dir']); measured = account.get(jid)
                 if job['backend'] == 'vast':
                     try:
-                        measured = vast_accounting(run_dir.parents[1], job, run_dir/'measurements/vast_states')
+                        measured = vast_accounting(run_dir.parents[1], job, destination/'vast_states')
                     except Exception as exc:
                         measured = {'backend': 'vast', 'job_id': jid, 'terminal': False, 'allocated_gpu_seconds': None,
                                     'state': 'cost_evidence_unavailable', 'error': type(exc).__name__+': '+str(exc)}
@@ -467,22 +468,23 @@ def observe(run_dir):
     value = {'schema': 'isg-runtime-validation-measurements-v1', 'campaign_id': CAMPAIGN, 'observed_at': time.time(),
              'run_dir': str(run_dir), 'classes': output, 'errors': errors, 'scheduler_evidence': scheduler_ref,
              'scope': 'Exact registered classes only; no acceptance mutations, no historical sample compatibility inference.'}
-    write(run_dir / 'measurements/current.json', value)
+    write(destination / 'current.json', value)
     lines = ['| Class | Native draws | Censored draws | Demo successes | Observed GPU h | Cost complete | Physical/acceptance status |', '|---|---:|---:|---:|---:|---|---|']
     for r in output:
         n = r['native_attempts']; status = (r['strict_outcomes'] or {}).get('status', 'awaiting strict result'); lines.append(f"| {r['class_id']} | {n.get('native_draws', 'unavailable')} | {n.get('censored_native_draws', 'unavailable')} | {len(r['distinct_demo_instance_ids'])} | {r['cost']['observed_allocated_gpu_hours']:.4f} | {r['cost']['cost_complete']} | {status} |")
-    (run_dir / 'measurements/current.md').write_text('\n'.join(lines)+'\n\nNative and collector process times overlap; allocation GPU time is counted once. Missing or censored costs remain explicit.\n')
+    (destination / 'current.md').write_text('\n'.join(lines)+'\n\nNative and collector process times overlap; allocation GPU time is counted once. Missing or censored costs remain explicit.\n')
     return value
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('--register', type=Path)
     parser.add_argument('--run-dir', type=Path); parser.add_argument('--every', type=float, default=0)
+    parser.add_argument('--output-dir', type=Path, help='Separate destination for additive read-only measurements')
     args = parser.parse_args()
     if args.register: print(json.dumps(register(args.register))); return
     require(args.run_dir is not None, '--run-dir required')
     while True:
-        result = observe(args.run_dir); print(json.dumps({'classes': len(result['classes']), 'errors': result['errors']}), flush=True)
+        result = observe(args.run_dir, args.output_dir); print(json.dumps({'classes': len(result['classes']), 'errors': result['errors']}), flush=True)
         if not args.every: return
         time.sleep(args.every)
 
