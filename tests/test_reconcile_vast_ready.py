@@ -26,3 +26,15 @@ def test_stale_or_missing_provider_observation_cannot_claim_more_work():
 def test_activation_does_not_release_an_explicit_hold_or_duplicate_active_job():
     submitted=[{'job_id':str(i)} for i in range(4)]
     assert activation_candidates(submitted,['1'],['0','1'])==[{'job_id':'2'},{'job_id':'3'}]
+
+
+def test_authoritative_terminal_state_overrides_historical_queue_record(tmp_path):
+    import json
+    from scripts.campaign_20261110.reconcile_vast_ready import active_job_states
+    (tmp_path/'vast/state/jobs').mkdir(parents=True);(tmp_path/'vast/queue').mkdir()
+    for jid in ['1','2','3']:(tmp_path/'vast/queue'/(jid+'.json')).write_text('{}')
+    (tmp_path/'vast/state/jobs/1.json').write_text(json.dumps({'id':'1','status':'synced'}))
+    (tmp_path/'vast/state/jobs/2.json').write_text(json.dumps({'id':'2','status':'queued'}))
+    states=active_job_states(tmp_path,['1','2','3'])
+    assert [s['status']for s in states]==['synced','queued','queued']
+    assert intake_slots(metrics(),states,timestamp=101)==126

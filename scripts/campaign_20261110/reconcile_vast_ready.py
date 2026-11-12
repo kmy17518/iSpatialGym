@@ -33,6 +33,15 @@ def activation_candidates(submitted, configured, previously_activated):
     return [r for r in submitted if str(r['job_id']) not in configured|previously_activated]
 
 
+def active_job_states(root, identifiers):
+    root=Path(root);states=[]
+    for jid in identifiers:
+        p=root/'vast/state/jobs'/(str(jid)+'.json')
+        if p.exists():states.append(json.loads(p.read_text()))
+        elif (root/'vast/queue'/(str(jid)+'.json')).exists():states.append({'status':'queued'})
+    return states
+
+
 def cycle(root, policy_path, adapter_module=adapter):
     root=Path(root);policy=json.loads(Path(policy_path).read_text())
     assert policy['owner']=='/root' and policy['production_released'] is False
@@ -40,11 +49,7 @@ def cycle(root, policy_path, adapter_module=adapter):
     directory=root/'infra/coordinator_dispatch';config_path=root/'vast/config.json'
     metrics=json.loads((root/'vast/metrics.json').read_text())
     config=json.loads(config_path.read_text());active=set(map(str,config.get('dispatch_job_ids',[])))
-    states=[]
-    for jid in active:
-        p=root/'vast/state'/(jid+'.json')
-        if p.exists():states.append(json.loads(p.read_text()))
-        elif (root/'vast/queue'/(jid+'.json')).exists():states.append({'status':'queued'})
+    states=active_job_states(root,active)
     remaining=intake_slots(metrics,states,timestamp=time.time())
     state_path=directory/'vast_ready_intake_state.json'
     state=json.loads(state_path.read_text()) if state_path.exists() else {'activated':[],'cursor':0}
@@ -94,6 +99,8 @@ def cycle(root, policy_path, adapter_module=adapter):
         shared_json(state_path,state)
     report={'owner':'/root','observed_at':time.time(),'elapsed_seconds':time.time()-began,
             'results':results,'newly_activated':verified,'errors':errors,'remaining_buffer_slots':remaining,
+            'provider_observation_age_seconds':time.time()-metrics.get('observed_at_unix',0),
+            'activated_queued_jobs':sum(s.get('status')=='queued' for s in states),
             'rental_owner':'existing Vast controller','benchmark_credit':0,'production_released':False}
     shared_json(directory/'vast_ready_intake.json',report)
     return report
