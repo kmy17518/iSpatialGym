@@ -64,7 +64,10 @@ def order_ledger_rows(rows, gates, requests):
         unique.setdefault(identity, row)
     def priority(row):
         entry = gates.get(row['jobid'], {})
-        if pending_retry(entry, requests.get(row['jobid'])): return 0
+        if pending_retry(entry, requests.get(row['jobid'])) or entry.get('retry_output'): return 0
+        # A prior denial is only an ordering hint, never an authorization cache.
+        # Fresh sources and owned replays must not wait behind old blocked bulk.
+        if entry.get('production_gate_block') and not entry.get('replay_job_id') and not entry.get('vast_migration'): return 3
         if entry.get('status') in ('submitting','replay_queued','waiting_for_demo'): return 1
         if not entry: return 2
         return 4 if entry.get('status') in ('validated','replay_failed') else 3
@@ -86,6 +89,14 @@ def observation_waits_for_demo(entry, successes, request):
     return (not successes and entry.get('status') in ('waiting_for_demo','demo_missing','demo_failed')
             and not entry.get('replay_job_id') and not entry.get('vast_migration')
             and not pending_retry(entry, request))
+
+
+def observation_waits_for_sampling(entry, job, request):
+    """No replay can start while its source may still rewrite native metadata."""
+    return (entry.get('status') in ('waiting_for_demo','demo_missing','demo_failed')
+            and not entry.get('replay_job_id') and not entry.get('vast_migration')
+            and not pending_retry(entry, request)
+            and not (job/'sampling.done').is_file())
 
 def isolated_suite_replay_owner(production, entry):
     return (production.get('allowed') is True and
@@ -311,6 +322,10 @@ def main():
                 if position%50==0:
                     atomic(progresspath,{**scan,'phase':'historical_terminal_observation','position':position,
                         'source_job_id':jid,'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat()})
+                continue
+            if observation_waits_for_sampling(entry,job,retry_requests.get(jid)):
+                entry['waiting_reason']='source_sampling_not_closed'
+                scan['awaiting_source_close_observations']=scan.get('awaiting_source_close_observations',0)+1
                 continue
             atomic(progresspath,{**scan,'phase':'source_authorization','position':position,'source_job_id':jid,
                 'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat()})

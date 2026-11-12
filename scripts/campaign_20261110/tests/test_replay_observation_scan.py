@@ -1,6 +1,6 @@
 import json
 import pytest
-from scripts.campaign_20261110.controller_validation import terminal_observation_unchanged, order_ledger_rows, observation_waits_for_demo
+from scripts.campaign_20261110.controller_validation import terminal_observation_unchanged, order_ledger_rows, observation_waits_for_demo, observation_waits_for_sampling
 
 
 def fixture(tmp_path):
@@ -56,3 +56,29 @@ def test_jobs_without_success_cannot_authorize_or_dispatch_replay(status):
 def test_existing_replay_or_migration_still_reconciles_without_demo_results(field):
     entry={'status':'waiting_for_demo',field:'existing'}
     assert not observation_waits_for_demo(entry,[],None)
+
+
+def test_open_source_cannot_dispatch_but_closure_immediately_rechecks_authorization(tmp_path):
+    entry={'status':'waiting_for_demo','demo_successes':6,'production_gate_block':{'allowed':False}}
+    assert observation_waits_for_sampling(entry,tmp_path,None)
+    (tmp_path/'sampling.done').touch()
+    assert not observation_waits_for_sampling(entry,tmp_path,None)
+    assert entry['production_gate_block']=={'allowed':False}
+
+
+@pytest.mark.parametrize('field',['replay_job_id','vast_migration'])
+def test_open_source_owned_replay_and_migration_still_reconcile(tmp_path,field):
+    assert not observation_waits_for_sampling({'status':'waiting_for_demo',field:'owned'},tmp_path,None)
+
+
+def test_explicit_retry_still_checks_current_source_even_before_close(tmp_path):
+    assert not observation_waits_for_sampling({'status':'waiting_for_demo'},tmp_path,{'request_id':'r1'})
+
+
+def test_interrupted_retry_and_new_sources_precede_prior_denials():
+    rows=[{'jobid':str(i),'job_dir':str(i),'key':'x','code':'n'}for i in range(5)]
+    entries={'0':{'status':'waiting_for_demo','production_gate_block':{'allowed':False}},
+             '1':{'status':'waiting_for_demo','retry_output':'exact_retry'},
+             '2':{'status':'replay_queued','replay_job_id':'42','production_gate_block':{'allowed':False}},
+             '4':{'status':'validated'}}
+    assert [r['jobid']for r in order_ledger_rows(rows,entries,{})]==['1','2','3','0','4']
