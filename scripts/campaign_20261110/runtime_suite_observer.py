@@ -10,6 +10,44 @@ from .runtime_suite_acceptance import reconcile, reference
 from .storage import atomic_directory_lock
 
 
+def source_stage(root,row,wrapper):
+    """Submission alone proves no worker, native instance, or demo progress."""
+    from .acceptance import report_passed
+    from .runtime_suite import timestamp
+    from .training_diversity import _terminal_jobs
+    job=Path(wrapper['allocation']['job_dir']);since=timestamp(row['run_started_at'])
+    native=list((job/'inst').rglob('*-tro_state.json')) if (job/'inst').exists() else []
+    successful=[];failed=[]
+    for path in (job/'demo').glob('*/meta.json'):
+        try:
+            value=json.loads(path.read_text());report_passed(value,'oracle')
+            require(timestamp(value['started_utc'])>=since and
+                    Path(value['provenance']['isg_root']).resolve()==Path(row['frozen_runtime']['path']).resolve(),
+                    'demo source runtime/time differs')
+            successful.append(reference(path))
+        except (OSError,ValueError,KeyError,TypeError):failed.append(str(path))
+    worker=any(path.exists() and path.stat().st_size>0 and path.stat().st_mtime>=since
+               for path in (job/'job.txt',job/'sample.log'))
+    terminal=False
+    if wrapper.get('terminal_evidence'):
+        proof=checked(root,wrapper['terminal_evidence'])
+        require(any(j['job_id']==str(wrapper['allocation']['jobid']) and j['stage'] in ('native','collection') for j in proof['jobs']),
+                'source terminal proof refers to another allocation')
+        try:_terminal_jobs(root,{'jobs':proof['jobs']},proof,proof['observed_at']);terminal=True
+        except (OSError,ValueError,KeyError,TypeError):pass
+    needed=1 if row['camera_exempt'] else 2
+    if len(successful)>=needed:status='awaiting_own_replay'
+    elif terminal:
+        status=('native_not_started_terminal' if not worker and not native else
+                'native_failed' if not native else 'demo_failed' if not successful else 'insufficient_successful_demos')
+    elif successful:status='awaiting_distinct_demos'
+    elif native:status='awaiting_demo'
+    elif worker:status='native_started'
+    else:status='awaiting_worker'
+    return {'status':status,'native_written_observed':len(native),'successful_demo_reports':successful,
+            'failed_demo_report_paths':failed,'worker_start_evidence_observed':worker,'source_terminal_verified':terminal}
+
+
 def observe(root, run_dir):
     root=Path(root).resolve();base=Path(run_dir).resolve()
     _,release,manifest,_,current=active(root)
@@ -36,7 +74,7 @@ def observe(root, run_dir):
                 gate_path=(Path(allocation['gate']['path']) if allocation.get('gate') else
                     root/'validation/open_loop'/receipt['allocation']['key']/str(job['jobid'])/'gate.json')
                 if not gate_path.exists():
-                    status['status']='awaiting_own_replay';state['classes'][cls]=status;continue
+                    status.update(source_stage(root,row,allocation));state['classes'][cls]=status;continue
                 gate_ref=reference(gate_path);gate=checked(root,gate_ref)
                 status['gate']=gate_ref
                 if gate.get('success') is not True:

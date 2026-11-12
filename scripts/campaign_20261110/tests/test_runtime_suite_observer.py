@@ -27,3 +27,22 @@ def test_failed_gate_remains_failure_without_resubmission(tmp_path,monkeypatch):
     state=o.observe(tmp_path,base)
     assert state['classes']['class0']['status']=='replay_failed'
     assert state['classes']['class0']['validation_passed'] is False
+
+
+def test_allocated_source_without_execution_is_not_awaiting_replay(tmp_path):
+    base,row_ref,allocation_ref,gate=bound(tmp_path)
+    wrapper=json.loads(Path(allocation_ref['path']).read_text());wrapper.pop('terminal_evidence')
+    row=json.loads(Path(row_ref['path']).read_text())
+    result=o.source_stage(tmp_path,row,wrapper)
+    assert result['status']=='awaiting_worker' and not result['successful_demo_reports']
+    job=Path(wrapper['allocation']['job_dir']);(job/'sample.log').write_text('native process started')
+    assert o.source_stage(tmp_path,row,wrapper)['status']=='native_started'
+
+
+def test_terminal_no_demo_is_not_reported_as_replay_wait(tmp_path):
+    base,row_ref,allocation_ref,gate=bound(tmp_path)
+    wrapper=json.loads(Path(allocation_ref['path']).read_text());row=json.loads(Path(row_ref['path']).read_text())
+    job=Path(wrapper['allocation']['job_dir']);(job/'sample.log').write_text('native rejected all draws')
+    assert o.source_stage(tmp_path,row,wrapper)['status']=='native_failed'
+    (job/'inst').mkdir();(job/'inst/member__1000-tro_state.json').write_text('{}')
+    assert o.source_stage(tmp_path,row,wrapper)['status']=='demo_failed'
