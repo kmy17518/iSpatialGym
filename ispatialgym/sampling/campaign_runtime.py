@@ -105,6 +105,8 @@ def contact_recovery(option: str) -> bool:
                                          'inter_object_relation_satisfaction-touching_small_scale'),
         'cereal_brace_gap_1mm': ('inter_object_relation_satisfaction-touching_02',
                                'inter_object_relation_satisfaction-touching_small_scale'),
+        'cereal_horizontal_push_proposal': ('inter_object_relation_satisfaction-touching_02',
+                                           'inter_object_relation_satisfaction-touching_small_scale'),
         'shelf_board_draw': ('inter_object_relation_satisfaction-touching_03',
                              'inter_object_relation_satisfaction-touching_small_scale'),
         'shelf_other_arm': ('inter_object_relation_satisfaction-touching_03',
@@ -136,7 +138,7 @@ def contact_recovery(option: str) -> bool:
     if value:
         require((template.class_id, template.task) == classes[option],
                 'contact recovery belongs to another audited class')
-        if option == 'cereal_brace_gap_1mm':
+        if option in ('cereal_brace_gap_1mm', 'cereal_horizontal_push_proposal'):
             expected = {'target': ('box_of_cereal', 'iucshm', .8),
                         'partner': ('box_of_cereal', 'dkhgxn', 1.)}
             require(template.split == 'eval_standard' and all(

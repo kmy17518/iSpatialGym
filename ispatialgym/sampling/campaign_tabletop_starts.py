@@ -9,6 +9,9 @@ from ispatialgym.sampling.campaign_held_goals import _require
 
 def source_stance_hint_enabled(relation, scale, class_id):
     """Scope source candidate ranking to the measured pair recoveries."""
+    if (relation, scale, class_id) == ('touching', 'small', 'inter_object_relation_satisfaction-touching_02'):
+        from ispatialgym.sampling import campaign_runtime
+        return campaign_runtime.contact_recovery('cereal_horizontal_push_proposal')
     recovered_pairs = {
         'nextto': {'inter_object_relation_satisfaction-nextto_01',
                    'inter_object_relation_satisfaction-nextto_02',

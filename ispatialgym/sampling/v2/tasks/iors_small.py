@@ -3236,6 +3236,15 @@ class IORSSmall(SamplerV2):
             import itertools
 
             cands = itertools.chain(self.open_push_candidates(st, hull_w, t_face_z, direction, line_xy=line_xy), cands)
+        from ispatialgym.sampling import campaign_runtime
+        if campaign_runtime.contact_recovery('cereal_horizontal_push_proposal'):
+            # The fresh cereal group selected a raised blade 7cm above the
+            # brace; both boxes tipped. The replay-proven source uses a
+            # horizontal fingertip push at their middle height. Restrict this
+            # proposal family so an unsuitable stance is rejected and the
+            # ordinary checked stance search continues. All exact checks below
+            # remain mandatory; no recorded contact is copied into a new draw.
+            cands = (c for c in cands if c[0] in ('push_tip_h', 'push_tip_h-'))
         pair = self.pair_goal_align()
         h_max = float(pair["push_max_height_m"]) if (pair is not None and pair["push_max_height_m"] is not None) else None
         cap = None
@@ -8059,6 +8068,11 @@ class IORSSmall(SamplerV2):
 
             # oracle-fix 2026-11-06 (owner on touching#02's cereal box): the open gripper low on the face first, today's classes after it
             cands = itertools.chain(self.open_push_candidates(st, hull_w, t_face_z, direction, line_xy=line_xy), cands)
+        from ispatialgym.sampling import campaign_runtime
+        if campaign_runtime.contact_recovery('cereal_horizontal_push_proposal'):
+            # Match the early proposal screen; ordinary chain, retreat,
+            # overlap, frame and full program checks still judge these poses.
+            cands = (c for c in cands if c[0] in ('push_tip_h', 'push_tip_h-'))
         pair = self.pair_goal_align()
         if pair is not None and pair["push_max_height_m"] is not None:
             h_max = float(pair["push_max_height_m"])
