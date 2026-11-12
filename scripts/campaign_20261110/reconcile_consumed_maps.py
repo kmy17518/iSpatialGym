@@ -125,7 +125,30 @@ def contact_grid_proof(native, identity, library, cm, cp, rm, np):
     return sum(int((v == cm.STATUS['feasible']).sum()) for v in grids)
 
 
-def native_read_contact(ticket, terminal_path, maps_root, backend, cache):
+def completed_contact_teardown(terminal, terminal_path, maps_root, identity):
+    """Forensic proof only: a completed map may survive a later Kit teardown crash."""
+    require(terminal['returncode'] == -11 and terminal['native_done'], 'Not a completed SIGSEGV teardown candidate')
+    log = terminal_path.parent / 'native.log'; text = log.read_text(errors='replace')
+    marker = 'GB_CONTACT_MAPS_DONE'; fatal = 'Fatal Python error: Segmentation fault'
+    require(text.count(marker) == 1 and text.count(fatal) == 1, 'Ambiguous completion/crash ordering')
+    completed, crashed = text.index(marker), text.index(fatal)
+    require(completed < crashed and 'unloading all plugins' in text[completed:crashed], 'Crash was not after completed native work and plugin unload')
+    native_log = maps_root / 'logs/maps_push_blade_0of1.jsonl'
+    rows = [json.loads(line) for line in native_log.read_text().splitlines() if line.strip()]
+    require(len(rows) == 1 and rows[0].get('ok') is True and rows[0].get('path'), 'Native map completion receipt missing or ambiguous')
+    row = rows[0]
+    require(row['id'] == identity['object_key']['entry'] and row['kind'] == identity['kind'] and
+            row['arm'] == identity['arm'] and row['h'] == identity['height_above_floor'], 'Native completion receipt identity differs')
+    declared = {r['path']: r['sha256'] for r in terminal['map_files']}
+    path = Path(row['path'])
+    require(path.is_relative_to(maps_root) and set(declared) == {str(path), str(path.with_suffix('.npz'))}, 'Incomplete native completion closure')
+    require(all(sha(p) == h for p, h in declared.items()), 'Completed native payload changed')
+    return {'process_exit_success': False, 'original_returncode': -11,
+            'artifact_recovery_basis': 'Native completion receipt and marker precede plugin-unload SIGSEGV; all native parser checks still required',
+            'completion_evidence': [{'path': str(p), 'sha256': sha(p)} for p in (log, native_log)]}
+
+
+def native_read_contact(ticket, terminal_path, maps_root, backend, cache, *, allow_completed_teardown=False):
     import numpy as np
     from ispatialgym.grasping import contact_library as CL, contact_policy as CP
     from ispatialgym.sampling import contact_maps as CM, reach_maps as RM
@@ -138,7 +161,11 @@ def native_read_contact(ticket, terminal_path, maps_root, backend, cache):
         require(sha(module.__file__) == expected['sha256'], 'Native contact reader runtime differs')
     terminal = json.loads(terminal_path.read_text()); identity = prepared['physical_identity']
     require(terminal['physical_dedup_key'] == ticket['physical_dedup_key'] and terminal['prepared_sha256'] == ticket['prepared']['sha256'], 'Contact terminal physical identity differs')
-    require(terminal['returncode'] == 0 and terminal['native_done'], 'Native contact builder failed')
+    recovery = {}
+    if allow_completed_teardown and terminal['returncode'] == -11:
+        recovery = completed_contact_teardown(terminal, terminal_path, maps_root, identity)
+    else:
+        require(terminal['returncode'] == 0 and terminal['native_done'], 'Native contact builder failed')
     source = prepared['source_library']; checked_hash(source, cache)
     library = CL.load_library(source['path'])
     require(library['digest'] == CL._library_digest(library), 'Contact library payload digest differs')
@@ -154,7 +181,7 @@ def native_read_contact(ticket, terminal_path, maps_root, backend, cache):
     declared = {r['path']: r['sha256'] for r in terminal['map_files']}
     files = [{'path': str(p), 'sha256': sha(p)} for p in (path, path.with_suffix('.npz'))]
     require(all(declared.get(r['path']) == r['sha256'] for r in files), 'Unbound contact map payload')
-    return {'status': 'verified_positive' if positive else 'valid_zero', 'native_reader_passed': True,
+    return {**recovery, 'status': 'verified_positive' if positive else 'valid_zero', 'native_reader_passed': True,
             'positive_cells': positive, 'verified_files': files,
             'maps': [{'arm': identity['arm'], 'pose_set': identity['pose_set'], 'files': files}],
             'builder_elapsed_seconds': terminal['finished_at'] - terminal['started_at'],
