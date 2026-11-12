@@ -128,3 +128,29 @@ def test_cap_source_focus_is_tried_without_waiving_fixed_partner_separation():
     ranked = goals.order_source_stances(p, 'configuration_matching-attachment_04', order, candidates)
     assert ranked[:4] == order[:4] and ranked[4] == 8
     assert sorted(ranked) == order
+
+
+def test_cap_elevated_carry_keeps_checked_lift_endpoint_and_every_original_pose():
+    lift = (th.tensor([.8, 0, .97]), th.tensor([0., 0, 0, 1]))
+    waypoints = [(th.tensor([.8, 0, 1.05]), lift[1]), (th.tensor([.95, -.3, 1.1]), lift[1])]
+    result = goals.lift_continuous_waypoints(
+        waypoints, lift, class_id="configuration_matching-attachment_04", enabled=True)
+    assert result[0] is lift and len(result) == len(waypoints) + 1
+    assert all(a is b for a, b in zip(result[1:], waypoints))
+    assert goals.lift_continuous_waypoints(
+        result, lift, class_id="configuration_matching-attachment_04", enabled=True) is result
+
+
+@pytest.mark.parametrize("class_id,enabled", [
+    ("configuration_matching-attachment_04", False), ("configuration_matching-attachment_03", True)])
+def test_lift_endpoint_serialization_is_scoped_and_opt_in(class_id, enabled):
+    lift = ([.8, 0, .97], [0, 0, 0, 1])
+    waypoints = [([.8, 0, 1.05], lift[1])]
+    assert goals.lift_continuous_waypoints(waypoints, lift, class_id=class_id, enabled=enabled) is waypoints
+
+
+def test_lift_endpoint_serialization_does_not_duplicate_equivalent_quaternion():
+    waypoints = [([.8, 0, .97], [0, 0, 0, -1])]
+    assert goals.lift_continuous_waypoints(
+        waypoints, ([.8, 0, .97], [0, 0, 0, 1]),
+        class_id="configuration_matching-attachment_04", enabled=True) is waypoints

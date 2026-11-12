@@ -89,6 +89,20 @@ def order_source_stances(plan, class_id, order, candidates):
     return prioritize_written_stances(order, candidates, [plan.anchor_manipulation_stance])
 
 
+def lift_continuous_waypoints(waypoints, lift, *, class_id, enabled=False):
+    """Serialize the checked lift endpoint before the existing carry poses.
+
+    The elevated cap carry is already screened as ``[lift] + waypoints``.
+    Keeping that endpoint lets the full program checker continue from the
+    preceding lift action instead of independently solving the elevated pose.
+    """
+    if not enabled or class_id != "configuration_matching-attachment_04" or lift is None or not waypoints:
+        return waypoints
+    same_position = all(abs(float(a) - float(b)) <= 1e-6 for a, b in zip(lift[0], waypoints[0][0]))
+    same_orientation = abs(sum(float(a) * float(b) for a, b in zip(lift[1], waypoints[0][1]))) >= 1 - 1e-6
+    return waypoints if same_position and same_orientation else [lift] + list(waypoints)
+
+
 def load_attachment_plan(*, template_id, scene, rooms, activated_at, expected_sha256=None):
     path = os.environ.get(ENV)
     if not path:

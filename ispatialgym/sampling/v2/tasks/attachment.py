@@ -1370,6 +1370,11 @@ class Attachment(SamplerV2):
         TT.whole_body_check_at(self, [init, manip] + ([work_st] if work_st is not manip else []), objects, require=True, reason="stance_collision")
         # record
         grasp.carry_height = float(carry)
+        if getattr(self, "_campaign_attachment_active", None) is not None:
+            from ispatialgym.sampling import campaign_runtime
+            wps = CAG.lift_continuous_waypoints(
+                wps, lift, class_id=campaign_runtime.configuration()[1].class_id,
+                enabled=os.environ.get("ISPATIALGYM_ATTACHMENT_LIFT_CHAIN", "") == "1")
         grasp.waypoints = wps
         grasp.pre_place, grasp.place = pre_attach, attach
         grasp.extras.update({"attach_stance": work_st.name, "lift": [float(v) for v in lift[0]] if lift is not None else None,
