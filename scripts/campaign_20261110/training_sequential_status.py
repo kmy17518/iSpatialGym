@@ -69,12 +69,17 @@ def control(root,batch,stage,name,scheduler,observation,*,directory=None):
                     'rendering-only verification scope differs')
         if verification.exists():
             value=read(verification)
-            entry=value.get('controls',{}).get(name)if cleanup else value.get('stages',{}).get(stage,{}).get(name)
+            targeted=value.get('schema')=='isg-sequential-mass-restart-verification-v1'
+            entry=value.get('controls',{}).get(name)if cleanup or targeted else value.get('stages',{}).get(stage,{}).get(name)
+            if targeted:
+                require(stage=='physics'and value.get('full_matrix_verified')is False and
+                        value.get('cleanup_controls_verified')is False,'targeted verification scope differs')
             require(value.get('status')=='verified'and entry and entry['probe']==out['evidence'].get('probe'),
                     'strict verification does not bind current probe')
             require(out['scheduler_state']=='COMPLETED'and out['scheduler']['exit_code']=='0:0','strict proof lacks current clean terminal observation')
             out['evidence']['verification']=ref(verification)
             out.update(status='verified',verification_status='verified',next_action='Retain exact verified artifacts; no new execution')
+            if targeted:out.update(status='targeted_physics_verified',next_action='Targeted physics only; complete same-runtime cleanup controls before full shared verification')
         failure=directory/'verification_failure_observations.json'
         if out['verification_status']!='verified' and failure.exists():
             value=read(failure)
@@ -104,6 +109,14 @@ def project(root,batch,scheduler,observation):
             require(row['request']==ref(manifest.parent/'physics'/row['control']/'request.json'),
                     'prospective request binding differs')
             prospective.append(control(root,batch,'physics',row['control'],scheduler,observation,directory=manifest.parent))
+    target_manifest=Path(batch)/'sequential_mass_restart_r3/requests.json';targeted=[]
+    if target_manifest.exists():
+        value=read(target_manifest)
+        require(len(value['records'])==2 and {r['control']for r in value['records']}=={'fresh_B','ABA'}and
+                all(r['stage']=='physics'for r in value['records']),'targeted matrix scope differs')
+        for row in value['records']:
+            require(row['request']==ref(target_manifest.parent/'physics'/row['control']/'request.json'),'targeted request differs')
+            targeted.append(control(root,batch,'physics',row['control'],scheduler,observation,directory=target_manifest.parent))
     return {'schema':'isg-sequential-control-status-v1','campaign_id':'campaign_20261110',
         'observed_at':datetime.now(timezone.utc).isoformat(),'owner':'/root/dataset_contract',
         'strict_source_observed_at':state.get('observed_at'),'strict_state':ref(state_path)if state_path.exists()else None,
@@ -111,11 +124,12 @@ def project(root,batch,scheduler,observation):
         'scheduler_observed_at':observation['observed_at'],'controls':rows,'required_controls':11,
         'prospective_physics_manifest':ref(manifest)if manifest.exists()else None,
         'prospective_controls':prospective,'prospective_verified_controls':sum(r['verification_status']=='verified'for r in prospective),
+        'targeted_physics_manifest':ref(target_manifest)if target_manifest.exists()else None,'targeted_controls':targeted,
         'verified_controls':sum(r['verification_status']=='verified'for r in rows),'production_released':False,'benchmark_credit':0}
 
 def observe(root,batch):
     jobs=[]
-    for directory in (Path(batch)/'sequential_verification_r1',Path(batch)/'renderer_cleanup_r1',Path(batch)/'sequential_anchor_r2'):
+    for directory in (Path(batch)/'sequential_verification_r1',Path(batch)/'renderer_cleanup_r1',Path(batch)/'sequential_anchor_r2',Path(batch)/'sequential_mass_restart_r3'):
         for p in directory.rglob('submission.json'):
             for j in read(p).get('jobs',[]):
                 if j.get('job_id'):jobs.append(str(j['job_id']))

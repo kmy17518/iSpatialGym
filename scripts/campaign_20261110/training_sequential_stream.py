@@ -327,6 +327,31 @@ def run_cycle(root,configuration,state):
                 inp=immutable(batch/'renderer_cleanup_r1/verification_inputs.json',document)
                 state['renderer_cleanup_verification']=immutable(batch/'renderer_cleanup_r1/verification.json',verify_render_cleanup(root,inp,started))
         except Exception as error:state['renderer_cleanup_error']=f'{type(error).__name__}: {error}'
+    targeted=batch/'sequential_mass_restart_r3/requests.json'
+    if targeted.exists():
+        from .training_mass_restart_verification import verify as verify_targeted
+        manifest=read(targeted);require({r['control']for r in manifest['records']}=={'fresh_B','ABA'}and
+            len(manifest['records'])==2 and all(r['stage']=='physics'for r in manifest['records']),
+            'targeted mass-ordering manifest scope differs')
+        controls={};state['targeted_mass_restart_request']=ref(targeted)
+        for row in manifest['records']:
+            checked(root,row['request']);d=Path(row['request']['path']).parent;p=Path(row['output'])/'probe.json';e=d/'execution_observation.json'
+            if p.exists()and e.exists():controls[row['control']]={'probe':ref(p),'execution':ref(e)}
+        state['targeted_mass_restart_completed_inputs']=sorted(controls)
+        if len(controls)==2 and not state.get('targeted_mass_restart_verification'):
+            matrix={'schema':'isg-sequential-mass-restart-verification-input-v1','controls':controls,
+                'original_cold':{name:{'probe':ref(batch/'sequential_verification_r1/physics'/name/'output/probe.json'),
+                    'execution':ref(batch/'sequential_verification_r1/physics'/name/'execution_observation.json')}
+                    for name in('fresh_A','fresh_B')}}
+            inp=immutable(targeted.parent/'verification_attempts'/digest(matrix)/'input.json',matrix)
+            try:
+                state['targeted_mass_restart_verification']=immutable(targeted.parent/'verification.json',verify_targeted(root,inp,started))
+                state.pop('targeted_mass_restart_error',None)
+            except Exception as error:
+                state['targeted_mass_restart_error']=f'{type(error).__name__}: {error}'
+                state['targeted_mass_restart_failure']=immutable(targeted.parent/'verification_attempts'/digest(matrix)/'failure.json',
+                    {'schema':'isg-sequential-verification-failure-v1','input':inp,'attempt':ref(targeted),
+                     'error':state['targeted_mass_restart_error'],'status':'failed','production_released':False,'benchmark_credit':0})
     return state
 
 
