@@ -14,7 +14,7 @@ from .training_stream import native_evidence
 from .training_canaries import publish_canary
 from .training_restoration import checked,validated_canary
 from .training_batch_probe import inputs,verify_runtime_compatibility
-from .training_sequential_augmentation import PHYSICS,RENDER,verify
+from .training_sequential_augmentation import PHYSICS,RENDER,verify,verify_render_cleanup
 
 
 def read(path):return json.loads(Path(path).read_text())
@@ -66,6 +66,40 @@ def prepare_matrix(root,batch,reviews,runtime,started_at):
         'runtime':str(runtime),'canaries':reviews,'records':rows,'new_native_draws':0,'benchmark_credit':0,'production_released':False})
 
 
+def prepare_render_cleanup(root,batch,reviews,native,runtime,source_environment):
+    root,batch,native,runtime=map(Path,(root,batch,native,runtime))
+    directory=batch/'renderer_cleanup_r1';manifest=directory/'requests.json'
+    if manifest.exists():
+        saved=read(manifest);require(saved['canaries']==reviews and saved['runtime']==str(runtime),'renderer cleanup source changed');return ref(manifest)
+    changed={}
+    for folder in ('ispatialgym','scripts'):
+        paths={str(p.relative_to(tree))for tree in (native,runtime)for p in(tree/folder).rglob('*.py')}
+        for relative in paths:
+            a,b=native/relative,runtime/relative
+            if not a.is_file()or not b.is_file()or file_digest(a)!=file_digest(b):changed[relative]=file_digest(b)
+    proof=immutable(directory/'runtime_compatibility.json',{'schema':'isg-render-cleanup-runtime-compatibility-v1',
+        'native_runtime':ref(native/'.snapshot_commit'),'cleanup_runtime':ref(runtime/'.snapshot_commit'),
+        'physical_code_changes':0,'changed_payloads':changed})
+    rows=[]
+    for name,control,boundary in [('failure','RENDER_FAILURE_A','writer'),('interruption','RENDER_INTERRUPT_A','post_render')]:
+        D=directory/name;request=immutable(D/'request.json',{'schema':'isg-training-batch-probe-request-v1',
+            'campaign_id':'campaign_20261110','canaries':reviews,'probe_runtime_sha256':file_digest(runtime/'.snapshot_commit'),
+            'runtime_compatibility':proof,'sequential_augmentation':True,'render_cleanup_only':True,
+            'diagnostic_control':control,'render_fault_boundary':boundary,'diagnostic_only':True,
+            'observe_native_dynamics':True,'accepted':False,'eligible_for_benchmark':False,'production_released':False,
+            'benchmark_credit':0,'quota_consumed':0,'source_files_unchanged':True})
+        value,records=inputs(root,request['path']);verify_runtime_compatibility(root,value,records,runtime)
+        preflight=immutable(D/'preflight.json',{'passed':True,'request':request,'runtime':str(runtime),
+            'runtime_proof':proof,'source_environment':source_environment,'kind':'kinematic_observation_rendering',
+            'control':name,'max_native_episodes':2,'output':str(D/'output'),'native_draws':0,'benchmark_credit':0,
+            'actual_native_execution':False,'cpu_scope':'Exact source bytes and minimal renderer-only compatibility; native saved-scene audit still required.'})
+        rows.append({'control':name,'stage':'rendering','kind':'kinematic_observation_rendering','request':request,
+            'runtime':str(runtime),'runtime_proof':proof,'source_environment':source_environment,'output':str(D/'output'),
+            'preflight':preflight,'max_native_episodes':2,'new_native_draws':0,'benchmark_credit':0})
+    return immutable(manifest,{'schema':'isg-sequential-render-cleanup-dispatch-v1','campaign_id':'campaign_20261110',
+        'runtime':str(runtime),'canaries':reviews,'records':rows,'new_native_draws':0,'benchmark_credit':0,'production_released':False})
+
+
 def publish_snapshot(path,value):
     path=Path(path)
     if path.exists():
@@ -75,19 +109,38 @@ def publish_snapshot(path,value):
     write_json_atomic(path,value)
 
 
+def selected_requests(root,configuration):
+    """A prospective pair can retain passed A and select one explicit B retry."""
+    if not configuration.get('members'):
+        document=checked(root,configuration['requests'])
+        return document,[configuration['requests']for _ in document['records']]
+    require(len(configuration['members'])==2,'exact pair selection required')
+    records=[];references=[]
+    for member in configuration['members']:
+        document=checked(root,member['requests'])
+        require(document['campaign_id']=='campaign_20261110','foreign pair source')
+        matches=[r for r in document['records']if r['candidate_id']==member['candidate_id']]
+        require(len(matches)==1,'ambiguous prospective pair member')
+        records.append(matches[0]);references.append(member['requests'])
+    require(records[0]['candidate_id']!=records[1]['candidate_id']and records[0]['start']!=records[1]['start'],
+            'prospective pair reused an input identity')
+    return {'campaign_id':'campaign_20261110','records':records},references
+
+
 def run_cycle(root,configuration,state):
-    root=Path(root);batch=Path(configuration['batch']);requests=checked(root,configuration['requests'])
+    root=Path(root);batch=Path(configuration['batch']);requests,source_requests=selected_requests(root,configuration)
     require(requests['campaign_id']=='campaign_20261110'and len(requests['records'])==2,'not exact two-input scope')
-    prepared=Path(configuration['prepared']);authorizer=Path(configuration['authorizer']['path'])
-    require(file_digest(authorizer)==configuration['authorizer']['sha256'],'collector authorizer changed')
+    prepared=Path(configuration['prepared'])
     authdir=Path(configuration['authorizations']);runtime=Path(configuration['runtime']);started=configuration['campaign_started_at']
     out={'schema':'isg-existing-training-canary-observation-v1','campaign_id':'campaign_20261110',
          'observed_at':datetime.now(timezone.utc).isoformat(),'source_request':configuration['requests'],
          'records':{},'new_native_draws':0,'benchmark_credit':0}
     launchpath=prepared/'launched.json';launched=read(launchpath).get('jobs',[])if launchpath.exists()else[]
-    for row in requests['records']:
+    for row,source_request in zip(requests['records'],source_requests):
         cid=row['candidate_id'];value={'candidate_id':cid,'status':'awaiting_native','native_written':0,'benchmark_credit':0,'new_native_draws':0}
         try:
+            authorizer_ref=configuration.get('authorizers',{}).get(cid,configuration['authorizer'])
+            authorizer=Path(authorizer_ref['path']);require(file_digest(authorizer)==authorizer_ref['sha256'],'collector authorizer changed')
             evidence=native_evidence(row,root)
             if evidence is None:out['records'][cid]=value;continue
             value.update(native_written=1,native_evidence=evidence,status='awaiting_preserved_input_collector_preparation')
@@ -96,7 +149,7 @@ def run_cycle(root,configuration,state):
             copied=read(prepared_ref)
             require(copied['candidate_id']==cid and copied['start']==row['start']and copied['count']==1 and
                     copied['configuration']=={'path':row['config_path'],'sha256':row['config_sha256']}and
-                    copied['runtime']==row['native_runtime']and copied['source_request']==configuration['requests'],
+                    copied['runtime']==row['native_runtime']and copied['source_request']==source_request,
                     'collector prepared identity differs')
             auth=authdir/cid/'authorization_receipt.json'
             if not auth.exists():
@@ -133,10 +186,20 @@ def run_cycle(root,configuration,state):
         out['records'][cid]=value
         publish_snapshot(batch/'existing_native_reviews.json',out)
     publish_snapshot(batch/'existing_native_reviews.json',out)
+    for source_request in source_requests:
+        parent=Path(source_request['path']).parent
+        if parent==batch:continue
+        candidates={r['candidate_id']for r,source in zip(requests['records'],source_requests)if source==source_request}
+        publish_snapshot(parent/'existing_native_reviews.json',{**out,'source_request':source_request,
+            'records':{k:v for k,v in out['records'].items()if k in candidates}})
     state.update(records=out['records'],observed_at=out['observed_at'],pid=os.getpid(),owner='/root/dataset_contract',new_native_draws=0,benchmark_credit=0)
     if all(v['status']=='validated_canary_exported'for v in out['records'].values())and len(out['records'])==2:
         reviews=[{'path':out['records'][r['candidate_id']]['validation_review']['review'],'sha256':out['records'][r['candidate_id']]['validation_review']['sha256']}for r in requests['records']]
-        try:state['matrix_request']=prepare_matrix(root,batch,reviews,runtime,started);state.pop('matrix_error',None)
+        try:
+            state['matrix_request']=prepare_matrix(root,batch,reviews,runtime,started);state.pop('matrix_error',None)
+            if configuration.get('render_cleanup_runtime'):
+                env=checked(root,state['matrix_request'])['records'][0]['source_environment']
+                state['renderer_cleanup_request']=prepare_render_cleanup(root,batch,reviews,runtime,configuration['render_cleanup_runtime'],env)
         except Exception as error:state['matrix_error']=f'{type(error).__name__}: {error}'
     if state.get('matrix_request'):
         manifest=checked(root,state['matrix_request']);matrix={'schema':'isg-sequential-augmentation-verification-input-v1','physics':{},'rendering':{},'execution':{'physics':{},'rendering':{}}};progress=[]
@@ -150,6 +213,19 @@ def run_cycle(root,configuration,state):
                 inp=immutable(batch/'sequential_verification_r1/verification_inputs.json',matrix)
                 state['verification']=immutable(batch/'sequential_verification_r1/verification.json',verify(root,inp,started))
             except Exception as error:state['verification_error']=f'{type(error).__name__}: {error}'
+    if state.get('renderer_cleanup_request') and not state.get('renderer_cleanup_verification'):
+        try:
+            m=checked(root,state['renderer_cleanup_request']);controls={}
+            for row in m['records']:
+                D=Path(row['request']['path']).parent;probe=Path(row['output'])/'probe.json';execution=D/'execution_observation.json'
+                if probe.exists()and execution.exists():controls[row['control']]={'probe':ref(probe),'execution':ref(execution)}
+            fresh=batch/'sequential_verification_r1/rendering/fresh_A'
+            if len(controls)==2 and(fresh/'output/probe.json').exists()and(fresh/'execution_observation.json').exists():
+                document={'schema':'isg-sequential-render-cleanup-input-v1','controls':controls,
+                    'independent_A':{'probe':ref(fresh/'output/probe.json'),'execution':ref(fresh/'execution_observation.json')}}
+                inp=immutable(batch/'renderer_cleanup_r1/verification_inputs.json',document)
+                state['renderer_cleanup_verification']=immutable(batch/'renderer_cleanup_r1/verification.json',verify_render_cleanup(root,inp,started))
+        except Exception as error:state['renderer_cleanup_error']=f'{type(error).__name__}: {error}'
     return state
 
 

@@ -33,3 +33,75 @@ def test_independent_reference_checks_final_lighting_and_reset_mass():
     b=deepcopy(a);b['boundaries'][0]['native_dynamics_context']['dynamic_roots']['target']['mass']=3.
     b['boundaries'][0]['native_dynamics_context_sha256']=digest(b['boundaries'][0]['native_dynamics_context'])
     with pytest.raises(ContractError,match='mass'):compare_physics_reference(a,b)
+
+
+def cleanup_fixture(tmp_path,monkeypatch,mutation=None):
+    """Keep hashes/state checks real; replace only expensive upstream audits."""
+    import json
+    from scripts.campaign_20261110 import training_sequential_augmentation as module
+    from scripts.campaign_20261110.contracts import file_digest
+    def put(name,value):
+        p=tmp_path/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(value))
+        return {'path':str(p),'sha256':file_digest(p)}
+    def ref(p):return {'path':str(p),'sha256':file_digest(p)}
+    stamp=tmp_path/'runtime/.snapshot_commit';stamp.parent.mkdir();stamp.write_text('frozen')
+    reviews=[put('review_A.json',{}),put('review_B.json',{})]
+    source={'instance_id':'A','export_record':{'validation_key':{'exact':'A'},'perturbations':{'parking':'A'}}}
+    requests={};matrix={'schema':'isg-sequential-render-cleanup-input-v1','controls':{}}
+    for name in ['fresh_A','failure','interruption']:
+        control={'fresh_A':'FRESH_A','failure':'RENDER_FAILURE_A','interruption':'RENDER_INTERRUPT_A'}[name]
+        request={'canaries':reviews,'diagnostic_control':control,'render_cleanup_only':name!='fresh_A','probe_runtime_sha256':file_digest(stamp)}
+        request_ref=put(name+'/request.json',request);requests[request_ref['path']]=request
+        probe={'request':request_ref,'probe_runtime':ref(stamp),'runtime_compatibility':{'verified':True},'kind':'kinematic_observation_rendering',
+               'world_construction':{'attempted':1,'completed':1,'method':'omnigibson.Environment'},'entries':[]}
+        for i in range(1 if name=='fresh_A'else 2):
+            observation=observed(i);observation.update(process_session=name,validation_key=source['export_record']['validation_key'],
+                perturbations_sha256=digest(source['export_record']['perturbations']),scheduler_job_id='123',simulator_module='omnigibson.sim')
+            report={'tag':'REPLAY_DEMO','kept':True,'demo':'/native/demo/A','episode_index':i,
+                'campaign_restoration':{'scale_verified':True,'native_observation':observation}}
+            entry={'canary_review':reviews[0]}
+            if name!='fresh_A'and i==0:
+                report.update(tag='REPLAY_EPISODE_ABORTED',kept=False,cleanup={
+                    'exception_type':'ControlledRenderFailure'if name=='failure'else'ControlledRenderInterrupt',
+                    'boundary':'after_native_writer_action'if name=='failure'else'after_existing_render',
+                    'frames_observed':2 if name=='failure'else 1,'native_writer_abort_called':True,
+                    'trajectory_buffer_empty':True,'dataset_pending_frames':False,'writer_aborted':True,
+                    'physics_steps_added':0,'render_ticks_added':0,'expected_controlled_failure':True})
+                entry['expected_controlled_failure']=True
+            else:
+                output=tmp_path/(name+'/video.mp4');output.write_bytes(b'hashed-video')
+                entry['outputs']=[ref(output)]
+            if mutation:mutation(name,i,report,probe,entry)
+            entry['report']=put(name+f'/report{i}.json',report);probe['entries'].append(entry)
+        item={'probe':put(name+'/probe.json',probe),'execution':put(name+'/execution.json',{})}
+        if name=='fresh_A':matrix['independent_A']=item
+        else:matrix['controls'][name]=item
+    monkeypatch.setattr(module,'inputs',lambda root,path:(requests[path],[source]))
+    monkeypatch.setattr(module,'validated_canary',lambda *args:source)
+    monkeypatch.setattr(module,'verify_probe_execution',lambda *args:{'verified':True})
+    monkeypatch.setattr(module,'verify_runtime_compatibility',lambda *args:{'verified':True})
+    return module.verify_render_cleanup(tmp_path,put('matrix.json',matrix),0)
+
+
+def test_cleanup_audit_requires_clean_buffers_and_independent_next_episode(tmp_path,monkeypatch):
+    result=cleanup_fixture(tmp_path,monkeypatch)
+    assert result['status']=='verified'and result['production_released']is False
+
+
+@pytest.mark.parametrize('fault',['pending_buffer','wrong_exception','added_step','wrong_boundary','two_worlds','wrong_next_light','same_process','missing_native_identity'])
+def test_cleanup_audit_rejects_invalid_native_evidence(tmp_path,monkeypatch,fault):
+    def mutate(name,index,report,probe,entry):
+        if name!='failure':return
+        if index==0:
+            if fault=='pending_buffer':report['cleanup']['dataset_pending_frames']=True
+            if fault=='wrong_exception':report['cleanup']['exception_type']='OSError'
+            if fault=='added_step':report['cleanup']['physics_steps_added']=1
+            if fault=='wrong_boundary':report['cleanup']['boundary']='after_scene_load'
+            if fault=='two_worlds':probe['world_construction']['completed']=2
+        observation=report['campaign_restoration']['native_observation']
+        if fault=='same_process':observation['process_session']='fresh_A'
+        if fault=='missing_native_identity':observation.pop('scheduler_job_id')
+        if fault=='wrong_next_light'and index==1:
+            observation['loaded_state']['lights']['lamp']=1500
+            observation['loaded_state_sha256']=digest(observation['loaded_state'])
+    with pytest.raises(ContractError):cleanup_fixture(tmp_path,monkeypatch,mutate)

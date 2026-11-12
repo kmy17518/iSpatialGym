@@ -30,3 +30,14 @@ def test_snapshot_preserves_previous_exact_bytes(tmp_path):
     stream.publish_snapshot(p,{'phase':'replay'})
     assert (tmp_path/'state_history'/(key+'.json')).read_bytes()==first
     assert json.loads(p.read_text())['phase']=='replay'
+
+
+def test_prospective_pair_retains_A_and_exact_new_B_without_relabeling_failure(tmp_path):
+    old=tmp_path/'old.json';new=tmp_path/'new.json'
+    stream.immutable(old,{'campaign_id':'campaign_20261110','records':[{'candidate_id':'A','start':1},{'candidate_id':'failed_B','start':2}]})
+    stream.immutable(new,{'campaign_id':'campaign_20261110','records':[{'candidate_id':'B_retry','start':3}]})
+    original=old.read_bytes();cfg={'members':[{'requests':stream.ref(old),'candidate_id':'A'},{'requests':stream.ref(new),'candidate_id':'B_retry'}]}
+    document,refs=stream.selected_requests(tmp_path,cfg)
+    assert [r['start']for r in document['records']]==[1,3]and old.read_bytes()==original
+    new.write_text('{}')
+    with pytest.raises(ContractError,match='changed'):stream.selected_requests(tmp_path,cfg)
