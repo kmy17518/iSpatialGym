@@ -63,6 +63,19 @@ class DispatchTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'shared input outside'):
                 D.enqueue(self.root,'external',self.command,backends=['shiyuc_svl'])
 
+    def test_snapshot_can_mount_one_dataset_without_mounting_its_parent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            provider=Path(directory);provider.chmod(0o755)
+            data=provider/'task_instances';data.mkdir();leaf=data/'scene.json';leaf.write_text('{}');leaf.chmod(0o644)
+            datasets=self.code/'Behavior-1K/datasets';datasets.mkdir(parents=True)
+            (datasets/'task_instances').symlink_to(data,target_is_directory=True)
+            logical=datasets/'task_instances/scene.json'
+            self.assertTrue(D.public_snapshot_dataset_leaf(self.root,logical,logical.resolve()))
+            other=provider/'outside.json';other.write_text('{}');other.chmod(0o644)
+            (data/'escape.json').symlink_to(other)
+            escape=datasets/'task_instances/escape.json'
+            self.assertFalse(D.public_snapshot_dataset_leaf(self.root,escape,escape.resolve()))
+
     def test_ambiguous_submission_is_not_retried(self):
         path = D.enqueue(self.root, 'fresh', self.command, backends=['vast_5090'])
         D.shared_json(self.root / 'dispatch/receipts/fresh.json', {'status': 'submitting'})

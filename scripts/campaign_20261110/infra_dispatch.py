@@ -170,8 +170,18 @@ def public_snapshot_dataset_leaf(root, original, resolved):
     if len(parts) < 5 or parts[0] != 'code' or not parts[1].startswith('trunk_') or parts[2:4] != ('Behavior-1K','datasets'):
         return False
     snapshot = root/'code'/parts[1]
-    dataset = (snapshot/'Behavior-1K/datasets').resolve()
-    if not (snapshot/'.snapshot_commit').is_file() or not resolved.is_relative_to(dataset):
+    logical_dataset = snapshot/'Behavior-1K/datasets'
+    dataset = logical_dataset.resolve()
+    # Snapshots may mount the whole dataset directory or one named dataset
+    # beneath it. The leaf must stay inside that declared directory mount.
+    mounted = resolved.is_relative_to(dataset)
+    if not mounted:
+        for parent in Path(original).parents:
+            if parent == logical_dataset: break
+            if parent.is_relative_to(logical_dataset) and parent.is_symlink() and parent.is_dir():
+                mounted = resolved.is_relative_to(parent.resolve())
+                break
+    if not (snapshot/'.snapshot_commit').is_file() or not mounted:
         return False
     if not resolved.is_file() or not resolved.stat().st_mode & 0o004:
         return False
