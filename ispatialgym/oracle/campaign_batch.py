@@ -119,6 +119,33 @@ def compare_saved_scenes(first, second, *, parking_objects, task_objects, tolera
             'native_static_tolerance': tolerance}
 
 
+def checked_nested_parking_provenance(scene, template_meta, stable_scene):
+    """Remove only native-bound parking history, never loaded actors or state.
+
+    Native exports nest scene provenance under metadata.task.ispatialgym. A
+    parked variant records its own operation; an unmodified variant can retain
+    earlier stable-scene history for actors outside the loaded crop.
+    """
+    document = copy.deepcopy(scene)
+    actual = document.get('metadata', {}).get('task', {}).get('ispatialgym', {})
+    fields = ('moved_objects', 'removed_objects')
+    if not any(key in actual for key in fields):
+        return document
+    variant = template_meta.get('scene_variant')
+    baseline = stable_scene.get('metadata', {})
+    candidates = [variant] if variant else [baseline.get('ispatialgym', {}),
+        baseline.get('task', {}).get('ispatialgym', {})]
+    observed = {key: actual[key] for key in fields if key in actual}
+    require(any(isinstance(candidate, dict) and
+                observed == {key: candidate[key] for key in fields if key in candidate}
+                for candidate in candidates), 'saved nested parking provenance differs from its native source')
+    require(isinstance(actual.get('moved_objects', {}), dict) and
+            isinstance(actual.get('removed_objects', []), list), 'invalid nested parking provenance')
+    for key in fields:
+        actual.pop(key, None)
+    return document
+
+
 def saved_world_scope(runner, records):
     contract = record_scope(records)
     paths = [r['artifacts']['tro']['path'] for r in records]
@@ -140,8 +167,10 @@ def saved_world_scope(runner, records):
             not task_objects.intersection(contract['parking_objects']), 'sequential parking overlaps task objects')
     scenes = [Path(runner.loaded_scene_path(x[1], x[2])) for x in resolved]
     docs = [_read(path) for path in scenes]
-    stable_states = _read(contract['stable_scene']['path'])['state']['registry']['object_registry']
-    comparison = compare_saved_scenes(*docs, parking_objects=contract['parking_objects'], task_objects=task_objects)
+    stable_scene = _read(contract['stable_scene']['path'])
+    stable_states = stable_scene['state']['registry']['object_registry']
+    compared = [checked_nested_parking_provenance(doc, meta, stable_scene) for doc, meta in zip(docs, metas)]
+    comparison = compare_saved_scenes(*compared, parking_objects=contract['parking_objects'], task_objects=task_objects)
     members = {}
     for path, scene, doc, meta, row in zip(paths, scenes, docs, metas, records):
         moved = meta.get('scene_variant', {}).get('moved_objects', {})

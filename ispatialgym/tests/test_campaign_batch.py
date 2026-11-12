@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from scripts.campaign_20261110.contracts import ContractError,file_digest
 from ispatialgym.oracle.campaign_batch import record_scope,compare_saved_scenes,restore_parking,SCHEMA
+from ispatialgym.oracle.campaign_batch import checked_nested_parking_provenance
 
 
 def scene():
@@ -65,6 +66,31 @@ def test_scene_compare_only_omits_declared_parking_state():
     with pytest.raises(ContractError,match='static scene'):compare_saved_scenes(a,b,parking_objects=['chair'],task_objects={'target'})
     b=deepcopy(a);b['state']['registry']['object_registry']['chair']['joint']=[.1]
     with pytest.raises(ContractError,match='static scene'):compare_saved_scenes(a,b,parking_objects=['chair'],task_objects={'target'})
+
+
+def test_nested_parking_history_requires_exact_native_source_and_preserves_physics():
+    a=scene();b=scene();stable=scene()
+    prior={'moved_objects':{'cropped_out':{'pos':[1,2,3],'moved_to':[-100,0,0]}},'removed_objects':['cropped_out']}
+    variant={'moved_objects':{'chair':{'pos':[0,0,0],'moved_to':[-200,0,0]}},'removed_objects':['chair']}
+    stable['metadata']['task']={'ispatialgym':deepcopy(prior)}
+    a['metadata']['task']={'ispatialgym':deepcopy(variant)};b['metadata']['task']={'ispatialgym':deepcopy(prior)}
+    a['state']['registry']['object_registry']['chair']['root_link']['pos']=[-200,0,0]
+    original=deepcopy(a)
+    normalize=lambda doc,meta:checked_nested_parking_provenance(doc,meta,stable)
+    checked_a=normalize(a,{'scene_variant':variant});checked_b=normalize(b,{'scene_variant':None})
+    assert a==original and checked_a['state']==a['state'] and checked_a['objects_info']==a['objects_info']
+    assert compare_saved_scenes(checked_a,checked_b,parking_objects=['chair'],task_objects={'target'})['maximum_numeric_difference']==0
+    changed=deepcopy(a);changed['metadata']['task']['ispatialgym']['removed_objects']=['unbound']
+    with pytest.raises(ContractError,match='native source'):normalize(changed,{'scene_variant':variant})
+    changed=deepcopy(a);changed['state']['registry']['object_registry']['table']['root_link']['pos'][0]=.006
+    with pytest.raises(ContractError,match='static scene'):
+        compare_saved_scenes(normalize(changed,{'scene_variant':variant}),checked_b,parking_objects=['chair'],task_objects={'target'})
+    changed=deepcopy(a);changed['metadata']['task']['ispatialgym']['unrelated_field']='must still compare'
+    with pytest.raises(ContractError,match='inventory'):
+        compare_saved_scenes(normalize(changed,{'scene_variant':variant}),checked_b,parking_objects=['chair'],task_objects={'target'})
+    missing=deepcopy(checked_a);missing['objects_info']['init_info'].pop('chair');missing['state']['registry']['object_registry'].pop('chair')
+    with pytest.raises(ContractError,match='actor missing'):
+        compare_saved_scenes(missing,checked_b,parking_objects=['chair'],task_objects={'target'})
 
 
 def test_native_parking_restore_is_hash_bound_and_adds_no_step(tmp_path):
