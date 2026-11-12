@@ -1,6 +1,7 @@
 """Publish exact suite allocation and per-member replay evidence, without credit."""
 from pathlib import Path
-import argparse,csv,hashlib,json,time
+import argparse,csv,hashlib,json,time,threading
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from .runtime_validation_metrics import checked,reference,register,require,write,validate_row
 from .training_diversity import observe_ticket_jobs,_terminal_jobs
 
@@ -51,22 +52,28 @@ def follow_receipt(root,row,receipt):
     return receipt,allocation(row,receipt,root,token=token),history
 
 
+_source_audits = threading.local()
+
+
 def gate_member(path,row,source):
     gate=json.loads(Path(path).read_text())
     require(Path(gate['source_job']).resolve()==source.resolve(),'member source differs')
     require(Path(gate['snapshot']).resolve()==Path(row['frozen_runtime']['path']).resolve(),'member runtime differs')
     demo=Path(gate['demo']);tro=Path(gate['instance'])
     require(demo.resolve().is_relative_to(source.resolve()/'demo') and tro.resolve().is_relative_to(source.resolve()/'inst'),'member inputs escape source')
-    require(reference(demo)['sha256']==gate['demo_sha256'] and reference(tro)['sha256']==gate['tro_sha256'],'member inputs changed')
+    from .immutable_file_audit import ImmutableFileAudit
+    if not hasattr(_source_audits,'audit'):_source_audits.audit=ImmutableFileAudit()
+    audit=_source_audits.audit
+    require(audit.sha256(demo)==gate['demo_sha256'] and audit.sha256(tro)==gate['tro_sha256'],'member inputs changed')
     require(tro.name==demo.parent.name+'-tro_state.json','member identity differs')
     return demo.parent.name,gate
 
 
-def observe(root,run_dir):
+def observe(root,run_dir,*,row_paths=None,central=None,summary_path=None):
     root=Path(root).resolve();run_dir=Path(run_dir);start=time.time();rows=[];errors=[];all_jobs={}
     central_path=root/'validation/controller.json'
-    central=json.loads(central_path.read_text()).get('gates',{}) if central_path.exists() else {}
-    for p in sorted((run_dir/'rows').glob('*.json')):
+    if central is None:central=json.loads(central_path.read_text()).get('gates',{}) if central_path.exists() else {}
+    for p in (sorted((run_dir/'rows').glob('*.json')) if row_paths is None else row_paths):
         try:
             row=json.loads(p.read_text());validate_row(row);register(p)
             rpath=root/'dispatch/receipts'/(row['dispatch_token']+'.json')
@@ -154,13 +161,55 @@ def observe(root,run_dir):
         except (ValueError,OSError,KeyError):pass
         write(target,value)
     summary={'observed_at':time.time(),'elapsed_seconds':time.time()-start,'allocations':len(rows),'updated':len(changing),'errors':errors,'owner':'compute_runtime_suite','acceptance_authority':False}
-    write(run_dir/'allocation_observer.json',summary);return summary
+    write(summary_path or run_dir/'allocation_observer.json',summary);return summary
+
+
+def stream(root,run_dir,every,workers):
+    """Bounded independent class readers; one blocked read does not gate the suite."""
+    require(type(workers) is int and 1<=workers<=4,'allocation readers must be bounded1..4')
+    root=Path(root);run_dir=Path(run_dir);pending=list(sorted((run_dir/'rows').glob('*.json')))
+    due={p:0 for p in pending};latest={};active={};central={};central_at=0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        while True:
+            now=time.time()
+            if now-central_at>=60 and len(active)<workers:
+                path=root/'validation/controller.json'
+                central=json.loads(path.read_text()).get('gates',{}) if path.exists() else {}
+                central_at=time.time()
+            eligible=sorted((p for p in pending if due[p]<=now),key=lambda p:(due[p],p.name))
+            for p in eligible[:workers-len(active)]:
+                pending.remove(p)
+                future=pool.submit(observe,root,run_dir,row_paths=[p],central=central,
+                                   summary_path=run_dir/'allocation_class_observations'/p.name)
+                active[future]=p
+            if not active:
+                time.sleep(min(every,1));continue
+            completed,_=wait(active,timeout=1,return_when=FIRST_COMPLETED)
+            for future in completed:
+                p=active.pop(future)
+                try:latest[p.stem]=future.result()
+                except Exception as exc:latest[p.stem]={'observed_at':time.time(),'allocations':0,'updated':0,'errors':[{'row':str(p),'error':repr(exc)}]}
+                due[p]=time.time()+every;pending.append(p)
+            if completed:
+                summary={'observed_at':time.time(),'mode':'independent_class_publication','workers':workers,
+                         'allocations':sum(x['allocations'] for x in latest.values()),
+                         'updated':sum(x['updated'] for x in latest.values()),
+                         'errors':[e for x in latest.values() for e in x['errors']],
+                         'class_observed_at':{k:v['observed_at'] for k,v in latest.items()},
+                         'inflight_classes':[p.stem for p in active.values()],
+                         'pending_class_count':len(pending),'owner':'compute_runtime_suite','acceptance_authority':False,
+                         'handoff_requires':'Retain executor futures; graceful exit must complete all active class writes before a new owner.'}
+                write(run_dir/'allocation_observer.json',summary)
+                print(json.dumps({'observed_at':summary['observed_at'],'allocations':summary['allocations'],
+                                  'errors':len(summary['errors']),'inflight':summary['inflight_classes']}),flush=True)
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--run-dir',type=Path,required=True);p.add_argument('--every',type=float,default=20);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--run-dir',type=Path,required=True);p.add_argument('--every',type=float,default=20);p.add_argument('--workers',type=int,default=1);a=p.parse_args()
     from .storage import atomic_directory_lock
     with atomic_directory_lock(a.run_dir/'allocation_observer.lockdir'):
+        if a.workers>1:
+            require(a.every>0,'streaming reader needs positive interval');stream(a.root,a.run_dir,a.every,a.workers);return
         while True:
             try:print(json.dumps(observe(a.root,a.run_dir)),flush=True)
             except Exception as e:print(json.dumps({'error':repr(e),'observed_at':time.time()}),flush=True)

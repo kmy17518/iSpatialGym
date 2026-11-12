@@ -27,7 +27,7 @@ def test_member_gate_must_bind_exact_source_runtime_tro_and_demo(tmp_path):
     g={'source_job':str(source),'snapshot':str(runtime),'demo':str(demo),'instance':str(tro),'demo_sha256':M.reference(demo)['sha256'],'tro_sha256':M.reference(tro)['sha256']}
     p=tmp_path/'gate.json';put(p,g);assert A.gate_member(p,row,source)[0]=='task__100'
     demo.write_bytes(b'changed')
-    with pytest.raises(ValueError,match='inputs changed'):A.gate_member(p,row,source)
+    with pytest.raises((ValueError,RuntimeError),match='changed'):A.gate_member(p,row,source)
 
 
 def test_exact_member_successes_preserve_canonical_first_and_bounds(tmp_path,monkeypatch):
@@ -78,3 +78,36 @@ def test_frozen_acceptance_allocation_survives_observation_only_updates(tmp_path
     for change in ({'allocation':{'jobid':'other'}},{'records':[]},{'member_gates':[]},{'dispatch_receipt':{'path':'foreign'}}):
         bad=put(tmp_path/'bad.json',{**original,**change})
         with pytest.raises(ValueError):M.same_execution_snapshot(accepted,bad,row)
+
+
+def test_allocation_selected_row_reader_does_not_scan_other_rows(tmp_path,monkeypatch):
+    root=tmp_path/'campaign';base=root/'suite';selected=base/'rows/selected.json'
+    put(selected,{'dispatch_token':'pending'})
+    (base/'rows/invalid.json').write_text('malformed unrelated input')
+    monkeypatch.setattr(A,'validate_row',lambda row:None)
+    monkeypatch.setattr(A,'register',lambda path:None)
+    out=base/'allocation_class_observations/selected.json'
+    result=A.observe(root,base,row_paths=[selected],central={},summary_path=out)
+    assert result['errors']==[] and result['allocations']==0 and out.exists()
+    assert not (base/'allocation_observer.json').exists()
+
+
+def test_blocked_class_does_not_delay_other_class_publication(tmp_path,monkeypatch):
+    import threading,time
+    root=tmp_path/'campaign';base=root/'suite';release=threading.Event();finished=[]
+    for name in ('a_blocked','b_ready'):put(base/'rows'/(name+'.json'),{})
+    class StopAfterProof(Exception):pass
+    def observe(root,base,*,row_paths,central,summary_path):
+        name=row_paths[0].stem
+        if name=='a_blocked':assert release.wait(3)
+        finished.append(name)
+        return {'observed_at':time.time(),'allocations':1,'updated':1,'errors':[]}
+    def write(path,value):
+        if path.name=='allocation_observer.json':
+            assert 'b_ready' in value['class_observed_at'] and 'a_blocked' not in value['class_observed_at']
+            release.set();raise StopAfterProof()
+    monkeypatch.setattr(A,'observe',observe);monkeypatch.setattr(A,'write',write)
+    try:
+        with pytest.raises(StopAfterProof):A.stream(root,base,20,2)
+    finally:release.set()
+    assert finished[0]=='b_ready'
