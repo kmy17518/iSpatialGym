@@ -78,3 +78,26 @@ def test_nested_pool_results_keep_verified_stages_and_old_failure_without_native
     assert facts['verification']['clean_exit'] is True
     assert facts['process_accounting']['record'][1:3]==['COMPLETED','0:0']
     assert len(json.dumps(facts))<2000
+
+
+def test_exact_loading_evidence_is_hashed_scoped_and_never_full_coverage(tmp_path):
+    from scripts.campaign_20261110.contracts import file_digest
+    proof=tmp_path/'training_preparation/exact/proof.json'
+    write_json_atomic(proof,{'configuration_id':'exact-one','native_reader_passed':True})
+    write_json_atomic(tmp_path/'training_preparation/G09_exact_loading_current.json',{
+        'campaign_id':'campaign_20261110','observed_at':'2026-11-12T06:30:00Z',
+        'source_evidence':{'path':str(proof),'sha256':file_digest(proof)},
+        'status':'verified_exact_configuration_loading','scope':'Only exact-one at measured height',
+        'summary':{'executed_configurations':1,'required_lower_bound':14620},
+        'next_action':'Advance the next exact selected dependency.'})
+    value=executed_audit(tmp_path,tmp_path,[])
+    row=next(r for r in value['requirements'] if r['id']=='G09')
+    assert row['status']=='partial' and row['evidence'][0]['scope']=='Only exact-one at measured height'
+    assert row['evidence'][0]['source_evidence']['sha256']==file_digest(proof)
+    assert not row['chain']['verification']['complete_requirement']
+    assert row['next_action']=='Advance the next exact selected dependency.'
+    proof.write_text('{}')
+    value=executed_audit(tmp_path,tmp_path,[])
+    row=next(r for r in value['requirements'] if r['id']=='G09')
+    assert row['status']=='untested' and not row['evidence']
+    assert value['observation_errors']

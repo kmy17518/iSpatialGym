@@ -180,6 +180,8 @@ def executed_audit(code_root, campaign_root, sources):
         'dependency_jobs':'training_preparation/full_scope_r1/jobs_asset_geometry.json',
         'full_preparation':'training_preparation/status.json',
         'model_pool':'training_preparation/pool_pair_r1/status.json',
+        'exact_loading':'training_preparation/G09_exact_loading_current.json',
+        'refill_distribution':'training_preparation/G12_refill_distribution_current.json',
     }
     # The canonical observer has one authoritative output; accept its established
     # validation directory or older monitor location only when exactly present.
@@ -190,6 +192,10 @@ def executed_audit(code_root, campaign_root, sources):
         try:
             value=json.loads(path.read_text())
             if value.get('campaign_id',CAMPAIGN)!=CAMPAIGN:raise ValueError('foreign observation')
+            if label in ('exact_loading','refill_distribution'):
+                reference=value['source_evidence'];source=Path(reference['path']).resolve()
+                if not source.is_relative_to(campaign_root.resolve()) or file_digest(source)!=reference['sha256']:
+                    raise ValueError('requirement observation source bytes changed or outside campaign')
             observations[label]={'reference':{'path':str(path),'sha256':file_digest(path)},'value':value,
                                  'observed_at':value.get('observed_at')}
         except Exception as exc:errors.append({'path':str(path),'error':repr(exc)})
@@ -222,7 +228,9 @@ def executed_audit(code_root, campaign_root, sources):
             'G03':('canonical','exact_standard_chains'),'G04':('canonical','accepted_exact_template_checks'),
             'G05':('pipeline','recorded_group_perturbations'),'G06':('pipeline','recorded_scene_removal'),
             'G07':('pipeline','recorded_lighting'),'G08':('pipeline','recorded_scales'),
+            'G09':('exact_loading','exact_native_dependency_loading'),
             'G10':('pipeline','aba_restoration'),'G11':('training_eligibility','observed_accepted_coverage'),
+            'G12':('refill_distribution','weighted_refill_and_soft_bucket_evidence'),
             'G13':('yield','attempt_and_cost_denominators'),'G14':('gate','bulk_and_canary_policy'),
             'G15':('canonical','canonical_progress'),'G18':('pipeline','family_path_coverage'),
             'G16':('model_pool','scoped_model_pool_mechanics'),'G17':('full_preparation','full_selected_dependency_status'),'G19':('backend_holdout','backend_gate_decisions'),'G20':('queue','queue_disposition')}
@@ -240,6 +248,16 @@ def executed_audit(code_root, campaign_root, sources):
                 row['evidence'][-1]['facts']=compact_model_pool(value)
 
         if key=='G17':row['next_action']='Assets reconciles all selected candidates and exact dependencies; compute dispatches disjoint positive-grasp/reach builds across both accounts.'
+        if key in ('G09','G12'):
+            row['owners']=['/root/templates_assets','/root'] if key=='G09' else ['/root','/root/compute']
+            label='exact_loading' if key=='G09' else 'refill_distribution'
+            value=observations.get(label,{}).get('value',{})
+            row['next_action']=value.get('next_action') or (
+                'Bind each selected configuration to its measured-height, exact model/scale/direction/arm library and native reader/query proof; one demonstrated configuration does not close the full denominator.' if key=='G09' else
+                'Implement measured-area/usable-edge/compartment weighted refill across the complete selected inventory; preserve model/scale capacity and soft train buckets, then run a bounded zero-credit decision/native canary. Missing geometry has an owned preparation dependency.')
+            if row['evidence']:
+                row['evidence'][-1]['scope']=value.get('scope','Only the exact executed configurations in the hashed source evidence')
+                row['evidence'][-1]['source_evidence']=value['source_evidence']
         if key in ('G05','G06','G07','G08','G10','G18'):
             row['owners']=['/root/dataset_contract','/root']
             verified=[batch for batch in pipeline.get('batch_stages',[])if batch.get('status')=='batch_restoration_verified']
