@@ -62,6 +62,73 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaises(ValueError): M.fresh_replacement(self.root,self.payload,'new',50000100)
         self.assertFalse((self.root/'groups/dispatch_migrations/new').exists())
 
+    def suite_payload(self):
+        payload = copy.deepcopy(self.payload)
+        payload['command'] += ['--extra-env','ISPATIALGYM_RUNTIME_SUITE_RUN=exact-suite']
+        payload['identity'] = D.input_identity(self.root,payload['command'])
+        return payload
+
+    def test_suite_keeps_range_goal_paths_and_behavior_but_isolates_outputs(self):
+        payload = self.suite_payload()
+        with patch('scripts.campaign_20261110.runtime_suite.authorize',return_value={'row':'exact'}) as authorize:
+            replacement = M.fresh_replacement(self.root,payload,'new',50000000)
+        self.assertGreaterEqual(authorize.call_count,2)
+        old, new = M.environment(payload['command']),M.environment(replacement['command'])
+        for key in ('ISPATIALGYM_CAMPAIGN_CONFIG','ISPATIALGYM_CAMPAIGN_GOAL_PLAN','EVAL_INDEX'):
+            self.assertEqual(new[key],old[key])
+        self.assertEqual(D.option(replacement['command'],'--base-index'),'50000000')
+        self.assertEqual(D.option(replacement['command'],'--tag'),'new')
+        self.assertEqual(M.read(self.group/'goal_plan.json')['group_id'],'old')
+        self.assertFalse((Path(replacement['directory'])/'goal_plan.json').exists())
+        with patch('scripts.campaign_20261110.runtime_suite.authorize',return_value={'row':'exact'}):
+            self.assertEqual(M.fresh_replacement(self.root,payload,'new',50000000),replacement)
+            with self.assertRaisesRegex(ValueError,'different range'):
+                M.fresh_replacement(self.root,payload,'different',50000100)
+            changed=copy.deepcopy(replacement);changed['command'] += ['--sample-limit-s','1']
+            with self.assertRaisesRegex(ValueError,'non-routing'):
+                M.check_suite_replacement(self.root,payload,changed)
+
+    def test_suite_invalid_replacement_cannot_cancel_or_publish(self):
+        path, request = self.request()
+        payload=self.suite_payload();request['source_payload']=payload
+        D.shared_json(path,request)
+        with patch.object(M.getpass,'getuser',return_value='minyeong'), \
+             patch('scripts.campaign_20261110.runtime_suite.authorize',return_value={'row':'exact'}), \
+             patch.object(M,'migrate_record') as cancel:
+            self.assertEqual(M.cancel(self.root),[])
+        cancel.assert_not_called()
+        request['record']['migration']={'never_started':True,'original_allocation':self.allocation,
+            'after':{'accounting':{'state':'CANCELLED','start':'Unknown'}},
+            'final_execution_proof':{'nonempty_execution_artifacts':[]}}
+        D.shared_json(path,request)
+        with patch.object(M.getpass,'getuser',return_value='minyeong'), \
+             patch('scripts.campaign_20261110.runtime_suite.authorize',return_value={'row':'exact'}), \
+             patch.object(M,'enqueue') as enqueue:
+            self.assertEqual(M.publish(self.root),[])
+        enqueue.assert_not_called()
+
+    def test_suite_publication_retains_exact_range_only_after_never_started_proof(self):
+        payload=self.suite_payload();D.shared_json(self.root/'dispatch/ready/old.json',payload)
+        with patch('scripts.campaign_20261110.runtime_suite.authorize',return_value={'row':'exact'}):
+            replacement=M.fresh_replacement(self.root,payload,'new',50000000)
+        request={'owner':'minyeong','source_payload':payload,'source_receipt':str(self.receipt),
+                 'replacement':replacement,'record':{'allocation':self.allocation}}
+        path=self.root/'dispatch/migrations/old/request.json';D.shared_json(path,request)
+        with patch.object(M.getpass,'getuser',return_value='minyeong'):
+            self.assertEqual(M.publish(self.root),[])
+        self.assertFalse((self.root/'dispatch/ready/new.json').exists())
+        request['record']['migration']={'never_started':True,'original_allocation':self.allocation,
+            'after':{'accounting':{'state':'CANCELLED','start':'Unknown'}},
+            'final_execution_proof':{'nonempty_execution_artifacts':[]}}
+        D.shared_json(path,request)
+        with patch.object(M.getpass,'getuser',return_value='minyeong'), \
+             patch('scripts.campaign_20261110.runtime_suite.authorize',return_value={'row':'exact'}):
+            self.assertEqual(M.publish(self.root),['new'])
+        intent=M.read(self.root/'dispatch/ready/new.json')
+        self.assertEqual(intent['identity']['start'],50000000)
+        self.assertEqual(M.read(self.receipt)['allocation'],self.allocation)
+        self.assertTrue(M.read(self.receipt)['migration']['never_started'])
+
     def test_queue_and_camera_owner_remain_with_existing_controller(self):
         payload = copy.deepcopy(self.payload)
         payload['command'] += ['--extra-env','ISPATIALGYM_CAMPAIGN_GOAL_QUEUE=/unused/queue.json']

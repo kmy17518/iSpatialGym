@@ -17,7 +17,7 @@ import time
 from scripts.campaign_20261110.contracts import file_digest, require
 from scripts.campaign_20261110.controller_families import reserve_indices
 from scripts.campaign_20261110.controller_migration import eligible, migrate_record, no_execution_artifacts, scheduler_proof
-from scripts.campaign_20261110.infra_dispatch import enqueue, input_identity, set_option, shared_json
+from scripts.campaign_20261110.infra_dispatch import enqueue, input_identity, option, set_option, shared_json
 from scripts.campaign_20261110.storage import atomic_directory_lock
 
 
@@ -67,8 +67,67 @@ def immutable_bytes(source, destination):
         destination.chmod(0o640)
 
 
+def suite_command(root, command):
+    """A registered suite keeps its exact row, range and physical input paths."""
+    env = environment(command)
+    if not any(k.startswith('ISPATIALGYM_RUNTIME_SUITE_') for k in env):
+        return None
+    from scripts.campaign_20261110.runtime_suite import authorize
+    path = Path(env['ISPATIALGYM_CAMPAIGN_CONFIG'])
+    return authorize(root, env, path, read(path),
+                     start=int(option(command, '--base-index')), count=int(command[4]))
+
+
+def check_suite_replacement(root, payload, replacement):
+    source = suite_command(root, payload['command'])
+    if source is None:
+        return
+    require(suite_command(root, replacement['command']) == source, 'replacement suite authorization differs')
+    identity = input_identity(root, replacement['command'])
+    require({k:v for k,v in identity.items() if k != 'tag'} ==
+            {k:v for k,v in payload['identity'].items() if k != 'tag'},
+            'suite migration changed its exact range or physical inputs')
+    old, new = environment(payload['command']), environment(replacement['command'])
+    require({k:v for k,v in old.items() if k != 'ISGF_SAMPLING_CACHE'} ==
+            {k:v for k,v in new.items() if k != 'ISGF_SAMPLING_CACHE'},
+            'suite migration changed execution behavior')
+    require(option(replacement['command'], '--tag') != option(payload['command'], '--tag') and
+            new.get('ISGF_SAMPLING_CACHE') != old.get('ISGF_SAMPLING_CACHE'),
+            'suite migration must isolate output and sampling cache')
+    expected = list(payload['command'])
+    set_option(expected, '--tag', option(replacement['command'], '--tag'))
+    set_environment(expected, 'ISGF_SAMPLING_CACHE', new['ISGF_SAMPLING_CACHE'])
+    require(expected == replacement['command'], 'suite migration changed a non-routing command option')
+
+
+def suite_replacement(root, payload, token, index):
+    require(input_identity(root, payload['command']) == payload['identity'], 'source intent changed')
+    require(suite_command(root, payload['command']) is not None, 'source is not an authorized suite row')
+    require(index == payload['identity']['start'], 'suite migration cannot reserve a different range')
+    directory = root/'groups/dispatch_migrations'/token
+    directory.mkdir(parents=True, exist_ok=True)
+    command = list(payload['command'])
+    set_option(command, '--tag', token)
+    set_environment(command, 'ISGF_SAMPLING_CACHE', root/'cache/dispatch_migrations'/token)
+    result = {'directory':str(directory), 'index':index, 'count':payload['identity']['n'],
+              'dispatch_intent':str(root/'dispatch/ready'/(token+'.json')),
+              'dispatch_receipt':str(root/'dispatch/receipts'/(token+'.json')), 'command':command,
+              'suite_range_preserved':True}
+    check_suite_replacement(root, payload, result)
+    proof = {'source_token':payload['token'], 'source_command_sha256':payload['command_sha256'],
+             'source_files':payload['identity']['files'], 'changed_plan_fields':[],
+             'range_reused_only_after_never_started_cancellation':True,
+             'publication_requires_never_started_proof':True}
+    path = directory/'migration_source.json'
+    if path.exists(): require(read(path) == proof, 'prepared suite migration provenance differs')
+    else: shared_json(path, proof)
+    return result
+
+
 def fresh_replacement(root, payload, token, index):
     """Copy the contract exactly; change only nonphysical execution identities."""
+    if suite_command(root, payload['command']) is not None:
+        return suite_replacement(root, payload, token, index)
     command = list(payload['command']); env = environment(command)
     require(not env.get('ISPATIALGYM_CAMPAIGN_GOAL_QUEUE'), 'queue migration belongs to its controller')
     require(input_identity(root, command) == payload['identity'], 'source intent changed')
@@ -133,7 +192,8 @@ def prepare(root, limit=4, minimum_age=0):
                 if not eligible(proof, owner=pending[jid], minimum_age=minimum_age, now=time.time()): continue
                 files = no_execution_artifacts(allocation['job_dir'], root)
                 token = payload['token'] + '_pending_m01'
-                start = reserve_indices(root, token, int(allocation['n']))
+                start = (payload['identity']['start'] if suite_command(root, payload['command']) is not None
+                         else reserve_indices(root, token, int(allocation['n'])))
                 replacement = fresh_replacement(root, payload, token, start)
                 path = root/'dispatch/migrations'/payload['token']/'request.json'
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -164,6 +224,7 @@ def cancel(root, limit=2):
             with atomic_directory_lock(path.with_suffix('.lockdir')):
                 request = read(path)
                 require(input_identity(root, request['source_payload']['command']) == request['source_payload']['identity'], 'source input changed before cancellation')
+                check_suite_replacement(root, request['source_payload'], request['replacement'])
                 result = migrate_record(root, request['record'], minimum_age=request['minimum_pending_seconds'],
                     owner=owner, save=lambda:shared_json(path, request), execute=True)
                 if result: results.append(str(path))
@@ -196,6 +257,7 @@ def publish(root, limit=4):
                     request['published_at'] = time.time(); shared_json(path, request)
                     continue
                 proof = request['record']['migration']; replacement = request['replacement']
+                check_suite_replacement(root, request['source_payload'], replacement)
                 require(proof.get('never_started') and proof['after']['accounting']['state'] == 'CANCELLED'
                         and proof['after']['accounting']['start'] in ('Unknown','None','N/A','')
                         and not proof['final_execution_proof']['nonempty_execution_artifacts'], 'incomplete never-started proof')
