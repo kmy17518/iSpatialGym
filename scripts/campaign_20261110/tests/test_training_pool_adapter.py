@@ -58,3 +58,36 @@ def test_export_removes_inactive_actor_and_preserves_active_model_scale_state():
     restore['metadata']['unresolved_reference']='campaign_pool_A'
     with pytest.raises(ValueError,match='inactive object remains referenced'):
         active_export(restore,list(isolation),'campaign_pool_B')
+
+
+def test_stopped_authoring_checks_whole_inventory_before_mutation():
+    from scripts.campaign_20261110.training_pool_adapter import author_isolation_stopped
+    events=[]
+    class Path:
+        def __init__(self, value):self.value=value
+        def MakeRelativePath(self, base):return self.value
+        def __str__(self):return self.value
+    class Prim:
+        def GetPath(self):return Path('base/collision')
+    class Attribute:
+        def __init__(self, label):self.label=label
+        def Set(self, value):events.append((self.label,value))
+    collision=NS(GetPrim=lambda:Prim(),GetCollisionEnabledAttr=lambda:Attribute('collision'))
+    obj=NS(category='bottle',model='exact',scale=NS(tolist=lambda:[1.,1.,1.]),n_joints=0,
+           links={'base':NS(prim=Prim(),_collision_apis=[collision])},prim_path='/actor',visible=True,
+           set_position_orientation=lambda **kw:events.append(('pose',kw)))
+    scene=NS(object_registry=lambda kind,name:obj if name=='actor'else None)
+    row={'active':False,'properties':{'category':'bottle','model':'exact','scale':[1.,1.,1.],
+         'visible':False,'links':{'base':{'gravity_disabled':True,'collisions':{'base/collision':False}}}},
+         'state':{'root_link':{'pos':[40,40,5],'ori':[0,0,0,1],'lin_vel':[0,0,0],'ang_vel':[0,0,0]}}}
+    sim=NS(is_stopped=lambda:True)
+    gravity=lambda prim:NS(GetDisableGravityAttr=lambda:Attribute('gravity'))
+    with pytest.raises(ContractError,match='initialized geometry'):
+        author_isolation_stopped(scene,sim,{'actor':row,'absent':row},gravity_api=gravity)
+    assert events==[]
+    result=author_isolation_stopped(scene,sim,{'actor':row},gravity_api=gravity)
+    assert events==[('gravity',True),('collision',False),('pose',{'position':[40,40,5],'orientation':[0,0,0,1],'frame':'scene'})]
+    assert obj.visible is False and result['native_velocity_writes']==0 and result['physics_steps_requested']==0
+    sim.is_stopped=lambda:False
+    with pytest.raises(ContractError,match='stopped physics'):
+        author_isolation_stopped(scene,sim,{'actor':row},gravity_api=gravity)

@@ -114,3 +114,54 @@ def active_export(scene_document, pool_names, active_name):
 def anchor_for_member(baseline, incoming_spawn):
     return cold_anchor_transform(baseline['spawn_pose'],
         {'position': baseline['anchor_position'], 'orientation': baseline['anchor_orientation']}, incoming_spawn)
+
+
+def author_isolation_stopped(scene, sim, isolation, *, gravity_api=None):
+    """Stage exact pool flags and root poses before an existing native play.
+
+    This helper is not installed by the current load probe. It supports the next
+    declared physical candidate, subject to the pending reset measurements.
+    Native property readback after play and ordinary TRO restoration remain
+    required. No invalid stopped tensor handle is accessed here.
+    """
+    require(sim.is_stopped(), 'pool USD authoring requires stopped physics')
+    if gravity_api is None:
+        import omnigibson.lazy as lazy
+        schema = lazy.pxr.PhysxSchema.PhysxRigidBodyAPI
+        gravity_api = lambda prim: schema(prim) if prim.HasAPI(schema) else schema.Apply(prim)
+    prepared = []
+    # Check every identity and every property path before making any change.
+    for name, row in isolation.items():
+        obj = scene.object_registry('name', name); expected = row['properties']
+        require(obj is not None and obj.category == expected['category'] and obj.model == expected['model']
+                and obj.scale.tolist() == expected['scale'] and set(obj.links) == set(expected['links']),
+                'stopped pool authoring cannot change initialized geometry: '+name)
+        require(int(getattr(obj, 'n_joints', 0)) == 0,
+                'articulated pool member needs a separate joint-state reconstruction contract')
+        links = []
+        for link_name, flags in expected['links'].items():
+            link = obj.links[link_name]
+            collisions = {str(api.GetPrim().GetPath().MakeRelativePath(obj.prim_path)): api
+                          for api in getattr(link, '_collision_apis', [])}
+            require(set(collisions) == set(flags['collisions']),
+                    'stopped pool collision inventory differs: '+name+'/'+link_name)
+            links.append((link, flags, collisions))
+        root = row['state']['root_link']
+        require(set(root) >= {'pos', 'ori', 'lin_vel', 'ang_vel'}, 'pool source root state incomplete')
+        prepared.append((name, obj, row, links))
+    records = []
+    for name, obj, row, links in prepared:
+        for link, flags, collisions in links:
+            if flags['gravity_disabled'] is not None:
+                gravity_api(link.prim).GetDisableGravityAttr().Set(flags['gravity_disabled'])
+            for key, enabled in flags['collisions'].items():
+                collisions[key].GetCollisionEnabledAttr().Set(enabled)
+        root = row['state']['root_link']
+        obj.set_position_orientation(position=root['pos'], orientation=root['ori'], frame='scene')
+        obj.visible = row['properties']['visible']
+        records.append({'name': name, 'active': row['active'], 'source_root': copy.deepcopy(root),
+                        'authored_properties': copy.deepcopy(row['properties'])})
+    return {'boundary': 'stopped_before_existing_play', 'actors': records,
+            'native_velocity_writes': 0, 'physics_steps_requested': 0,
+            'static_geometry_changes': 0,
+            'scope': 'USD activation and root pose authoring only; native readback and exact source velocities restored after play.'}
