@@ -877,7 +877,8 @@ def stage_bounded(rec, C):
         return json.load(stream)
 
 
-def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed, hourly, phase):
+def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed, hourly, phase,
+                    eligibility=None):
     try:
         try:
             from .heartbeat_mirror import mirror_heartbeats
@@ -888,6 +889,12 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
         log('HEARTBEAT_MIRROR_UNAVAILABLE ' + type(error).__name__)
     staging = STAGER.reservations() if STAGER else {}
     n = {k: sum(1 for s in states.values() if s["status"] == k) for k in ("queued", "assigned", "synced", "failed")}
+    # Reporting must not re-run every authorization and input hash. The old
+    # observer did this twice per publication (four extra full scans per tick),
+    # delaying ready assignments behind read-only metrics. Actual planning and
+    # each assignment boundary still perform their normal authorization checks.
+    eligible = (None if eligibility is None else sum(
+        s['status'] == 'queued' and str(s['id']) in eligibility['job_ids'] for s in states.values()))
     instance_metrics = [{**{k:i.get(k) for k in ("id","label","gpu_name","num_gpus","actual_status","dph_total")},
                          "account":SHORT.get(i.get('_key_name'),'unknown'),
                          "worker_phase":(hbs.get(iid) or {}).get('phase'),
@@ -906,8 +913,10 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
                "rental_pending_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status'] not in ('running','stopped','exited')) if list_ok else None,
                "preserved_stopped_instances": sorted(preserved_instances(F)),
                "max_instances":C['max_instances'],
-               "dispatch_eligible_queued":len(dispatch_order(states.values(), C)),
-               "dispatch_excluded_queued":n['queued']-len(dispatch_order(states.values(), C)),
+               "dispatch_eligible_queued":eligible,
+               "dispatch_excluded_queued":None if eligible is None else n['queued']-eligible,
+               "dispatch_eligibility_observed_at_unix":None if eligibility is None else eligibility['observed_at'],
+               "dispatch_eligibility_scope":"Last planning check, filtered by current queued state; not execution authorization",
                "spend_estimate_usd": tot, "future_compute_commitment_usd": committed, "transfer_reserve_usd": C.get("transfer_reserve_usd",300), "budget_usd": min(C["budget_usd"],3000), "hourly_usd": hourly, "queue": n}
     mp = os.path.join(VJ, "metrics.json")
     with open(mp + ".tmp", "w") as handle:
@@ -1077,7 +1086,10 @@ def tick(c, s3, state):
     if cluster_return.has_pending(F):
         remote_jobs = {Path(key).stem for key in r2_list(s3, 'assign/')}
         cluster_return.reconcile(F, states, STAGER.active(), hbs, remote_jobs, save_state)
+    coordinator_progress('eligibility_check', started_at=now())
     queued = dispatch_order(states.values(), C)
+    eligibility = {'job_ids':{str(job['id']) for job in queued}, 'observed_at':now()}
+    coordinator_progress('assigning_ready', eligible_queued=len(queued))
     for job in queued:
         job['compatible_gpus'] = compatible_gpus(job.get('gpu') or C['default_gpu'], C)
         job['exact_ik_exchange_required'] = bool(read_env(job['job_dir']).get('ISPATIALGYM_EXACT_IK_MANIFEST'))
@@ -1236,7 +1248,7 @@ def tick(c, s3, state):
         log(line)
         state["last_line"], state["last_line_t"] = line, t
     open(os.path.join(VJ, "status.txt"), "w").write(time.strftime("%Y-%m-%d %H:%M:%S ") + line + "\n")
-    publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed, hourly, "complete")
+    publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed, hourly, "complete", eligibility)
     coordinator_progress("idle", queue=n)
 
 
