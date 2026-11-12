@@ -40,8 +40,14 @@ def _row(root, row_ref, prior_ref, number, reservation, pointer, base, correctio
     require(row['fresh_start']!=prior['fresh_start'], 'retry reuses original indices')
     require(row.get('input_correction')==correction_ref, 'retry correction binding differs')
     if correction_ref:
-        from .runtime_suite_correction import recorded_range
-        recorded_range(root,correction_ref,prior_ref,row)
+        schema=checked(root,correction_ref).get('schema')
+        if schema=='isg-current100-disembedding-recorded-range-audit-v1':
+            from .runtime_suite_correction import recorded_range
+            correction_proof=recorded_range(root,correction_ref,prior_ref,row)
+        elif schema=='isg-current100-articulation-recorded-range-audit-v1':
+            from .runtime_suite_opening_correction import recorded_opening
+            correction_proof=recorded_opening(root,correction_ref,prior_ref,row)
+        else:raise ValueError('unknown exact input correction type')
     else:
         require(row.get('selected_bucket')==prior.get('selected_bucket'), 'retry changes selected strict bucket')
     _reservation(root,reservation,row,checked(root,pointer['index_reservation']))
@@ -56,7 +62,7 @@ def _row(root, row_ref, prior_ref, number, reservation, pointer, base, correctio
         # New indices/group and a measured time allowance may change; target,
         # geometry, source proposals, strict bucket, and every QA option may not.
         ignored={'group_id','created_at','budget_seconds'}
-        if correction_ref:ignored.add('crowdedness_range')
+        if correction_ref:ignored.update(k.split('.',1)[1]for k in correction_proof['changed_fields']if k.startswith('goal_plan.'))
         require({k:v for k,v in old.items() if k not in ignored}==
                 {k:v for k,v in new.items() if k not in ignored}, 'retry changes physical goal or checks')
         if 'budget_seconds' in new:
