@@ -33,6 +33,9 @@ ALLOWED = {'scripts/campaign_20261110/training_batch_probe.py',
 
 
 def verify_inputs(root, request, records):
+    if request.get('pool_action_replay_v1') is True:
+        from .training_pool_replay_probe import load_request
+        return verify_inputs(root, load_request(request), records)
     require(request.get('selected_pool_world') is True and request.get('load_only') is True
             and request.get('production_released') is False and request.get('benchmark_credit') == 0
             and not request.get('physical_candidate') and not request.get('sequential_augmentation')
@@ -50,6 +53,9 @@ def verify_inputs(root, request, records):
 
 
 def verify_runtime(root, request, records, runtime):
+    if request.get('pool_action_replay_v1') is True:
+        from .training_pool_replay_probe import verify_runtime as verify_action_runtime
+        return verify_action_runtime(root, request, records, runtime, verify_runtime)
     if request.get('pool_preserve_native_anchor_v1') is True:
         from .training_pool_native_anchor_probe import verify_runtime as verify_native_anchor
         return verify_native_anchor(root, request, records, runtime, verify_runtime)
