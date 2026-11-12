@@ -114,6 +114,12 @@ def use_kind(class_id, kind, inputs):
     if kind not in contract.required | contract.optional:
         return None
     arm = inputs.get('arm')
+    if kind == 'generic_reach_map' and arm not in (None, 'right'):
+        # Axial and block-design call ensure_bands with a default RIGHT BandSpec.
+        return None
+    if kind == 'tabletop_reach_map' and class_id.startswith('configuration_matching-attachment_') and arm not in (None, 'right'):
+        # The male is picked by RIGHT; a handover reads a distinct LEFT attach map.
+        return None
     if kind == 'contact_push_map' and arm not in (None, 'right'):
         return None
     if kind == 'contact_brace_map' and not class_id.startswith('alignment-world_vertical_') and arm not in (None, 'left'):

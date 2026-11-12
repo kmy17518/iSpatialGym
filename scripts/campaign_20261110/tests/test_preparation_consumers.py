@@ -14,6 +14,22 @@ def test_optional_alignment_data_and_exact_arms():
     assert use_kind('alignment-axial_01', 'contact_push_map', {'arm': 'left'}) is None
     assert use_kind('alignment-world_vertical_01', 'contact_push_library', {}) is None
     assert use_kind('alignment-world_vertical_01', 'contact_brace_map', {'arm': 'right'}) == 'optional'
+    assert use_kind('alignment-axial_01', 'generic_reach_map', {'arm': 'left'}) is None
+    assert use_kind('configuration_matching-block_design_01', 'generic_reach_map', {'arm': 'right'}) == 'required'
+    assert use_kind('configuration_matching-attachment_01', 'tabletop_reach_map', {'arm': 'left'}) is None
+    assert use_kind('configuration_matching-attachment_01', 'tabletop_reach_map', {'arm': 'right'}) == 'required'
+    assert use_kind('configuration_matching-attachment_01', 'attachment_reach_map', {'arm': 'left'}) == 'required'
+
+
+def test_support_profile_does_not_substitute_another_placed_object():
+    from scripts.campaign_20261110.prepare_consumed_attachment_maps import support_identity_matches
+    selected = {'selected_scale': [1., 1., .9], 'object': 'desk_2', 'scene': 'office'}
+    measured = {'absolute_scale': [1., 1., .9], 'object': 'desk_0', 'scene': 'office'}
+    assert not support_identity_matches(selected, measured)
+    measured['object'] = 'desk_2'
+    assert support_identity_matches(selected, measured)
+    measured['absolute_scale'] = [1., 1., 1.1]
+    assert not support_identity_matches(selected, measured)
 
 
 def test_special_consumers_do_not_inherit_generic_wrong_data():
