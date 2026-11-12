@@ -63,10 +63,15 @@ def main():
         nodes.append(dict(node=row['NodeName'],partitions=sorted(partitions),model=model,state=row.get('State'),free_gpus=free,free_cpus=cpus,free_mem_mb=memory,eligible=usable,slots_9cpu_48gb=slots,
                           slots_8cpu_40gb=min(free,cpus//8,memory//(40*1024)) if usable else 0))
     jobs=[]
-    for line in output(['squeue','-r','-u','minyeong,shiyuc','-h','-o','%u|%i|%j|%T|%P|%a|%b|%q|%R']).splitlines():
-        user,jid,name,state,part,acct,gres,qos,reason=line.split('|')
+    for line in output(['squeue','-r','-u','minyeong,shiyuc','-h','-o','%u|%i|%j|%T|%P|%a|%b|%q|%R|%M|%V']).splitlines():
+        user,jid,name,state,part,acct,gres,qos,reason,elapsed,submitted=line.split('|')
         count=sum(int(x) for x in re.findall(r'gres/gpu(?::[^:,]+)?:(\d+)',gres))
-        jobs.append(dict(user=user,id=jid,name=name,state=state,partition=part,account=acct,gpus=count,qos=qos,pending_reason=reason if state=='PENDING' else None))
+        gpu_types=re.findall(r'gres/gpu:([^:,]+):\d+',gres)
+        try: queue_age=max(0,(datetime.datetime.now()-datetime.datetime.fromisoformat(submitted)).total_seconds()) if state=='PENDING' else None
+        except ValueError: queue_age=None
+        jobs.append(dict(user=user,id=jid,name=name,state=state,partition=part,account=acct,gpus=count,qos=qos,
+                         backend='cluster',gpu_type=','.join(gpu_types) or None,elapsed=elapsed,submitted_at=submitted,
+                         queue_age_seconds=queue_age,pending_reason=reason if state=='PENDING' else None))
     summary=collections.defaultdict(lambda:collections.Counter())
     for j in jobs:
         summary[j['user']][j['state']+'_gpus']+=j['gpus']
@@ -99,6 +104,32 @@ def main():
         vast_campaign=json.loads((campaign_root/'vast/metrics.json').read_text())
     except (OSError,ValueError):
         vast_campaign={}
+    for job in jobs:
+        source=validation.get('gates',{}).get(job['id'],{})
+        if not source:
+            source=next((g for g in validation.get('gates',{}).values() if str(g.get('replay_job_id'))==job['id']),{})
+        job['class_id']=source.get('key')
+        job['task']=job['class_id'] or job['name']
+        name=job['name'].lower()
+        if any(x in name for x in ('changed_physics','batch_probe','canary','restoration')): stream='pipeline canaries'
+        elif any(x in name for x in ('geometry','float','map','grasp','prebuild','prepare')): stream='training preparation'
+        elif 'held' in name: stream='heldout eval'
+        elif any(x in name for x in ('axial','close','replay','current100','native')): stream='validation/recovery'
+        else: stream='unclassified'
+        job['workstream']=stream
+        job['workstream_source']='job_name' if not source else 'validation_ownership_and_job_name'
+        job['owner']=source.get('owner')
+        job['owner_status']='observed' if job['owner'] else 'unavailable'
+        job['utilization_percent']=None
+    observation_path=campaign_root/'infra/current_gpu_jobs.json'
+    compact={'schema':'isg-current-gpu-jobs-v1','observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+             'status':'observed','jobs':[j for j in jobs if j['gpus']>0],
+             'vast':{'observed_at_unix':vast_campaign.get('observed_at_unix'),
+                     'running_gpus':vast_campaign.get('running_gpus'),'instances':vast_campaign.get('instances',[])},
+             'utilization_status':'unmeasured','owner_status':'unknown_unless_explicit_source'}
+    # Observation-only publication by the existing monitor invocation.
+    temporary=observation_path.with_suffix('.json.new')
+    temporary.write_text(json.dumps(compact,indent=2)+'\n');temporary.replace(observation_path)
     scale_prebuild={}
     for account,root in [('minyeong',campaign_root),('shiyuc',pathlib.Path('/vision/u/shiyuc/minyeong/campaign_20261110'))]:
         try:scale_prebuild[account]=json.loads((root/'scale_prebuild/controller.json').read_text())

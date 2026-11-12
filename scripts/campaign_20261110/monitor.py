@@ -34,6 +34,13 @@ def refresh(output, host, ssh_options=()):
             raise RuntimeError('SSH capacity probe failed (rc=%s)'%result.returncode)
         cluster=json.loads(result.stdout)
         atomic(infra/'cluster_snapshot.json',json.dumps(cluster,indent=2)+'\n')
+        atomic(infra/'current_gpu_jobs.json',json.dumps({'schema':'isg-current-gpu-jobs-v1',
+            'observed_at':cluster.get('checked_at'),'status':'observed',
+            'jobs':[j for j in cluster.get('jobs',[]) if j.get('gpus',0)>0],
+            'vast':{'observed_at_unix':cluster.get('vast_campaign',{}).get('observed_at_unix'),
+                    'running_gpus':cluster.get('vast_campaign',{}).get('running_gpus'),
+                    'instances':cluster.get('vast_campaign',{}).get('instances',[])},
+            'utilization_status':'unmeasured','owner_status':'unknown_unless_explicit_source'},indent=2)+'\n')
     except (OSError,ValueError,subprocess.TimeoutExpired,RuntimeError) as exc:
         error=str(exc)
         cluster=read_json(infra/'cluster_snapshot.json',{})
