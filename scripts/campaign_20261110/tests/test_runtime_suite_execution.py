@@ -53,3 +53,13 @@ def test_regression_outcome_never_counts_as_accepted_eval(tmp_path):
     assert M.rates({'observed_allocated_gpu_hours':2,'cost_complete':True},value)['gpu_hours_per_accepted_eval_instances'] is None
     result['quota']['consumed']=1;result['quota_evidence']=put(tmp_path/'quota2.json',result['quota'])
     with pytest.raises(ValueError,match='regression consumed'):M.strict_outcomes(result,row,{},{} )
+
+
+def test_canonical_suite_handoff_retains_existing_attempt_owners():
+    from scripts.campaign_20261110.controller_validation import isolated_suite_replay_owner
+    decision={'allowed':True,'category':'runtime_suite_validation','runtime_suite':{'row':{'path':'exact','sha256':'bound'}}}
+    assert isolated_suite_replay_owner(decision,{})
+    assert not isolated_suite_replay_owner(decision,{'replay_job_id':'123'})
+    assert not isolated_suite_replay_owner(decision,{'vast_migration':{'status':'prepared'}})
+    assert not isolated_suite_replay_owner({**decision,'allowed':False},{})
+    assert not isolated_suite_replay_owner({**decision,'category':'ordinary_validation'},{})

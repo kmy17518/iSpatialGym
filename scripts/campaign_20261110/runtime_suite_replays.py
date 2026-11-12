@@ -49,6 +49,8 @@ def cycle(root,run_dir,helper):
     from .replay_scheduling import dual_partition_resources
     from .replay_migration import migrate
     errors=[];submitted=[];observed=None;resources=None
+    central_path=root/'validation/controller.json'
+    central=json.loads(central_path.read_text()).get('gates',{}) if central_path.exists() else {}
     for rowpath in sorted((run_dir/'rows').glob('*.json')):
         try:
             row=json.loads(rowpath.read_text());validate_row(row)
@@ -66,7 +68,8 @@ def cycle(root,run_dir,helper):
             state['canonical_first_member']=first
             for member in members:
                 iid=member['instance_id']
-                if iid==first:continue
+                # A pre-handoff canonical allocation remains its owner's work.
+                if iid==first and central.get(str(a['jobid']),{}).get('replay_job_id'):continue
                 key=str(a['jobid'])+'_'+iid;entry=state['members'].get(iid)
                 save=lambda:write(target,state)
                 if entry:

@@ -87,6 +87,12 @@ def observation_waits_for_demo(entry, successes, request):
             and not entry.get('replay_job_id') and not entry.get('vast_migration')
             and not pending_retry(entry, request))
 
+def isolated_suite_replay_owner(production, entry):
+    return (production.get('allowed') is True and
+            production.get('category') == 'runtime_suite_validation' and
+            bool(production.get('runtime_suite')) and
+            not entry.get('replay_job_id') and not entry.get('vast_migration'))
+
 def archive_diagnosed_launcher_gate(entry, request, root, active):
     """Preserve explicitly diagnosed launcher evidence before a new strict replay.
 
@@ -308,6 +314,14 @@ def main():
                 # retry, or pending-to-Vast migration can bypass the source gate.
                 continue
             entry.pop('production_gate_block', None)
+            if isolated_suite_replay_owner(production, entry):
+                # The suite owner replays each successful member into an
+                # isolated namespace. Keep those gates out of ordinary source
+                # admission scans, while retaining any already-owned attempt.
+                entry.update(status='external_suite_replay_owner',
+                    runtime_suite=production['runtime_suite'],
+                    waiting_reason='exact suite member replay owner')
+                continue
             try:
                 if apply_retry_request(entry,retry_requests.get(jid),a.root,replay_active):atomic(statepath,state)
             except ValueError as error:
