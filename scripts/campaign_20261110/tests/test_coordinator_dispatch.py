@@ -96,3 +96,14 @@ def test_new_preparation_classes_and_heldouts_are_not_starved_by_large_older_wav
     ordered=list(dispatch_order(rows))
     assert [r['id']for r in ordered[:4]]==['physics','heldout','0','camera']
     assert len(ordered)==len(rows) and len({r['id']for r in ordered})==len(rows)
+
+
+def test_downstream_collectors_keep_bounded_capacity_when_preparation_is_full():
+    from scripts.campaign_20261110.coordinator_dispatch import collector_allowance
+    cap={'status':'observed','compatible_available_slots':0,'account_slots':{'minyeong':0},
+         'pending_job_ids':['1','2','99']}
+    assert collector_allowance(cap,['1','2'])==1
+    assert collector_allowance(cap,['1','2','99'])==0
+    assert collector_allowance({**cap,'status':'unavailable'},[])==0
+    cap.update(compatible_available_slots=4,account_slots={'minyeong':4})
+    assert collector_allowance(cap,['1','2','99'])==4

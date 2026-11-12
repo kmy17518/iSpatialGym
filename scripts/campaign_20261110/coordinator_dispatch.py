@@ -107,6 +107,14 @@ def pending_status(ticket):
     return 'ready'
 
 
+def collector_allowance(capacity, existing_jobs, account='minyeong', pending_limit=3):
+    """Keep downstream validation queued even while preparation fills the GPUs."""
+    if capacity.get('status')!='observed':return 0
+    free=min(capacity.get('compatible_available_slots',0),capacity.get('account_slots',{}).get(account,0))
+    pending=set(map(str,capacity.get('pending_job_ids',[])))&set(map(str,existing_jobs))
+    return max(free,max(0,pending_limit-len(pending)))
+
+
 def dispatch_order(tickets):
     """Keep critical work first and distribute preparation across task classes."""
     priority={'pipeline':0,'canonical recovery':1,'heldout eval':2,'training preparation':3}
