@@ -75,3 +75,43 @@ def verify(root, request, records, runtime, verify_base):
                    for name in set(previous)|set(actual) if previous.get(name) != actual.get(name)}
     require(differences == proof['changed_payloads'], 'integrated candidate changes were not fully declared')
     return request['runtime_compatibility']
+
+
+def renderer_source_request(root, request):
+    root = Path(root).resolve()
+    require(request.get('integrated_renderer_candidate_v1') is True
+            and request.get('production_released') is False
+            and type(request.get('benchmark_credit')) is int and request['benchmark_credit'] == 0
+            and 'changed_payloads' not in request, 'integrated renderer scope or payload declaration ambiguous')
+    proof = json.loads(checked(root, request['integration_proof']).read_text())
+    require(proof.get('schema') == SCHEMA and proof.get('production_released') is False
+            and proof.get('benchmark_credit') == 0 and proof.get('physical_equivalence_established') is False
+            and proof.get('source_inputs_changed') is False
+            and proof.get('permitted_execution_kinds') == ['kinematic_observation_rendering'],
+            'renderer integration cannot claim physics equivalence or release')
+    base = json.loads(checked(root, proof['base_request']).read_text())
+    replaced = {'candidate_runtime','changed_payloads','integrated_renderer_candidate_v1','integration_proof'}
+    require(not base.get('integrated_renderer_candidate_v1')
+            and base.get('schema') == 'isg-pool-native-render-reuse-request-v1'
+            and {k:v for k,v in request.items() if k not in replaced} ==
+                {k:v for k,v in base.items() if k not in replaced},
+            'integrated renderer changed recording selection, frames, cleanup or physical scope')
+    return base, proof
+
+
+def verify_renderer(root, request, runtime, validate_base):
+    root = Path(root).resolve(); runtime = Path(runtime).resolve()
+    base, proof = renderer_source_request(root, request)
+    baseline = checked(root, proof['base_runtime']).parent
+    require(baseline.is_relative_to(root/'code') and runtime.is_relative_to(root/'code')
+            and base['candidate_runtime'] == proof['base_runtime']
+            and request['candidate_runtime'] == proof['candidate_runtime'] == reference(runtime/'.snapshot_commit'),
+            'renderer integrated or original runtime differs')
+    original = validate_base(root, proof['base_request']['path'], runtime=baseline)
+    require(original[0] == base, 'original renderer input checks failed')
+    actual = payloads(runtime); previous = payloads(baseline)
+    require(actual == proof['candidate_python_payloads'], 'integrated renderer payload changed')
+    differences = {name:{'base':previous.get(name),'candidate':actual.get(name)}
+                   for name in set(previous)|set(actual) if previous.get(name) != actual.get(name)}
+    require(differences == proof['changed_payloads'], 'integrated renderer changes not fully declared')
+    return proof

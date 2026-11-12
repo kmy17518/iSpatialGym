@@ -71,3 +71,44 @@ def test_original_physical_verifier_failure_is_not_bypassed(tmp_path):
     q,base,proof,new,_=fixture(tmp_path)
     def reject(*args):raise ContractError('old native source no longer authorized')
     with pytest.raises(ContractError,match='no longer authorized'):verify(tmp_path,q,[],new,reject)
+
+
+def renderer_fixture(tmp_path):
+    q,old,proof,new,put=fixture(tmp_path)
+    base={'schema':'isg-pool-native-render-reuse-request-v1','candidate_runtime':proof['base_runtime'],
+          'changed_payloads':{'old_isolated_payload':'hash'},'sequence':[0,1,0],
+          'production_released':False,'benchmark_credit':0,'cold_requests':['A','B'],
+          'physical_delta':{'added_physics_steps':0},'member_campaign_configs':['exactA','exactB']}
+    proof.update(base_request=put('renderer_base.json',base),permitted_execution_kinds=['kinematic_observation_rendering'])
+    request={k:v for k,v in base.items()if k!='changed_payloads'}
+    request.update(candidate_runtime=proof['candidate_runtime'],integrated_renderer_candidate_v1=True,
+                   integration_proof=put('renderer_proof.json',proof))
+    return request,base,proof,new,put
+
+
+def test_renderer_preserves_original_checked_frames_and_cold_sources(tmp_path):
+    from scripts.campaign_20261110.training_integrated_runtime import verify_renderer
+    q,base,proof,new,_=renderer_fixture(tmp_path);calls=[]
+    def validate(root,path,*,runtime):
+        assert Path(path)==Path(proof['base_request']['path']) and runtime==tmp_path/'code/old'
+        calls.append(path);return (base,)
+    assert verify_renderer(tmp_path,q,new,validate)==proof and len(calls)==1
+
+
+@pytest.mark.parametrize('field,value',[('sequence',[0,0,0]),('cold_requests',['different','B']),
+    ('member_campaign_configs',['different','exactB']),('physical_delta',{'added_physics_steps':1}),
+    ('renderer_cleanup','failure'),('changed_payloads',{}),('production_released',True)])
+def test_renderer_integration_cannot_change_selection_physics_or_cleanup(tmp_path,field,value):
+    from scripts.campaign_20261110.training_integrated_runtime import renderer_source_request
+    q,base,proof,new,put=renderer_fixture(tmp_path);q[field]=value
+    with pytest.raises(ContractError):renderer_source_request(tmp_path,q)
+
+
+def test_renderer_rechecks_original_payload_proof_and_new_payload_inventory(tmp_path):
+    from scripts.campaign_20261110.training_integrated_runtime import verify_renderer
+    q,base,proof,new,put=renderer_fixture(tmp_path)
+    def fail(*args,**kwargs):raise ContractError('old recorded source changed')
+    with pytest.raises(ContractError,match='old recorded'):verify_renderer(tmp_path,q,new,fail)
+    put('code/common/ispatialgym/native.py','changed again')
+    with pytest.raises(ContractError,match='payload changed'):
+        verify_renderer(tmp_path,q,new,lambda *args,**kwargs:(base,))

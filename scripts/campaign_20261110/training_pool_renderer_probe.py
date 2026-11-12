@@ -148,25 +148,30 @@ def prohibit_native_mutation(sim, events):
             else: delattr(target,name)
 
 
-def inputs(root, request_path):
+def inputs(root, request_path, *, runtime=None):
     q = json.loads(Path(request_path).read_text())
     require(q['schema'] == 'isg-pool-native-render-reuse-request-v1' and q['sequence'] == [0,1,0]
             and q['physical_delta'] == declared_delta(q) and q['benchmark_credit'] == 0
             and q['production_released'] is False, 'unbounded renderer scope')
-    runtime = Path(__file__).resolve().parents[2]; parent = Path(q['parent_runtime']['path']).parent
+    runtime = Path(runtime).resolve() if runtime else Path(__file__).resolve().parents[2]
+    parent = Path(q['parent_runtime']['path']).parent
     require(ref(runtime/'.snapshot_commit') == q['candidate_runtime']
             and ref(parent/'.snapshot_commit') == q['parent_runtime']
             and (parent/'.snapshot_commit').read_text().strip() == PARENT_COMMIT,
             'renderer native/runtime provenance differs')
-    paths = {str(p.relative_to(tree)) for tree in (parent,runtime) for folder in ('ispatialgym','scripts')
-             for p in (tree/folder).rglob('*.py') if p.is_file()}
-    changed = {name for name in paths if not (parent/name).is_file() or not (runtime/name).is_file()
-               or file_digest(parent/name) != file_digest(runtime/name)}
-    allowed = ALLOWED | CLEANUP_PAYLOADS if q.get('renderer_cleanup') else ALLOWED
-    require(changed == set(q['changed_payloads']) and changed <= allowed
-            and (not q.get('renderer_cleanup') or CLEANUP_PAYLOADS <= changed)
-            and all(file_digest(runtime/name) == sha for name,sha in q['changed_payloads'].items()),
-            'unapproved native renderer payload change')
+    if q.get('integrated_renderer_candidate_v1') is True:
+        from .training_integrated_runtime import verify_renderer
+        verify_renderer(root, q, runtime, inputs)
+    else:
+        paths = {str(p.relative_to(tree)) for tree in (parent,runtime) for folder in ('ispatialgym','scripts')
+                 for p in (tree/folder).rglob('*.py') if p.is_file()}
+        changed = {name for name in paths if not (parent/name).is_file() or not (runtime/name).is_file()
+                   or file_digest(parent/name) != file_digest(runtime/name)}
+        allowed = ALLOWED | CLEANUP_PAYLOADS if q.get('renderer_cleanup') else ALLOWED
+        require(changed == set(q['changed_payloads']) and changed <= allowed
+                and (not q.get('renderer_cleanup') or CLEANUP_PAYLOADS <= changed)
+                and all(file_digest(runtime/name) == sha for name,sha in q['changed_payloads'].items()),
+                'unapproved native renderer payload change')
     cold = checked(root,q['cold_verification']); require(cold['status']=='native_cold_render_verified', 'cold renderer proof failed')
     helper = Path(q['cold_driver']['path']); require(ref(helper)==q['cold_driver'], 'cold source verifier changed')
     driver = runpy.run_path(str(helper)); records=[];documents=[]; requests=[]; observations=[]; cold_frames=[]
