@@ -476,3 +476,21 @@ def test_control_current_submission_schema_checks_every_historical_receipt(tmp_p
     value['request']=status.ref(request);write_json_atomic(pointer,value)
     Path(refs[1]['path']).write_text('{}')
     with pytest.raises(ValueError,match='history changed'):status.diagnostic_control_observation(tmp_path,request)
+
+
+def test_transient_publication_conflict_reaudits_committed_proof(tmp_path,monkeypatch):
+    from scripts.campaign_20261110 import training_canaries as canary
+    from scripts.campaign_20261110.training_pipeline_status import recover_review_publication_contention
+    row={'status':'blocked','job_dir':'job','own_replay_gate':'gate','error':"FileExistsError: "+str(tmp_path/'validation/training_canaries/ledger.lockdir')}
+    checked=[]
+    monkeypatch.setattr(canary,'audit_canary',lambda *a,**k: checked.append(a) or {'validated':True})
+    monkeypatch.setattr(canary,'committed_equivalent',lambda root,review:{'review':'immutable','sha256':'abc'})
+    result=recover_review_publication_contention(tmp_path,row)
+    assert result['status']=='validated_canary_exported' and checked==[('job','gate')]
+    assert result['publication_observation']['gpu_retry_required'] is False
+    bad={**row,'error':'ContractError: own physics replay failed'}
+    assert recover_review_publication_contention(tmp_path,bad)==bad and len(checked)==1
+    def failed(*a,**k):raise ValueError('own QA changed')
+    monkeypatch.setattr(canary,'audit_canary',failed)
+    result=recover_review_publication_contention(tmp_path,row)
+    assert result['status']=='blocked' and result['error']=='ValueError: own QA changed'

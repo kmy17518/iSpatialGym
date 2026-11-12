@@ -150,8 +150,32 @@ def _audit_canary(job, gate_path, *, root, started_at, policy, policy_sha):
         'unverified_pipeline_checks':['batched replay/render contamination','complete distribution coverage','production release']}
 
 
+def committed_equivalent(root, review):
+    """Keep the immutable review after a full current-policy re-audit.
+
+    A policy observation hash alone is not new physical or authorization
+    evidence. Any other changed field still needs ordinary publication.
+    """
+    directory=Path(root)/'validation/training_canaries';ledger=directory/'ledger.json'
+    if not ledger.exists():return None
+    previous=read(ledger).get('records',{}).get(review['instance_id'])
+    if not previous:return None
+    path=Path(previous['review']).resolve()
+    require(path.is_relative_to((directory/'reviews').resolve()) and
+            file_digest(path)==previous['sha256'],'committed canary review changed')
+    saved=read(path)
+    comparable=lambda value:{k:v for k,v in value.items() if k!='gate_policy_sha256'}
+    if digest(comparable(saved))!=digest(comparable(review)):return None
+    require(previous=={'review':str(path),'sha256':file_digest(path),'instance_id':review['instance_id'],
+        'task':review['task'],'class_id':review['class_id'],'validation_passed':True,
+        'eligible_for_benchmark':False,'quota_consumed':0},'committed canary index changed')
+    return previous
+
+
 def publish_canary(job, gate, *, root, started_at):
     root=Path(root).resolve();review=audit_canary(job,gate,root=root,started_at=started_at)
+    previous=committed_equivalent(root,review)
+    if previous:return previous
     key=digest(review);directory=root/'validation/training_canaries';directory.mkdir(parents=True,exist_ok=True)
     path=directory/'reviews'/(key+'.json')
     ledger_path=directory/'ledger.json'

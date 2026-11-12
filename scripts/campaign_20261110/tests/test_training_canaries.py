@@ -166,3 +166,17 @@ def test_historical_audit_preserves_original_policy_without_authorizing_current_
     previous.write_text('{}')
     with pytest.raises(c.ContractError,match='policy bytes missing or changed'):
         canary.audit_historical_canary(f.job,f.gate,root=tmp_path,started_at=f.since,policy_reference=reference)
+
+
+def test_policy_observation_change_keeps_committed_review_without_writer(tmp_path,monkeypatch):
+    f,_=setup(tmp_path,monkeypatch)
+    first=canary.publish_canary(f.job,f.gate,root=tmp_path,started_at=f.since)
+    ledger=tmp_path/'validation/training_canaries/ledger.json';original=ledger.read_bytes()
+    policy_path=tmp_path/'controllers/training_production_gate.json'
+    policy=json.loads(policy_path.read_text());policy['observed_at']='new observation'
+    c.write_json_atomic(policy_path,policy);(ledger.parent/'ledger.lockdir').mkdir()
+    assert canary.publish_canary(f.job,f.gate,root=tmp_path,started_at=f.since)==first
+    assert ledger.read_bytes()==original
+    policy['allowed_canaries']=[];c.write_json_atomic(policy_path,policy)
+    with pytest.raises(c.ContractError,match='one exact explicit authorization'):
+        canary.publish_canary(f.job,f.gate,root=tmp_path,started_at=f.since)

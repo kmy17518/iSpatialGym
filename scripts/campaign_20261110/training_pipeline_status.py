@@ -509,6 +509,27 @@ class BatchObservationWorker:
                 'verification_scope':'read-only reporting; release rechecks original evidence'}
 
 
+def recover_review_publication_contention(root, row):
+    """A busy publication lock is separate from immutable physical evidence."""
+    lock=str(Path(root)/'validation/training_canaries/ledger.lockdir')
+    if row.get('status')!='blocked' or not row.get('error','').startswith('FileExistsError:') or lock not in row['error']:
+        return row
+    result={**row,'status':'awaiting_review_publication','publication_observation':{
+        'state':'transient_lock_contention','error':row['error'],'gpu_retry_required':False}}
+    from .training_canaries import audit_canary, committed_equivalent
+    try:
+        audited=audit_canary(row['job_dir'],row['own_replay_gate'],root=root,started_at=1794321600)
+        committed=committed_equivalent(root,audited)
+        if committed:
+            result.update(status='validated_canary_exported',validation_review=committed)
+            result['publication_observation']['current_full_reaudit_passed']=True
+        else:result['publication_observation']['current_full_reaudit_passed']=True
+    except Exception as error:
+        result.update(status='blocked',error=f'{type(error).__name__}: {error}')
+        result['publication_observation']['current_full_reaudit_passed']=False
+    return result
+
+
 def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier=observed_batch_verification):
     root = Path(root).resolve(); base = root/'training_pipeline_canaries'
     result = {'schema': 'isg-training-pipeline-status-v1', 'campaign_id': 'campaign_20261110',
@@ -543,6 +564,7 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
             require(value['campaign_id'] == result['campaign_id'], 'foreign review observation')
             result['sources'].append({**ref(path), 'observed_at': value.get('observed_at'), 'kind': 'existing_native_reviews'})
             for candidate, row in value['records'].items():
+                row=recover_review_publication_contention(root,row)
                 allocation = row.get('allocation') or {}
                 start = allocation.get('start')
                 if start is not None:
