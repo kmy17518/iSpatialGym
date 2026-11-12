@@ -6,12 +6,12 @@ Terminal, artifact, verification and submission timestamps stay distinct.
 import argparse
 from collections import Counter
 from datetime import datetime
-import fcntl
 import json
 from pathlib import Path
 import time
 
 from scripts.campaign_20261110.vast_prebuild import require, sha, write
+from scripts.campaign_20261110.storage import atomic_directory_lock
 
 
 def epoch(value):
@@ -219,15 +219,15 @@ def main():
     parser.add_argument('--route'); parser.add_argument('--route-sha256')
     parser.add_argument('--library-audit'); parser.add_argument('--library-audit-sha256'); args = parser.parse_args()
     output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
-    with (output / 'callback.lock').open('a') as lock:
-        try: fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            print(json.dumps({'callback': 'already_running', 'output': args.output})); return
-        report = reconcile(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
-                           {'path': args.route, 'sha256': args.route_sha256} if args.route else None, args.output)
-        if args.library_audit:
-            project_library_advancement(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
-                                        {'path': args.library_audit, 'sha256': args.library_audit_sha256})
+    try:
+        with atomic_directory_lock(output / 'callback.lockdir'):
+            report = reconcile(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
+                               {'path': args.route, 'sha256': args.route_sha256} if args.route else None, args.output)
+            if args.library_audit:
+                project_library_advancement(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
+                                            {'path': args.library_audit, 'sha256': args.library_audit_sha256})
+    except FileExistsError:
+        print(json.dumps({'callback': 'existing_lock_requires_owner_reconciliation', 'output': args.output})); return
     print(json.dumps({k: report[k] for k in ('summary', 'verified_this_cycle', 'cycle_seconds')}))
 
 

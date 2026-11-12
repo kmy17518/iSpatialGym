@@ -5,7 +5,6 @@ Vast controller alone assigns workers, rents capacity and enforces expenditure.
 No scene-query adapter or previous activation list enters this route.
 """
 import argparse
-import fcntl
 import json
 import math
 from pathlib import Path
@@ -197,11 +196,12 @@ def main():
     for name in ('root', 'policy', 'policy-sha256'): parser.add_argument('--' + name, required=True)
     parser.add_argument('--execute-root-owned', action='store_true'); args = parser.parse_args()
     directory = Path(args.root) / 'infra/coordinator_dispatch/consumed_vast_intake'; directory.mkdir(parents=True, exist_ok=True)
-    with (directory / 'cycle.lock').open('a') as lock:
-        try: fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError: return
-        report = cycle(args.root, args.policy, args.policy_sha256, execute=args.execute_root_owned)
-        print(json.dumps({'routes': report['total_routes'], 'ready': len(report['ready']), 'submitted': len(report['submitted']), 'errors': report['errors']}))
+    try:
+        with atomic_directory_lock(directory / 'cycle.lockdir'):
+            report = cycle(args.root, args.policy, args.policy_sha256, execute=args.execute_root_owned)
+            print(json.dumps({'routes': report['total_routes'], 'ready': len(report['ready']), 'submitted': len(report['submitted']), 'errors': report['errors']}))
+    except FileExistsError:
+        print(json.dumps({'intake': 'existing_lock_requires_owner_reconciliation'}))
 
 
 if __name__ == '__main__': main()
