@@ -170,8 +170,9 @@ def reconcile(root, states, active_staging, heartbeats, remote_jobs, save_state,
                                     [s['cluster_return'] for s in states.values() if s.get('cluster_return', {}).get('request')])
                 claim = {**identity, 'request': reference, 'claimed_at': now,
                          'boundary': 'Coordinator removed this never-assigned job before account submission.'}
-                job.update(status='cluster_reserved', cluster_return=claim)
-                save_state(job)
+                candidate = {**job, 'status': 'cluster_reserved', 'cluster_return': claim}
+                save_state(candidate)
+                job.update(candidate)
             write(acknowledgement, {'schema': 'isg-map-cluster-return-ack-v1', 'campaign_id': root.name,
                                    'observed_at': now, **claim})
             report['acknowledged'].append(jid)

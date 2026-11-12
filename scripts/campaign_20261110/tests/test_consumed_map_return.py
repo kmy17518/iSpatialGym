@@ -102,3 +102,15 @@ def test_existing_coordinator_hook_uses_same_durable_boundary(tmp_path,monkeypat
     assert result['consumed_maps']['acknowledged']==['9001']
     assert saved[0]['status']=='cluster_reserved'
     assert not existing.has_pending(tmp_path)
+
+
+def test_failed_durable_claim_cannot_publish_or_recover_false_ack(tmp_path):
+    _,job,path,_=fixture(tmp_path)
+    def fail_before_write(candidate):raise OSError('disk write did not occur')
+    result=cr.reconcile(tmp_path,{'9001':job},set(),{},set(),fail_before_write,now=1001)
+    assert job['status']=='queued' and 'consumed_cluster_return'not in job
+    assert not (cr.base(tmp_path)/'acknowledgements'/path.name).exists()
+    assert result['rejected'] and not result['deferred']
+    saved=[]
+    repeated=cr.reconcile(tmp_path,{'9001':job},set(),{},set(),lambda j:saved.append(j),now=1002)
+    assert not repeated['acknowledged'] and not saved

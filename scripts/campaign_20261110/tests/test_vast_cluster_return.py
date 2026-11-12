@@ -100,6 +100,15 @@ def test_acknowledgement_follows_durable_claim_and_recovers_once(tmp_path, monke
     assert repeated['acknowledged'] == [] and len(saved) == 1
 
 
+def test_failed_claim_write_does_not_change_live_owner(tmp_path):
+    root,_,job,_,path=fixture(tmp_path)
+    def fail(candidate):raise OSError('no durable write')
+    report=cr.reconcile(root,{'9001':job},{},{},set(),fail,now=1001)
+    assert job['status']=='queued' and 'cluster_return'not in job
+    assert report['rejected'] and not report['deferred']
+    assert not(root/'vast/cluster_return/acknowledgements'/path.name).exists()
+
+
 def test_capacity_is_shared_across_accounts_and_snapshots(tmp_path):
     root, request, job, _, _ = fixture(tmp_path)
     other = {'job_id': '9002', 'account': 'shiyuc', 'claimed_at': 999,

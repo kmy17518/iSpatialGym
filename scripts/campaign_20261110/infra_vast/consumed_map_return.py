@@ -8,6 +8,7 @@ from contextlib import contextmanager
 import fcntl
 import getpass
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -164,7 +165,9 @@ def reconcile(root, states, staging, heartbeats, remote_jobs, save_state, *, now
             else:
                 identity = validate(root,request,job,staging,running,remote_jobs,now,outstanding)
                 claim = {**identity,'request':reference,'claimed_at':now,'boundary':'Sole Vast coordinator removed untouched map before cluster submission'}
-                job.update(status='cluster_reserved',consumed_cluster_return=claim);save_state(job)
+                candidate={**job,'status':'cluster_reserved','consumed_cluster_return':claim}
+                save_state(candidate)
+                job.update(candidate)
             write(ack_path,claim);outstanding[claim['job_id']] = claim['account'];report['acknowledged'].append(claim['job_id'])
         except Exception as error:
             row={'request':reference,'error':str(error),'cluster_submission_allowed':False}
@@ -175,6 +178,12 @@ def reconcile(root, states, staging, heartbeats, remote_jobs, save_state, *, now
 
 
 def probe():
+    path=os.environ.get('ISG_CONSUMED_RETURN_CAPACITY_HELPER')
+    if path:
+        require(sha(path)==os.environ.get('ISG_CONSUMED_RETURN_CAPACITY_HELPER_SHA256'),'Capacity helper identity differs')
+        spec=importlib.util.spec_from_file_location('consumed_return_capacity',path)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        return module.probe()
     from scripts.campaign_20261110.coordinator_dispatch import probe as observed_capacity
     return observed_capacity()
 
