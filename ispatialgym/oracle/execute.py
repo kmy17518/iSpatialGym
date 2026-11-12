@@ -6014,13 +6014,15 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         end_pose = yield from _push_recontact_rounds(action, motions, state, targets, geom, pose0, supports, through, cfg, ctx, end_pose)
     # 3. back off along the reversed push direction so the retreat does not rub the pad up the object's face, then
     #    measure the residual the object is left with (a swung painting settles back onto the backed-off pad)
+    from ispatialgym.oracle.campaign_axial_contact import tangent_backoff_m
+    backoff_m = tangent_backoff_m(action.contact, cfg.push_backoff_m)
     tangent = push_tangent(geom, end_pose)
-    back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
+    back = (end_pose[0] - tangent * backoff_m, end_pose[1])
     if extra.get("hold"):
         back = end_pose  # a preparatory press (two-flap carton, 2026-09-19): the pad stays on the flap until its Retreat, after the other hand's grasp
         ctx["push_hold"] = True
         motions.press_hold = {"arm": arm, "object": action.contact.object, "link": (extra.get("articulation") or {}).get("link")}
-    elif cfg.push_backoff_m > 0:
+    elif backoff_m > 0:
         yield from motions.arm_along(arm, [back], loaded=True, **_speed_kw(ctx))
     else:
         back = end_pose  # rush: ISG_PUSH_BACKOFF_M=0 keeps the pad on the target (the brace retreats first, ISG_BRACE_RETREATS_FIRST)

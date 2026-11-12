@@ -738,6 +738,10 @@ class AlignmentAxial(SamplerV2):
         # manipulation stance works with the right arm, the left arm idle)
         self.sidecar.add_stance(manip)
         push_rec = ContactRecord("push", "right", p_pre, p_init, p_mid, p_goal, d_push, dist, object=tname)
+        if campaign_runtime.contact_recovery('axial_magazine_radial_escape'):
+            # The inset pad must leave radially/up, as the native program checks.
+            # A tangent backoff dragged the magazine away after reaching its goal.
+            push_rec.extras['campaign_axial_radial_escape'] = True
         if push_orient is not None and len([o for o in push_orient["options"] if o["source"] == "ik"]) > 1:
             push_rec.extras["orient"] = push_orient
         annotate_height_extra(self.sidecar.add_contact(push_rec), self)

@@ -124,6 +124,7 @@ def contact_recovery(option: str) -> bool:
                                       'inter_object_relation_satisfaction-inside_small_scale'),
         'axial_magazine_contact_height': ('alignment-axial_04', 'alignment-axial'),
         'axial_magazine_contact_inward_1cm': ('alignment-axial_04', 'alignment-axial'),
+        'axial_magazine_radial_escape': ('alignment-axial_04', 'alignment-axial'),
         'nextto_native_base_hulls': ('inter_object_relation_satisfaction-nextto_large_scale_01',
                                    'inter_object_relation_satisfaction-nextto_large_scale'),
         'cap_vertical_final_retreat': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
@@ -158,7 +159,7 @@ def contact_recovery(option: str) -> bool:
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('cap', 'xxqyrt', (1.0, 1.0, 1.0))],
                     'cap capture margin belongs to its exact default-scale canonical model')
-        if option in ('axial_magazine_contact_height', 'axial_magazine_contact_inward_1cm'):
+        if option in ('axial_magazine_contact_height', 'axial_magazine_contact_inward_1cm', 'axial_magazine_radial_escape'):
             require(template.split == 'eval_standard' and
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('magazine', 'tfovwy', (1.0, 1.0, 1.0))],

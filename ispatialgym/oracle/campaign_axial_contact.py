@@ -35,3 +35,20 @@ def recontact_adjustment(arm, poses, supports):
     return amount, {'lowering_m':amount,'minimum_hand_support_clearance_before_m':before,
                     'minimum_required_clearance_m':.003,'maximum_lowering_m':.002,
                     'native_hand_geometry':geometry.digest,'source':geometry.source}
+
+
+def tangent_backoff_m(contact, configured):
+    """Honor an audited axial contact's radial escape without a tangent pull.
+
+    The normal Retreat action still executes its checked radial/up motion.
+    Other contacts retain the configured backoff, including explicit env values.
+    """
+    extra = getattr(contact, 'extra', {}) or {}
+    enabled = extra.get('campaign_axial_radial_escape', False)
+    if type(enabled) is not bool:
+        raise ValueError('campaign axial radial escape must be boolean')
+    if not enabled:
+        return float(configured)
+    if getattr(contact, 'mid', None) is None or extra.get('articulation'):
+        raise ValueError('campaign axial radial escape requires a free-object arc')
+    return 0.0
