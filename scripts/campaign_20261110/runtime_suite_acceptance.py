@@ -116,7 +116,9 @@ def audit(root, row_ref, allocation_ref, gate_ref):
     policy = active_policy(root); require(policy is not None, 'suite needs active reservation evidence')
     check_reservations(template,policy[1],policy[2])
     if row['camera_exempt']:
-        review = audit_camera(job,gate_ref['path'],root=root,started_at=since,template=template)
+        # The camera auditor returns dataclass tuples; published JSON stores
+        # these as arrays. Compare the same JSON values on every re-audit.
+        review = json.loads(json.dumps(audit_camera(job,gate_ref['path'],root=root,started_at=since,template=template)))
         require(len(review['members']) == 1, 'camera suite expects one successful exact member')
         validation = {'validation_passed':True,'quota_consumed':0,'camera_exempt':True,'members':review['members']}
     else:

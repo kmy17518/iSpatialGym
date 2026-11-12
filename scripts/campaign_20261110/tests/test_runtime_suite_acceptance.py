@@ -44,6 +44,29 @@ def test_scope_requires_new_own_gate_and_actual_terminal_binding(tmp_path):
     with pytest.raises(ContractError,match='own newly executed'):a.scope(tmp_path,row,allocation,wrong)
 
 
+def test_camera_audit_repeated_json_evidence_retains_every_field(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    member={'instance_id':'camera__1000','bucket':'3','artifacts':{'tro':{'path':'exact','sha256':'unchanged'}}}
+    row={'camera_exempt':True,'class_id':'camera','run_started_at':0,'fresh_start':1000,'fresh_count':1}
+    cfg={'validation_key':{'exact':'native'}};template=SimpleNamespace()
+    raw={'campaign_id':'campaign_20261110','class_id':'camera','validation_key':cfg['validation_key'],
+         'contract':{'objects':({'role':'target','models':('actual',)},)},'members':[member]}
+    monkeypatch.setattr(a,'scope',lambda *args:(row,{},cfg,tmp_path,{}))
+    monkeypatch.setattr(a,'template_from',lambda config:template)
+    monkeypatch.setattr('scripts.campaign_20261110.reservation_policy.active_policy',lambda root:({}, {}, {}))
+    monkeypatch.setattr('scripts.campaign_20261110.group_lane.check_reservations',lambda *args:None)
+    monkeypatch.setattr('scripts.campaign_20261110.current_eligibility.pending_instance_blockers',lambda *args:[])
+    monkeypatch.setattr('scripts.campaign_20261110.camera_lane.audit_camera',lambda *args,**kwargs:raw)
+    first=a.audit(tmp_path,{}, {}, {'path':'gate'})[3]
+    path=tmp_path/'review.json';proof=a.immutable(path,first)
+    second=a.audit(tmp_path,{}, {}, {'path':'gate'})[3]
+    assert a.immutable(path,second)==proof
+    assert first==json.loads(json.dumps(raw)) and first['members']==raw['members']
+    raw['members'][0]['artifacts']['tro']['sha256']='changed'
+    changed=a.audit(tmp_path,{}, {}, {'path':'gate'})[3]
+    with pytest.raises(ContractError,match='immutable suite evidence differs'):a.immutable(path,changed)
+
+
 def test_scope_rejects_active_scheduler_despite_status_label(tmp_path):
     base,row,allocation,gate=bound(tmp_path)
     raw=json.loads((base/'raw.json').read_text());raw['squeue_stdout']='123|RUNNING'
