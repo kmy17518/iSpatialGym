@@ -116,4 +116,30 @@ class MetricsTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'timestamps'):vast_accounting(root,job,root/'evidence',now=100)
 
 
+
+    def test_vast_replay_cost_requires_hash_bound_canonical_transport(self):
+        with tempfile.TemporaryDirectory()as t:
+            root=Path(t);job,state,attempt,put=self.vast_fixture(root)
+            # The queue/attempt identities name the transported worker directory;
+            # the suite owns a canonical symlink to that transport's gate.
+            transport=root/'out/vast_replay/exact';canonical=root/'validation/member'
+            manifest={'schema':'isg-vast-physics-replay-inputs-v1','campaign_root':str(root),
+                      'job_dir':str(transport),'source_job':str(root/'out/source'),
+                      'canonical_output':str(canonical)}
+            ref=put(transport/'replay_inputs.json',manifest)
+            canonical.parent.mkdir();canonical.symlink_to(transport/'gate')
+            v=json.loads(state.read_text());v.update(job_dir=str(transport),job_kind='physics_replay',
+                source_job=manifest['source_job'],replay_inputs_sha256=ref['sha256']);put(state,v)
+            a=json.loads(attempt.read_text());a['done']['job_dir']=str(transport);put(attempt,a)
+            bp=Path(v['cost_assignment_begin']['path']);b=json.loads(bp.read_text());b['scope']['job_dir']=str(transport);put(bp,b)
+            measured=vast_accounting(root,{**job,'job_dir':str(canonical),'stage':'physics_replay'},root/'evidence',now=100)
+            self.assertEqual(measured['allocated_gpu_seconds'],30)
+            self.assertIn(ref,measured['evidence'])
+            manifest['canonical_output']=str(root/'validation/another');put(transport/'replay_inputs.json',manifest)
+            with self.assertRaisesRegex(ValueError,'manifest hash'):
+                vast_accounting(root,{**job,'job_dir':str(canonical),'stage':'physics_replay'},root/'evidence',now=100)
+            v['replay_inputs_sha256']=reference(transport/'replay_inputs.json')['sha256'];put(state,v)
+            with self.assertRaisesRegex(ValueError,'canonical output'):
+                vast_accounting(root,{**job,'job_dir':str(canonical),'stage':'physics_replay'},root/'evidence',now=100)
+
 if __name__=='__main__':unittest.main()

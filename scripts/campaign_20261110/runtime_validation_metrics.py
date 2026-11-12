@@ -172,17 +172,33 @@ def vast_accounting(root, job, evidence_dir, now=None):
     root = Path(root); now = time.time() if now is None else now
     jid = str(job['job_id']); state_path = root/'vast/state/jobs'/(jid+'.json')
     data = state_path.read_bytes(); state = json.loads(data)
-    require(str(state['id']) == jid and Path(state['job_dir']).resolve() == Path(job['job_dir']).resolve(),
-            'Vast job identity differs')
+    require(str(state['id']) == jid, 'Vast job identity differs')
+    transport = Path(state['job_dir']).resolve(); replay_ref = None
+    if transport != Path(job['job_dir']).resolve():
+        require(job.get('stage') == 'physics_replay' and state.get('job_kind') == 'physics_replay',
+                'Vast job identity differs')
+        manifest_path = transport/'replay_inputs.json'; replay_ref = reference(manifest_path)
+        require(replay_ref['sha256'] == state['replay_inputs_sha256'], 'Vast replay manifest hash differs')
+        manifest = checked(replay_ref)
+        require(manifest['schema'] == 'isg-vast-physics-replay-inputs-v1' and
+                Path(manifest['campaign_root']).resolve() == root.resolve() and
+                Path(manifest['job_dir']).resolve() == transport and
+                transport.is_relative_to(root.resolve()/'out/vast_replay') and
+                Path(manifest['canonical_output']).absolute() == Path(job['job_dir']).absolute() and
+                Path(manifest['source_job']).resolve() == Path(state['source_job']).resolve() and
+                Path(job['job_dir']).absolute().is_relative_to(root.resolve()/'validation') and
+                Path(job['job_dir']).is_symlink() and
+                Path(job['job_dir']).resolve() == (transport/'gate').resolve(),
+                'Vast replay canonical output binding differs')
     retained = Path(evidence_dir)/(jid+'_'+hashlib.sha256(data).hexdigest()+'.json')
     retained.parent.mkdir(parents=True, exist_ok=True)
     if not retained.exists(): retained.write_bytes(data)
-    evidence = [reference(retained)]; attempts_by_id = {}; parts = []; missing = []
+    evidence = [reference(retained)] + ([replay_ref] if replay_ref else []); attempts_by_id = {}; parts = []; missing = []
     for path in sorted((root/'vast/state/attempts'/jid).glob('*.json')):
         item = json.loads(path.read_text()); done = item['done']; aid = item['attempt_id']
         require(item['schema'] == 'isg-vast-attempt-v1' and str(item['job_id']) == jid and
                 str(done['id']) == jid and done['attempt_id'] == aid and
-                Path(done['job_dir']).resolve() == Path(job['job_dir']).resolve(), 'Vast attempt identity differs')
+                Path(done['job_dir']).resolve() == transport, 'Vast attempt identity differs')
         require(aid not in attempts_by_id, 'duplicate Vast attempt identity')
         require(done.get('gpu_count') == 1, 'multi-GPU rental cost allocation is unavailable')
         begin_path = root/'vast/state/cost_provenance'/('assignment_begin_'+hashlib.sha256(('assignment_begin\0'+aid).encode()).hexdigest()+'.json')
@@ -190,7 +206,7 @@ def vast_accounting(root, job, evidence_dir, now=None):
         require(begin['kind'] == 'assignment_begin' and begin['identity'] == aid and
                 str(begin['job_id']) == jid and str(begin['instance']) == str(item['instance']) and
                 begin['assignment_started_unix'] == item['assigned_unix'], 'Vast assignment provenance differs')
-        require(Path(begin['scope']['job_dir']).resolve() == Path(job['job_dir']).resolve(), 'Vast assignment scope differs')
+        require(Path(begin['scope']['job_dir']).resolve() == transport, 'Vast assignment scope differs')
         times = [item['assigned_unix'], done['fetch_started_unix'], done['runtime_started_unix'],
                  done['runtime_ended_unix'], done['upload_finished_unix']]
         require(all(isinstance(t, (int, float)) and not isinstance(t, bool) and 0 < t <= now for t in times)
@@ -207,7 +223,7 @@ def vast_accounting(root, job, evidence_dir, now=None):
         begin = checked(state['cost_assignment_begin']); aid = begin['identity']
         require(str(begin['job_id']) == jid and str(begin['instance']) == str(state['instance']) and
                 begin['assignment_started_unix'] == state['assigned'] and
-                Path(begin['scope']['job_dir']).resolve() == Path(job['job_dir']).resolve(), 'current Vast assignment differs')
+                Path(begin['scope']['job_dir']).resolve() == transport, 'current Vast assignment differs')
         hb_path = root/'vast/worker_heartbeats'/(str(state['instance'])+'.json')
         hb_data = hb_path.read_bytes(); hb = json.loads(hb_data)['heartbeat']; running = hb.get('running', {}).get(jid)
         if aid not in attempts_by_id and running and 0 <= now-hb['time'] <= 180 and hb['time'] >= state['assigned']:

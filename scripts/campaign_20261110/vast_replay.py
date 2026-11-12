@@ -51,9 +51,9 @@ def prepare(root, source_job, snapshot, helper_snapshot, canonical_output, token
     root, source = Path(root).resolve(), Path(source_job).resolve()
     snapshot, helper = Path(snapshot).resolve(), Path(helper_snapshot).resolve()
     output = Path(canonical_output).absolute()
-    require(re.fullmatch(r'[A-Za-z0-9_-]+', token), 'unsafe replay token')
+    require(token not in ('.', '..') and re.fullmatch(r'[A-Za-z0-9_.-]+', token), 'unsafe replay token')
     require(instance_id is None or isinstance(instance_id, str) and
-            re.fullmatch(r'[A-Za-z0-9_-]+', instance_id), 'unsafe exact replay member')
+            instance_id not in ('.', '..') and re.fullmatch(r'[A-Za-z0-9_.-]+', instance_id), 'unsafe exact replay member')
     require(source.is_relative_to(root / 'out') and (source / 'sampling.done').is_file(), 'source sampling is not closed inside campaign')
     require(snapshot.is_relative_to(root / 'code') and helper.is_relative_to(root / 'code'), 'replay runtimes must be owned snapshots')
     require(output.is_relative_to(root / 'validation') and output.parent.resolve().is_relative_to(root / 'validation')
@@ -113,7 +113,7 @@ def verify(job, root=None):
         require(path.is_file() and sha(path) == expected, 'replay source bytes changed: ' + name)
     if value.get('instance_id') is not None:
         member = value['instance_id']
-        require(isinstance(member, str) and re.fullmatch(r'[A-Za-z0-9_-]+', member), 'unsafe exact replay member')
+        require(isinstance(member, str) and member not in ('.', '..') and re.fullmatch(r'[A-Za-z0-9_.-]+', member), 'unsafe exact replay member')
         require(Path(value['source_demo']).parent.name == member and
                 Path(value['source_tro']).name == member + '-tro_state.json' and
                 read_env(job/'job.env').get('ISGF_REPLAY_INSTANCE_ID') == member,

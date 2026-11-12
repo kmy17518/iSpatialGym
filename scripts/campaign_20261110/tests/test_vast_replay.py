@@ -109,3 +109,23 @@ def test_exact_shell_selector_matches_transport_and_never_falls_back(tmp_path):
     assert run('missing').stdout==''
     assert run('../i').returncode!=0
     assert '/demo/i/demo.hdf5' in run('').stdout
+
+
+def test_decimal_scaled_member_and_token_preserve_exact_paths(tmp_path):
+    import shutil,subprocess
+    source,runtime,helper,out=fixture(tmp_path)
+    member='alignment-axial-book__target-jhaltj-s1x1x2.5__50300203'
+    shutil.copytree(source/'demo/i',source/'demo'/member)
+    (source/'inst/task/scene/instances'/(member+'-tro_state.json')).write_text('{}')
+    job=vr.prepare(tmp_path,source,runtime,helper,out,'pending_123_'+member,instance_id=member)
+    value=vr.verify(job,tmp_path)
+    assert value['instance_id']==member and Path(value['source_demo']).parent.name==member
+    shell=(Path(vr.__file__).parent/'infra_open_loop.sh').read_text()
+    selection=shell.split('"$REQUESTED_REPLAY_MEMBER" <<\'PY\'\n',1)[1].split('\nPY\n',1)[0]
+    def run(member):return subprocess.run(['python3','-',str(source),member],input=selection,text=True,capture_output=True)
+    result=run(member)
+    assert result.returncode==0 and '/demo/'+member+'/demo.hdf5' in result.stdout
+    for bad in ('.','..','../'+member,member+'/../i',member+'\n',member+';echo nope'):
+        assert run(bad).returncode!=0
+        with pytest.raises(ValueError,match='unsafe'):
+            vr.prepare(tmp_path,source,runtime,helper,tmp_path/'validation/bad','bad',instance_id=bad)
