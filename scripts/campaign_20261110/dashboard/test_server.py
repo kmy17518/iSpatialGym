@@ -59,6 +59,25 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertFalse(snapshot(self.root,self.root/'inventory')['deadline_checkpoint_source']['available'])
         self.assertEqual(self.request('GET','/reports/deadline-checkpoint')[0],404)
 
+    def test_monitor_preserves_execution_clocks_and_reads_only_scoped_mirror(self):
+        value={'campaign_id':'campaign_20261110','observed_at':'2026-11-12T01:20:00Z',
+               'jobs':[{'job_id':'1','execution_state':'RUNNING','execution_observed_at':'2026-11-12T01:02:00Z',
+                        'observation_status':'stale','utilization_percent':None,'mapping_status':'missing'}],
+               'backlog':[{'requirement':'native fit','owner':'engineer','ready_since':'2026-11-12T01:01:00Z'}],
+               'api_key':'HIDDEN','environment':{'TOKEN':'HIDDEN'}}
+        self.write('dashboard/monitor_status.json',value)
+        before=self.hashes();data=json.loads(self.request('GET','/api/status')[1])
+        self.assertEqual(data['monitor_status']['jobs'][0]['execution_state'],'RUNNING')
+        self.assertEqual(data['monitor_status']['jobs'][0]['execution_observed_at'],'2026-11-12T01:02:00Z')
+        self.assertIsNone(data['monitor_status']['jobs'][0]['utilization_percent'])
+        code,raw=self.request('GET','/reports/monitor-status')
+        self.assertEqual(code,200);self.assertNotIn(b'HIDDEN',raw);self.assertEqual(before,self.hashes())
+        self.write('dashboard/monitor_status.json',{'campaign_id':'old'})
+        self.assertFalse(snapshot(self.root,self.root/'inventory')['monitor_status_source']['available'])
+        self.assertEqual(self.request('GET','/reports/monitor-status')[0],404)
+        (self.root/'dashboard/monitor_status.json').unlink()
+        self.assertFalse(snapshot(self.root,self.root/'inventory')['monitor_status_source']['available'])
+
     def test_dependency_readiness_requires_current_exact_preparation_join(self):
         source={'path':'/campaign/training_preparation/frozen/dependency_kind_readiness.json','sha256':'abc'}
         self.write('dashboard/preparation_status.json',{'campaign_id':'campaign_20261110',

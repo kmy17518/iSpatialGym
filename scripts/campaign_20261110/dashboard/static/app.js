@@ -316,16 +316,49 @@ function selectCompactView(){
  document.querySelectorAll('nav a').forEach(a=>a.setAttribute('aria-current',a.hash==='#'+section.id?'page':'false'));
 }
 function workstream(j){
- const label=[j.workstream,j.name,j.task,j.class_id].filter(Boolean).join(' ');
- if(/canary|pipeline|changed_physics|restore|sequential/i.test(label))return 'Pipeline canary';
- if(/heldout|held_|category|model_eval/i.test(label))return 'Heldout eval';
- if(/grasp|map|reach|prepar|scale_measure|left|geometry/i.test(label))return 'Training preparation';
- if(/production/i.test(label))return 'Frozen production';
- if(/canonical|current100|runtime|axial|replay|recovery|close|attachment|diagnos/i.test(label))return 'Validation / recovery';
- return 'Unclassified';
+ if(['missing','metadata_missing'].includes(j.mapping_status)||!j.workstream)return 'Metadata missing';
+ return ({'canonical recovery':'Validation / recovery','training preparation':'Training preparation','heldout eval':'Heldout eval',coordination:'Coordination',canonical_validation:'Validation / recovery',validation_recovery:'Validation / recovery',training_preparation:'Training preparation',shared_pipeline:'Pipeline canary',pipeline:'Pipeline canary',heldout_eval:'Heldout eval',frozen_production:'Frozen production'})[j.workstream]??j.workstream;
 }
 function evidenceState(status,time){
- const at=stamp(time);return !at?'Unavailable':Date.now()-at>180000?'Stale':status??'Observed';
+ return status??'Unknown';
+}
+function observationAge(time){
+ const at=stamp(time);if(!at)return 'time unavailable';const seconds=Math.max(0,Math.floor((Date.now()-at)/1000));
+ return seconds<60?`${seconds}s ago`:seconds<3600?`${Math.floor(seconds/60)} minutes ago`:`${Math.floor(seconds/3600)}h ${Math.floor(seconds%3600/60)}m ago`;
+}
+function executionObservation(status,time,observationStatus){
+ const at=stamp(time), stale=observationStatus==='stale'||(at&&Date.now()-at>180000);
+ return `Last observed: ${esc(evidenceState(status,time))}<div class="small-label">${esc(observationAge(time))} · ${!at?'observation time missing':stale?'stale observation':esc(observationStatus??'current observation')}</div>`;
+}
+function explicitJobs(d){
+ const monitor=d.monitor_status??{}, mapped=monitor.jobs??monitor.current_gpu_jobs??[], merged=new Map();
+ const key=j=>`${j.backend==='vast'?'vast':'cluster'}:${j.job_id??j.id}`;
+ for(const j of (d.cluster?.jobs??[]).filter(owned))merged.set(key(j),{...j,job_id:j.id,account:j.user,execution_state:j.state,execution_observed_at:d.cluster.checked_at,mapping_status:j.mapping_status??'missing',mapping_remediation_owner:j.mapping_remediation_owner??'/root'});
+ for(const v of d.live?.campaign_vast_metrics?.instances??[])for(const id of v.assigned_jobs??[]){const j={job_id:id,backend:'vast',account:'vast',execution_state:'UNKNOWN',execution_observed_at:null,mapping_status:'missing',mapping_remediation_owner:'/root',gpu_type:v.gpu_name,pending_reason:'Provider assignment only; worker execution observation unavailable',report:'/reports/vast-runtime'};merged.set(key(j),j);}
+ for(const j of mapped){
+  const prior=merged.get(key(j))??{};const observed=stamp(j.execution_observed_at),old=stamp(prior.execution_observed_at);
+  const state=old&&(!observed||old>observed)?{execution_state:prior.execution_state,execution_observed_at:prior.execution_observed_at,observation_status:prior.observation_status}:{};
+  merged.set(key(j),{...prior,...j,...state});
+ }
+ return [...merged.values()].map(j=>({...j,id:String(j.job_id??j.id),user:j.account??j.user??'Unknown',state:String(j.execution_state??j.state??'UNKNOWN').toUpperCase(),gpus:num(j.gpus??j.gpu_count)}));
+}
+function workerEvent(w){
+ const event=w.last_verified_work_event;
+ return typeof event==='object'&&event!==null?event:{at:w.last_verified_work_event_at??null,description:typeof event==='string'?event:null};
+}
+function workEvidence(values){
+ const refs=Array.isArray(values)?values:[];
+ return refs.length?`<details><summary>${refs.length} evidence reference${refs.length===1?'':'s'}</summary><pre>${esc(JSON.stringify(refs,null,2))}</pre></details>`:'<div class="small-label">Evidence unavailable</div>';
+}
+function renderWorkBacklog(d){
+ const m=d.monitor_status??{},available=!!d.monitor_status_source?.available;
+ const exceptions=m.exceptions??[],kind=x=>x.type??x.kind??x.exception_type;
+ const ready=exceptions.filter(x=>kind(x)==='ready_not_submitted'),completed=exceptions.filter(x=>kind(x)==='completed_not_advanced');
+ $('compact-backlog-summary').innerHTML=available?`<strong>${ready.length} Ready but not submitted</strong> · <strong>${completed.length} Completed but not advanced</strong><div class="small-label">Monitor observation ${date(m.observed_at)} · <a href="/reports/monitor-status">Full backlog and exceptions ↗</a></div>`:'Backlog observation unavailable; no zero backlog is inferred.';
+ const selected=$('work-backlog-state').value,term=$('work-backlog-search').value.toLowerCase();
+ let rows=selected==='all'?(m.backlog??[]):exceptions.filter(x=>kind(x)===selected);
+ rows=rows.filter(r=>!term||JSON.stringify(r).toLowerCase().includes(term));
+ $('compact-backlog').innerHTML=rows.map(r=>`<tr><td>${esc(plain(r.requirement??r.class_id??r.configuration??r.id??'Requirement unavailable'))}<div class="small-label">${esc(workstream(r))}</div></td><td>${esc(r.stage??kind(r)??'Stage unavailable')}<div>${esc(r.owner??'Owner missing · /root to assign')}</div></td><td>${esc(plain(r.blocker??'No blocker recorded'))}<div>${esc(plain(r.next_action??'Next action missing'))}</div></td><td>${r.ready_since?`Ready ${date(r.ready_since)} · ${esc(observationAge(r.ready_since))}`:r.completed_at?`Completed ${date(r.completed_at)} · ${esc(observationAge(r.completed_at))}`:'Waiting time unavailable'}<div class="small-label">Last verified event ${date(r.last_verified_event_at)} · ${esc(r.observation_status??'freshness unavailable')}</div></td><td>${esc((r.jobs??[]).map(j=>typeof j==='object'?(j.job_id??j.id??'Unknown'):j).join(', ')||'No running job recorded')}${workEvidence(r.evidence)}</td></tr>`).join('')||`<tr><td colspan="5">${available?'No matching unresolved items in this observation.':'Monitor backlog unavailable.'}</td></tr>`;
 }
 function renderCompact(d){
  const runtime=d.runtime_validation??{}, prep=d.execution_ledger?.preparation??{}, pipeline=d.pipeline_status??{}, inventory=d.inventory_current?.summary??{};
@@ -337,19 +370,21 @@ function renderCompact(d){
  $('compact-forecast').textContent=`Target: ${date(d.deadline)}. Completion ETA unavailable: canonical, preparation and pipeline gates remain open.`;
  $('compact-compute-observation').innerHTML=observation('Cluster',d.cluster.checked_at,!!d.sources.cluster?.available,d.cluster.probe_error??d.sources.cluster?.error,180)+observation('Vast',d.live.vast_observed_at,!!d.live.campaign_vast_metrics?.account_listing_complete,null,300);
  $('compact-gpus').innerHTML=$('gpu-cards').innerHTML;$('compact-budget').innerHTML=$('budget').innerHTML;$('compact-capacity').innerHTML=$('capacity').innerHTML;
- const activity=d.interactive_activity??{}, jobs=(d.cluster.jobs??[]).filter(owned);
- $('compact-work-observation').innerHTML=observation('Jobs',d.cluster.checked_at,!!d.sources.cluster?.available,d.cluster.probe_error??d.sources.cluster?.error,180)+observation('Interactive activity',activity.observed_at,!!d.interactive_activity_source?.available,d.interactive_activity_source?.error,180);
- const workers=(activity.workers??[]).map(w=>({...w,kind:'Interactive',status:evidenceState(w.status,w.observed_at),link:w.link??'#execution'}));
- for(const j of jobs.filter(j=>j.gpus===0))workers.push({name:j.name,kind:'Persistent controller',workstream:workstream(j),task:j.name,status:evidenceState(j.state,d.cluster.checked_at),observed_at:d.cluster.checked_at,link:'/reports/job/'+encodeURIComponent(j.id),result:j.id});
- $('compact-agents').innerHTML=workers.map(w=>`<tr><td>${esc(w.name)}<div class="small-label">${esc(w.kind)}</div></td><td>${esc(w.workstream)}</td><td>${esc(w.task)}</td><td>${pill(w.status,/stale|unavailable|stop/i.test(w.status)?'warn':'')}</td><td>${date(w.observed_at)}</td><td><a href="${esc(w.link)}">${esc(w.result??'Evidence')}</a></td></tr>`).join('')||'<tr><td colspan="6">Worker observations unavailable.</td></tr>';
+ const activity=d.interactive_activity??{}, monitor=d.monitor_status??{}, jobs=explicitJobs(d);
+ $('compact-work-observation').innerHTML=observation('Jobs',monitor.jobs_observed_at??d.cluster.checked_at,!!d.sources.cluster?.available,d.cluster.probe_error??d.sources.cluster?.error,180)+observation('Interactive activity',activity.observed_at,!!d.interactive_activity_source?.available,d.interactive_activity_source?.error,180)+observation('Monitor',monitor.observed_at,!!d.monitor_status_source?.available,d.monitor_status_source?.available?null:'Monitor status has not been mirrored; see the source report after synchronization.',180);
+ const workers=(activity.workers??[]).map(w=>({...w,kind:'Interactive',link:w.link??'#execution'}));
+ const controllers=monitor.workers??monitor.controllers??[];
+ workers.push(...controllers.map(w=>({...w,kind:'Persistent controller',link:w.link??'/reports/monitor-status'})));
+ for(const j of jobs.filter(j=>j.gpus===0))if(!controllers.some(c=>String(c.job_id)===j.id))workers.push({name:j.name??j.id,kind:'CPU allocation',workstream:j.workstream,mapping_status:j.mapping_status,task:j.stage??'Metadata missing',status:'Process liveness unknown',allocation:j,link:'/reports/job/'+encodeURIComponent(j.id),result:j.id});
+ $('compact-agents').innerHTML=workers.map(w=>{const event=workerEvent(w),interactive=w.kind==='Interactive';return `<tr><td>${esc(w.name??w.owner??'Worker unavailable')}<div class="small-label">${esc(w.kind)}</div></td><td>${esc(workstream(w))}${workstream(w)==='Metadata missing'?`<div class="small-label">Metadata remediation: ${esc(w.mapping_remediation_owner??'/root')}</div>`:''}</td><td>${esc(w.task??'Task unavailable')}</td><td>${interactive?esc(w.status??'Status unavailable'):executionObservation(w.process_state??w.status,w.process_observed_at,w.observation_status)}${w.allocation?`<div class="small-label">Scheduler ${esc(w.allocation.state)} · ${date(w.allocation.execution_observed_at)}</div>`:''}<div class="small-label">Heartbeat ${date(w.heartbeat_at)}</div></td><td>${interactive?`Work event ${date(event.at)}<div>${esc(event.description??'No verified work event recorded')}</div>`:`Useful output ${date(w.last_useful_progress_at)}<div class="small-label">Successful reconciliation ${date(w.last_reconciliation_at)}</div>`}</td><td><a href="${esc(w.link)}">${esc(w.result??'Evidence')}</a>${workEvidence(event.evidence??w.evidence)}</td></tr>`;}).join('')||'<tr><td colspan="6">Worker observations unavailable.</td></tr>';
  const account=$('work-account').value, stream=$('work-stream').value, state=$('work-state').value, term=$('work-search').value.toLowerCase(), sort=$('work-sort').value;
- const vastJobs=(d.live.campaign_vast_metrics?.instances??[]).flatMap(v=>(v.assigned_jobs??[]).map(id=>({id,user:'vast',backend:'vast',name:'Instance '+v.id,task:'Assignment; task unavailable',state:v.actual_status==='running'?(v.heartbeat_age_seconds<=300&&v.worker_phase==='run'?'RUNNING':'UNVERIFIED'):'STOPPED',gpus:null,gpu_type:v.gpu_name,elapsed:'Unavailable',owner:null,observed_at:d.live.vast_observed_at,report:'/reports/vast-runtime'})));
- const rows=[...jobs.filter(j=>j.gpus>0),...vastJobs].filter(j=>(account==='all'||j.user===account)&&(stream==='all'||workstream(j)===stream)&&(state==='all'||state==='active'&&['RUNNING','PENDING','UNVERIFIED'].includes(j.state)||j.state===state)&&[j.id,j.name,j.task,j.class_id].join(' ').toLowerCase().includes(term)).sort((a,b)=>String(a[sort]??'').localeCompare(String(b[sort]??''),undefined,{numeric:true}));
+ const rows=jobs.filter(j=>j.gpus!==0).filter(j=>(account==='all'||j.user===account)&&(stream==='all'||workstream(j)===stream)&&(state==='all'||state==='active'&&['RUNNING','PENDING','UNVERIFIED','UNKNOWN','CONFIGURING','COMPLETING'].includes(j.state)||j.state===state)&&[j.id,j.name,j.task,j.class_id,j.configuration,j.owner].join(' ').toLowerCase().includes(term)).sort((a,b)=>String(a[sort]??'').localeCompare(String(b[sort]??''),undefined,{numeric:true}));
  const open=new Set([...document.querySelectorAll('#compact-jobs details[open]')].map(x=>x.dataset.array));
- const row=j=>`<tr><td><a href="${j.report??'/reports/job/'+encodeURIComponent(j.id)}">${esc(j.id)}</a></td><td>${esc(j.user)}</td><td>${workstream(j)}</td><td>${esc(j.class_id??j.task??j.name)}</td><td>${pill(evidenceState(j.state,j.observed_at??d.cluster.checked_at))}</td><td>${n(j.gpus)} / ${esc(j.gpu_type??j.gres??'type unknown')}</td><td>${esc(j.state==='PENDING'?(j.queue_age_seconds==null?'Unavailable':Math.round(j.queue_age_seconds)+'s queued'):(j.elapsed??'Unavailable'))}</td><td>${esc(j.pending_reason??'—')}<div class="small-label">${esc(j.owner??'Owner unavailable')}</div></td></tr>`;
- const groups=new Map();for(const j of rows){const key=String(j.array_job_id??String(j.id).split('_')[0]);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(j);}
- $('compact-jobs').innerHTML=[...groups.entries()].map(([id,members])=>members.length===1?row(members[0]):`<tr><td colspan="8"><details data-array="${esc(id)}" ${open.has(id)?'open':''}><summary>Array ${esc(id)} · ${members.length} members · ${esc(members[0].user)} · ${workstream(members[0])}</summary><table class="array-members"><tbody>${members.map(row).join('')}</tbody></table></details></td></tr>`).join('')||'<tr><td colspan="8">No matching observed cluster GPU jobs. Vast job-level details are unavailable in this source; see Compute for provider observations.</td></tr>';
+ const row=j=>`<tr><td><a href="${esc(j.report??'/reports/job/'+encodeURIComponent(j.id))}">${esc(j.id)}</a>${workEvidence(j.evidence)}</td><td>${esc(j.user)}<div class="small-label">${esc(j.backend??'cluster')}</div></td><td>${esc(workstream(j))}<div class="small-label">${esc(j.stage??'Stage unavailable')}</div></td><td>${esc(j.class_id??j.task??'Metadata missing')}<div class="small-label">${esc(typeof j.configuration==='object'?JSON.stringify(j.configuration):j.configuration??'')}</div></td><td>${executionObservation(j.state,j.execution_observed_at,j.observation_status)}<div class="small-label">Useful progress ${date(j.last_useful_progress_at)}</div>${j.outcomes?`<div class="small-label">Outcomes: ${esc(plain(j.outcomes))}</div>`:''}</td><td>${j.state==='PENDING'?'Requested':'Allocation'}: ${n(j.gpus)} / ${esc(j.gpu_type??j.gres??'type unknown')}<div class="small-label">Measured utilization ${j.utilization_percent==null?'unknown':n(j.utilization_percent)+'%'} · ${date(j.utilization_observed_at)}</div></td><td>${esc(j.state==='PENDING'?(j.queue_age_seconds==null?'Unavailable':Math.round(j.queue_age_seconds)+'s queued'):(j.elapsed??'Unavailable'))}</td><td>${esc(j.pending_reason??'—')}<div class="small-label">Owner ${esc(j.owner??'unavailable')}</div>${workstream(j)==='Metadata missing'?`<div class="small-label">Metadata remediation: ${esc(j.mapping_remediation_owner??'/root')}</div>`:''}</td></tr>`;
+ const groups=new Map();for(const j of rows){const key=[j.backend??'cluster',j.user,j.array_job_id??j.id,workstream(j),j.stage??'',j.owner??''].join('|');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(j);}
+ $('compact-jobs').innerHTML=[...groups.entries()].map(([id,members])=>members.length===1?row(members[0]):`<tr><td colspan="8"><details data-array="${esc(id)}" ${open.has(id)?'open':''}><summary>Array ${esc(members[0].array_job_id)} · ${members.length} members · ${esc(members[0].user)} · ${esc(workstream(members[0]))}</summary><table class="array-members"><tbody>${members.map(row).join('')}</tbody></table></details></td></tr>`).join('')||'<tr><td colspan="8">No matching jobs in the available observations.</td></tr>';
+ renderWorkBacklog(d);
  selectCompactView();
 }
-for(const id of ['work-account','work-stream','work-state','work-sort','work-search'])$(id).addEventListener(id==='work-search'?'input':'change',()=>current&&renderCompact(current));
+for(const id of ['work-account','work-stream','work-state','work-sort','work-search','work-backlog-state','work-backlog-search'])$(id).addEventListener(id.endsWith('search')?'input':'change',()=>current&&renderCompact(current));
 window.addEventListener('hashchange',selectCompactView);selectCompactView();
