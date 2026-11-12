@@ -107,6 +107,54 @@ def pending_status(ticket):
     return 'ready'
 
 
+def authorize_preparation(ticket, policy):
+    """Admit consumed data builders only, using the reviewed immutable manifest.
+
+    This is a scheduling scope check, not another physical validation job.
+    Existing claims and receipts remain authoritative and are never rewritten.
+    """
+    scope=policy.get('preparation_scope')
+    if not scope:
+        raise ValueError('Preparation requires the consumed-data scope policy')
+    verify_ref(scope['policy_ref']);contract=read(scope['policy_ref']['path'])
+    if contract.get('schema')!='isg-consumed-preparation-admission-v1':
+        raise ValueError('Unknown preparation scope policy')
+    manifest=ticket.get('_prepared_manifest')
+    reviewed=next((r for r in scope['normalized_manifests'] if r['manifest']==manifest),None)
+    if reviewed is None:
+        raise ValueError('Preparation manifest lacks a reviewed code consumer')
+    source=next((r for r in contract['approved_manifests'] if r['manifest']==reviewed['source_manifest']),None)
+    if source is None:
+        raise ValueError('Preparation source is outside the consumed-data policy')
+    kind=source['computation_kind'];subtype=source['consumer_kind']
+    if subtype not in contract['allowed_computation_kinds'].get(kind,[]):
+        raise ValueError('Preparation computation kind is not allowed')
+    if source['account']!=ticket['expected_account']:
+        raise ValueError('Preparation account differs from reviewed source')
+    key=ticket.get('physical_dedup_key')
+    if not key or key!=ticket.get('dedup_key') or key not in Path(ticket['claim_path']).name:
+        raise ValueError('Preparation needs its exact shared physical claim')
+    for field,namespace in [('claim_path','claim_namespace'),('submission_path','receipt_namespace')]:
+        if Path(ticket[field]).parent!=Path(source[namespace]):
+            raise ValueError('Preparation claim/receipt namespace changed')
+    if not ticket.get('configuration_ids') or not ticket.get('input_refs'):
+        raise ValueError('Preparation lacks selected consumer/input identities')
+    runtime=ticket.get('runtime_ref',{})
+    if not runtime or ticket['inputs'].get(runtime['path'])!=runtime['sha256']:
+        raise ValueError('Preparation runtime is not pinned in its input closure')
+    # The exact manifest authorizes reviewed builders. Also reject the former
+    # per-scene sampler at the executable entrypoints before creating a claim.
+    forbidden=contract['forbidden_preparation_entrypoint']
+    paths={ticket['command'][-1]}
+    paths.update(r['path'] for r in ticket.get('scripts',[]))
+    for path in paths:
+        if forbidden in Path(path).read_text():
+            raise ValueError('Per-scene sampling is not preparation')
+    return {'policy':scope['policy_ref'],'source_manifest':source['manifest'],
+            'computation_kind':kind,'consumer_kind':subtype,
+            'required_for_readiness':source['required_for_readiness']}
+
+
 def collector_allowance(capacity, existing_jobs, account='minyeong', pending_limit=3):
     """Keep downstream validation queued even while preparation fills the GPUs."""
     if capacity.get('status')!='observed':return 0
@@ -202,7 +250,8 @@ def cycle(root, account, capacity_probe=probe):
         try:
             verify_ref(reference)
             for ticket in read(reference['path'])['tickets']:
-                if ticket['expected_account']==account:tickets.append(ticket)
+                if ticket['expected_account']==account:
+                    tickets.append({**ticket,'_prepared_manifest':reference})
         except (OSError,ValueError,KeyError,TypeError) as exc:
             errors.append({'source':reference['path'],'error':str(exc),'owner':'/root'})
     capacity=capacity_probe()
@@ -215,11 +264,13 @@ def cycle(root, account, capacity_probe=probe):
             if jid in pending:known_pending.add(jid)
     queue_allowance=max(0,int(policy.get('critical_pending_limit',6))-len(known_pending)) if capacity.get('status')=='observed' else 0
     rows=[]
-    # New camera/layout work must not sit behind hundreds of earlier queries
-    # for one model family. Existing claim receipts still prevent duplicate work.
+    # Distribute independent consumed-data builders across classes. Existing
+    # claim receipts still prevent duplicate work across both backends.
     for ticket in dispatch_order(tickets):
         try:
             state=pending_status(ticket)
+            if state=='ready' and ticket.get('workstream')=='training preparation':
+                ticket['preparation_authorization']=authorize_preparation(ticket,policy)
             slots=int(ticket.get('gpu_slots',1));is_critical=ticket.get('workstream') in critical
             if state=='ready' and (allowance>=slots or is_critical and queue_allowance>=slots):
                 result=submit(ticket,capacity)

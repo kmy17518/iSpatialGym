@@ -107,3 +107,64 @@ def test_downstream_collectors_keep_bounded_capacity_when_preparation_is_full():
     assert collector_allowance({**cap,'status':'unavailable'},[])==0
     cap.update(compatible_available_slots=4,account_slots={'minyeong':4})
     assert collector_allowance(cap,['1','2','99'])==4
+
+
+@pytest.fixture
+def consumed_preparation(tmp_path):
+    from scripts.campaign_20261110 import coordinator_dispatch as module
+    runtime=tmp_path/'runtime';runtime.write_text('immutable-runtime')
+    script=tmp_path/'builder.py';script.write_text('build_scaled_grasp_library()')
+    manifest={'path':str(tmp_path/'normalized.json'),'sha256':'a'*64}
+    source={'path':str(tmp_path/'source.json'),'sha256':'b'*64}
+    row=ticket(tmp_path)
+    row.update(workstream='training preparation',expected_account='minyeong',
+               physical_dedup_key='physical123',dedup_key='physical123',
+               claim_path=str(tmp_path/'claims/physical123.json'),
+               submission_path=str(tmp_path/'receipts/physical123.json'),
+               configuration_ids=['selected_scaled_object'],input_refs=[{'path':str(runtime),'sha256':module.sha(runtime)}],
+               runtime_ref={'path':str(runtime),'sha256':module.sha(runtime)},
+               inputs={str(runtime):module.sha(runtime)},command=['sbatch','--parsable',str(script)],
+               _prepared_manifest=manifest)
+    contract={'schema':'isg-consumed-preparation-admission-v1',
+              'allowed_computation_kinds':{'grasp_library':['attachment_free']},
+              'forbidden_preparation_entrypoint':'ispatialgym.sampling.sample_isg',
+              'approved_manifests':[{'manifest':source,'account':'minyeong','computation_kind':'grasp_library',
+                  'consumer_kind':'attachment_free','required_for_readiness':True,
+                  'claim_namespace':str(tmp_path/'claims'),'receipt_namespace':str(tmp_path/'receipts')}]}
+    path=tmp_path/'scope.json';path.write_text(json.dumps(contract))
+    policy={'preparation_scope':{'policy_ref':{'path':str(path),'sha256':module.sha(path)},
+            'normalized_manifests':[{'manifest':manifest,'source_manifest':source}]}}
+    return row,policy
+
+
+def test_consumed_scaled_library_uses_reviewed_manifest_and_original_claim(consumed_preparation):
+    from scripts.campaign_20261110.coordinator_dispatch import authorize_preparation
+    row,policy=consumed_preparation
+    assert authorize_preparation(row,policy)['consumer_kind']=='attachment_free'
+    assert not __import__('pathlib').Path(row['claim_path']).exists()
+
+
+@pytest.mark.parametrize('change',['manifest','physical_key','claim_namespace','runtime','consumer'])
+def test_preparation_identity_changes_fail_closed(consumed_preparation,change):
+    from scripts.campaign_20261110.coordinator_dispatch import authorize_preparation
+    row,policy=consumed_preparation
+    if change=='manifest':row['_prepared_manifest']={**row['_prepared_manifest'],'sha256':'c'*64}
+    elif change=='physical_key':row['physical_dedup_key']='other'
+    elif change=='claim_namespace':row['claim_path']=row['claim_path'].replace('/claims/','/new_claims/')
+    elif change=='runtime':row['inputs']={}
+    elif change=='consumer':row['configuration_ids']=[]
+    with pytest.raises(ValueError):authorize_preparation(row,policy)
+
+
+def test_preparation_rejects_scene_sampler_even_with_approved_manifest(consumed_preparation):
+    from pathlib import Path
+    from scripts.campaign_20261110.coordinator_dispatch import authorize_preparation
+    row,policy=consumed_preparation
+    Path(row['command'][-1]).write_text('python -m ispatialgym.sampling.sample_isg')
+    with pytest.raises(ValueError,match='Per-scene'):authorize_preparation(row,policy)
+
+
+def test_missing_scope_cannot_authorize_preparation(consumed_preparation):
+    from scripts.campaign_20261110.coordinator_dispatch import authorize_preparation
+    row,_=consumed_preparation
+    with pytest.raises(ValueError,match='requires'):authorize_preparation(row,{})
