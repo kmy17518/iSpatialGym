@@ -178,11 +178,17 @@ def project(root, scheduled, now, previous=None):
         errors.append({'kind': 'preparation_campaign_ready_count_unknown', 'owner': '/root/templates_assets',
                        'detail': 'Admitted queue is enumerated separately; remaining selected consumers need incremental manifests or exact per-item blockers'})
     prior = {e['exception_key']: e for e in previous.get('exceptions', [])}
+    responses = read(directory/'root_responses.json', [], optional=True)
     for error in errors:
         key = '|'.join(str(error.get(k, '')) for k in ('kind', 'requirement', 'account', 'source'))
         error['exception_key'] = key
         error['first_raised_at'] = prior.get(key, {}).get('first_raised_at', now)
         error['root_response_due_at'] = error['first_raised_at']+300
+        response = next((r for r in responses.get('responses', []) if r.get('exception') == error['kind']), None)
+        error['root_response'] = response
+        answered = response and (epoch(responses.get('observed_at')) or 0) >= error['first_raised_at']
+        error['root_response_overdue'] = bool(now > error['root_response_due_at'] and
+            (not answered or (epoch(response.get('next_check_at')) or 0) < now))
     return {'schema': 'isg-preparation-flow-watchdog-v1', 'observed_at': now,
             'owner': 'existing read-only campaign monitor', 'root_response_owner': '/root',
             'admitted_queue_enumeration': 'complete' if complete else 'unknown',
