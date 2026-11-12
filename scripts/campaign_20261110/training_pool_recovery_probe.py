@@ -20,6 +20,32 @@ ALLOWED = {'scripts/campaign_20261110/training_pool_recovery_probe.py',
 ORDERS = {'FRESH_A': [0], 'AA': [0, 0], 'A_FAILURE_A': [0, 0], 'A_INTERRUPT_A': [0, 0]}
 
 
+class ControlledEpisodeFailure(RuntimeError):
+    """An ordinary native error after one unchanged requested control action."""
+
+
+class ControlledEpisodeInterrupt(KeyboardInterrupt):
+    """An interruption through the ordinary native BaseException cleanup."""
+
+
+def abort_after_native_control_step(env, destination, exception):
+    # Self-contained: the pinned pool source predates the newer tray helper's
+    # exception types. Do not depend on unshipped current-checkout helpers.
+    step = env.step; original = vars(env).get('step'); had_step = 'step' in vars(env)
+    def cleanup():
+        if vars(env).get('step') is interrupted:
+            if had_step: env.step = original
+            else: del env.step
+    def interrupted(*args, **kwargs):
+        cleanup()
+        step(*args, **kwargs)
+        destination.update(native_control_calls_completed=1, physics_steps_added=0,
+                           exception_type=exception.__name__, injected=True)
+        raise exception('bounded restoration cleanup control after one native action')
+    env.step = interrupted
+    return cleanup
+
+
 def parent_request(request, proof=None):
     require(request.get('pool_recovery_v1') is True and request.get('pool_action_replay_v1') is True
             and request.get('diagnostic_control') in ORDERS and request.get('load_only') is False
@@ -59,14 +85,12 @@ def verify_runtime(root, request, records, runtime, verify_parent):
 
 
 def exception_type(control, ordinal):
-    from .training_batch_probe import ControlledEpisodeFailure, ControlledEpisodeInterrupt
     require(control in ORDERS and 0 <= ordinal < len(ORDERS[control]), 'recovery episode differs')
     if ordinal != 0: return None
     return {'A_FAILURE_A': ControlledEpisodeFailure, 'A_INTERRUPT_A': ControlledEpisodeInterrupt}.get(control)
 
 
 def install(runner, control, current, cleanups):
-    from .training_batch_probe import abort_after_native_control_step
     original = runner.InstanceLoader.restore
     def restored(loader, *args, **kwargs):
         result = original(loader, *args, **kwargs)

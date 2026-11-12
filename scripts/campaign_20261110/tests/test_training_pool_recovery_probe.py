@@ -53,3 +53,10 @@ def test_cleanup_restores_native_step_when_episode_fails_before_action():
     assert loader.env.step('unchanged') == 'unchanged' and not loader.report['pool_controlled_abort']
     with pytest.raises(ContractError):
         verify_expected_abort('A_FAILURE_A', 0, 1, {'success': False, 'error': 'other'}, {'loader': loader.report})
+
+
+def test_recovery_does_not_import_newer_unshipped_tray_helpers(monkeypatch):
+    import sys
+    monkeypatch.setitem(sys.modules, 'scripts.campaign_20261110.training_batch_probe', N())
+    assert exception_type('A_FAILURE_A', 0).__name__ == 'ControlledEpisodeFailure'
+    assert issubclass(exception_type('A_INTERRUPT_A', 0), KeyboardInterrupt)
