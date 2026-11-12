@@ -22,6 +22,7 @@ DELTA = {'fixed_initialized_actor_union': True, 'source_recordings_unchanged': T
          'native_slot_start_load_writer_cameras_retained': True,
          'selection_scope': 'exact_checked_two_source_records_A_B_A',
          'member_configuration': 'restore_each_exact_hash_bound_source_campaign_config_environment',
+         'frame_reference': 'exact_own_independent_native_cold_readback_bound_to_same_recorded_frame',
          'inactive_actor': 'parked_and_hidden_before_native_restoration_observation',
          'added_physics_steps': 0, 'added_stop_play_pairs': 0, 'explicit_sdk_reconstructions': 0,
          'proprio': 'native_loaded_state', 'collection_time_behavior_proprio_recorded': False,
@@ -109,12 +110,20 @@ def inputs(root, request_path):
             'unapproved native renderer payload change')
     cold = checked(root,q['cold_verification']); require(cold['status']=='native_cold_render_verified', 'cold renderer proof failed')
     helper = Path(q['cold_driver']['path']); require(ref(helper)==q['cold_driver'], 'cold source verifier changed')
-    driver = runpy.run_path(str(helper)); records=[];documents=[]; requests=[]; observations=[]
+    driver = runpy.run_path(str(helper)); records=[];documents=[]; requests=[]; observations=[]; cold_frames=[]
     for control, reference in zip(('FRESH_A','FRESH_B'),q['cold_requests']):
         checked(root,reference); request,record,document,old_runtime = driver['inputs'](root,reference['path'])
         require(request['control']==control and old_runtime==parent, 'cold renderer source differs')
         coldobs=checked(root,cold['controls'][control]['observation'])
         require(coldobs['request']==reference and coldobs['status']=='native_cold_render_passed', 'cold renderer observation differs')
+        frame_ref = cold['controls'][control]['frame_readback']; frame_path = Path(frame_ref['path']).resolve()
+        require(frame_path.is_relative_to(root) and ref(frame_path) == frame_ref == coldobs['frame_readback']
+                and cold['controls'][control]['original_cold_state_matched'] is True,
+                'native cold frame readback missing or changed')
+        frames = [json.loads(line) for line in frame_path.read_text().splitlines()]
+        require(len(frames) == cold['controls'][control]['native_frame_count'] == coldobs['episodes'][0]['frames']
+                and [f['frame'] for f in frames] == list(range(len(frames))), 'native cold frame sequence differs')
+        cold_frames.append(frames)
         records.append(record);documents.append(document);requests.append(request);observations.append(coldobs)
     environment_keys = set(requests[0]['source_environment']) | set(requests[1]['source_environment'])
     differences = {key for key in environment_keys
@@ -129,13 +138,13 @@ def inputs(root, request_path):
     contract=scene_union(documents,names,'robot_r1',physical)
     require(digest(contract)==q['scene_union_sha256'], 'checked renderer scene union changed')
     for doc in documents: require(not doc['state']['registry']['system_registry'], 'new particle/system boundary is unmeasured')
-    return q,records,documents,requests,observations,contract,names,runtime
+    return q,records,documents,requests,observations,contract,names,runtime,cold_frames
 
 
 def run(root,request_path,output,preflight=False):
     root=Path(root).resolve();request_path=Path(request_path).resolve();output=Path(output).resolve()
     require(request_path.is_relative_to(root) and output.is_relative_to(root), 'renderer outside campaign')
-    q,records,documents,requests,cold,contract,names,runtime=inputs(root,request_path)
+    q,records,documents,requests,cold,contract,names,runtime,cold_frames=inputs(root,request_path)
     if preflight: return {'passed':True,'request':ref(request_path),'native_execution':False,'scene_union_sha256':digest(contract)}
     require(not output.exists(),'preserve renderer output');output.mkdir(parents=True)
     os.environ.update(requests[0]['source_environment'])
@@ -207,10 +216,16 @@ def run(root,request_path,output,preflight=False):
         state,consumed=slot.scene.deserialize(flat);require(consumed==len(flat),'native state reader did not consume full source')
         require(not(set(state['registry']['object_registry']) & (set(names)-{active})),'source frame contains inactive actor')
         native=restoration_observation(slot.demo.campaign_meta['campaign'],slot.scene,og.sim)['loaded_state']
-        expected,observed=source_state_expected(native,state);same_loaded_state(expected,observed)
+        require({o.name:id(o) for o in slot.scene.objects}==identities,'native frame replaced initialized actors')
+        source_hash=hashlib.sha256(flat.detach().cpu().numpy().tobytes()).hexdigest()
+        cold_frame=cold_frames[member][slot.i]
+        require(cold_frame['frame']==slot.i and cold_frame['source_flat_sha256']==source_hash,
+                'cold native readback does not belong to this exact source frame')
+        expected=cold_frame['native_observation']['loaded_state']
+        observed=project_active_loaded(native,contract,active);same_loaded_state(expected,observed)
         frame_file.write(json.dumps({'episode':len(result['entries'])-1,'frame':slot.i,
-            'source_flat_sha256':hashlib.sha256(flat.detach().cpu().numpy().tobytes()).hexdigest(),
-            'source_expected':expected,'native_observed':observed,'strict_match':True})+'\n');frame_file.flush()
+            'source_flat_sha256':source_hash,
+            'cold_native_expected':expected,'native_observed':observed,'strict_match':True})+'\n');frame_file.flush()
         result['frame_counts'][-1]+=1;return answer
     campaign.selected_records=select;renderer.env_config=env_config;renderer.Slot.start=started;renderer.Slot.load=loaded
     try:
