@@ -10,6 +10,19 @@ def read(path, default=None):
     except (OSError,ValueError):return default
 
 
+def reconciliation_summary(base):
+    path=base/'accepted_reconciliation_inventory_r1/summary_r2.json'
+    value=read(path)
+    if value is None:return None
+    # Keep the observation compact; the full inventory retains every exact row.
+    result={k:value[k] for k in ('schema','observed_at','accepted_capture_started_at','accepted_capture_finished_at','counts','records','snapshot','no_retrospective_clearance_from_current100','regeneration_launched') if k in value}
+    impact=value.get('impact',{})
+    result['impact']={k:v for k,v in impact.items() if k in ('observed_at','pending_change_count','summary','snapshot','unchanged_from_start_audit')}
+    result['eligibility_observed_at']=value.get('eligibility',{}).get('observed_at')
+    result['source']={'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
+    return result
+
+
 def report(root):
     root=Path(root);pointer=read(root/'runtime_validation/current.json',{});release=read(pointer.get('release',{}).get('path',''),{})
     base=Path(pointer.get('release',{}).get('path','')).parent;manifest=read(pointer.get('manifest',{}).get('path',''),{})
@@ -31,6 +44,9 @@ def report(root):
         if authored:state='ready_unsubmitted';next_action='Complete command preflight and instrumented dispatch'
         if failure and not dispatch:state='failed_preflight';blocker=[failure.get('log')];next_action=failure['next_action']
         if dispatch:state=dispatch.get('status','queued');next_action='Reconcile backend allocation and native outcome'
+        exception=read(base/'dispatch'/(cls+'.exception.json'))
+        if exception and (not dispatch or dispatch.get('status')=='ready_unsubmitted'):
+            state='failed_intake';blocker=[exception.get('error')];next_action=exception.get('next_action','Inspect exact input/dispatch failure before retry.')
         receipt=read(dispatch.get('dispatch_receipt',''),{}) if dispatch else {}
         if receipt.get('status') in ('blocked','failed'):
             state='failed_dispatch';blocker=[receipt.get('error') or receipt.get('reason') or receipt.get('status')]
@@ -40,8 +56,18 @@ def report(root):
         if allocation:
             jobs=allocation.get('records',jobs)
             state=allocation.get('execution_state',state);next_action=allocation.get('next_action',next_action)
+            if state in ('COMPLETED','completed','synced'):
+                state='collection_terminal_awaiting_checks'
         audit=observer.get('classes',{}).get(cls,{})
-        if audit.get('status') in ('audit_blocked','replay_failed','awaiting_member_replay','awaiting_own_replay','awaiting_terminal_evidence'):
+        audit_allocation=read(audit.get('allocation',{}).get('path',''),{})
+        same_allocation=bool(allocation and str(audit_allocation.get('allocation',{}).get('jobid'))==str(allocation.get('allocation',{}).get('jobid')))
+        if same_allocation and audit.get('status') in ('native_started','awaiting_demo','awaiting_distinct_demos','native_failed','demo_failed','insufficient_successful_demos'):
+            state=audit['status']
+            if state in ('native_failed','demo_failed','insufficient_successful_demos'):
+                next_action='Root diagnoses actual native/demo evidence before a bounded registered retry; no unchanged automatic resubmission.'
+                blocker=audit.get('failed_demo_report_paths',[])
+        if same_allocation and (audit.get('status') in ('audit_blocked','replay_failed','awaiting_member_replay','awaiting_terminal_evidence','awaiting_acceptance_lock') or (
+                audit.get('status')=='awaiting_own_replay' and measured.get(cls,{}).get('distinct_demo_instance_ids'))):
             state=audit['status'];next_action=audit.get('next_action','Dedicated replay and acceptance owners reconcile this exact allocation; inspect failed checks before retry.')
             blocker=[audit.get('error') or audit.get('reason')] if audit.get('error') or audit.get('reason') else []
         if accepted:
@@ -50,7 +76,7 @@ def report(root):
         measurement=measured.get(cls)
         if measurement and not allocation and measurement.get('jobs'):
             jobs=measurement['jobs']
-        owner='/root/templates_assets' if state=='blocked_named_input' else '/root/compute' if state in ('failed_dispatch','external_submission','allocated_execution_unverified') else '/root'
+        owner='/root/templates_assets' if state=='blocked_named_input' else '/root/dataset_contract' if state in ('audit_blocked','awaiting_acceptance_lock','awaiting_terminal_evidence') else '/root/compute' if state in ('failed_dispatch','external_submission','allocated_execution_unverified','replay_failed','awaiting_member_replay','awaiting_own_replay') else '/root'
         rows.append({'class_id':cls,'state':state,'owner':owner,
                      'camera_exempt':catalog.get('camera_exempt'), 'runtime':release.get('frozen_runtime',{}).get('commit'),
                      'fresh_indices':None if not launched else [launched['fresh_start'],launched['fresh_count']],
@@ -58,6 +84,7 @@ def report(root):
                      'catalog_observed_at':catalog.get('observed_at'),'launch_created_at':(launched or{}).get('created_at'),
                      'last_execution_observed_at':(allocation or{}).get('observed_at'),
                      'measurements':measurement,'dispatch_receipt':dispatch.get('dispatch_receipt') if dispatch else None,
+                     'stage_observation':audit,
                      'row_path':str(base/'rows'/(cls+'.json')) if launched else None})
     states=dict(Counter(r['state']for r in rows));summary=manifest.get('summary',{})
     return {'schema':'isg-current-runtime-suite-observation-v1','campaign_id':'campaign_20261110',
@@ -66,9 +93,10 @@ def report(root):
             'historical_runtime_identities':summary.get('historical_runtime_identity_count'),
             'required_classes':100,'validation_passed':states.get('validation_passed',0),'state_counts':states,'rows':rows,
             'metrics':metrics,'intake_worker':read(base/'dispatch_intake_worker.json'),
+            'existing_sample_reconciliation':reconciliation_summary(base),
             'acceptance_observer':observer,
             'impact_observed_at':summary.get('impact_ledger_observed_at'),'impact_summary':summary.get('impact_summary'),
-            'regeneration_decision':{'status':'not_authorized_pending_measurements','reason':'Full current-runtime suite and measured per-configuration replacement scope are incomplete; no defensible two-hour full-regeneration estimate.'},
+            'regeneration_decision':{'status':'authorized_conditionally_gates_and_measurements_pending','reason':'Full current-runtime suite and measured per-configuration replacement scope are incomplete; no defensible two-hour full-regeneration estimate.'},
             'observer_authority':'Read existing records only; does not dispatch, cancel, accept, or release.'}
 
 
