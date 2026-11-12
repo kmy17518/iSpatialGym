@@ -20,6 +20,18 @@ def test_non_axis_aligned_inertia_round_trip_and_native_equality():
     assert not matches(actual,expected)
 
 
+def test_diagonal_native_inertia_preserves_axes_across_float_usd_reconstruction():
+    # Measured source tray from stopped_r3. The old sorted eigenbasis rotated
+    # 90 degrees, creating off-diagonal terms above the unchanged strict bound.
+    matrix=np.diag(np.array([.05185231193900108,.02582222782075405,.07756210118532181],dtype=np.float32))
+    values,quat=principal_inertia(matrix)
+    assert values==np.diag(matrix).tolist() and quat==[0.,0.,0.,1.]
+    rotation=Rotation.from_quat(np.asarray(quat,dtype=np.float32)).as_matrix().astype(np.float32)
+    rebuilt=rotation@np.diag(np.asarray(values,dtype=np.float32))@rotation.T
+    assert np.array_equal(matrix,rebuilt)
+    assert matches(state(rebuilt),state(matrix))
+
+
 def test_equal_mass_never_hides_wrong_native_inertia_or_missing_usd():
     original=state(np.diag([.001,.002,.003]))
     stale=state(np.diag([.0001,.0002,.0003]))

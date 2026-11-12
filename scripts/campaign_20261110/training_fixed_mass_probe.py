@@ -10,6 +10,7 @@ DELTA = {'name': 'fixed_tray_mass_inertia_baseline_v1',
          'cold_physical_operations_changed': True, 'warm_physical_operations_changed': True,
          'additional_physics_steps': 0, 'task_input_files_changed': False,
          'initial_actor_reconstruction': 'one_stop_author_both_trays_play_before_baseline',
+         'diagonal_principal_axes': 'preserve_native_axes_without_eigenaxis_rotation',
          'thresholds_changed': False, 'stock_mass_restored_between_episodes': False}
 ALLOWED = {'scripts/campaign_20261110/training_fixed_mass_probe.py',
            'scripts/campaign_20261110/tests/test_training_fixed_mass_probe.py',
@@ -66,6 +67,13 @@ def principal_inertia(tensor):
     matrix=np.asarray(tensor,dtype=float).reshape(3,3,order='F')
     require(np.isfinite(matrix).all() and np.allclose(matrix,matrix.T,atol=1e-10,rtol=1e-6),
             'invalid native inertia tensor')
+    # Principal moments need not be sorted. Sorting an already diagonal tensor
+    # introduces a needless rotation; its float USD quaternion can create
+    # off-diagonal inertia during native reconstruction. Preserve exact axes.
+    if np.array_equal(matrix,np.diag(np.diag(matrix))):
+        values=np.diag(matrix)
+        require((values>0).all(),'nonpositive native inertia')
+        return values.tolist(),[0.,0.,0.,1.]
     values, axes=np.linalg.eigh(matrix)
     require((values>0).all(),'nonpositive native inertia')
     if np.linalg.det(axes)<0:axes[:,0]*=-1
