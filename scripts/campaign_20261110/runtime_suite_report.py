@@ -10,6 +10,20 @@ def read(path, default=None):
     except (OSError,ValueError):return default
 
 
+def attempt_scope(root, pointer, base, cls):
+    """Read the registered active attempt; retain references to retired attempts."""
+    initial=base/'rows'/(cls+'.json')
+    if not initial.exists():return None,[],None
+    refs=[{'path':str(initial),'sha256':hashlib.sha256(initial.read_bytes()).hexdigest()}]
+    if pointer.get('attempt_registry'):
+        try:
+            from scripts.campaign_20261110.runtime_suite import registered_rows
+            refs=registered_rows(root,pointer,base,cls)
+        except (OSError,ValueError,KeyError,TypeError,ImportError) as exc:
+            return None,refs,str(exc)
+    return refs[-1],refs,None
+
+
 def reconciliation_summary(base):
     path=base/'accepted_reconciliation_inventory_r1/summary_r2.json'
     value=read(path)
@@ -34,17 +48,26 @@ def report(root):
         for folder in ['custom_providers_r1','camera_bddl_r1']:
             resolved=read(base/'input_resolutions'/folder/(cls+'.json'))
             if resolved:catalog=resolved
-        launched=read(base/'rows'/(cls+'.json'));dispatch=read(base/'dispatch'/(cls+'.json'));allocation=read(base/'allocations'/(cls+'.json'));accepted=read(base/'acceptance'/(cls+'.json'))
-        authored=read(base/'authoring'/(cls+'.json'));attempt=read(base/'authoring_attempts_r1'/(cls+'.json'));failure=read(base/'dispatch'/(cls+'.failure.json'))
+        active_ref,attempt_refs,registry_error=attempt_scope(root,pointer,base,cls)
+        launched=read(active_ref['path']) if active_ref else None
+        retry=bool(launched and launched.get('attempt_number'));attempt_dir=Path(active_ref['path']).parent if active_ref else base
+        dispatch_path=attempt_dir/'dispatch.json' if retry else base/'dispatch'/(cls+'.json')
+        allocation_path=attempt_dir/'allocation.json' if retry else base/'allocations'/(cls+'.json')
+        dispatch=read(dispatch_path);allocation=read(allocation_path);accepted=read(base/'acceptance'/(cls+'.json'))
+        historical_acceptance=None
+        if retry and accepted and accepted.get('row')!=active_ref:
+            historical_acceptance=accepted;accepted=None
+        authored=launched if retry else read(base/'authoring'/(cls+'.json'));attempt=None if retry else read(base/'authoring_attempts_r1'/(cls+'.json'))
+        failure=read(attempt_dir/'dispatch.failure.json' if retry else base/'dispatch'/(cls+'.failure.json'))
         for folder in ['authoring_attempts_camera_r1','authoring_attempts_opening_r2']:
-            attempt=read(base/folder/(cls+'.json')) or attempt
+            if not retry:attempt=read(base/folder/(cls+'.json')) or attempt
         state='inputs_resolved' if catalog.get('state')=='inputs_resolved' else 'blocked_named_input'
         next_action=catalog.get('next_action','Resolve exact inputs');blocker=catalog.get('missing_inputs',[]);jobs=[]
         if attempt and attempt.get('returncode') not in (None,0):state='failed_authoring';blocker=[attempt.get('log')];next_action=attempt['next_action']
         if authored:state='ready_unsubmitted';next_action='Complete command preflight and instrumented dispatch'
         if failure and not dispatch:state='failed_preflight';blocker=[failure.get('log')];next_action=failure['next_action']
         if dispatch:state=dispatch.get('status','queued');next_action='Reconcile backend allocation and native outcome'
-        exception=read(base/'dispatch'/(cls+'.exception.json'))
+        exception=read(attempt_dir/'dispatch.exception.json' if retry else base/'dispatch'/(cls+'.exception.json'))
         if exception and (not dispatch or dispatch.get('status')=='ready_unsubmitted'):
             state='failed_intake';blocker=[exception.get('error')];next_action=exception.get('next_action','Inspect exact input/dispatch failure before retry.')
         receipt=read(dispatch.get('dispatch_receipt',''),{}) if dispatch else {}
@@ -60,7 +83,7 @@ def report(root):
                 state='collection_terminal_awaiting_checks'
         audit=observer.get('classes',{}).get(cls,{})
         audit_allocation=read(audit.get('allocation',{}).get('path',''),{})
-        same_allocation=bool(allocation and str(audit_allocation.get('allocation',{}).get('jobid'))==str(allocation.get('allocation',{}).get('jobid')))
+        same_allocation=bool(allocation and str(audit_allocation.get('allocation',{}).get('jobid'))==str(allocation.get('allocation',{}).get('jobid')) and (not retry or audit.get('row')==active_ref))
         if same_allocation and audit.get('status') in ('native_started','awaiting_demo','awaiting_distinct_demos','native_failed','demo_failed','insufficient_successful_demos'):
             state=audit['status']
             if state in ('native_failed','demo_failed','insufficient_successful_demos'):
@@ -77,6 +100,17 @@ def report(root):
         if measurement and not allocation and measurement.get('jobs'):
             jobs=measurement['jobs']
         owner='/root/templates_assets' if state=='blocked_named_input' else '/root/dataset_contract' if state in ('audit_blocked','awaiting_acceptance_lock','awaiting_terminal_evidence') else '/root/compute' if state in ('failed_dispatch','external_submission','allocated_execution_unverified','replay_failed','awaiting_member_replay','awaiting_own_replay') else '/root'
+        diagnosis_path=base/'diagnoses'/(cls+'.json');diagnosis=read(diagnosis_path)
+        if diagnosis:
+            diagnosis={**diagnosis,'source':{'path':str(diagnosis_path),'sha256':hashlib.sha256(diagnosis_path.read_bytes()).hexdigest()}}
+            # Original diagnosis remains visible after a registered recovery,
+            # but must not relabel new execution or a verified result as failed.
+            if not retry and state!='validation_passed':
+                owner=diagnosis.get('owner',owner);next_action=diagnosis.get('next_action',next_action)
+                if diagnosis.get('blocker'):blocker=[diagnosis['blocker']]
+        if registry_error:
+            state='attempt_registry_unavailable';owner='/root';blocker=[registry_error]
+            next_action='Repair exact registered-attempt evidence; do not infer active execution or validation from the retired attempt.'
         rows.append({'class_id':cls,'state':state,'owner':owner,
                      'camera_exempt':catalog.get('camera_exempt'), 'runtime':release.get('frozen_runtime',{}).get('commit'),
                      'fresh_indices':None if not launched else [launched['fresh_start'],launched['fresh_count']],
@@ -85,7 +119,9 @@ def report(root):
                      'last_execution_observed_at':(allocation or{}).get('observed_at'),
                      'measurements':measurement,'dispatch_receipt':dispatch.get('dispatch_receipt') if dispatch else None,
                      'stage_observation':audit,
-                     'row_path':str(base/'rows'/(cls+'.json')) if launched else None})
+                     'diagnosis':diagnosis,'attempt_number':(launched or{}).get('attempt_number',0),
+                     'attempt_rows':attempt_refs,'historical_acceptance':historical_acceptance,
+                     'row_path':active_ref['path'] if active_ref else None})
     states=dict(Counter(r['state']for r in rows));summary=manifest.get('summary',{})
     return {'schema':'isg-current-runtime-suite-observation-v1','campaign_id':'campaign_20261110',
             'observed_at':datetime.now(timezone.utc).isoformat(),'run_id':release.get('run_id'),'release':pointer.get('release'),

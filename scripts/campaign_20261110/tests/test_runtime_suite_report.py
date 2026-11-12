@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 from scripts.campaign_20261110 import runtime_suite_report as r
 
 
@@ -39,3 +40,35 @@ def test_acceptance_lock_reports_acceptance_owner(tmp_path):
     put(base/'acceptance_observer.json',{'classes':{'class0':{'allocation':{'path':str(base/'allocations/class0.json')},'status':'awaiting_acceptance_lock'}}})
     row=r.report(tmp_path)['rows'][0]
     assert row['state']=='awaiting_acceptance_lock' and row['owner']=='/root/dataset_contract'
+
+
+def test_registered_retry_does_not_inherit_predecessor_job_or_acceptance(tmp_path):
+    base,put=fixture(tmp_path)
+    put(base/'rows/class0.json',{'fresh_start':1,'fresh_count':3})
+    new=base/'attempts/class0/attempt_1/row.json'
+    put(new,{'attempt_number':1,'fresh_start':4,'fresh_count':3})
+    put(base/'acceptance/class0.json',{'validation_passed':False,'status':'failed','row':{'path':'old'}})
+    refs=[{'path':str(base/'rows/class0.json')},{'path':str(new)}]
+    with patch.object(r,'attempt_scope',return_value=(refs[-1],refs,None)):
+        row=r.report(tmp_path)['rows'][0]
+    assert row['fresh_indices']==[4,3] and row['state']=='ready_unsubmitted'
+    assert row['jobs']==[] and row['acceptance'] is None
+    assert row['historical_acceptance']['status']=='failed'
+    assert row['attempt_rows']==refs
+
+
+def test_unreadable_registry_is_explicit_not_original_attempt_fallback(tmp_path):
+    base,put=fixture(tmp_path)
+    with patch.object(r,'attempt_scope',return_value=(None,[],'changed registry bytes')):
+        row=r.report(tmp_path)['rows'][0]
+    assert row['state']=='attempt_registry_unavailable'
+    assert row['blocker']==['changed registry bytes']
+
+
+def test_owned_diagnosis_is_visible_without_changing_execution_stage(tmp_path):
+    base,put=fixture(tmp_path)
+    put(base/'diagnoses/class0.json',{'owner':'/root/templates_assets','blocker':'exact fixed geometry excludes requested bucket','next_action':'Verify corrected input after old allocation terminates','observed_at':123})
+    row=r.report(tmp_path)['rows'][0]
+    assert row['state']=='collection_terminal_awaiting_checks'
+    assert row['owner']=='/root/templates_assets' and row['diagnosis']['observed_at']==123
+    assert row['blocker']==['exact fixed geometry excludes requested bucket']
