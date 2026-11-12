@@ -4743,6 +4743,18 @@ class IORSLarge(SamplerV2):
             return list(draw_order)
         return [i for i, e in zip(draw_order, ends) if e is not False]
 
+    def record_path(self, *args, **kwargs):
+        record = super().record_path(*args, **kwargs)
+        from ispatialgym.sampling.campaign_base_hull_screen import screen_record
+        try:
+            overlap = screen_record(self, record)
+            if overlap is not None:
+                raise Reject('path_collision', 'native base/chair hull route: ' + str(overlap))
+        except Exception:
+            self.sidecar.paths = [p for p in self.sidecar.paths if p is not record]
+            raise
+        return record
+
     # ------------------------------------------------------------------ legs A -> B and B -> C (owner 2026‑09‑19 21:56)
 
     def _drop_leg_records(self, to: str) -> None:

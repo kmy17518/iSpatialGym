@@ -116,6 +116,8 @@ def contact_recovery(option: str) -> bool:
         'cap_capture_margin': ('configuration_matching-attachment_02',
                                 'configuration_matching-attachment'),
         'axial_magazine_contact_height': ('alignment-axial_04', 'alignment-axial'),
+        'nextto_native_base_hulls': ('inter_object_relation_satisfaction-nextto_large_scale_01',
+                                   'inter_object_relation_satisfaction-nextto_large_scale'),
         'cap_vertical_final_retreat': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
         'lid_vertical_final_retreat': ('configuration_matching-attachment_04', 'configuration_matching-attachment'),
     }
