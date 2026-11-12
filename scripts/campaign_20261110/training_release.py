@@ -51,19 +51,24 @@ def verify_probe_execution(root, reference, execution_reference):
             'probe execution output or submitted allocation differs')
     scheduler = execution['scheduler_evidence']; raw = _reference(root, scheduler).read_text()
     command = scheduler.get('command', [])
-    fields = 'JobIDRaw,State,ExitCode,Start,End,ElapsedRaw,AllocTRES'
+    required_fields = {'JobIDRaw', 'State', 'ExitCode', 'Start', 'End', 'ElapsedRaw', 'AllocTRES'}
+    formats = [arg.split('=', 1)[1].split(',') for arg in command if arg.startswith('--format=')]
     require(command and Path(command[0]).name == 'sacct' and '-X' in command and '-P' in command and
-            '-n' in command and '--format='+fields in command and '-j' in command and
+            '-n' in command and len(formats) == 1 and len(formats[0]) == len(set(formats[0])) and
+            required_fields <= set(formats[0]) <= required_fields | {'JobID'} and '-j' in command and
             job_id in command[command.index('-j')+1].split(','), 'exact raw scheduler query required')
+    fields = formats[0]
     rows = [line.split('|') for line in raw.splitlines() if line.strip()]
-    matches = [row for row in rows if row[0] == job_id]
-    require(len(matches) == 1 and len(matches[0]) == 7, 'native allocation raw scheduler row missing or ambiguous')
+    require(all(len(row) == len(fields) for row in rows), 'raw scheduler columns differ from exact query')
+    matches = [dict(zip(fields, row)) for row in rows if row[fields.index('JobIDRaw')] == job_id]
+    require(len(matches) == 1, 'native allocation raw scheduler row missing or ambiguous')
     row = matches[0]
-    require(row[1:3] == ['COMPLETED', '0:0'] and row[3] not in ('', 'Unknown', 'None') and
-            row[4] not in ('', 'Unknown', 'None') and row[5].isdigit() and int(row[5]) > 0 and row[6],
+    require(row.get('JobID', job_id) == job_id and row['State'] == 'COMPLETED' and row['ExitCode'] == '0:0' and
+            row['Start'] not in ('', 'Unknown', 'None') and row['End'] not in ('', 'Unknown', 'None') and
+            row['ElapsedRaw'].isdigit() and int(row['ElapsedRaw']) > 0 and row['AllocTRES'],
             'native raw scheduler result is not a clean completed execution')
-    require(jobs[0].get('start') == row[3] and jobs[0].get('end') == row[4] and
-            jobs[0].get('elapsed_seconds') == int(row[5]) and jobs[0].get('allocated_resources') == row[6],
+    require(jobs[0].get('start') == row['Start'] and jobs[0].get('end') == row['End'] and
+            jobs[0].get('elapsed_seconds') == int(row['ElapsedRaw']) and jobs[0].get('allocated_resources') == row['AllocTRES'],
             'probe execution summary differs from raw scheduler evidence')
     return {'probe': reference, 'execution': execution_reference, 'job_id': job_id,
             'status': 'native_process_completed_cleanly'}

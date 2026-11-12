@@ -63,3 +63,23 @@ def test_original_failed_artifact_stays_immutable_during_later_clean_audit(tmp_p
     old=save('old_failure.json',failed);before=(tmp_path/'old_failure.json').read_bytes()
     release.verify_probe_execution(tmp_path,probe,save('execution.json',execution))
     assert (tmp_path/'old_failure.json').read_bytes()==before and file_digest(old['path'])==old['sha256']
+
+
+def test_raw_query_declared_column_order_and_explicit_jobid_are_bound(tmp_path):
+    save,probe,execution,_,_=fixture(tmp_path)
+    raw=tmp_path/'scheduler.txt'
+    raw.write_text('42|42|COMPLETED|0:0|60|2026-11-12T01:00:00|2026-11-12T01:01:00|cpu=8,gres/gpu=1\n')
+    execution['scheduler_evidence']['command'][-1]='--format=JobID,JobIDRaw,State,ExitCode,ElapsedRaw,Start,End,AllocTRES'
+    execution['scheduler_evidence']['sha256']=file_digest(raw)
+    assert release.verify_probe_execution(tmp_path,probe,save('execution.json',execution))['job_id']=='42'
+    raw.write_text(raw.read_text().replace('42|42|','43|42|'))
+    execution['scheduler_evidence']['sha256']=file_digest(raw)
+    with pytest.raises(ContractError,match='not a clean completed'):
+        release.verify_probe_execution(tmp_path,probe,save('execution.json',execution))
+
+
+def test_duplicate_or_unbound_scheduler_columns_fail_closed(tmp_path):
+    save,probe,execution,_,_=fixture(tmp_path)
+    execution['scheduler_evidence']['command'][-1]='--format=JobIDRaw,State,ExitCode,Start,End,ElapsedRaw,AllocTRES,State'
+    with pytest.raises(ContractError,match='exact raw scheduler query'):
+        release.verify_probe_execution(tmp_path,probe,save('execution.json',execution))
