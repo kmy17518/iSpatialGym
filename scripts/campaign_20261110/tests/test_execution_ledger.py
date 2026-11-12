@@ -149,5 +149,35 @@ class ExecutionLedgerTests(unittest.TestCase):
                 self.assertEqual(r['active_work'], [])
                 self.assertEqual(r['evidence_state'], 'unavailable')
 
+    def test_current_runtime_regression_stays_separate_from_historical_acceptance(self):
+        self.put('canonical',{'validated':100,'total':100,'classes':[]})
+        self.put('current_runtime',{'run_id':'fresh','validation_passed':1,'required_classes':100,
+            'rows':[{'class_id':'class','runtime':'exact','state':'validation_passed',
+                     'last_execution_observed_at':1000,'jobs':[{'job_id':'done','status':'COMPLETED'}],
+                     'attempt_rows':[{'path':'row','sha256':'exact-row'}],
+                     'acceptance':{'status':'regression_validation_passed','validation_passed':True,
+                                   'quota':{'consumed':0},'claim_result':{'accepted':{}}}}]})
+        value=build(self.root,1001);r=value['rows'][0]
+        self.assertEqual(value['canonical']['validated'],100)
+        self.assertEqual(value['current_runtime']['validation_passed'],1)
+        self.assertEqual(r['kind'],'current_runtime_validation')
+        self.assertTrue(r['verification']['validation_passed'])
+        self.assertEqual(r['acceptance']['accepted_instances'],{})
+        self.assertEqual(r['acceptance']['quota_consumed'],0)
+        self.assertEqual(r['active_work'],[])
+        self.assertEqual(r['stages']['physics_replay']['status'],'unobserved')
+        self.assertFalse(value['release_decisions']['ledger_alone_authorizes_release'])
+
+    def test_current_runtime_submission_cannot_invent_native_or_active_job(self):
+        self.put('current_runtime',{'run_id':'fresh','rows':[{'class_id':'class',
+            'dispatch_receipt':'receipt.json','jobs':[{'job_id':'unknown'}],
+            'last_execution_observed_at':1000,'stage_observation':{},'state':'allocated_execution_unverified'}]})
+        r=build(self.root,1001)['rows'][0]
+        self.assertEqual(r['stages']['submitted']['status'],'source_evidence')
+        self.assertEqual(r['stages']['native']['status'],'unobserved')
+        self.assertFalse(r['verification']['validation_passed'])
+        self.assertEqual(r['active_work'],[])
+        self.assertEqual(r['reported_work'],[{'job_id':'unknown'}])
+
 
 if __name__=='__main__':unittest.main()

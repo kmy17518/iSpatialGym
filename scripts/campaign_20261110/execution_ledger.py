@@ -27,6 +27,7 @@ SOURCES = {
     'eligibility': 'accounting/current_eligibility.json',
     'production_gate': 'controllers/training_production_gate.json',
     'assignments': 'infra/execution_assignments.json',
+    'current_runtime': 'runtime_validation/status.json',
 }
 STAGES = ('implemented', 'submitted', 'native', 'demo', 'physics_replay', 'rendering', 'accepted')
 
@@ -174,6 +175,51 @@ def build(root, now=None):
             controller=observed.get('controller'), acceptance=observed.get('acceptance',c.get('acceptance',{})),
             verification=c, last_progress_at=observed.get('last_progress_at'), blocker=observed.get('blocker'),
             next_action=observed.get('next_action') or 'Reconcile exact accepted quota and current refill owner.'))
+    # The current frozen suite is a separate proof obligation from historical
+    # canonical acceptance. Index its exact attempts without replacing history
+    # or interpreting replay/submission as an accepted benchmark instance.
+    current = values['current_runtime']
+    scheduler = {str(j.get('id')):j for account in values['capacity'].get('accounts',{}).values()
+                 for j in account.get('jobs',[]) if j.get('id') is not None}
+    for i,r in enumerate(current.get('rows',[])):
+        observed = r.get('stage_observation') or {}
+        accepted = r.get('acceptance') or {}
+        jobs = [{**j, 'status':scheduler[str(j['job_id'])]['state'],
+                 'scheduler_observation':refs['capacity']} if not j.get('never_started') and
+                str(j.get('job_id')) in scheduler else j for j in r.get('jobs',[])]
+        activity = worker_activity({'worker_observed_at': refs['capacity'].get('observed_at')
+                                    if scheduler else r.get('last_execution_observed_at'),
+                                    'active_jobs': jobs}, now)
+        stages = {s:stage() for s in STAGES}
+        if r.get('dispatch_receipt'): stages['submitted']=stage(r['dispatch_receipt'])
+        if 'native_written_observed' in observed:
+            stages['native']=stage({'written_observed':observed['native_written_observed'],
+                                    'observed_at':observed.get('observed_at')})
+        if observed.get('successful_demo_reports'):
+            stages['demo']=stage(observed['successful_demo_reports'])
+        own_replays=[m['member_replay'] for m in accepted.get('members',[]) if m.get('member_replay')]
+        if own_replays: stages['physics_replay']=stage(own_replays)
+        quota=accepted.get('quota',{})
+        claimed=accepted.get('claim_result',{}).get('accepted',{})
+        acceptance={'status':accepted.get('status','unobserved'),
+                    'accepted_instances':claimed,'quota_consumed':quota.get('consumed'),
+                    'regression_is_not_benchmark_acceptance':True}
+        if accepted: stages['accepted']=stage(acceptance)
+        result.append(row(f"runtime:{current.get('run_id')}:{r.get('class_id',i)}",
+            'current_runtime_validation',r.get('owner','/root'),refs['current_runtime'],
+            class_id=r.get('class_id'),runtime=r.get('runtime'),run_id=current.get('run_id'),
+            status=r.get('state'),requirement_ids=['G14','G15'],
+            row_path=r.get('row_path'),attempt_number=r.get('attempt_number'),
+            dependencies=r.get('attempt_rows',[]),fresh_indices=r.get('fresh_indices'),
+            **activity,stages=stages,acceptance=acceptance,
+            verification={'status':accepted.get('status','unverified'),
+                          'validation_passed':accepted.get('validation_passed') is True,
+                          'strict_review':accepted.get('strict_review'),
+                          'source_observation_only':True},
+            artifacts=[v for v in (accepted.get('strict_review'),accepted.get('regression_audit')) if v],
+            blocker=r.get('blocker'),diagnosis=r.get('diagnosis'),
+            last_progress_at=r.get('last_execution_observed_at'),
+            next_action=r.get('next_action') or 'Reconcile exact current-runtime evidence; preserve historical results separately.'))
     for i,r in enumerate(values['heldout'].get('rows',[])):
         stages = {s:stage() for s in STAGES}
         for name,key in [('native','native'),('demo','demo'),('physics_replay','replay')]: stages[name] = stage(r.get(key))
@@ -206,6 +252,8 @@ def build(root, now=None):
         'sources':refs,'rows':result,'indexed_sources':{'configurations':refs['configurations'],'dependencies':refs['dependencies']},
         'requirements_by_task':{t:reqs(t) for t in sorted({c.get('task') for c in configs if c.get('task')})},'accepted':{'counts':counts,'source':refs['eligibility']},
         'canonical':{k:values['canonical'].get(k) for k in ('validated','total','state_counts')},
+        'current_runtime':{k:current.get(k) for k in ('run_id','frozen_runtime','required_classes',
+                           'validation_passed','state_counts','observed_at')},
         'preparation':{'required_configurations':len(configs) if manifest else None,'verified_configurations':served if manifest else None,
             'denominator_complete':status.get('summary',{}).get('denominator_complete') is True and not gaps,'scope_gaps':gaps,
             'dependency_status_counts':dict(Counter(d.get('status','unobserved') for d in deps)),
