@@ -103,6 +103,8 @@ def contact_recovery(option: str) -> bool:
                                      'inter_object_relation_satisfaction-touching_small_scale'),
         'touching_push_straight_retreat': ('inter_object_relation_satisfaction-touching_04',
                                          'inter_object_relation_satisfaction-touching_small_scale'),
+        'cereal_brace_gap_1mm': ('inter_object_relation_satisfaction-touching_02',
+                               'inter_object_relation_satisfaction-touching_small_scale'),
         'shelf_board_draw': ('inter_object_relation_satisfaction-touching_03',
                              'inter_object_relation_satisfaction-touching_small_scale'),
         'shelf_other_arm': ('inter_object_relation_satisfaction-touching_03',
@@ -130,6 +132,16 @@ def contact_recovery(option: str) -> bool:
     if value:
         require((template.class_id, template.task) == classes[option],
                 'contact recovery belongs to another audited class')
+        if option == 'cereal_brace_gap_1mm':
+            expected = {'target': ('box_of_cereal', 'iucshm', .8),
+                        'partner': ('box_of_cereal', 'dkhgxn', 1.)}
+            require(template.split == 'eval_standard' and all(
+                len(objects := [o for o in template.objects if o.role == role]) == 1 and
+                (objects[0].category, objects[0].model) == spec[:2] and
+                len(objects[0].default_scale) == 3 and
+                all(abs(float(v) - spec[2]) <= 1e-7 for v in objects[0].default_scale)
+                for role, spec in expected.items()),
+                'cereal brace gap belongs to its exact canonical models and scales')
         if option == 'held_jar_close_brace':
             require(template.split == 'eval_category' and
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==

@@ -8321,8 +8321,13 @@ class IORSSmall(SamplerV2):
         brace poses at the partner's far (robot-left) face in the order to try - the open-finger stop on a wide face under
         ``brace_open_when_wide``, else the fingertip-front classes (wide stop, ``brace_tip_h[-][_p15][_lo]``), the top-down blades, the side
         contacts. Yields ``(pre, contact, kind, extras)``."""
+        from ispatialgym.sampling import campaign_runtime
+        # Exact-source native/oracle/own-action replay showed that the 5mm gap
+        # let the cereal partner tilt before the brace engaged. Keep a positive
+        # 1mm gap; every generated pose still passes the normal native checks.
+        clearance = .001 if campaign_runtime.contact_recovery('cereal_brace_gap_1mm') else None
         yield from CPZ.touching_brace_candidates(self, manip, b_point, face_z, a_face, partner_hull_w=partner_hull_w, push_point=push_point,
-                                                 open_when_wide=self.brace_open_when_wide())
+                                                 open_when_wide=self.brace_open_when_wide(), stop_clearance_m=clearance)
 
     def _nudge_until_touching(self, tname: str, pname: str, step: float = 0.001, max_steps: int = 25):
         from omnigibson.object_states import Touching

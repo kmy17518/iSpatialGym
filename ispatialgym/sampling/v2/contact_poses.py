@@ -908,7 +908,8 @@ def open_brace_candidates(gs, b_point: th.Tensor, face_z: Tuple[float, float], a
 
 
 def touching_brace_candidates(gs, manip: Stance, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor,
-                              partner_hull_w: Optional[th.Tensor] = None, push_point: Optional[th.Tensor] = None, *, open_when_wide: bool = False):
+                              partner_hull_w: Optional[th.Tensor] = None, push_point: Optional[th.Tensor] = None, *, open_when_wide: bool = False,
+                              stop_clearance_m: Optional[float] = None):
     """Brace poses of the closed left gripper at the partner's far (robot-left) face, in the order to try — the axial
     stop-brace rule instead of the former 12 mm pad-slab at the face point: (1) the pads on the face, pad centre
     ``STOP_CLEARANCE`` outside it (closing axis vertical then horizontal, either wrist turn); (2) the top-down blade
@@ -922,7 +923,9 @@ def touching_brace_candidates(gs, manip: Stance, b_point: th.Tensor, face_z: Tup
     z_axis = th.tensor([0.0, 0.0, 1.0])
     side_h = C.unit(th.cross(z_axis, outward, dim=0))
     z0, z1 = face_z
-    clearance = float(gs.gen("stop_clearance_m", STOP_CLEARANCE))
+    clearance = float(gs.gen("stop_clearance_m", STOP_CLEARANCE) if stop_clearance_m is None else stop_clearance_m)
+    if not math.isfinite(clearance) or clearance < 0:
+        raise ValueError('brace stop clearance must be finite and nonnegative')
     rule = brace_open_rule(gs, b_point, face_z, a_face, partner_hull_w, push_point, open_when_wide=open_when_wide)
     if rule is not None and rule["required"]:
         # generation.brace_open_when_wide on a wide face: the open-finger stop or nothing (``touching_contacts`` rejects the draw)
