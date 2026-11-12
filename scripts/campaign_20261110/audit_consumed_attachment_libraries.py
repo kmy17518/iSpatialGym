@@ -10,7 +10,7 @@ from scripts.campaign_20261110.contracts import file_digest, require, write_json
 from scripts.campaign_20261110.reservation_policy import active_policy
 
 
-def audit(root, manifest):
+def audit(root, manifest, only_keys=None):
     from ispatialgym.grasping import schema as S, candidates as C
     from ispatialgym.sampling.knowledge import is_ready
     root = Path(root); manifest = Path(manifest)
@@ -24,6 +24,7 @@ def audit(root, manifest):
         if path not in digest_cache: digest_cache[path] = file_digest(path)
         require(digest_cache[path] == reference['sha256'], 'Input bytes changed: ' + path)
     for ticket in json.loads(manifest.read_text())['jobs']:
+        if only_keys is not None and ticket['physical_dedup_key'] not in only_keys: continue
         directory = Path(ticket['prepared']['path']).parent
         row = {'id': ticket['id'], 'physical_dedup_key': ticket['physical_dedup_key'],
                'configuration_ids': ticket['configuration_ids'], 'selected_dependency_ids': ticket['selected_dependency_ids'],
@@ -47,18 +48,23 @@ def audit(root, manifest):
             checked(terminal['library']); path = Path(terminal['library']['path']); data = json.loads(path.read_text())
             candidates = json.loads((path.parent / 'candidates.json').read_text())
             validation = json.loads((path.parent / 'validation.json').read_text())
-            require(data['schema'] == S.LIBRARY and data['constraint'] == 'attachment_free', 'Not an attachment library')
+            constraint = entry['constraint']
+            require(constraint in {'attachment_free', 'tabletop_insert', 'flower_stem_top'}, 'Unsupported consumed library constraint')
+            require(data['schema'] == S.LIBRARY and data['constraint'] == constraint, 'Wrong library constraint')
             require(all(data[k] == entry[k] == candidates[k] for k in ('category', 'model', 'dataset', 'scale', 'constraint')), 'Native model/scale/constraint differs')
             require(data['arm'] == candidates['arm'] == validation['config']['arm'] == data['policy']['arm'] == 'right', 'Native arm differs')
             require(data['provenance']['validator'] == validation['validator'] == 'isg-tabletop-validator/1', 'Native validator differs')
             require(data['policy_key'] == validation['policy_key'] == candidates['policy_key'] and data['physics_profile'], 'Native physics/policy differs')
-            require(data['candidate_switches'] == S.candidate_switches(candidates['config']) == expected_switches and
-                    data['attach_axis'] == candidates['config']['attach_axis'] == C.CandidateConfig().attach_axis,
-                    'Native default candidate/attachment policy differs')
+            require(data['candidate_switches'] == S.candidate_switches(candidates['config']) == expected_switches,
+                    'Native default candidate policy differs')
+            if constraint == 'attachment_free':
+                require(data['attach_axis'] == candidates['config']['attach_axis'] == C.CandidateConfig().attach_axis,
+                        'Native attachment policy differs')
             require(not any(t.get('error') or t.get('traceback') for t in validation['trials']), 'Native validator recorded an exception')
+            compatibility = {'candidate_switches': expected_switches}
+            if constraint == 'attachment_free': compatibility['attach_axis'] = C.CandidateConfig().attach_axis
             lib = S.load_model(entry['category'], entry['model'], entry['scale'], str(directory / 'glib'),
-                               constraint='attachment_free', rest_hint_wxyz=None,
-                               require={'candidate_switches': expected_switches, 'attach_axis': C.CandidateConfig().attach_axis})
+                               constraint=constraint, rest_hint_wxyz=entry.get('rest_hint_wxyz'), require=compatibility)
             require(lib is not None and Path(lib.path) == path and len(lib.grasps()) == len(data['grasps']), 'Native consumer resolver differs')
             valid = {(t.get('candidate'), t.get('rest_id')) for t in validation['trials'] if t.get('verdict') == 'valid'}
             require(all(g['physics'] == 'tested' and (g['name'], g['rest_id']) in valid for g in data['grasps']), 'Positive grasp lacks native trial')
