@@ -10,6 +10,7 @@ import json
 import logging
 import math
 import os
+from copy import deepcopy
 from types import SimpleNamespace as NS
 
 import numpy as np
@@ -252,14 +253,14 @@ def _lib(tmp_path):
     return lib
 
 
-def _compute(tmp_path, monkeypatch, params=PARAMS_BOX, jump_rows=None, sphere=(0.0, 0.0, 0.05), **kw):
+def _compute(tmp_path, monkeypatch, params=PARAMS_BOX, jump_rows=None, sphere=(0.0, 0.0, 0.05), spec=None, **kw):
     monkeypatch.setattr(RM, "_solve", _solver(jump_rows))
     monkeypatch.setattr(RB, "trunk_grid", lambda h: [(0.25, -0.3), (0.5, -0.8)])
     cfg = RM.MapConfig(seeds=2, lattice_m=0.16, n_yaws=4)
     w = _FakeWorld(cfg)
     w.sphere_offset = th.tensor(sphere, dtype=th.float32)
     lib = _lib(tmp_path)
-    meta, arrays = AM.compute_attach_map(w, _spec(), lib, "r0", 0.7853, {"key": "0.7853", "surfaces": ["office/desk/top"]}, male=LID, hand=H.load("right"),
+    meta, arrays = AM.compute_attach_map(w, _spec() if spec is None else spec, lib, "r0", 0.7853, {"key": "0.7853", "surfaces": ["office/desk/top"]}, male=LID, hand=H.load("right"),
                                          params=params, pre_back_m=0.10, cfg=cfg, **kw)
     return meta, arrays, lib, cfg
 
@@ -327,6 +328,59 @@ def test_find_enforces_every_identity_field(tmp_path, monkeypatch):
     open(p, "w").write(json.dumps(m))
     assert _find(root, lib, pre_back_m=0.12) is None
     assert RM.ReachMap.find(str(root / "lid__abc__s1__attachment_free"), lib, 0.7853, rest_id="r0") is None
+
+
+def test_partner_rest_identity_preserves_old_keys_and_rejects_malformed_quaternions():
+    base=_spec(); identity=base.digest()
+    base.data['partner']['rest_quat']=[0.,0.,0.,-1.]
+    assert base.digest()==identity and base.partner_rest==[0.,0.,0.,1.]
+    base.data['partner']['rest_quat']=[1.,0.,0.,0.]
+    assert base.digest()!=identity
+    changed=base.digest();base.data['partner']['rest_quat']=[-1.,0.,0.,0.]
+    assert base.digest()==changed
+    for invalid in ([0,0,0,0],[2,0,0,0],[0,0,1],[float('nan'),0,0,1]):
+        with pytest.raises(ValueError):AM.canonical_partner_rest(invalid)
+
+
+def test_rest_transform_matches_independently_rotated_geometry_and_map_checks(tmp_path,monkeypatch):
+    rotated=_spec();rest=[math.sin(.4),0.,0.,math.cos(.4)]
+    rotated.data['partner']['rest_quat']=rest
+    transform=S.pose_mat([0.,0.,0.],rest)
+    rotated.data['partner']['bottom_offset_m']=-min(AM._tf(transform,p)[:,2].min() for p in rotated.partner_pieces)
+    baked=deepcopy(rotated);baked.data['partner'].pop('rest_quat')
+    baked.partner_pieces=[AM._tf(transform,p) for p in rotated.partner_pieces]
+    baked.data['partner']['geometry_digest']=AM.pieces_digest(baked.partner_pieces)
+    baked.data['attachment']['T_partner_male']=S.mat_pose(transform @ rotated.T_partner_male)
+    for key in ('insertion_axis','seat_axis'):
+        baked.data[key]['local']=(transform[:3,:3] @ np.array(rotated.data[key]['local'])).tolist()
+    yaws=[0.,.7,2.1];grasps=[{'name':'g','T':T_OE,'finger_q':[.012,.012]}]
+    a=AM.hover_table(rotated,LID,H.load('right'),grasps,yaws,PARAMS_SWEPT)
+    b=AM.hover_table(baked,LID,H.load('right'),grasps,yaws,PARAMS_SWEPT)
+    for x,y in zip(a,b):
+        for key in ('h_m','touchdown_m','depth_m','part_clearance_m'):
+            assert x[0][key]==pytest.approx(y[0][key],abs=1e-6)
+    np.testing.assert_allclose(AM.chain_offsets(rotated,a,yaws,.10),AM.chain_offsets(baked,b,yaws,.10),atol=1e-6)
+    # The independently baked spec passes through the native six-decimal pose serialization.
+    np.testing.assert_allclose(AM.seat_eef(rotated,grasps,yaws),AM.seat_eef(baked,grasps,yaws),atol=1e-6)
+    # Full filters also exercise inverse rest in arm/partner collisions and the support footprint.
+    _,ar,_,_=_compute(tmp_path/'rotated',monkeypatch,spec=rotated,sphere=(.0975,0.,-.05))
+    _,br,_,_=_compute(tmp_path/'baked',monkeypatch,spec=baked,sphere=(.0975,0.,-.05))
+    assert ar.keys()==br.keys()
+    for key in ar:np.testing.assert_array_equal(ar[key],br[key])
+
+
+def test_rest_is_required_by_cache_lookup_and_live_pair(tmp_path,monkeypatch):
+    spec=_spec();spec.data['partner']['rest_quat']=[1.,0.,0.,0.]
+    spec.data['partner']['bottom_offset_m']=.085
+    path,meta,lib,root=_saved(tmp_path,monkeypatch,spec=spec)
+    assert _find(root,lib) is None
+    assert _find(root,lib,partner_rest_quat=[-1.,0.,0.,0.]).path==path
+    assert AM.live_mismatch(meta,{}) is not None
+    assert AM.live_mismatch(meta,{'partner_rest_quat':[1.,0.,0.,0.]}) is None
+    original_key=meta['key'];meta['partner']['rest_quat']=[0.,0.,0.,1.]
+    assert AM.map_key(meta)!=original_key
+    with open(path,'w') as stream:json.dump(meta,stream)
+    assert _find(root,lib) is None  # A relabeled old/new-rest cache may never serve.
 
 
 def test_map_key_changes_with_the_rule_the_spec_and_the_pre_distance(tmp_path, monkeypatch):
@@ -415,6 +469,7 @@ def _attachment(monkeypatch, view):
     s.root_in_child_link = (th.tensor([0.0, 0.0, 0.008]), th.tensor([0.0, 0.0, 0.0, 1.0]))
     s.insertion_axis_local = th.tensor([0.0, 0.0, 1.0])
     s.hull = {"partner": th.tensor(np.concatenate(_pot()), dtype=th.float32)}
+    s.rest = {"partner": C.IDENTITY_QUAT.clone()}
     s.world = NS(bottom_offset=lambda hull, quat: -float(hull[:, 2].min()), floor_z=0.0, scene_model="office")
     s.defaults = {"pre_attach_back_m": 0.1}
     s.gen = lambda key, default=None: default

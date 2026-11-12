@@ -10,7 +10,7 @@ reads it at a stance only as cells - ``band_cells_world`` (the partner cells ``_
 An attach map is its scene-independent replacement, the reach map of the held male at its SEAT on the partner, computed in the synthetic
 world of :mod:`reach_maps` (the R1Pro alone; the support a synthetic slab at the anchor height, its near edge at ``d_e``):
 
-* **cell** = the partner's ROOT xy in the map frame (the base on the floor, +x ahead), the partner upright (its rest = identity, the task's)
+* **cell** = the partner's ROOT xy in the map frame (the base on the floor, +x ahead), at its explicit rest (identity by default)
   at ``n_yaws`` yaw slots, its root at ``h + bottom offset + 3 mm`` (``tabletop.object_pose_on``); **grasps** = the male's v2 grasps of
   its stable rest with their twins / family members (``reach_maps.grasp_set``: the pick map's grasp axis);
 * the pair (:class:`AttachSpec`, measured in Isaac Sim by :func:`measure_pair` with the task's own code): the male root in the partner
@@ -79,6 +79,20 @@ AXIS_Z_MIN = 0.5
 PARTNER_DROP_M = 0.003
 #: the live pair (sampler template) vs the map's measured spec: the male's seat position / rotation, the insertion axis, the bottom offset
 SPEC_TOL = {"pos_m": 0.001, "rot_rad": 0.01, "axis_rad": 0.01, "bottom_m": 0.002}
+
+
+def canonical_partner_rest(value=None) -> List[float]:
+    """Explicit measured partner rest; omitted values preserve old identity maps."""
+    q = np.asarray([0., 0., 0., 1.] if value is None else value, dtype=np.float64)
+    if q.shape != (4,) or not np.isfinite(q).all() or abs(float(np.linalg.norm(q))-1.) > 1e-5:
+        raise ValueError('partner rest must be a finite unit xyzw quaternion')
+    q = q / np.linalg.norm(q)
+    # q and -q name one physical rest and must share a cache identity.
+    for index in (3, 0, 1, 2):
+        if abs(q[index]) > 1e-12:
+            if q[index] < 0: q = -q
+            break
+    return [0. if abs(x) < 1e-12 else float(x) for x in q]
 
 
 # ------------------------------------------------------------------------------------------------ small math (numpy, 4x4)
@@ -268,6 +282,15 @@ class AttachSpec:
     partner_pieces: List[np.ndarray]
 
     @property
+    def partner_rest(self) -> List[float]:
+        return canonical_partner_rest(self.data['partner'].get('rest_quat'))
+
+    def partner_transform(self, yaw: float) -> np.ndarray:
+        rotation = _rz(float(yaw))
+        rest = self.partner_rest
+        return rotation if rest == [0., 0., 0., 1.] else rotation @ S.pose_mat([0., 0., 0.], rest)
+
+    @property
     def T_partner_male(self) -> np.ndarray:
         return S.pose_of(self.data["attachment"]["T_partner_male"])
 
@@ -289,10 +312,13 @@ class AttachSpec:
 
     def identity(self) -> Dict[str, Any]:
         d = self.data
-        return {"schema": d.get("schema"), "male": {k: d["male"].get(k) for k in ("entry", "category", "model", "scale", "geometry_digest")},
+        identity = {"schema": d.get("schema"), "male": {k: d["male"].get(k) for k in ("entry", "category", "model", "scale", "geometry_digest")},
                 "partner": {k: d["partner"].get(k) for k in ("category", "model", "scale", "geometry_digest", "bottom_offset_m", "drop_m")},
                 "attachment": {k: d["attachment"].get(k) for k in ("T_partner_male", "child_link", "parent_link")},
                 "insertion_axis": [round(float(v), 6) for v in d["insertion_axis"]["local"]], "seat_axis": [round(float(v), 6) for v in d["seat_axis"]["local"]]}
+        if self.partner_rest != [0., 0., 0., 1.]:
+            identity['partner']['rest_quat'] = self.partner_rest
+        return identity
 
     def digest(self) -> str:
         return digest(self.identity(), 16)
@@ -372,7 +398,7 @@ def hover_table(spec: AttachSpec, male: Sequence[np.ndarray], hand, grasps: Sequ
     out: List[List[Dict[str, Any]]] = []
     swept: Dict[int, Tuple[Optional[float], Optional[float], Any]] = {}
     for yi, yaw in enumerate(yaws):
-        R = _rz(float(yaw))
+        R = spec.partner_transform(yaw)
         axis = R[:3, :3] @ spec.seat_axis
         partner = [_tf(R, p) for p in spec.partner_pieces]
         row = []
@@ -402,7 +428,7 @@ def chain_offsets(spec: AttachSpec, hover: List[List[Dict[str, Any]]], yaws: Seq
     nY, nG = len(yaws), len(hover[0]) if hover else 0
     out = np.zeros((nY, nG, len(CHAIN), 3))
     for yi, yaw in enumerate(yaws):
-        R = _rz(float(yaw))[:3, :3]
+        R = spec.partner_transform(yaw)[:3, :3]
         a_ins, a_seat = R @ spec.insertion_axis, R @ spec.seat_axis
         for gi in range(nG):
             hv = hover[yi][gi]
@@ -417,7 +443,7 @@ def seat_eef(spec: AttachSpec, grasps: Sequence[Dict[str, Any]], yaws: Sequence[
     T_pm = spec.T_partner_male
     out = np.zeros((len(yaws), len(grasps), 4, 4))
     for yi, yaw in enumerate(yaws):
-        Tp = _rz(float(yaw))
+        Tp = spec.partner_transform(yaw)
         Tp[2, 3] = spec.bottom_offset_m + spec.drop_m
         for gi, g in enumerate(grasps):
             out[yi, gi] = Tp @ T_pm @ np.asarray(g["T"], dtype=np.float64)
@@ -498,7 +524,7 @@ def compute_attach_map(world: RM.SynthWorld, spec: AttachSpec, lib: S.ModelLibra
     fq = th.as_tensor([g["finger_q"] for g in grasps], dtype=th.float32, device=dev)  # (G, 2)
     # the partner's footprint toward the robot at each yaw (support fit at d_e), its pieces' planes in its root frame
     pts = np.concatenate(spec.partner_pieces)
-    reach_back = np.array([float(_tf(_rz(y), pts)[:, 0].min()) for y in yaws])
+    reach_back = np.array([float(_tf(spec.partner_transform(y), pts)[:, 0].min()) for y in yaws])
     hulls = [h for h in (hull_of(p) for p in spec.partner_pieces) if h is not None]
     planes = [(th.as_tensor(h.normals, dtype=th.float32, device=dev), th.as_tensor(h.offsets, dtype=th.float32, device=dev)) for h in hulls]
     # -- the hand vs the slab per d_e at every chain pose (IK-independent), the fingers closed at the grasp's opening
@@ -530,6 +556,8 @@ def compute_attach_map(world: RM.SynthWorld, spec: AttachSpec, lib: S.ModelLibra
     yaw_t = th.as_tensor(yaws, dtype=th.float32, device=dev)
     root_z = float(height) + spec.bottom_offset_m + spec.drop_m
     cells_t = th.as_tensor(cells, dtype=th.float32, device=dev)
+    rest_rotation = (th.as_tensor(S.pose_mat([0., 0., 0.], spec.partner_rest)[:3, :3], dtype=th.float32, device=dev)
+                     if spec.partner_rest != [0., 0., 0., 1.] else None)
 
     def partner_clear(qq: th.Tensor, rows: th.Tensor) -> th.Tensor:
         """The arm's spheres (not the hand's) clear of every partner piece, problems ``rows`` at configurations ``qq``."""
@@ -541,6 +569,8 @@ def compute_attach_map(world: RM.SynthWorld, spec: AttachSpec, lib: S.ModelLibra
             ca, sa = th.cos(a), th.sin(a)
             rel = sp[..., :3] - th.stack([cells_t[c_of[r], 0], cells_t[c_of[r], 1], th.full_like(a, root_z)], 1)[:, None]
             loc = th.stack([ca[:, None] * rel[..., 0] + sa[:, None] * rel[..., 1], -sa[:, None] * rel[..., 0] + ca[:, None] * rel[..., 1], rel[..., 2]], -1)
+            if rest_rotation is not None:
+                loc = loc @ rest_rotation
             deep = th.full(loc.shape[:2], float("inf"), device=dev)
             for nrm, dd in planes:
                 deep = th.minimum(deep, (loc @ nrm.T - dd).max(dim=-1).values)
@@ -661,10 +691,12 @@ def compute_attach_map(world: RM.SynthWorld, spec: AttachSpec, lib: S.ModelLibra
     tim.update(ik_s=round(t_ik, 2), checks_s=round(t_chk, 2), ik_problems=n_ik, total_s=round(time.time() - t_all, 2))
     d = spec.data
     meta = {"schema": SCHEMA, "kind": KIND, "arm": cfg.arm, "frame": "base_link on the floor: +x ahead, +y left, z up from the floor",
-            "cell": "the partner ROOT xy (upright: rest identity, turned by the yaw slot; root z = h + bottom offset + drop)",
+            "cell": ("the partner ROOT xy (upright: rest identity, turned by the yaw slot; root z = h + bottom offset + drop)"
+                     if spec.partner_rest == [0., 0., 0., 1.] else
+                     "the partner ROOT xy (yaw composed with declared rest; root z = h + rotated bottom offset + drop)"),
             "male": {"entry": d["male"]["entry"], "category": lib.category, "model": lib.model, "scale": list(lib.scale), "rest_id": rest_id,
                      "object_key": lib.identity_key(), "geometry_digest": d["male"].get("geometry_digest")},
-            "partner": {k: d["partner"].get(k) for k in ("category", "model", "scale", "geometry_digest", "bottom_offset_m", "drop_m")},
+            "partner": spec.identity()['partner'],
             "spec": {"digest": spec.digest(), "id": d.get("id"), "T_partner_male": d["attachment"]["T_partner_male"], "child_link": d["attachment"].get("child_link"),
                      "parent_link": d["attachment"].get("parent_link"), "insertion_axis": d["insertion_axis"], "seat_axis": d["seat_axis"],
                      "measured": d.get("measured")},
@@ -693,6 +725,9 @@ def map_key(meta: Dict[str, Any]) -> str:
     ident.update(male={k: meta["male"].get(k) for k in ("entry", "object_key", "rest_id")},
                  partner={k: meta["partner"].get(k) for k in ("category", "model", "scale", "geometry_digest")},
                  spec=meta["spec"]["digest"], hover=hover_identity(meta["hover"]), height=meta["height"]["value"])
+    rest = canonical_partner_rest(meta['partner'].get('rest_quat'))
+    if rest != [0., 0., 0., 1.]:
+        ident['partner']['rest_quat'] = rest
     return hashlib.sha1(json.dumps(ident, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -724,7 +759,7 @@ class AttachMap:
     @staticmethod
     def find(entry_dir: str, height: float, *, partner: Tuple[str, str, Any], rest_id: str, object_key: Optional[str] = None, arm: str = "right",
              hover: Optional[Dict[str, Any]] = None, pre_back_m: Optional[float] = None, policy_key: Optional[str] = None, robot: Optional[str] = None,
-             anchors=None, config_require: Optional[Dict[str, Any]] = None) -> Optional["AttachMap"]:
+             anchors=None, config_require: Optional[Dict[str, Any]] = None, partner_rest_quat=None) -> Optional["AttachMap"]:
         """The attach map in ``entry_dir`` (the male entry's maps directory) of the partner ``(category, model, scale)`` at the anchor covering
         ``height`` (``anchors``: exact or within the anchor's clipped range; None: the map's own height within 1 mm), the male's rest (and
         identity key), the arm, the hover rule + parameters (:func:`hover_identity`), ``pre_attach_back_m``, the contact policy, the robot,
@@ -738,6 +773,7 @@ class AttachMap:
             target = float(a["height"])
         cat, model, scale = partner
         want_scale = list(S.canonical_scale(scale))
+        want_rest = canonical_partner_rest(partner_rest_quat)
         want_hover = hover_identity(hover) if hover is not None else None
         for fn in sorted(os.listdir(entry_dir)) if os.path.isdir(entry_dir) else []:
             if not (fn.startswith(FILE_PREFIX) and fn.endswith(".json")):
@@ -752,6 +788,11 @@ class AttachMap:
                 continue
             pm = m.get("partner") or {}
             if pm.get("category") != cat or pm.get("model") != model or list(S.canonical_scale(pm.get("scale"))) != want_scale:
+                continue
+            try:
+                if canonical_partner_rest(pm.get('rest_quat')) != want_rest:
+                    continue
+            except (TypeError, ValueError):
                 continue
             if (m.get("male") or {}).get("rest_id") != rest_id or (object_key is not None and (m.get("male") or {}).get("object_key") != object_key):
                 continue
@@ -805,6 +846,8 @@ def live_mismatch(meta: Dict[str, Any], live: Dict[str, Any], tol: Dict[str, flo
     """The map's pair spec against the live pair of the sampler's template (``T_partner_male`` pose, ``insertion_axis`` in the partner root
     frame, ``partner_bottom_offset_m``; optional ``child_link`` / ``parent_link`` names): None when they agree within ``tol``, else why."""
     sp = meta.get("spec") or {}
+    if canonical_partner_rest((meta.get('partner') or {}).get('rest_quat')) != canonical_partner_rest(live.get('partner_rest_quat')):
+        return "the partner rest orientation differs from the map's"
     T_map = S.pose_of(sp["T_partner_male"])
     if live.get("T_partner_male") is not None:
         p, q = live["T_partner_male"]
@@ -849,6 +892,8 @@ def sampler_view(s, *, grasp_key: str, partner: Tuple[str, str, Any], top, live:
     entry = os.path.basename(os.path.dirname(lib.path)) if lib is not None else None
     req = dict(kind=KIND, entry=entry, rest_id=rid, partner=f"{cat}/{model}", partner_scale=list(S.canonical_scale(scale)), h=round(h, 4), arm=arm,
                hover_rule=params["rule"], pre_back_m=float(pre_back_m), support=str(getattr(top, "name", "")), scene=str(getattr(s.world, "scene_model", "")))
+    if canonical_partner_rest(live.get('partner_rest_quat')) != [0., 0., 0., 1.]:
+        req['partner_rest_quat'] = canonical_partner_rest(live['partner_rest_quat'])
     if lib is None or rid is None:
         return None, req, f"the male {grasp_key} has no v2 entry with a stable rest"
     root = TT.map_sampling_root()
@@ -862,7 +907,8 @@ def sampler_view(s, *, grasp_key: str, partner: Tuple[str, str, Any], top, live:
         anchors = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
     cfg_req = json.loads(os.environ.get("ISPATIALGYM_REACH_MAP_REQUIRE") or "{}") or None
     am = AttachMap.find(os.path.join(root, entry), h, partner=(cat, model, scale), rest_id=rid, object_key=lib.identity_key(), arm=arm, hover=params,
-                        pre_back_m=pre_back_m, policy_key=CP.DEFAULT.key(arm), robot=RM.robot_digest(), anchors=anchors, config_require=cfg_req)
+                        pre_back_m=pre_back_m, policy_key=CP.DEFAULT.key(arm), robot=RM.robot_digest(), anchors=anchors, config_require=cfg_req,
+                        partner_rest_quat=live.get('partner_rest_quat'))
     if am is None:
         log.info("attach map miss for %s on %s/%s at h %.4f, %s arm, hover %s (%s)", entry, cat, model, h, arm, params["rule"], os.path.join(root, entry))
         return None, req, "no compatible attach map"
@@ -973,7 +1019,9 @@ def measure_pair(og, scene, job: Dict[str, Any], glib_root: str) -> Tuple[Dict[s
             dev = max(float(np.abs(np.sort(a, axis=0) - np.sort(b, axis=0)).max()) for a, b in zip(live_male, glib_male)) if len(live_male) == len(glib_male) else None
         except (FileNotFoundError, ValueError):
             glib_male, dev = None, None
-        bottom = -float(hull_f[:, 2].min())
+        rest = canonical_partner_rest(pj.get('rest_quat'))
+        bottom = -float(hull_f[:, 2].min() if rest == [0., 0., 0., 1.] else
+                        C.quat_rotate(th.tensor(rest), hull_f)[:, 2].min())
         data = {"schema": SPEC_SCHEMA, "id": job["id"], "frame": "partner root (upright, rest identity)",
                 "male": {"entry": job["male_entry"], "category": lib["category"], "model": lib["model"], "scale": list(S.canonical_scale(lib.get("scale"))),
                          "geometry_digest": pieces_digest(glib_male) if glib_male is not None else None},
@@ -988,6 +1036,9 @@ def measure_pair(og, scene, job: Dict[str, Any], glib_root: str) -> Tuple[Dict[s
                 "measured": {"male_geometry_max_dev_m": dev, "male_live_pieces": len(live_male), "partner_hull_points": int(hull_f.shape[0]),
                              "seat_vs_insertion_deg": round(math.degrees(math.acos(max(-1.0, min(1.0, float(_unit(seat_local) @ _unit(axis_ins)))))), 3),
                              "created": S.now()}}
+        if rest != [0., 0., 0., 1.]:
+            data['partner']['rest_quat'] = rest
+            data['frame'] = 'partner root (yaw composed with explicitly measured rest)'
         return data, pieces
     finally:
         for o in (male, female):

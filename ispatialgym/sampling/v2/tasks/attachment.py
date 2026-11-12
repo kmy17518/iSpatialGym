@@ -680,7 +680,12 @@ class Attachment(SamplerV2):
         child_link, parent_link = self.pair
         self.grasps, self.grasp_key, self.rest[self.t_role] = TT.library_grasps(self, self.t_role, "attachment", kinds=["attachment", "tabletop"])
         self._select_attach_route(want)
-        self.rest[self.p_role] = C.IDENTITY_QUAT.clone()
+        partner_rest = self.gen("partner_rest_quat")
+        if partner_rest is None:
+            self.rest[self.p_role] = C.IDENTITY_QUAT.clone()
+        else:
+            from ispatialgym.sampling.attach_maps import canonical_partner_rest
+            self.rest[self.p_role] = th.tensor(canonical_partner_rest(partner_rest))
         for role, o in ((self.t_role, male), (self.p_role, female)):
             self.hull[role] = self.world.local_hull(o)
         # owner 2026-09-24 item 5: the male stands on its STABLE end - the library's rest orientation flipped 180 deg about a
@@ -743,10 +748,10 @@ class Attachment(SamplerV2):
         T_attach = C.compose(self.parent_link_in_female, self.root_in_child_link)  # male root in the female root frame when attached
         pseudo = [TT._BandGrasp(f"attach:{g.name}", C.compose(T_attach, g.pose)) for g in self.grasps]
         attach_spec = TT.BandSpec(object=f"{pc.category}/{pc.model}", grasp_key=f"attach:{self.grasp_key}", grasps=pseudo, hull=self.hull[self.p_role],
-                                  rest_quat=C.IDENTITY_QUAT.clone(), scale=list(pc.scale) if pc.scale else None, placed=[f"attach:{mc.category}/{mc.model}"],
+                                  rest_quat=self.rest[self.p_role], scale=list(pc.scale) if pc.scale else None, placed=[f"attach:{mc.category}/{mc.model}"],
                                   height=self.height[self.p_role])
         H_max = max(self.height.values())
-        margins = {"kind": "attachment", "w_target": TT.half_extent(self.hull[self.t_role], self.rest[self.t_role]), "w_partner": TT.half_extent(self.hull[self.p_role], C.IDENTITY_QUAT),
+        margins = {"kind": "attachment", "w_target": TT.half_extent(self.hull[self.t_role], self.rest[self.t_role]), "w_partner": TT.half_extent(self.hull[self.p_role], self.rest[self.p_role]),
                    "safety": 0.02, "H_max": H_max}
         rng = np.random.default_rng(self.ctx.base_seed)
         errors = []
@@ -885,7 +890,8 @@ class Attachment(SamplerV2):
 
         pc = self.choice.models[self.p_role]
         live = {"T_partner_male": C.compose(self.parent_link_in_female, self.root_in_child_link), "insertion_axis": self.insertion_axis_local,
-                "partner_bottom_offset_m": float(self.world.bottom_offset(self.hull[self.p_role], C.IDENTITY_QUAT))}
+                "partner_bottom_offset_m": float(self.world.bottom_offset(self.hull[self.p_role], self.rest[self.p_role])),
+                "partner_rest_quat": self.rest[self.p_role].tolist()}
         view, req, why = AM.sampler_view(self, grasp_key=grasp_key or self.grasp_key, partner=(pc.category, pc.model, list(pc.scale) if pc.scale else None),
                                          top=self.top, live=live, pre_back_m=float(self.g("pre_attach_back_m")), arm=arm)
         self.template_facts["attach_map"] = {"hit": view is not None, "why": why, "path": None if view is None else view.meta.get("map_path")}
@@ -1660,7 +1666,7 @@ class Attachment(SamplerV2):
                 continue
             plan = getattr(self, "_campaign_attachment_active", None)
             pose = self.campaign_tensor_pose(plan.partner) if plan is not None else TT.object_pose_on(
-                self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, float(rng.uniform(-math.pi, math.pi)), self.top.z)
+                self, self.hull[self.p_role], self.rest[self.p_role], xy, float(rng.uniform(-math.pi, math.pi)), self.top.z)
             fp = self.world.footprint(self.hull[self.p_role], pose)
             if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
                 fails["support"] += 1
@@ -2409,7 +2415,7 @@ class Attachment(SamplerV2):
             geo_cells.append(i)
             for yaw in yaws:
                 pose = self.campaign_tensor_pose(plan.partner) if plan is not None else TT.object_pose_on(
-                    self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, yaw, self.top.z)
+                    self, self.hull[self.p_role], self.rest[self.p_role], xy, yaw, self.top.z)
                 fp = self.world.footprint(self.hull[self.p_role], pose)
                 if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
                     fails["support"] += 1
