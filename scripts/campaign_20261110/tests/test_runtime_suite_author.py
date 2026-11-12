@@ -40,3 +40,82 @@ def test_recorded_opening_goal_keeps_its_strict_bucket():
     assert anchor["planned_goal_joints"]["fixture"] == [1.8]
     anchor["planned_goal_joints"]["fixture"] = [3.]
     with pytest.raises(AssertionError):recorded_opening_range(template, anchor)
+
+
+def disembedding_anchor(tmp_path, coverage=.32):
+    from copy import deepcopy
+    from scripts.campaign_20261110.contracts import ObjectRef
+    from scripts.campaign_20261110.runtime_suite_author import ref
+    objects = tuple(ObjectRef(instance=n, role=r, category='piece', model=m, asset_sha256='a'*64)
+                    for n, r, m in [('target', 'target', 'aaa'), ('distractor', 'distractor', 'bbb')])
+    template = SimpleNamespace(task='disembedding', split='eval_standard', class_id='disembedding_01', objects=objects)
+    profile = {'schema':'isg-native-tray-coverage-profile-v1','source_floor_area_m2':1.,
+               'target':{'instance':'target','category':'piece','model':'aaa','scale':[1.,1.,1.],'area_m2':.1},
+               'distractors':[{'instance':'distractor','category':'piece','model':'bbb','scale':[1.,1.,1.],'area_m2':coverage-.1}]}
+    bounds = [0,.3] if coverage < .3 else [.3,.45] if coverage < .45 else [.45,1]
+    group = {'group_id':'source_group','plan_sha256':'b'*64,'bucket_strict':True,
+             'crowdedness_range':bounds,'actual_crowdedness':coverage}
+    anchor = {'template_dir':str(tmp_path),'template_meta':{'template_facts':{'campaign_coverage_profile':profile}},
+              'summary':{'campaign_goal_group':deepcopy(group)},
+              'tro':{'ispatialgym':{'campaign':{'class_id':template.class_id,'split':'eval_standard',
+                                              'runtime':{'goal_group':deepcopy(group)}}}},
+              'sources':{}, 'planned_goal_poses':{'target':[[1,2,3],[0,0,0,1]]}}
+    (tmp_path/'template_meta.json').write_text(json.dumps(anchor['template_meta']))
+    for name in ('tro','summary'):
+        path=tmp_path/(name+'.json');path.write_text(json.dumps(anchor[name]));anchor['sources'][name]=ref(path)
+    return template,anchor
+
+
+def rewrite_anchor_bytes(anchor):
+    from pathlib import Path
+    from scripts.campaign_20261110.runtime_suite_author import ref
+    root=Path(anchor['template_dir'])
+    (root/'template_meta.json').write_text(json.dumps(anchor['template_meta']))
+    for name in ('tro','summary'):
+        path=root/(name+'.json');path.write_text(json.dumps(anchor[name]));anchor['sources'][name]=ref(path)
+
+
+@pytest.mark.parametrize('coverage,expected',[(.22,((0,.3),0)),(.32,((.3,.45),1)),(.55,((.45,1),2))])
+def test_recorded_disembedding_preserves_exact_selection_and_goals(tmp_path,coverage,expected):
+    from copy import deepcopy
+    from scripts.campaign_20261110.runtime_suite_author import recorded_disembedding_range,recorded_disembedding_evidence
+    template,anchor=disembedding_anchor(tmp_path,coverage);before=deepcopy(anchor)
+    assert recorded_disembedding_range(template,anchor)==expected
+    evidence=recorded_disembedding_evidence(template,anchor)
+    assert evidence['coverage']==pytest.approx(coverage)
+    assert evidence['pool_geometry_goal_changed'] is False
+    assert anchor==before
+
+
+@pytest.mark.parametrize('change', ['model','scale','missing_instance','area','floor','boundary','historical_range',
+                                    'historical_actual','not_strict','runtime_disagrees','class','group_identity'])
+def test_recorded_disembedding_rejects_incompatible_proof(tmp_path,change):
+    from scripts.campaign_20261110.runtime_suite_author import recorded_disembedding_range
+    template,anchor=disembedding_anchor(tmp_path)
+    profile=anchor['template_meta']['template_facts']['campaign_coverage_profile']
+    group=anchor['summary']['campaign_goal_group']
+    if change=='model':profile['target']['model']='other'
+    elif change=='scale':profile['target']['scale']=[.9,.9,.9]
+    elif change=='missing_instance':profile['distractors']=[]
+    elif change=='area':profile['target']['area_m2']=float('nan')
+    elif change=='floor':profile['source_floor_area_m2']=0
+    elif change=='boundary':profile['distractors'][0]['area_m2']=.2
+    elif change=='historical_range':group['crowdedness_range']=[0,.3]
+    elif change=='historical_actual':group['actual_crowdedness']=.2
+    elif change=='not_strict':group['bucket_strict']=False
+    elif change=='runtime_disagrees':anchor['tro']['ispatialgym']['campaign']['runtime']['goal_group']['crowdedness_range']=[0,.3]
+    elif change=='class':anchor['tro']['ispatialgym']['campaign']['class_id']='disembedding_02'
+    elif change=='group_identity':group['plan_sha256']='c'*64
+    rewrite_anchor_bytes(anchor)
+    with pytest.raises((AssertionError,ValueError)):
+        recorded_disembedding_range(template,anchor)
+
+
+@pytest.mark.parametrize('source',['tro','summary','metadata'])
+def test_recorded_disembedding_checks_saved_bytes(tmp_path,source):
+    from scripts.campaign_20261110.runtime_suite_author import recorded_disembedding_range
+    template,anchor=disembedding_anchor(tmp_path)
+    path=tmp_path/('template_meta.json' if source=='metadata' else source+'.json')
+    path.write_text('{}')
+    with pytest.raises((AssertionError,ValueError)):
+        recorded_disembedding_range(template,anchor)

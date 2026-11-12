@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -81,6 +82,53 @@ def recorded_opening_range(template, anchor):
     return choices[0]
 
 
+def recorded_disembedding_evidence(template, anchor):
+    """Bind the unchanged active selection to its measured historical bucket.
+
+    Quota deficits cannot change occupied area when reusing a recorded pool and
+    goal. Require both the native geometry profile and the hash-bound successful
+    source to agree; this does not authorize changing the pool or any threshold.
+    """
+    from scripts.campaign_20261110.contracts import digest, require
+    from scripts.campaign_20261110.controller_groups import ranges
+    from scripts.campaign_20261110.disembedding_coverage import measure
+    require(template.task == "disembedding" and template.split == "eval_standard",
+            "recorded coverage requires standard disembedding")
+    for name in ("tro", "summary"):
+        require(checked(anchor["sources"][name]) == anchor[name], "anchor " + name + " changed")
+    metadata_path = Path(anchor["template_dir"])/"template_meta.json"
+    require(read(metadata_path) == anchor["template_meta"], "native coverage metadata changed")
+    profile = anchor["template_meta"].get("template_facts", {}).get("campaign_coverage_profile", {})
+    coverage, bucket, objects = measure(template, profile)
+    bounds = tuple(ranges(template)[bucket])
+    campaign = anchor["tro"]["ispatialgym"]["campaign"]
+    require(campaign["class_id"] == template.class_id and campaign["split"] == template.split,
+            "recorded coverage source class/split differs")
+    summary_group = anchor["summary"].get("campaign_goal_group", {})
+    runtime_group = campaign.get("runtime", {}).get("goal_group", {})
+    for group in (summary_group, runtime_group):
+        require(group.get("bucket_strict") is True and tuple(group.get("crowdedness_range", ())) == bounds,
+                "recorded historical strict bucket disagrees with native coverage")
+        actual = group.get("actual_crowdedness")
+        require(isinstance(actual, (int, float)) and math.isfinite(actual) and bounds[0] < actual < bounds[1],
+                "recorded actual crowdedness lies outside its measured strict bucket")
+    require(summary_group.get("group_id") and summary_group.get("plan_sha256") and
+            all(summary_group[k] == runtime_group.get(k) for k in ("group_id", "plan_sha256")),
+            "recorded source group identities differ")
+    return {"schema": "isg-current-runtime-recorded-disembedding-range-v1", "bucket": bucket,
+            "strict_range": list(bounds), "coverage": coverage, "active_objects_sha256": objects,
+            "native_template_metadata": ref(metadata_path), "native_profile_sha256": digest(profile),
+            "source_tro": anchor["sources"]["tro"], "source_summary": anchor["sources"]["summary"],
+            "historical_group_id": summary_group["group_id"], "historical_plan_sha256": summary_group["plan_sha256"],
+            "historical_actual_crowdedness": summary_group["actual_crowdedness"],
+            "pool_geometry_goal_changed": False, "bucket_threshold_changed": False}
+
+
+def recorded_disembedding_range(template, anchor):
+    evidence = recorded_disembedding_evidence(template, anchor)
+    return tuple(evidence["strict_range"]), evidence["bucket"]
+
+
 def author(root, run_dir, catalog_path, ordinal):
     from scripts.campaign_20261110 import goal_groups as g
     from scripts.campaign_20261110.contracts import Template, ObjectRef
@@ -125,6 +173,7 @@ def author(root, run_dir, catalog_path, ordinal):
         budget = int(read(original_env["ISPATIALGYM_CAMPAIGN_GOAL_PLAN"])["budget_seconds"])
     quota = read(run_dir/"quota_observation.json")["classes"][template.class_id]
     magnitude, bucket = ((None, None) if camera else group_range(template, quota["accepted_bucket_counts"]))
+    recorded_range_evidence = None
     if camera:
         destination.mkdir(parents=True)
         source["purpose"] = "validation"
@@ -152,6 +201,9 @@ def author(root, run_dir, catalog_path, ordinal):
         anchor["goal_proposal_source"] = "approved_recorded_goal_as_input_only; fresh_current_runtime_members_required"
         if template.task == "configuration_matching-articulation_open_large_scale":
             magnitude, bucket = recorded_opening_range(template, anchor)
+        elif template.task == "disembedding":
+            recorded_range_evidence = recorded_disembedding_evidence(template, anchor)
+            magnitude, bucket = tuple(recorded_range_evidence["strict_range"]), recorded_range_evidence["bucket"]
         g.prepare_group(anchor=anchor,template=template,campaign_id=root.name,group_id=token,output=destination,
                         code_sha256=runtime["snapshot_sha256"],physics_sha256=source["validation_key"]["physics_sha256"],
                         data_sha256=source["validation_key"]["data_sha256"],magnitude_range=magnitude,
@@ -185,6 +237,8 @@ def author(root, run_dir, catalog_path, ordinal):
            "quota_ineligible_at_authoring":bool(quota["current_eligible_standard"]>=10),
            "source_environment_replaced_keys":replaced,
            "historical_proof_used_as_new_success":False,"production_authorization":False,"created_at":time.time()}
+    if recorded_range_evidence is not None:
+        row["recorded_range_evidence"] = recorded_range_evidence
     row_ref = immutable(row_path,row)
     command += ["--extra-env","ISPATIALGYM_RUNTIME_SUITE_RUN="+release["run_id"],
                 "--extra-env","ISPATIALGYM_RUNTIME_SUITE_ROW="+str(row_path),
