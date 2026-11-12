@@ -220,6 +220,11 @@ class Handler(BaseHTTPRequestHandler):
             value,status=read_source(self.server.data_root/'dashboard/batch_restoration_status.json')
             if not status['available'] or value.get('campaign_id')!='campaign_20261110':
                 return self.send_body(404,b'Restoration observation unavailable','text/plain')
+            matrix,matrix_source=read_source(self.server.data_root/'dashboard/batch_restoration_control_status.json')
+            if matrix_source['available'] and matrix.get('campaign_id')=='campaign_20261110':
+                value={**value,'matrix':matrix,'matrix_source':matrix_source}
+            else:
+                value={**value,'matrix':None,'matrix_source':matrix_source}
             return self.send_body(200,json.dumps(sanitize(value)).encode(),'application/json')
         if path == '/api/status':
             data = snapshot(self.server.data_root, self.server.inventory)

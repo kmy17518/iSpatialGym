@@ -15,6 +15,7 @@ FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group
 FLEET_FILE = 'vast_fleet_gpu_time.json'
 CLUSTER_FLEET_FILE = 'cluster_fleet_gpu_time.json'
 AUDIT_FILES = {'runtime_validation.json':'runtime_validation/status.json','execution_ledger.json':'infra/execution_ledger.json','preparation_status.json':'training_preparation/status.json','pipeline_status.json': 'training_pipeline_canaries/pipeline_status.json', 'ik_observation.json': 'ik_exchange/observation.json', 'capacity_recovery.json': 'infra/capacity_recovery/ledger.json', 'heldout_recovery.json': 'infra/heldout_recovery/ledger.json','canonical_validation.json': 'infra/standard_recovery/canonical_validation.json','gate_quality_audit.json': 'validation/gate_quality_audit.json',
+               'batch_restoration_control_status.json': 'training_pipeline_canaries/tray_changed_augmentation_r1/control_status.json',
                'training_eligibility.json': 'accounting/training_eligibility.json',
                'training_production_gate.json': 'controllers/training_production_gate.json',
                'training_containment.json': 'infra/training_production_gate/containment_status.json',

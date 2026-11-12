@@ -9,6 +9,13 @@ async function refreshEvidence(){
     byId('observation').textContent=`Observed ${chicago.format(observed)}${stale?' — STALE':''}`;
     byId('scope').textContent=value.scope;
     byId('checks').replaceChildren(...value.checks.map(check=>{const p=document.createElement('p');p.textContent=`${check.name}: ${check.status.replaceAll('_',' ')}. ${check.detail}`;if(check.status!=='verified')p.className='pending';return p;}));
+    const matrix=value.matrix;
+    byId('matrix-observation').textContent=matrix?`Control observations: ${observedText(matrix.observed_at)}. Submitted, completed, and verified remain separate.`:'UNAVAILABLE: no authoritative control observation; no restoration result inferred.';
+    byId('matrix-controls').replaceChildren(...(matrix?.controls||[]).map(row=>{
+      const p=document.createElement('p');
+      p.textContent=`${row.stage||row.kind||'stage unavailable'} / ${row.control}: ${row.status||'status unavailable'}; job ${row.job_id||'unavailable'}; scheduler ${row.scheduler_state||'unavailable'}; verification ${row.verification_status||'not verified'}. ${row.next_action||''} Observed ${observedText(row.observed_at||matrix.observed_at)}.`;
+      if(row.verification_status!=='verified')p.className='pending';return p;
+    }));
     for(const episode of value.episodes){
       let card=byId(episode.id);
       if(!card){card=document.createElement('article');card.id=episode.id;const h=document.createElement('h2');const p=document.createElement('p');const video=document.createElement('video');video.controls=true;video.preload='metadata';video.playsInline=true;video.src=episode.url;const link=document.createElement('a');link.href=episode.url;link.textContent='Open video';card.append(h,p,video,document.createElement('br'),link);byId('episodes').append(card);}
