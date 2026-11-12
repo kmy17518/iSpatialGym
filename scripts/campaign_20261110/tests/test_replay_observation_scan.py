@@ -1,0 +1,44 @@
+import json
+import pytest
+from scripts.campaign_20261110.controller_validation import terminal_observation_unchanged, order_ledger_rows
+
+
+def fixture(tmp_path):
+    job=tmp_path/'job';job.mkdir();(job/'sampling.done').touch()
+    out=tmp_path/'replay';out.mkdir();gate={'success':True,'validated_at':'2026-11-11T01:00:00Z'}
+    (out/'gate.json').write_text(json.dumps(gate))
+    row={'jobid':'1','job_dir':str(job),'key':'example','code':'native'}
+    entry={'source_job_id':'1','source_job_dir':str(job),'key':'example','output':str(out),
+           'status':'validated','gate':gate,'gate_quality':{'passed':True}}
+    return row,entry,out
+
+
+def test_terminal_reuse_preserves_historical_proof(tmp_path):
+    row,entry,out=fixture(tmp_path);before=json.dumps(entry,sort_keys=True)
+    assert terminal_observation_unchanged(entry,row,None)
+    assert json.dumps(entry,sort_keys=True)==before
+
+
+@pytest.mark.parametrize('change',['retry','gate','quality','source','sampling','migration','active'])
+def test_actions_or_unverified_terminal_changes_traverse_source_gate(tmp_path,change):
+    row,entry,out=fixture(tmp_path);request=None
+    if change=='retry':request={'request_id':'fresh'}
+    elif change=='gate':(out/'gate.json').write_text(json.dumps({'success':False}))
+    elif change=='quality':entry.pop('gate_quality')
+    elif change=='source':row['job_dir']=str(tmp_path/'other')
+    elif change=='sampling':(tmp_path/'job/sampling.done').unlink()
+    elif change=='migration':entry['vast_migration']={'status':'prepared'}
+    else:entry['status']='replay_queued'
+    assert not terminal_observation_unchanged(entry,row,request)
+
+
+def test_explicit_retry_and_new_work_precede_history_and_duplicates():
+    rows=[{'jobid':str(i),'job_dir':str(i),'key':'x','code':'n'} for i in range(4)]
+    gates={'0':{'status':'validated'},'1':{'status':'replay_failed'},'2':{'status':'replay_queued'}}
+    ordered=order_ledger_rows(rows+[dict(rows[0])],gates,{'1':{'request_id':'retry'}})
+    assert [r['jobid']for r in ordered]==['1','2','3','0']
+
+
+def test_changed_ledger_identity_is_not_silently_deduplicated():
+    rows=[{'jobid':'1','job_dir':p,'key':'x','code':'n'}for p in ('one','two')]
+    assert len(order_ledger_rows(rows,{},{}))==2

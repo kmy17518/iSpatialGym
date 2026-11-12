@@ -33,6 +33,53 @@ def ledger_paths(root, explicit=None):
             seen.add(resolved);result.append(path)
     return result
 
+def pending_retry(entry, request):
+    return bool(request and request.get('request_id') not in entry.get('applied_retry_requests', []))
+
+
+def terminal_observation_unchanged(entry, row, request):
+    """Reuse a historical terminal observation only when no action is possible.
+
+    This does not cache authorization. Every retry, submission and migration
+    still traverses the current source gate. Acceptance verifies its own inputs.
+    """
+    if entry.get('status') not in ('validated', 'replay_failed') or pending_retry(entry, request):
+        return False
+    if entry.get('source_job_id') != row['jobid'] or entry.get('source_job_dir') != row['job_dir'] or entry.get('key') != row['key']:
+        return False
+    if entry.get('vast_migration', {}).get('status') in ('prepared','cancel_requested','cancelled_never_started','ready_to_activate'):
+        return False
+    if not entry.get('gate') or not entry.get('gate_quality') or not entry.get('output'):
+        return False
+    if not (pathlib.Path(row['job_dir'])/'sampling.done').is_file():
+        return False
+    return read(pathlib.Path(entry['output'])/'gate.json', None) == entry['gate']
+
+
+def order_ledger_rows(rows, gates, requests):
+    """Deduplicate identical ledger identities and put actionable work first."""
+    unique = {}
+    for row in rows:
+        identity = tuple(row.get(k, '') for k in ('jobid','job_dir','key','code'))
+        unique.setdefault(identity, row)
+    def priority(row):
+        entry = gates.get(row['jobid'], {})
+        if pending_retry(entry, requests.get(row['jobid'])): return 0
+        if entry.get('status') in ('submitting','replay_queued','waiting_for_demo'): return 1
+        if not entry: return 2
+        return 4 if entry.get('status') in ('validated','replay_failed') else 3
+    return sorted(unique.values(), key=priority)
+
+
+def read_demo_results(job):
+    results=[]
+    try:
+        for line in (job/'results.jsonl').read_text().splitlines():
+            try:results.append(json.loads(line))
+            except ValueError:pass
+    except OSError:pass
+    return results
+
 def archive_diagnosed_launcher_gate(entry, request, root, active):
     """Preserve explicitly diagnosed launcher evidence before a new strict replay.
 
@@ -182,6 +229,7 @@ def main():
         if not a.scene_helper.is_relative_to(a.root/'code') or not a.scene_helper.is_file():raise ValueError('replay scene helper must be frozen inside this campaign')
     statepath=a.root/'validation/controller.json';state=read(statepath,{'schema':1,'gates':{}})
     while True:
+        cycle_started=time.monotonic()
         ledgers=ledger_paths(a.root,a.ledger)
         rows=[]
         for ledger in ledgers:
@@ -211,10 +259,31 @@ def main():
                 resources=None
                 state['replay_resource_probe_error']={'reason':str(error),'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat()}
         retry_requests=read(a.root/'validation/replay_retry_requests.json',{}).get('requests',{})
-        for row in rows:
+        raw_rows=len(rows);rows=order_ledger_rows(rows,state['gates'],retry_requests)
+        scan={'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'ledger_rows':raw_rows,
+              'unique_rows':len(rows),'terminal_observations_reused':0,'source_authorizations_checked':0}
+        progresspath=a.root/'validation/controller_progress.json'
+        for position,row in enumerate(rows):
             jid=row['jobid'];job=pathlib.Path(row['job_dir']);entry=state['gates'].setdefault(jid,{'source_job_id':jid,'key':row['key'],'source_job_dir':str(job),'status':'waiting_for_demo'})
+            row_started=time.monotonic()
+            source_results=read_demo_results(job)
+            successes=[x for x in source_results if x.get('success') is True]
+            entry['demo_successes']=len(successes)
+            entry['demo_failures']=sum(x.get('success') is False for x in source_results)
+            if terminal_observation_unchanged(entry,row,retry_requests.get(jid)):
+                scan['terminal_observations_reused']+=1
+                # Updating this heartbeat never changes the gate's observation
+                # date, proof or prior authorization result.
+                if position%50==0:
+                    atomic(progresspath,{**scan,'phase':'historical_terminal_observation','position':position,
+                        'source_job_id':jid,'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat()})
+                continue
+            atomic(progresspath,{**scan,'phase':'source_authorization','position':position,'source_job_id':jid,
+                'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat()})
             from scripts.campaign_20261110.production_gate import check_job
             production = check_job(a.root, job, kind='source_validation')
+            scan['source_authorizations_checked']+=1
+            scan['last_authorization_seconds']=time.monotonic()-row_started
             if not production['allowed']:
                 entry['production_gate_block'] = production
                 # Existing reports and history remain immutable. No new replay,
@@ -225,15 +294,6 @@ def main():
                 if apply_retry_request(entry,retry_requests.get(jid),a.root,replay_active):atomic(statepath,state)
             except ValueError as error:
                 entry['retry_request_error']=str(error)
-            source_results=[]
-            try:
-                for line in (job/'results.jsonl').read_text().splitlines():
-                    try:source_results.append(json.loads(line))
-                    except ValueError:pass
-            except OSError:pass
-            successes=[x for x in source_results if x.get('success') is True]
-            entry['demo_successes']=len(successes)
-            entry['demo_failures']=sum(x.get('success') is False for x in source_results)
             if successes and entry['status'] in ('demo_missing','demo_failed'):
                 entry['status']='waiting_for_demo'
             if entry['status']=='waiting_for_demo':
@@ -290,7 +350,10 @@ def main():
                     if entry.get('seen_queue_absent'):entry['status']='replay_missing'
                     else:entry['seen_queue_absent']=True
                 else:entry.pop('seen_queue_absent',None)
+        scan['elapsed_seconds']=time.monotonic()-cycle_started
+        state['scan_metrics']=scan
         state['updated_at']=datetime.datetime.now(datetime.timezone.utc).isoformat();atomic(statepath,state)
+        atomic(progresspath,{**scan,'phase':'idle','observed_at':state['updated_at']})
         if a.once:break
         time.sleep(max(10,a.interval))
 if __name__=='__main__':main()
