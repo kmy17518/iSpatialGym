@@ -32,6 +32,15 @@ def test_snapshot_preserves_previous_exact_bytes(tmp_path):
     assert json.loads(p.read_text())['phase']=='replay'
 
 
+def test_changed_pair_preserves_failed_prior_source_without_refreshing_its_age(tmp_path):
+    path=tmp_path/'reviews.json'
+    stream.publish_reviews(path,{'observed_at':'first','records':{'A':{'status':'failed_own_replay','failure_evidence':{'gate':'original'}}}})
+    stream.publish_reviews(path,{'observed_at':'second','records':{'A2':{'status':'awaiting_native'}}})
+    value=stream.read(path)
+    assert value['records']['A']=={'status':'failed_own_replay','failure_evidence':{'gate':'original'},'observed_at':'first','current_pair_member':False}
+    assert value['records']['A2']['observed_at']=='second' and value['records']['A2']['current_pair_member'] is True
+
+
 def test_replay_failure_retains_task_success_and_measured_qa_failure(tmp_path):
     report=tmp_path/'meta.json';metric={'measured':True,'triggered':True,'report':{'max_occluded':.6301,'threshold':.5}}
     stream.immutable(report,{'qa':{'metrics':{'goal_occlusion':metric}}})

@@ -118,6 +118,17 @@ def publish_snapshot(path,value):
     write_json_atomic(path,value)
 
 
+def publish_reviews(path,value):
+    """Keep superseded source verdicts visible with their original observation time."""
+    previous=read(path) if Path(path).exists() else {}
+    records={key:{**record,'observed_at':record.get('observed_at',previous.get('observed_at')),
+                  'current_pair_member':False}
+             for key,record in previous.get('records',{}).items() if key not in value['records']}
+    records.update({key:{**record,'observed_at':value['observed_at'],'current_pair_member':True}
+                    for key,record in value['records'].items()})
+    publish_snapshot(path,{**value,'records':records})
+
+
 def replay_failure(root,gate_path,gate):
     """Retain a failed gate's measured reason without converting task success to QA success."""
     require(gate.get('success') is False,'expected explicit failed own replay')
@@ -215,13 +226,13 @@ def run_cycle(root,configuration,state):
             value.update(status='waiting_publication_lock'if waiting else'engineering_blocked',error=f'{type(error).__name__}: {error}',
                 next_action='Retry exact CPU stage after current lock owner exits'if waiting else'Inspect exact recorded cause before any retry; no new native draw')
         out['records'][cid]=value
-        publish_snapshot(batch/'existing_native_reviews.json',out)
-    publish_snapshot(batch/'existing_native_reviews.json',out)
+        publish_reviews(batch/'existing_native_reviews.json',out)
+    publish_reviews(batch/'existing_native_reviews.json',out)
     for source_request in source_requests:
         parent=Path(source_request['path']).parent
         if parent==batch:continue
         candidates={r['candidate_id']for r,source in zip(requests['records'],source_requests)if source==source_request}
-        publish_snapshot(parent/'existing_native_reviews.json',{**out,'source_request':source_request,
+        publish_reviews(parent/'existing_native_reviews.json',{**out,'source_request':source_request,
             'records':{k:v for k,v in out['records'].items()if k in candidates}})
     state.update(records=out['records'],observed_at=out['observed_at'],pid=os.getpid(),owner='/root/dataset_contract',new_native_draws=0,benchmark_credit=0)
     if all(v['status']=='validated_canary_exported'for v in out['records'].values())and len(out['records'])==2:
