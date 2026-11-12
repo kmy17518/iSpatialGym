@@ -53,11 +53,13 @@ def main(args):
             library = libraries[0]
             before = read(library)
             routed = deepcopy(before)
-            routed["legacy_key"] = job["target"]["category"] + "__" + job["target"]["model"] + "__f"
-            assert {k: v for k, v in before.items() if k != "legacy_key"} == {k: v for k, v in routed.items() if k != "legacy_key"}
+            stem = job["target"]["category"] + "__" + job["target"]["model"]
+            routed["legacy_key"] = stem
+            routed["legacy_keys"] = sorted(set(routed.get("legacy_keys", [])) | {stem, stem + "__f"})
+            assert {k: v for k, v in before.items() if k not in ("legacy_key", "legacy_keys")} == {k: v for k, v in routed.items() if k not in ("legacy_key", "legacy_keys")}
             write(library, routed)
             proof = read(source_release / "release.json")
-            proof.update(routed=ref(library), route_revision="native_floating_suffix_f", supersedes=ref(source_release / "release.json"), consumer_lookup=author.verify_floating_consumer(release, job["target"], job["arm"]))
+            proof.update(routed=ref(library), route_revision="native_floating_alias_union_v2", supersedes=ref(source_release / "release.json"), consumer_lookup=author.verify_floating_consumer(release, job["target"], job["arm"]))
             proof["files"] = [ref(p) for p in release.rglob("*") if p.is_file() and p.name != "release.json"]
             write(release / "release.json", proof)
             releases[str(source_release)] = proof["consumer_lookup"]
@@ -72,13 +74,13 @@ def main(args):
                 assert sha(dest) == old_ref["sha256"]
         job["input_refs"] = [ref(r["path"]) for r in job["input_refs"]]
         job["supersedes_request"] = original_job["request"]
-        job["route_revision"] = "native_floating_suffix_f"
+        job["route_revision"] = "native_floating_alias_union_v2"
         job["consumer_lookup"] = releases[str(source_release)]
         request = Path(job.pop("request")["path"])
         write(request, job)
         job["request"] = ref(request)
         jobs.append(job)
-    report = {**original, "observed_at": time.time(), "supersedes": ref(source), "route_revision": "native_floating_suffix_f", "jobs": jobs,
+    report = {**original, "observed_at": time.time(), "supersedes": ref(source), "route_revision": "native_floating_alias_union_v2", "jobs": jobs,
               "revision_scope": "Only native floating library alias metadata corrected; exact physical query identities, task constraints, geometry and native runtime retained. Existing claims require dispatch-owner reconciliation before replacement.",
               "consumer_lookup_verified_releases": len(releases), "repair_helper": ref(Path(__file__)), "author_helper": ref(args.author)}
     write(out / "requests.json", report)

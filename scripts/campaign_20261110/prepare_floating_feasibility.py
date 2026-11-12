@@ -23,12 +23,12 @@ def verify_floating_consumer(release, target, arm):
     from ispatialgym.sampling import grasp_library as GL
     from ispatialgym.grasping import schema as GS
 
-    key = target["category"] + "__" + target["model"] + "__f"
+    stem = target["category"] + "__" + target["model"]
     previous = {name: os.environ.get(name) for name in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_V2_ONLY")}
     try:
         os.environ.update(ISPATIALGYM_GRASP_LIBRARY_V2=str(Path(release) / "glib"), ISPATIALGYM_V2_ONLY="1")
-        resolved = GL.resolve_key(target["category"], target["model"], key, ["floating"])
-        assert resolved == key
+        resolved = GL.resolve_key(target["category"], target["model"], None, ["floating"])
+        assert resolved in (stem, stem + "__f")
         lib = GL.v2_entry(resolved)
         assert lib is not None and lib.floating
         assert lib.scale == GS.canonical_scale(target["applied_scale"])
@@ -36,7 +36,7 @@ def verify_floating_consumer(release, target, arm):
         assert all(lib.data[k] == target[k] for k in ("category", "model", "dataset"))
         grasps = GL.load_grasps(resolved)
         assert grasps and all(g.meta["library"] == "v2" for g in grasps)
-        return {"key": key, "library": lib.path, "arm": arm, "scale": list(lib.scale), "native_reader_grasps": len(grasps)}
+        return {"key": resolved, "preferred": None, "library": lib.path, "arm": arm, "scale": list(lib.scale), "native_reader_grasps": len(grasps)}
     finally:
         for name, value in previous.items():
             if value is None:
@@ -164,8 +164,10 @@ def main(args):
                     dest = release / "glib/models" / lp.parent.name
                     shutil.copytree(lp.parent, dest)
                     routed = read(dest / "library.json")
-                    routed["legacy_key"] = target["category"] + "__" + target["model"] + "__f"
-                    assert {k: v for k, v in routed.items() if k != "legacy_key"} == {k: v for k, v in lib.items() if k != "legacy_key"}
+                    stem = target["category"] + "__" + target["model"]
+                    routed["legacy_key"] = stem
+                    routed["legacy_keys"] = sorted(set(routed.get("legacy_keys", [])) | {stem, stem + "__f"})
+                    assert {k: v for k, v in routed.items() if k not in ("legacy_key", "legacy_keys")} == {k: v for k, v in lib.items() if k not in ("legacy_key", "legacy_keys")}
                     write(dest / "library.json", routed)
                     (release / "maps").mkdir()
                     write(release / "anchors.json", {})
