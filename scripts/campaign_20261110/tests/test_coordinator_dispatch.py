@@ -208,3 +208,15 @@ def test_two_accounts_cannot_spend_the_same_physical_reserve(tmp_path,monkeypatc
         results=list(executor.map(lambda account:module.cycle(tmp_path,account,capacity),['minyeong','shiyuc']))
     assert len(calls)==2 and free[0]==4
     assert sum(r['state']=='ready' for report in results for r in report['requests'])==2
+
+
+def test_callback_reported_errors_are_not_hidden_by_zero_exit(tmp_path,monkeypatch):
+    from scripts.campaign_20261110 import coordinator_dispatch as module
+    d=tmp_path/'infra/coordinator_dispatch';d.mkdir(parents=True)
+    (d/'policy.json').write_text(json.dumps({'owner':'/root','production_released':False,
+        'reconcilers':[{'id':'verify','account':'shiyuc','inputs':[],'command':['callback'], 'owner':'engineer'}]}))
+    monkeypatch.setattr(module.subprocess,'run',lambda *a,**kw:SimpleNamespace(returncode=0,stdout='{"errors":["native reader unavailable"]}',stderr=''))
+    cap={'status':'observed','observed_at':1,'compatible_available_slots':0,'account_slots':{'shiyuc':0}}
+    result=module.cycle(tmp_path,'shiyuc',lambda:cap)
+    assert result['errors'][0]['source']=='verify'
+    assert result['errors'][0]['details']==['native reader unavailable']

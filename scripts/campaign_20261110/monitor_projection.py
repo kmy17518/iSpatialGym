@@ -5,6 +5,7 @@ submit jobs, change acceptance, or infer ownership from scheduler job names.
 """
 import datetime as dt
 import hashlib
+import importlib.util
 import json
 import subprocess
 from pathlib import Path
@@ -163,10 +164,18 @@ def project(root, live_jobs, capacity, now=None, accountant=accounting):
             worker['last_useful_progress_at'] = report.get(spec.get('progress_field', 'last_useful_progress_at'))
         worker['observation_status'] = freshness(worker['last_reconciliation_at'], now, spec.get('stale_after_seconds', 300))
         workers.append(worker)
+    preparation_flow = {}
+    try:
+        spec = importlib.util.spec_from_file_location('preparation_flow_watchdog', Path(__file__).with_name('preparation_watchdog.py'))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        preparation_flow = module.publish(root, rows, now)
+        errors.extend(preparation_flow['exceptions'])
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        errors.append({'kind': 'preparation_ready_count_unknown', 'owner': '/root', 'detail': str(exc)})
     return {'schema': SCHEMA, 'schema_version': 1, 'campaign_id': 'campaign_20261110', 'observed_at': now,
             'owner': 'existing local campaign monitor', 'cadence_seconds': 45, 'jobs_observed_at': now, 'jobs': rows, 'workers': workers,
             'backlog': backlog, 'exceptions': errors, 'capacity': capacity, 'capacity_blockers': registry.get('capacity_blockers', []),
-            'evidence': evidence, 'utilization_status': 'unmeasured'}
+            'evidence': evidence, 'utilization_status': 'unmeasured', 'preparation_flow': preparation_flow}
 
 
 def publish(root, live_jobs, capacity):

@@ -226,6 +226,7 @@ def submit(ticket, capacity, runner=subprocess.run):
 
 
 def cycle(root, account, capacity_probe=probe):
+    cycle_started=time.monotonic()
     root=Path(root);directory=root/'infra/coordinator_dispatch'
     policy=read(directory/'policy.json');tickets=[];errors=[]
     if policy.get('owner')!='/root' or policy.get('production_released') is not False:
@@ -240,6 +241,13 @@ def cycle(root, account, capacity_probe=probe):
                         {'observed_at':time.time(),'returncode':result.returncode,
                          'stdout':result.stdout[-4000:],'stderr':result.stderr[-2000:],'owner':reconciler['owner']})
             if result.returncode:errors.append({'source':reconciler['id'],'error':'Reconciler failed','owner':reconciler['owner']})
+            if not result.returncode:
+                try:
+                    child=json.loads(result.stdout.strip().splitlines()[-1])
+                    if child.get('errors'):
+                        errors.append({'source':reconciler['id'],'error':'Reconciler reported errors',
+                                       'details':child['errors'],'owner':reconciler['owner']})
+                except (ValueError,IndexError,AttributeError):pass
         except (OSError,ValueError,subprocess.SubprocessError) as exc:
             errors.append({'source':reconciler['id'],'error':str(exc),'owner':reconciler['owner']})
     if account=='minyeong':
@@ -278,6 +286,7 @@ def cycle(root, account, capacity_probe=probe):
                 if jid in pending:known_pending.add(jid)
         queue_allowance=max(0,int(policy.get('critical_pending_limit',6))-len(known_pending)) if capacity.get('status')=='observed' else 0
         rows=[]
+        submit_until=time.monotonic()+min(15,float(policy.get('submission_slice_seconds',15)))
         # Distribute independent consumed-data builders across classes. Existing
         # claim receipts still prevent duplicate work across both backends.
         for ticket in dispatch_order(tickets):
@@ -288,7 +297,8 @@ def cycle(root, account, capacity_probe=probe):
                 slots=int(ticket.get('gpu_slots',1));is_critical=ticket.get('workstream') in critical
                 is_preparation=ticket.get('workstream')=='training preparation'
                 within_reserve=not is_preparation or preparation_allowance>=slots
-                if state=='ready' and within_reserve and (allowance>=slots or is_critical and queue_allowance>=slots):
+                within_slice=time.monotonic()<submit_until
+                if state=='ready' and within_slice and within_reserve and (allowance>=slots or is_critical and queue_allowance>=slots):
                     result=submit(ticket,capacity)
                     if result:
                         allowance=max(0,allowance-slots);state=result['status']
@@ -297,7 +307,9 @@ def cycle(root, account, capacity_probe=probe):
                 rows.append({'id':ticket['id'],'workstream':ticket['workstream'],'owner':ticket['owner'],
                              'class_id':ticket.get('class_id'),'state':state,'ready_since':ticket.get('ready_since'),
                              'submission_path':ticket['submission_path'],'claim_path':ticket['claim_path'],
-                             'blocker':('Physical headroom reserved for recovery/pipeline; eligible consumed data may use Vast'
+                             'blocker':('Submission time slice ended; existing owner advances on next cycle'
+                                        if state=='ready' and not within_slice else
+                                        'Physical headroom reserved for recovery/pipeline; eligible consumed data may use Vast'
                                         if state=='ready' and is_preparation and not within_reserve else
                                         'No currently available account/physical slots' if state=='ready' and allowance<=0 else None)})
             except (OSError,ValueError,KeyError,subprocess.SubprocessError) as exc:
@@ -305,6 +317,7 @@ def cycle(root, account, capacity_probe=probe):
         report={'schema':'isg-coordinator-dispatch-status-v1','campaign_id':root.name,'owner':'/root',
                 'account':account,'pid':os.getpid(),'observed_at':time.time(),'last_reconciliation_at':time.time(),
                 'cadence_seconds':30,'capacity':{k:v for k,v in capacity.items() if k!='probe'},'requests':rows,'errors':errors,
+                'cycle_elapsed_seconds':time.monotonic()-cycle_started,
                 'production_released':False,'automatic_retry_ambiguous_submission':False}
         shared_json(directory/('status_'+account+'.json'),report)
         return report
@@ -319,13 +332,16 @@ def main():
     with (directory/(args.account+'.worker.lock')).open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         while True:
+            began=time.monotonic()
             try:
                 result=cycle(args.root,args.account)
                 print(json.dumps({'observed_at':result['observed_at'],'requests':len(result['requests']),'errors':len(result['errors'])}),flush=True)
             except (OSError,ValueError,KeyError,subprocess.SubprocessError) as exc:
                 shared_json(directory/('error_'+args.account+'.json'),{'observed_at':time.time(),'error':str(exc),'owner':'/root'})
             if args.once:break
-            time.sleep(30)
+            # Cadence is measured from cycle start, not added after work. A
+            # slow callback must not silently add another 30 seconds of delay.
+            time.sleep(max(1,30-(time.monotonic()-began)))
 
 
 if __name__=='__main__':main()

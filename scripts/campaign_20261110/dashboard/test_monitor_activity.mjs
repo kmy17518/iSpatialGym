@@ -47,3 +47,8 @@ assert.match(elements.get('compact-backlog').innerHTML,/ready.json/);
 run('renderWorkBacklog({})');
 assert.match(elements.get('compact-backlog-summary').innerHTML,/no zero backlog is inferred/);
 console.log('Monitor activity: explicit ownership, independent execution clocks, unknown utilization and missing backlog passed.');
+context.flowFixture={monitor_status_source:{available:true},monitor_status:{observed_at:fresh,backlog:[],exceptions:[],preparation_flow:{ready_count:null,known_ready_count:5,oldest_ready_age_seconds:121,completed_awaiting_verification:2,completed_awaiting_downstream:1,actual_submissions_last_ten_minutes:[{job_id:'22'}],campaign_inventory_enumeration:'incomplete; independent ready batches continue',exceptions:[{}],items:[]}}};
+run('renderWorkBacklog(flowFixture)');
+assert.match(elements.get('compact-backlog-summary').innerHTML,/Unknown \(5 known\)/);
+assert.match(elements.get('compact-backlog-summary').innerHTML,/2 awaiting verification/);
+assert.match(elements.get('compact-backlog-summary').innerHTML,/1 submitted in 10 min/);
