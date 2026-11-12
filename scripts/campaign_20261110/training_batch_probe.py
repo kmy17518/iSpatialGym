@@ -32,6 +32,9 @@ def verify_saved_checker_delta(base, runtime, proof):
 def verify_runtime_compatibility(root, request, records, runtime):
     """Recheck the narrow observation-only runtime against native source bytes."""
     root=Path(root).resolve();runtime=Path(runtime).resolve()
+    if request.get('integrated_candidate_v1') is True:
+        from .training_integrated_runtime import verify
+        return verify(root, request, records, runtime, verify_runtime_compatibility)
     if request.get('selected_pool_world') is True:
         from .training_pool_probe import verify_runtime
         return verify_runtime(root, request, records, runtime)
@@ -447,6 +450,11 @@ def _run(root,request,output,kind,construction):
     runtime=Path(__file__).resolve().parents[2]/'.snapshot_commit'
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
     compatibility=verify_runtime_compatibility(root,value,records,runtime.parent)
+    operation_value = value
+    if value.get('integrated_candidate_v1') is True:
+        from .training_integrated_runtime import source_request
+        require(kind == 'physics_action_open_loop', 'integrated physical candidate cannot render')
+        operation_value, _ = source_request(root, value)
     # Exact production-purpose sources retain their original native identity;
     # the loader independently rechecks this narrow observational proof.
     os.environ['ISPATIALGYM_TRAINING_OBSERVATION_REQUEST']=str(Path(request).resolve())
@@ -473,7 +481,7 @@ def _run(root,request,output,kind,construction):
         from ispatialgym.oracle import run_isg
         if value.get('late_incoming_physics_rebuild_v1') is True:
             from .training_late_rebuild_probe import install as install_late, DELTA as LATE_DELTA
-            install_late(run_isg, value, output)
+            install_late(run_isg, operation_value, output)
             common['late_physics_reconstruction_delta'] = LATE_DELTA
         if value.get('explicit_physics_sdk_rebuild_v1') is True:
             from .training_physics_rebuild_probe import install as install_sdk_rebuild, DELTA as SDK_DELTA

@@ -59,6 +59,9 @@ def verify_inputs(root, request, records):
 
 
 def verify_runtime(root, request, records, runtime):
+    if request.get('integrated_candidate_v1') is True:
+        from .training_integrated_runtime import verify
+        return verify(root, request, records, runtime, verify_runtime)
     if request.get('pool_active_recording_v1') is True:
         from .training_pool_recording_probe import verify_runtime as verify_recording
         return verify_recording(root, request, records, runtime, verify_runtime)

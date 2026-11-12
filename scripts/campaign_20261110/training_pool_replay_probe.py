@@ -98,17 +98,21 @@ def run(root, request_path, output):
     runtime = Path(__file__).resolve().parents[2]
     require(file_digest(runtime/'.snapshot_commit') == request['probe_runtime_sha256'], 'pool replay runtime changed')
     pool.verify_runtime(root, request, records, runtime)
-    action_request = request
+    operation_request = request
+    if request.get('integrated_candidate_v1') is True:
+        from .training_integrated_runtime import source_request
+        operation_request, _ = source_request(root, request)
+    action_request = operation_request
     recovery = None
     recording = None
     if request.get('pool_active_recording_v1') is True:
         from . import training_pool_recording_probe as recording
-        action_request = recording.parent_request(request,
-            json.loads(Path(request['runtime_compatibility']['path']).read_text()))
+        action_request = recording.parent_request(operation_request,
+            json.loads(Path(operation_request['runtime_compatibility']['path']).read_text()))
     if request.get('pool_recovery_v1') is True:
         from . import training_pool_recovery_probe as recovery
-        action_request = recovery.parent_request(request,
-            json.loads(Path(request['runtime_compatibility']['path']).read_text()))
+        action_request = recovery.parent_request(operation_request,
+            json.loads(Path(operation_request['runtime_compatibility']['path']).read_text()))
     proof = json.loads(Path(action_request['runtime_compatibility']['path']).read_text())
     output.mkdir(parents=True)
     os.environ['ISPATIALGYM_TRAINING_OBSERVATION_REQUEST'] = str(Path(request_path).resolve())
