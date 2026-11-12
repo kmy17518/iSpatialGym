@@ -138,11 +138,13 @@ def accepted_counts(root, class_id):
 
 def next_bucket(counts, quotas, enabled=None):
     enabled=list(range(len(quotas))) if enabled is None else enabled
-    require(isinstance(enabled,list) and enabled and len(set(enabled))==len(enabled)
+    require(isinstance(enabled,list) and len(set(enabled))==len(enabled)
             and all(isinstance(i,int) and not isinstance(i,bool) and 0<=i<len(quotas) for i in enabled),
             'invalid enabled evaluation buckets')
     used = sum(n for (split, _), n in counts.items() if split == "eval_standard")
-    return None if used >= sum(quotas) else enabled[0]
+    # An old empty bucket allowlist is descriptive under the new owner policy.
+    # Physical holds remain explicit in allow_new_cycles and failed readiness.
+    return None if used >= sum(quotas) else (enabled[0] if enabled else 0)
 
 
 def slurm_status():

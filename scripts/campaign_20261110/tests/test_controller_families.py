@@ -218,7 +218,13 @@ class FamilyControllerTests(unittest.TestCase):
         with patch.object(c,'accepted_counts',return_value=counts):
             c.advance({'class_id':'class','eval_quotas':[5,5],'enabled_buckets':[0]},state,{},Path('/campaign'),{},1,lambda:None)
         self.assertEqual(state['status'],'evaluation_quota_complete')
-        for invalid in ([],[2],[-1],[0,0],[True]):
+        self.assertEqual(c.next_bucket({},[5,5],[]),0)
+        state={}
+        with patch.object(c,'accepted_counts',return_value={}):
+            c.advance({'class_id':'class','eval_quotas':[5,5],'enabled_buckets':[],
+                       'allow_new_cycles':False},state,{},Path('/campaign'),{},1,lambda:None)
+        self.assertEqual(state['status'],'needs_family_diagnosis')
+        for invalid in ([2],[-1],[0,0],[True]):
             with self.assertRaises(ValueError):c.next_bucket({},[5,5],invalid)
 
     def test_global_indices_skip_other_ledger_and_are_idempotent(self):
