@@ -93,6 +93,13 @@ def observed_no_steps(sim, call):
     return result, {'observed_physics_step_calls': calls, 'time_step_settings': list(before)}
 
 
+def bind_anchor_function(parent_install, anchor_function):
+    """Bind the actual installer's namespace, including a ``python -m`` entrypoint."""
+    namespace = parent_install.__globals__
+    require(callable(namespace.get('anchor_for_member')), 'parent anchor route is absent')
+    namespace['anchor_for_member'] = anchor_function
+
+
 def install(runner, contract, output, parent_install, request):
     from . import training_pool_probe as pool
     parent_install(runner, contract, output)
@@ -102,7 +109,12 @@ def install(runner, contract, output, parent_install, request):
     def persist():
         write_json_atomic(output/'source_anchor_audit.json', {'physical_delta': DELTA, 'events': events,
             'benchmark_credit': 0, 'production_released': False})
-    pool.anchor_for_member = source_anchor
+    anchor_calls = []
+    def measured_anchor(baseline, incoming):
+        result = source_anchor(baseline, incoming)
+        anchor_calls.append(copy.deepcopy(result))
+        return result
+    bind_anchor_function(parent_install, measured_anchor)
     def cold(loader):
         original = runner.M.apply_eval_base_mass
         observations = []
@@ -134,9 +146,14 @@ def install(runner, contract, output, parent_install, request):
             **observations[0]}); persist()
         return result
     def warm(loader, shared):
+        offset = len(anchor_calls)
         result = attach(loader, shared)
+        incoming = pool._incoming_spawn(loader, loader.robot)
+        require(len(anchor_calls) == offset+1 and anchor_calls[-1] == incoming,
+                'warm native attach did not use the exact source anchor operation')
         events.append({'phase': 'warm_after_existing_anchor_lifecycle', 'tro': loader.tro_path,
-            'source_spawn': pool._incoming_spawn(loader, loader.robot),
+            'source_spawn': incoming, 'actual_parent_anchor_argument': anchor_calls[-1],
+            'actual_anchor_route_observed': True,
             'native_anchor': [v.tolist() for v in loader.robot.root_link.get_position_orientation()]}); persist()
         return result
     runner.InstanceLoader.build_env = cold

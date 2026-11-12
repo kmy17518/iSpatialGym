@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts.campaign_20261110.contracts import ContractError
-from scripts.campaign_20261110.training_pool_source_anchor_probe import source_anchor, observed_no_steps
+from scripts.campaign_20261110.training_pool_source_anchor_probe import source_anchor, observed_no_steps, bind_anchor_function
 
 
 def test_anchor_uses_source_components_without_composing_reference_roundoff():
@@ -40,3 +40,18 @@ def test_existing_lifecycle_must_not_add_steps_and_wrappers_are_restored():
     assert result == 'existing stop/play finished' and not evidence['observed_physics_step_calls']
     with pytest.raises(ContractError, match='physics stepping'): observed_no_steps(sim, lambda: sim.step_physics())
     assert 'step_physics' not in vars(sim) and sim._sim_context.step is native
+
+
+def test_python_m_parent_namespace_is_bound_instead_of_imported_module():
+    namespace = {'__name__': '__main__', 'anchor_for_member': lambda: 'old SE3 calculation'}
+    exec('def install():\n    return lambda: anchor_for_member()\n', namespace)
+    parent = namespace['install']; native_attach = parent()
+    bind_anchor_function(parent, lambda: 'exact source pose')
+    assert native_attach() == 'exact source pose'
+
+
+def test_missing_parent_anchor_route_fails_before_silent_noop():
+    namespace = {'__name__': '__main__'}
+    exec('def install():\n    return None\n', namespace)
+    with pytest.raises(ContractError, match='route is absent'):
+        bind_anchor_function(namespace['install'], lambda: None)
