@@ -7,7 +7,7 @@ from pathlib import Path
 import stat
 import tempfile
 import time
-from .contracts import canonical_json, digest, require
+from .contracts import canonical_json, digest, file_digest, require
 from .runtime_suite import active, checked, registered_rows, timestamp
 from .runtime_suite_acceptance import executed_scope, immutable, reference
 from .storage import atomic_directory_lock
@@ -39,6 +39,47 @@ def _replace_pointer(path, value):
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def _share_registered_controls(root, base, entry, registry_ref):
+    """Publish only the exact control records read by this registration's gate.
+
+    This is an explicit list of checked references, not a recursive filesystem
+    permission walk. Native assets, external paths and unrelated attempts are
+    never permission targets. Existing directories must already be traversable.
+    """
+    prepared = checked(root, entry['prepared'])
+    row = checked(root, entry['row'])
+    diagnosis = checked(root, prepared['diagnosis'])
+    references = [registry_ref, entry['row'], entry['prepared'], entry['approval'],
+                  prepared['diagnosis'], row['campaign_config'], row.get('goal_plan'),
+                  row.get('catalog_row'), prepared.get('input_correction'),
+                  *diagnosis['evidence']]
+    planned = {}
+    for ref in references:
+        if ref is None:
+            continue
+        path = Path(ref['path'])
+        # Source/binary evidence outside this suite retains its existing access.
+        if not path.resolve().is_relative_to(base) or path.suffix != '.json':
+            continue
+        info = path.lstat()
+        require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid(),
+                'registered control must be an owned regular file')
+        require(file_digest(path) == ref['sha256'], 'registered control bytes changed')
+        for parent in path.parents:
+            if parent == base or parent.is_relative_to(base):
+                require(parent.stat().st_mode & stat.S_IXGRP,
+                        'registered control directory is not group traversable')
+        planned[str(path)] = (path, ref, stat.S_IMODE(info.st_mode))
+    changes = []
+    for path, ref, mode in planned.values():
+        if not mode & stat.S_IRGRP:
+            os.chmod(path, mode | stat.S_IRGRP)
+        require(file_digest(path) == ref['sha256'], 'registered control changed during publication')
+        changes.append({'reference': ref, 'mode_before': mode,
+                        'mode_after': stat.S_IMODE(path.stat().st_mode)})
+    return changes
 
 
 def _reservation(root, proof, row, initial):
@@ -245,5 +286,7 @@ def register(root, prepared_ref, approval_ref):
         registry['attempts'].setdefault(row['class_id'],[]).append(entry)
         registry_ref=immutable(base/'attempt_registries'/(digest(registry)+'.json'),registry)
         immutable(base/'pointer_history'/(digest(pointer)+'.json'),pointer)
+        access=_share_registered_controls(root,base,entry,registry_ref)
         _replace_pointer(root/'runtime_validation/current.json',{**pointer,'attempt_registry':registry_ref})
-        return {'registered':entry,'registry':registry_ref,'dispatch_performed':False}
+        return {'registered':entry,'registry':registry_ref,'dispatch_performed':False,
+                'control_access':access}
