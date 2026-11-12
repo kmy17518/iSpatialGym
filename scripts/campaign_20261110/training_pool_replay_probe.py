@@ -100,6 +100,11 @@ def run(root, request_path, output):
     pool.verify_runtime(root, request, records, runtime)
     action_request = request
     recovery = None
+    recording = None
+    if request.get('pool_active_recording_v1') is True:
+        from . import training_pool_recording_probe as recording
+        action_request = recording.parent_request(request,
+            json.loads(Path(request['runtime_compatibility']['path']).read_text()))
     if request.get('pool_recovery_v1') is True:
         from . import training_pool_recovery_probe as recovery
         action_request = recovery.parent_request(request,
@@ -110,8 +115,10 @@ def run(root, request_path, output):
     os.environ['ISPATIALGYM_TRAINING_OBSERVATION_REQUEST_SHA256'] = file_digest(request_path)
     from ispatialgym.oracle import run_isg as runner
     import omnigibson as og
+    native_build_config = runner.build_env_config
     install_anchor(runner, contract, output, pool.install, load_request(action_request, proof))
     current = {}; planner = []
+    flush_recording = recording.install(runner, contract, current, output, native_build_config) if recording else None
     cleanups = []
     if recovery is not None:
         recovery.install(runner, request['diagnostic_control'], current, cleanups)
@@ -131,6 +138,9 @@ def run(root, request_path, output):
               'scope': 'Native source action replay and planner exclusion only. Full-union diagnostic recording; '
                        'active-only export and cold/reused rendering are not verified.', 'entries': []}
     if recovery is not None: result['recovery_delta'] = recovery.DELTA
+    if recording is not None:
+        result['recording_delta'] = recording.DELTA
+        result['scope'] = 'Native action replay with active-only serialized-state and scene export diagnostic. Renderer and dataset release remain unverified.'
     final_isolation = []
     try:
         with pool.world_construction_counter(og) as construction:
@@ -153,6 +163,9 @@ def run(root, request_path, output):
                 result['entries'].append({'source_index': index, 'canary_review': request['canaries'][index],
                     'returncode': code, 'result': entry,
                     'report': {'path': str(report), 'sha256': file_digest(report)}})
+                if recording is not None:
+                    result['entries'][-1]['active_recording_scene'] = current.get('active_recording_scene')
+                    flush_recording()
                 write_json_atomic(output/'probe.json', result)
                 require(current.get('planner_observed') is True, 'native pool planner boundary missing')
                 aborted = recovery is not None and recovery.verify_expected_abort(
@@ -174,6 +187,7 @@ def run(root, request_path, output):
         inputs(root, request_path)
         return result
     finally:
+        if flush_recording is not None: flush_recording()
         write_json_atomic(output/'probe.json', result)
 
 
