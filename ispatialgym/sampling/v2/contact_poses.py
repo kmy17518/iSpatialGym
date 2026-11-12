@@ -1465,6 +1465,33 @@ def axial_push_chain(side_pt: th.Tensor, d: th.Tensor, half: float, approach: th
     return [C.pre_pose(p_init), p_init, arc[0], arc[1]]
 
 
+def inset_axial_push_chain(chain, centre, distance):
+    """Move an arc radially inward without changing its height or orientation.
+
+    The pre-contact translates with init, preserving its approach displacement.
+    This builds a proposal only; native IK, collision and full-program checks
+    remain responsible for accepting it.
+    """
+    if not math.isfinite(distance) or distance < 0:
+        raise ValueError('axial radial inset must be finite and nonnegative')
+    if distance == 0:
+        return chain
+    if len(chain) != 4:
+        raise ValueError('axial inset requires pre/init/mid/goal')
+    points = [G.t(p).clone() for p, _ in chain]
+    shifts = []
+    for p in points[1:]:
+        inward = G.t(centre)[:2] - p[:2]
+        radius = float(th.linalg.norm(inward))
+        if not math.isfinite(radius) or radius <= distance:
+            raise ValueError('axial inset reaches or crosses the pivot')
+        delta = inward * (distance / radius)
+        p[:2] += delta
+        shifts.append(delta)
+    points[0][:2] += shifts[0]
+    return [(p, original[1]) for p, original in zip(points, chain)]
+
+
 # ------------------------------------------------------------------------------------------------ the contact SCHEMA (push / brace library entries)
 
 CONTACT_SCHEMA = "isg-contact/1"

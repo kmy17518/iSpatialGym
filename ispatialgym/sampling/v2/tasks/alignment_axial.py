@@ -595,6 +595,8 @@ class AlignmentAxial(SamplerV2):
             motions.sort(key=lambda m: 0 if (m[1]["ok"] and m[1]["work_ok"]) else 1)
             TT._count(self, "axial_brace.paired" if paired else "axial_brace.push_only")
         brace_reason = "no_joint_cell"
+        from ispatialgym.sampling import campaign_runtime
+        radial_inset = .01 if campaign_runtime.contact_recovery('axial_magazine_contact_inward_1cm') else 0.
         for e, jp, d, r_xy, goal_pose, stop_pts, d_stop in motions:
             if not jp["work_ok"]:
                 continue
@@ -618,6 +620,7 @@ class AlignmentAxial(SamplerV2):
                     for rank, c_sign in enumerate((1.0, -1.0)):
                         # i7-contact 2026-11-07: the shared chain (contact_poses.axial_push_chain)
                         chain = CPZ.axial_push_chain(side_pt, d, push_half_p, a_vec, c_axis, c_sign, th.tensor([float(com[0]), float(com[1]), z_push]), d_goal)
+                        chain = CPZ.inset_axial_push_chain(chain, com, radial_inset)
                         props.append(O.Proposal(f"{pitch:.0f}{'' if c_sign > 0 else '-'}{'_side' if c_axis is side_c else ''}", rank, c_sign, chain))
 
                     def evaluate(p):
