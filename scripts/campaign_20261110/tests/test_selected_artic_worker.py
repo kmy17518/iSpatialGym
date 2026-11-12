@@ -116,3 +116,32 @@ def test_relocation_rejects_foreign_or_escaping_paths(tmp_path, monkeypatch, kin
         output.symlink_to(target, target_is_directory=True)
     with pytest.raises(AssertionError):
         worker.resolve_output(request, {'campaign_id': 'campaign_20261110'}, unit, output)
+
+
+def test_exact_input_copy_binds_original_request(tmp_path, monkeypatch):
+    _, request, _, output = relocation_fixture(tmp_path, monkeypatch)
+    copied = output.parent / 'inputs/customs.json'; copied.parent.mkdir(parents=True); copied.write_bytes(b'{"exact": true}\n')
+    manifest = output.parent / 'mapping.json'
+    record = {'schema': 'isg-selected-artic-input-relocations-v1', 'campaign_id': 'campaign_20261110',
+              'source_request': worker.ref(request), 'files': {'/private/customs.json': worker.ref(copied)}}
+    manifest.write_text(json.dumps(record)); before = request.read_bytes()
+    sources, proof = worker.load_input_relocations(request, manifest, worker.ref(manifest)['sha256'])
+    assert sources == {'/private/customs.json': copied} and proof == worker.ref(manifest)
+    assert request.read_bytes() == before
+    copied.write_bytes(b'changed')
+    with pytest.raises(AssertionError, match='input copy changed'):
+        worker.load_input_relocations(request, manifest, worker.ref(manifest)['sha256'])
+
+
+@pytest.mark.parametrize('mismatch', ['digest', 'request', 'outside'])
+def test_rejects_unbound_input_copy(tmp_path, monkeypatch, mismatch):
+    _, request, _, output = relocation_fixture(tmp_path, monkeypatch)
+    copied = output.parent / 'inputs/customs.json'; copied.parent.mkdir(parents=True); copied.write_bytes(b'{}')
+    record = {'schema': 'isg-selected-artic-input-relocations-v1', 'campaign_id': 'campaign_20261110',
+              'source_request': worker.ref(request), 'files': {'/private/customs.json': worker.ref(copied)}}
+    if mismatch == 'request': record['source_request']['sha256'] = '0' * 64
+    if mismatch == 'outside': record['files']['/private/customs.json']['path'] = str(tmp_path / 'outside')
+    manifest = output.parent / 'mapping.json'; manifest.write_text(json.dumps(record))
+    expected = '0' * 64 if mismatch == 'digest' else worker.ref(manifest)['sha256']
+    with pytest.raises(AssertionError):
+        worker.load_input_relocations(request, manifest, expected)

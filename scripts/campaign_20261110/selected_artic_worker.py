@@ -30,7 +30,28 @@ def write(path, value):
     temp.replace(path)
 
 
-def verify(path, index):
+def load_input_relocations(path, manifest=None, expected_sha256=None):
+    if manifest is None:
+        assert expected_sha256 is None, 'relocation digest without manifest'
+        return {}, None
+    assert expected_sha256 and ref(manifest)['sha256'] == expected_sha256, 'input relocation manifest digest differs'
+    mapping = read(manifest)
+    assert mapping['schema'] == 'isg-selected-artic-input-relocations-v1'
+    assert mapping['campaign_id'] == 'campaign_20261110' and mapping['source_request'] == ref(path)
+    wave = Path(path).resolve().parent.name
+    allowed = [c / 'training_preparation' / wave for c in CAMPAIGN_ROOTS]
+    sources = {}
+    for original, entry in mapping['files'].items():
+        destination = Path(entry['path'])
+        assert destination.is_absolute() and '..' not in destination.parts
+        assert any(destination.is_relative_to(p) and destination.resolve().is_relative_to(p.resolve()) for p in allowed), 'input copy outside isolated wave'
+        assert ref(destination)['sha256'] == entry['sha256'], 'input copy changed'
+        sources[original] = destination
+    return sources, ref(manifest)
+
+
+def verify(path, index, input_relocations=None, input_relocations_sha256=None):
+    sources, _ = load_input_relocations(path, input_relocations, input_relocations_sha256)
     wave = read(path)
     assert wave['schema'] == 'isg-selected-artic-motion-wave-v1'
     assert wave['campaign_id'] == 'campaign_20261110' and wave['production_authorization'] is False
@@ -38,7 +59,8 @@ def verify(path, index):
     assert unit['index'] == index and unit['benchmark_credit'] == unit['new_native_instances'] == 0
     for r in [wave['source_handoff'], wave['selected_manifest'], unit['request'], unit['source_customs'], unit['customs'],
               unit['identity']['geometry'], unit['identity']['handle_annotation']]:
-        assert ref(r['path']) == r, r['path']
+        actual = sources.get(r['path'], r['path'])
+        assert ref(actual)['sha256'] == r['sha256'], r['path']
     runtime = Path(unit['native_runtime'])
     for name, sha in unit['identity']['generator_files'].items():
         assert ref(runtime / name)['sha256'] == sha, name
@@ -104,13 +126,15 @@ def audit_library(path, unit):
             'handle_sig': lib['handle_sig'], 'positive': moving > 0}
 
 
-def run(path, index, output_root=None):
-    wave, unit = verify(path, index)
+def run(path, index, output_root=None, input_relocations=None, input_relocations_sha256=None):
+    wave, unit = verify(path, index, input_relocations, input_relocations_sha256)
+    sources, input_mapping = load_input_relocations(path, input_relocations, input_relocations_sha256)
     out, relocation = resolve_output(path, wave, unit, output_root)
     if relocation is not None:
         out.parent.mkdir(parents=True, exist_ok=True)
     out.mkdir(exist_ok=False)
     if relocation is not None:
+        relocation['input_relocations'] = input_mapping
         write(out / 'output_relocation.json', relocation)
     start = time.time()
     result = {'schema': 'isg-selected-artic-motion-result-v1', 'campaign_id': 'campaign_20261110', 'unit_id': unit['id'],
@@ -121,12 +145,14 @@ def run(path, index, output_root=None):
         result['output_relocation'] = ref(out / 'output_relocation.json')
     result['actual_output'] = str(out)
     result['original_output'] = unit['output']
+    result['input_relocations'] = input_mapping
     write(out / 'result.json', result)
     runtime = Path(unit['native_runtime'])
     sys.path.insert(0, str(runtime))
     log = out / 'native.log'
     cmd = [sys.executable, '-u', '-m', 'ispatialgym.grasping.validate_artic', 'motions', '--aliases', unit['alias'],
-           '--root', str(out / 'alib'), '--arm', unit['identity']['arm'], '--q-starts', 'grid', '--customs', unit['customs']['path']]
+           '--root', str(out / 'alib'), '--arm', unit['identity']['arm'], '--q-starts', 'grid',
+           '--customs', str(sources.get(unit['customs']['path'], unit['customs']['path']))]
     result['command'] = cmd
     try:
         with log.open('w') as f:
@@ -166,11 +192,14 @@ if __name__ == '__main__':
     parser.add_argument('--unit', type=int, required=True)
     parser.add_argument('--verify-only', action='store_true')
     parser.add_argument('--output-root', type=Path, help='Relocate outputs within this named campaign preparation wave only')
+    parser.add_argument('--input-relocations', type=Path, help='Hash-bound exact-byte private input copies for this request')
+    parser.add_argument('--input-relocations-sha256')
     args = parser.parse_args()
     if args.verify_only:
-        wave, unit = verify(args.request, args.unit)
+        wave, unit = verify(args.request, args.unit, args.input_relocations, args.input_relocations_sha256)
         out, relocation = resolve_output(args.request, wave, unit, args.output_root)
         print(json.dumps({'status': 'inputs_verified', 'unit_id': unit['id'], 'request': ref(args.request),
-                          'actual_output': str(out), 'output_relocation': relocation}))
+                          'actual_output': str(out), 'output_relocation': relocation,
+                          'input_relocations': ref(args.input_relocations) if args.input_relocations else None}))
     else:
-        run(args.request, args.unit, args.output_root)
+        run(args.request, args.unit, args.output_root, args.input_relocations, args.input_relocations_sha256)
