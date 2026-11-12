@@ -54,7 +54,12 @@ def routing_capacity(capacity, metrics, policy, timestamp, *, eligible_accounts=
     reason = ('cluster_observation_unknown' if not fresh else 'cluster_headroom_available' if usable > 0 else
               'provider_observation_unknown' if not provider_fresh else 'campaign_budget_unknown' if not budget_known else
               'campaign_budget_exhausted' if exposure >= 3000 else 'overflow_allowed')
+    safety_reason = ('cluster_observation_unknown' if not fresh else 'provider_observation_unknown' if not provider_fresh else
+                     'campaign_budget_unknown' if not budget_known else 'campaign_budget_exhausted' if exposure >= 3000 else 'allowed')
     return {'reason': reason, 'allow_overflow': reason == 'overflow_allowed', 'usable_cluster_slots': usable,
+            'overflow_safety_allowed': bool(fresh and provider_fresh and budget_known and exposure < 3000),
+            'overflow_safety_reason': safety_reason,
+            'usable_physical_slots': max(0, capacity['compatible_available_slots'] - reserve) if fresh else None,
             'account_slots': account_slots, 'critical_reserved_physical_slots': reserve,
             'prepared_account_routes': eligible_accounts,
             'compatible_idle_workers': idle, 'observed_exposure_usd': exposure,
@@ -107,6 +112,7 @@ def cycle(root, policy_path, expected_sha, *, execute=False, timestamp=None, tra
     state = json.loads(state_path.read_text()) if state_path.exists() else {'cursor': 0, 'ever_activated': []}
     results = []; errors = []; submitted = []; ready = []; began = time.monotonic(); cursor = state['cursor']
     idle = [w['gpu'] for w in capacity['compatible_idle_workers'] for _ in range(w['slots'])]
+    cluster_reserved = {'minyeong': 0, 'shiyuc': 0}
     # This is a finite per-cycle buffer, never a fleet cap. The next cycle resumes.
     for offset in range(min(len(rows), policy['max_examined_per_cycle'])):
         if time.monotonic() - began >= policy['max_cycle_seconds']: break
@@ -117,8 +123,18 @@ def cycle(root, policy_path, expected_sha, *, execute=False, timestamp=None, tra
             results.append({'physical_dedup_key': key, 'status': 'existing_physical_claim_or_receipt'}); continue
         row_capacity = routing_capacity(status.get('capacity', {}), metrics, policy, timestamp,
                                         eligible_accounts=[row['ticket']['expected_account']])
-        if not row_capacity['allow_overflow']:
-            results.append({'physical_dedup_key': key, 'status': row_capacity['reason'],
+        prefer_idle = len(ready) < len(idle) and row_capacity['overflow_safety_allowed']
+        account = row['ticket']['expected_account']
+        remaining_cluster = (min(max(0, row_capacity['account_slots'][account] - cluster_reserved[account]),
+                                 max(0, row_capacity['usable_physical_slots'] - sum(cluster_reserved.values())))
+                             if row_capacity['usable_cluster_slots'] is not None else None)
+        if not prefer_idle and remaining_cluster is not None and remaining_cluster > 0:
+            cluster_reserved[account] += 1
+            results.append({'physical_dedup_key': key, 'status': 'reserved_for_usable_cluster_slot',
+                            'prepared_account_routes': [account], 'cluster_slots_remaining_before': remaining_cluster})
+            continue
+        if not prefer_idle and not row_capacity['overflow_safety_allowed']:
+            results.append({'physical_dedup_key': key, 'status': row_capacity['overflow_safety_reason'],
                             'prepared_account_routes': row_capacity['prepared_account_routes'],
                             'usable_cluster_slots': row_capacity['usable_cluster_slots']}); continue
         try:
@@ -168,6 +184,7 @@ def cycle(root, policy_path, expected_sha, *, execute=False, timestamp=None, tra
             state['ever_activated'] = sorted(set(state['ever_activated']) | set(activated))
     report = {'schema': 'isg-consumed-library-intake-status-v1', 'observed_at': timestamp, 'owner': '/root',
               'policy': policy_ref, 'execute': execute, 'capacity': capacity, 'total_routes': len(rows),
+              'cluster_rows_reserved_this_cycle': cluster_reserved,
               'results': results, 'ready': ready, 'submitted': submitted, 'activated': activated, 'errors': errors,
               'benchmark_credit': 0, 'production_authorized': False}
     if execute: shared_json(state_path, state)

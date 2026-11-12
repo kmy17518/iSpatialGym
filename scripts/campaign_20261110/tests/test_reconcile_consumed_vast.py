@@ -169,3 +169,35 @@ def test_unreviewed_or_changed_source_rejected_before_claim(tmp_path):
     with pytest.raises(ValueError, match='outside reviewed admission'):
         m.cycle(tmp_path, path, v.sha(path), execute=True, timestamp=1000, gate=allowed)
     assert not Path(ticket['claim_path']).exists()
+
+
+def test_fresh_idle_vast_is_preferred_even_with_usable_primary_slots(tmp_path):
+    path, _, policy, capacity, _ = setup(tmp_path, map_route=True)
+    capacity.update(account_slots={'minyeong': 2, 'shiyuc': 48}, compatible_available_slots=50)
+    v.write(policy['cluster_status_path'], {'capacity': capacity})
+    result=m.cycle(tmp_path,path,v.sha(path),timestamp=1000,gate=allowed)
+    assert len(result['ready'])==1 and result['ready'][0]['gpu']=='RTX 4090'
+    assert result['cluster_rows_reserved_this_cycle']=={'minyeong':0,'shiyuc':0}
+
+
+def test_only_usable_cluster_slots_are_reserved_and_remaining_rows_overflow(tmp_path,monkeypatch):
+    import copy
+    path, _, policy, capacity, metrics = setup(tmp_path,map_route=True)
+    capacity.update(account_slots={'minyeong':2,'shiyuc':48},compatible_available_slots=10)
+    metrics['instances']=[]
+    v.write(policy['cluster_status_path'],{'capacity':capacity});v.write(tmp_path/'vast/metrics.json',metrics)
+    original=m.reviewed_routes(tmp_path,policy)[0];rows=[];values={}
+    for i in range(5):
+        row=copy.deepcopy(original);key=f'{i+1:064x}';row['physical_dedup_key']=key
+        for field in ('claim_path','submission_path'):
+            row[field]=str(Path(row[field]).parent/(key+'.json'));row['ticket'][field]=row[field]
+        row['job_dir']=str(tmp_path/'out/vast_map_prebuild'/key)
+        values[row['job_dir']]={'kind':'tabletop_maps','scenes':[],'source_consumed_map_ticket':True,
+                               **{k:row[k]for k in ('physical_dedup_key','claim_path','submission_path')}}
+        rows.append(row)
+    monkeypatch.setattr(m,'reviewed_routes',lambda *args:rows)
+    fake=SimpleNamespace(verify=lambda job,root:values[str(job)])
+    result=m.cycle(tmp_path,path,v.sha(path),timestamp=1000,gate=allowed,map_transport=fake)
+    assert result['cluster_rows_reserved_this_cycle']=={'minyeong':2,'shiyuc':0}
+    assert len(result['ready'])==3 and not result['errors']
+    assert len([r for r in result['results']if r['status']=='reserved_for_usable_cluster_slot'])==2
