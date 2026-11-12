@@ -58,3 +58,69 @@ def test_legacy_lifecycle_does_not_opt_unrelated_sources_into_reconstruction():
     assert restart_reused_world({},None) is None
     with pytest.raises(ContractError):
         restart_reused_world({'scene_setup':{'restoration_options':{'reuse_native_lifecycle_v1':True}}},None)
+
+
+def additional_fixture(tmp_path, mechanism='camera'):
+    import json
+    from scripts.campaign_20261110.training_mechanism_probe import ref
+    def put(name,value):
+        p=tmp_path/name;p.parent.mkdir(parents=True,exist_ok=True)
+        p.write_text(value if isinstance(value,str) else json.dumps(value));return ref(p)
+    cls='camera_relocalization-standard' if mechanism=='camera' else 'configuration_matching-block_design_01'
+    row={'instance_id':'original_source','class_id':cls}
+    for k in ('source_tro','source_sidecar','collector_environment','collector_meta','collector_demo',
+              'own_replay_meta','generation_row','campaign_config'):
+        row[k]=put(k,{'identity':k})
+    marker=put('code/.snapshot_commit','original_commit\n')
+    row['source_generation_and_collection_runtime']={'path':str(tmp_path/'code'),
+        'commit':'original_commit','snapshot_sha256':marker['sha256'],'b1k':put('code/.snapshot_b1k','original_b1k')}
+    gate={'success':True,'replay_rc':0,'demo':row['collector_demo']['path'],
+          'demo_sha256':row['collector_demo']['sha256'],'instance':row['source_tro']['path'],
+          'tro_sha256':row['source_tro']['sha256'],'replay_meta_paths':[row['own_replay_meta']['path']]}
+    row['own_replay_gate']=put('gate.json',gate)
+    member={'instance_id':row['instance_id'],**{k+'_sha256':row[f]['sha256'] for k,f in (
+        ('demo','collector_demo'),('tro','source_tro'),('report','collector_meta'),('sidecar','source_sidecar'))}}
+    review={'schema':'isg-camera-release-review-v1' if mechanism=='camera' else 'isg-release-review-v1',
+        'class_id':cls,'template_validation_passed':True,'gate':row['own_replay_gate'],
+        'members':[member]}
+    if mechanism!='camera':review['selected_member_ids']=[row['instance_id']]
+    row['first_party_strict_review']=put('review.json',review)
+    return {'rows':[row]}, {'mechanism':mechanism,'instance_id':row['instance_id']}, put
+
+
+@pytest.mark.parametrize('mechanism',['camera','grouped_objects'])
+def test_additional_sources_preserve_original_runtime_and_real_review_schema(tmp_path,mechanism):
+    from scripts.campaign_20261110.training_mechanism_probe import additional_source
+    manifest,q,_=additional_fixture(tmp_path,mechanism)
+    result=additional_source(tmp_path,manifest,q)
+    assert result['generation_runtime']['commit']=='original_commit'
+    assert result['collector_runtime']==result['generation_runtime']
+    assert 'strict_distinct_group_review' not in result
+
+
+@pytest.mark.parametrize('field,value',[('success',False),('demo_sha256','other_demo'),
+    ('tro_sha256','other_tro'),('replay_meta_paths',[])])
+def test_additional_source_gate_cannot_substitute_inputs_or_own_replay(tmp_path,field,value):
+    import json
+    from pathlib import Path
+    from scripts.campaign_20261110.training_mechanism_probe import additional_source
+    manifest,q,put=additional_fixture(tmp_path);row=manifest['rows'][0]
+    gate=json.loads(Path(row['own_replay_gate']['path']).read_text());gate[field]=value
+    row['own_replay_gate']=put('gate.json',gate)
+    with pytest.raises(ContractError,match='exact own replay'):additional_source(tmp_path,manifest,q)
+
+
+@pytest.mark.parametrize('change',['camera_group_schema','other_gate','ambiguous_source','failed_review','original_marker'])
+def test_additional_source_rejects_reinterpreted_review_or_original_identity(tmp_path,change):
+    import json
+    from pathlib import Path
+    from scripts.campaign_20261110.training_mechanism_probe import additional_source
+    manifest,q,put=additional_fixture(tmp_path);row=manifest['rows'][0]
+    review=json.loads(Path(row['first_party_strict_review']['path']).read_text())
+    if change=='camera_group_schema':review['schema']='isg-release-review-v1'
+    elif change=='other_gate':review['gate']={'path':'different','sha256':'different'}
+    elif change=='failed_review':review['template_validation_passed']=False
+    elif change=='ambiguous_source':manifest['rows'].append(row)
+    else:row['source_generation_and_collection_runtime']['commit']='new_execution_commit'
+    row['first_party_strict_review']=put('review.json',review)
+    with pytest.raises(ContractError):additional_source(tmp_path,manifest,q)

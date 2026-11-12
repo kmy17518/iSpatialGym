@@ -54,6 +54,52 @@ def scope(request):
     return ORDERS[request['control']]
 
 
+def additional_source(root, manifest, request):
+    """Consume the actual camera/block review schema without fabricating a group."""
+    classes = {'camera':'camera_relocalization-standard',
+               'grouped_objects':'configuration_matching-block_design_01'}
+    require(request['mechanism'] in classes, 'additional source mechanism unsupported')
+    rows = [r for r in manifest['rows'] if r['class_id'] == classes[request['mechanism']]
+            and r['instance_id'] == request['instance_id']]
+    require(len(rows) == 1, 'additional mechanism source ambiguous')
+    row = dict(rows[0])
+    for name in ('source_tro','source_sidecar','collector_environment','collector_meta','collector_demo',
+                 'own_replay_gate','own_replay_meta','generation_row','campaign_config','first_party_strict_review'):
+        checked(root, row[name])
+    original = row['source_generation_and_collection_runtime']
+    marker = Path(original['path'])/'.snapshot_commit'
+    checked(root, {'path':str(marker),'sha256':original['snapshot_sha256']})
+    require(marker.read_text().strip() == original['commit'], 'additional original runtime changed')
+    checked(root, original['b1k'])
+    identity = {**original, 'identity':ref(marker)}
+    row.update(generation_runtime=identity, collector_runtime=identity,
+               mechanism=request['mechanism'])
+    gate = json.loads(Path(row['own_replay_gate']['path']).read_text())
+    require(gate.get('success') is True and gate.get('replay_rc') == 0
+            and gate.get('demo') == row['collector_demo']['path']
+            and gate.get('demo_sha256') == row['collector_demo']['sha256']
+            and gate.get('instance') == row['source_tro']['path']
+            and gate.get('tro_sha256') == row['source_tro']['sha256']
+            and row['own_replay_meta']['path'] in gate.get('replay_meta_paths',[]),
+            'additional source lacks its exact own replay')
+    review = json.loads(Path(row['first_party_strict_review']['path']).read_text())
+    schema = 'isg-camera-release-review-v1' if request['mechanism'] == 'camera' else 'isg-release-review-v1'
+    require(review.get('schema') == schema and review.get('class_id') == row['class_id']
+            and review.get('template_validation_passed') is True
+            and review.get('gate') == {k:row['own_replay_gate'][k] for k in ('path','sha256')},
+            'additional source lacks its first-party strict review')
+    members = [m for m in review.get('members',[]) if m.get('instance_id') == row['instance_id']]
+    require(len(members) == 1, 'additional reviewed source missing or ambiguous')
+    # These are zero-credit retained-source controls. Camera grouping is exempt;
+    # the actual noncamera source review remains intact and is not reinterpreted.
+    if request['mechanism'] == 'grouped_objects':
+        require(row['instance_id'] in review.get('selected_member_ids',[])
+                and all(members[0].get(key+'_sha256') == row[field]['sha256'] for key, field in (
+                    ('demo','collector_demo'),('tro','source_tro'),('report','collector_meta'),
+                    ('sidecar','source_sidecar'))), 'grouped source review artifacts differ')
+    return row
+
+
 def inputs(root, request_path, *, runtime=None):
     from .production_gate import read_environment
     from .acceptance import report_passed
@@ -61,21 +107,24 @@ def inputs(root, request_path, *, runtime=None):
     require(path.is_relative_to(root), 'mechanism request outside campaign')
     q = json.loads(path.read_text()); scope(q)
     manifest = json.loads(checked(root, q['source_manifest']).read_text())
-    require(manifest['schema'] == 'isg-pipeline-canonical-source-bindings-v1', 'unknown source binding schema')
-    rows = [r for r in manifest['rows'] if r['mechanism'] == q['mechanism']]
-    require(len(rows) == 1 and rows[0]['instance_id'] == q['instance_id'], 'mechanism source ambiguous')
-    row = rows[0]
-    for name in ('native_request','native_review','native_configuration','goal_plan','native_environment',
-                 'source_tro','source_sidecar','collector_environment','collector_meta','collector_demo',
-                 'own_replay_gate','own_replay_meta','strict_distinct_group_review'):
-        checked(root, row[name])
-    for name in ('generation_runtime','collector_runtime','own_replay_runtime'):
-        marker = checked(root, row[name]['identity'])
-        require(marker.read_text().strip() == row[name]['commit'], 'original source runtime differs')
-    review = row['strict_review_entry']
-    require(review['eligible_distinct_group'] is True and any(
-        member['index'] == row['index'] and member['native_quality']['passed'] is True
-        for member in review['successful_members']), 'source lacks its own strict distinct-group evidence')
+    if manifest['schema'] == 'isg-pipeline-additional-source-bindings-v1':
+        row = additional_source(root, manifest, q)
+    else:
+        require(manifest['schema'] == 'isg-pipeline-canonical-source-bindings-v1', 'unknown source binding schema')
+        rows = [r for r in manifest['rows'] if r['mechanism'] == q['mechanism']]
+        require(len(rows) == 1 and rows[0]['instance_id'] == q['instance_id'], 'mechanism source ambiguous')
+        row = rows[0]
+        for name in ('native_request','native_review','native_configuration','goal_plan','native_environment',
+                     'source_tro','source_sidecar','collector_environment','collector_meta','collector_demo',
+                     'own_replay_gate','own_replay_meta','strict_distinct_group_review'):
+            checked(root, row[name])
+        for name in ('generation_runtime','collector_runtime','own_replay_runtime'):
+            marker = checked(root, row[name]['identity'])
+            require(marker.read_text().strip() == row[name]['commit'], 'original source runtime differs')
+        review = row['strict_review_entry']
+        require(review['eligible_distinct_group'] is True and any(
+            member['index'] == row['index'] and member['native_quality']['passed'] is True
+            for member in review['successful_members']), 'source lacks its own strict distinct-group evidence')
     for name, mode in (('collector_meta','oracle'),('own_replay_meta','replay')):
         report = json.loads(Path(row[name]['path']).read_text()); report_passed(report, mode)
         require(report['instance_id'] == row['instance_id'], 'source report instance differs')
