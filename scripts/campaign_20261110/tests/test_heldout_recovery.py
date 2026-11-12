@@ -10,15 +10,15 @@ def catalog():
     return {q.task+'__'+str(i):q.task for q in task_quotas() for i in range(q.standard_classes)}
 
 
-def test_all_held_targets_include_zero_count_scopes_and_strict_owner_buckets():
+def test_all_held_targets_include_zero_count_scopes_and_owner_total_quotas():
     rows=targets(catalog())
     assert sum(r['target']for r in rows if r['split']=='eval_model')==891
     assert sum(r['target']for r in rows if r['split']=='eval_category')==109
     assert len({r['class_id']for r in rows if r['split']=='eval_model'})==99
     assert len({r['task']for r in rows if r['split']=='eval_category'})==23
     assert not any(r['split']=='eval_model'and r['task']=='camera_relocalization-standard'for r in rows)
-    assert [r['target']for r in rows if r['split']=='eval_category'and r['task']=='configuration_matching-articulation_open_large_scale']==[2,1]
-    assert [r['target']for r in rows if r['split']=='eval_model'and r['task']=='configuration_matching-block_design']==[2,3,2,2]
+    assert [r['target']for r in rows if r['split']=='eval_category'and r['task']=='configuration_matching-articulation_open_large_scale']==[3]
+    assert [r['target']for r in rows if r['split']=='eval_model'and r['task']=='configuration_matching-block_design']==[9]
 
 
 def test_incomplete_ready_manifest_cannot_silently_remove_seven_missing_classes():
@@ -27,10 +27,19 @@ def test_incomplete_ready_manifest_cannot_silently_remove_seven_missing_classes(
     with pytest.raises(ContractError,match='incomplete canonical'):targets(c)
 
 
-def test_native_camera_radius_labels_map_exactly_to_quota_positions():
-    assert [quota_bucket('camera_relocalization-obstructed',v,True)for v in ('3','5','10')]==[0,1,2]
-    assert quota_bucket('configuration_matching-attachment',0,False) is None
-    with pytest.raises(ContractError):quota_bucket('camera_relocalization-standard','4',True)
+def test_labels_cannot_exclude_valid_instances_from_class_totals():
+    for value in ('3','5','10','4',None,-1,99):
+        assert quota_bucket('camera_relocalization-obstructed',value,True) is None
+    from scripts.campaign_20261110.heldout_recovery import count_accepted_scopes
+    rows=[{'instance_id':str(i),'task':'object_scaling','split':'eval_model','class_id':'scaling1',
+           'bucket':label}for i,label in enumerate([0,0,0,0,0,0,0,0,99])]
+    eligibility={r['instance_id']:{'quota_eligible':True}for r in rows}
+    counts,raw,labels=count_accepted_scopes(rows,eligibility)
+    assert counts[('eval_model','scaling1',None)]==9
+    assert raw==counts and labels[('eval_model','scaling1',None)]=={'0':8,'99':1}
+    eligibility['8']['quota_eligible']=False
+    counts,raw,labels=count_accepted_scopes(rows,eligibility)
+    assert counts[('eval_model','scaling1',None)]==8 and raw[('eval_model','scaling1',None)]==9
 
 
 def test_unknown_scheduler_state_is_not_pending_and_new_admission_is_not_old_failure():

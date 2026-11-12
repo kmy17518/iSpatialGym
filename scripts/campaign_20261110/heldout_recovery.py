@@ -10,6 +10,7 @@ from scripts.campaign_20261110.current_eligibility import assess,read_ledger
 from scripts.campaign_20261110.dashboard_evidence import standard_catalog,observed_json,failure_observation
 from scripts.campaign_20261110.export_release import CAMERA_STATES
 from scripts.campaign_20261110.storage import atomic_directory_lock
+from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
 
 SPLITS=('eval_model','eval_category')
 def iso(t):return datetime.fromtimestamp(t,timezone.utc).isoformat() if t else None
@@ -109,22 +110,33 @@ def scheduler_states(ids):
         except (OSError,subprocess.SubprocessError)as exc:errors.append({'source':command[0],'error':str(exc)[:500]})
     return states,errors
 def quota_bucket(task,value,has_buckets):
-    if not has_buckets:return None
-    if task.startswith('camera_relocalization-'):
-        require(str(value) in ('3','5','10'),'unknown native camera radius bucket')
-        return ('3','5','10').index(str(value))
-    require(isinstance(value,int) and not isinstance(value,bool),'unknown native evaluation bucket')
-    return value
+    """Compatibility adapter: owner v2 quotas aggregate the entire class/task."""
+    return None
+
+
+def count_accepted_scopes(accepted, eligible):
+    counts=Counter(); rawcounts=Counter(); descriptive=defaultdict(Counter)
+    for record in accepted:
+        task,split=record['task'],record['split']
+        cls=record.get('class_id')or record.get('contract',{}).get('class_id')or task
+        scope=cls if split=='eval_model'else task
+        key=(split,scope,None)
+        rawcounts[key]+=1
+        if eligible[record['instance_id']]['quota_eligible']:
+            counts[key]+=1
+            descriptive[key][json.dumps(record.get('bucket'),sort_keys=True)]+=1
+    return counts,rawcounts,descriptive
+
 def targets(catalog):
     quotas={q.task:q for q in task_quotas()};require(len(catalog)==100 and Counter(catalog.values())==Counter({q.task:q.standard_classes for q in quotas.values()}),'incomplete canonical inventory')
     rows=[]
     for cls,task in sorted(catalog.items()):
         q=quotas[task]
         if not q.model_classes:continue
-        buckets=list(enumerate(q.model_buckets)) if q.model_buckets else [(None,q.model_instances_per_class)]
+        buckets=[(None,q.model_instances_per_class)]
         rows.extend({'split':'eval_model','class_id':cls,'task':task,'bucket':b,'target':n}for b,n in buckets)
     for task,q in sorted(quotas.items()):
-        buckets=list(enumerate(q.category_buckets)) if q.category_buckets else [(None,q.category_instances)]
+        buckets=[(None,q.category_instances)]
         rows.extend({'split':'eval_category','class_id':task,'task':task,'bucket':b,'target':n}for b,n in buckets)
     require(sum(r['target']for r in rows if r['split']=='eval_model')==891,'model quota changed')
     require(sum(r['target']for r in rows if r['split']=='eval_category')==109,'category quota changed')
@@ -166,12 +178,11 @@ def publish(root):
         if mirror:result['heartbeat_source']=str(hp)
         return result
     catalogpath=root/'manifests/dashboard_standard_catalog.json';catalog=standard_catalog(catalogpath);sources.append(ref(catalogpath));rows=targets(catalog)
-    accepted,groups,snapshot_sources=snapshot(root);ledger,lref=read_ledger(root);eligible,_=assess(root,accepted,groups,ledger);counts=Counter();rawcounts=Counter();last=defaultdict(float)
+    accepted,groups,snapshot_sources=snapshot(root);ledger,lref=read_ledger(root);eligible,_=assess(root,accepted,groups,ledger);counts,rawcounts,descriptive=count_accepted_scopes(accepted,eligible);last=defaultdict(float)
     quotas={q.task:q for q in task_quotas()}
     for r in accepted:
         task=r['task'];split=r['split'];q=quotas[task];bucket=quota_bucket(task,r.get('bucket'),getattr(q,'model_buckets'if split=='eval_model'else'category_buckets'))
-        cls=r.get('class_id')or r.get('contract',{}).get('class_id')or task;scope=cls if split=='eval_model'else task;key=(split,scope,bucket);rawcounts[key]+=1
-        if eligible[r['instance_id']]['quota_eligible']:counts[key]+=1
+        cls=r.get('class_id')or r.get('contract',{}).get('class_id')or task;scope=cls if split=='eval_model'else task;key=(split,scope,bucket)
         p=root/'dataset/groups'/(r.get('group_id','')+'.json')
         if p.is_file():last[key]=max(last[key],p.stat().st_mtime)
     # The active supervisor manifest selects the precise configs during helper handoff.
@@ -292,7 +303,7 @@ def publish(root):
         action='Preserve validated exact configuration; quota complete.'if not remain else'Follow active bounded job through its own strict replay and held-out acceptance.'if jobs else'Diagnose latest native/demo/replay rejection against exact candidate and dependencies before a fresh bounded recovery.'if failures else'Bind ready candidate to native geometry, demo and own strict replay, then admit only this held-out scope.'
         if state=='ready_for_scoped_refill':
             blocker='New exact runtime passed admission; remaining quota needs a scoped refill.'
-            action='Author only the unfinished strict bucket from this admitted exact configuration, with its own new replay before acceptance.'
+            action='Fill the remaining class/task total from this admitted exact configuration, with its own new replay before acceptance; buckets are descriptive.'
         elif state=='awaiting_acceptance':
             blocker='Collection is terminal; own fresh replay or strict acceptance reconciliation is pending.'
             action='Reconcile this exact allocation through its own physics gate and acceptance; do not duplicate sampling.'
@@ -309,7 +320,7 @@ def publish(root):
             failures += [{'reason':prepared_latest['reason'],'evidence':prepared_latest.get('evidence',[])}] if state=='failed_with_diagnosis' else []
         if remain and (latest or{}).get('next_action'):
             action=latest['next_action']
-        row.update(accepted=n,historical_accepted=rawcounts[countkey],remaining=remain,owner=(latest or{}).get('owner','/root/templates_assets'),state=state,blocker=blocker,next_action=action,
+        row.update(accepted=n,historical_accepted=rawcounts[countkey],bucket_breakdown=dict(descriptive[countkey]),remaining=remain,owner=(latest or{}).get('owner','/root/templates_assets'),state=state,blocker=blocker,next_action=action,
             configuration=(latest or{}).get('configuration'),runtime=(latest or{}).get('runtime'),controller=sorted(set(ownership[key]+[o['controller']for o in obs])),active_jobs=list(jobs.values()),
             last_accepted_at=iso(last[countkey]),last_accepted_time_kind='immutable committed-group export mtime; exact commit timestamp not recorded'if last[countkey]else'unavailable',
             last_progress_at=iso(max([last[countkey],evidence_epoch(prep[-1].get('evidence',[]))if prep else 0]+[o['last_progress_epoch']for o in same])),failures=failures,
@@ -320,11 +331,11 @@ def publish(root):
                 'controller_observations':same,'preparation':prep,'candidate_is_not_demo_or_replay_pass':True})
     summary={s:{'target':sum(r['target']for r in rows if r['split']==s),'accepted':sum(r['accepted']for r in rows if r['split']==s),
         'historical_accepted':sum(r['historical_accepted']for r in rows if r['split']==s),'remaining':sum(r['remaining']for r in rows if r['split']==s),
-        'complete_buckets':sum(not r['remaining']for r in rows if r['split']==s),'total_buckets':sum(r['split']==s for r in rows)}for s in SPLITS}
+        'complete_scopes':sum(not r['remaining']for r in rows if r['split']==s),'total_scopes':sum(r['split']==s for r in rows)}for s in SPLITS}
     unmatched=[{'key':list(k),'accepted':v}for k,v in counts.items()if k not in {(r['split'],r['class_id'],r['bucket'])for r in rows}];require(not unmatched,'accepted held records fall outside frozen targets: '+str(unmatched))
-    value={'schema':'isg-heldout-recovery-ledger-v1','campaign_id':'campaign_20261110','observed_at':iso(now),'owner':'/root','summary':summary,'rows':rows,
+    value={'schema':'isg-heldout-recovery-ledger-v2','bucket_policy':BUCKET_POLICY,'campaign_id':'campaign_20261110','observed_at':iso(now),'owner':'/root','summary':summary,'rows':rows,
         'sources':sources+snapshot_sources,'current_eligibility_ledger':lref,'errors':errors,'training_generation_authorized':False,
-        'semantics':'All99 model classes and23 category/room task scopes enumerated from frozen100-class inventory and exact owner quotas. Bucket targets remain strict. Candidate preparation is separate from native/demo/replay/accepted proof. No collection action is performed by this audit.'}
+        'semantics':'All99 model classes and23 category/room task scopes enumerated from frozen100-class inventory and exact owner quotas. Class/task total targets apply; buckets and measurements are descriptive metadata. Candidate preparation is separate from native/demo/replay/accepted proof. No collection action is performed by this audit.'}
     write_json_atomic(D/'ledger.json',value);print(json.dumps({'path':str(D/'ledger.json'),'summary':summary,'errors':len(errors),'rows':len(rows)}));return value
 
 def main():
