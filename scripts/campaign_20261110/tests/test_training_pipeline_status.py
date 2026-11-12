@@ -1,3 +1,4 @@
+import pytest
 from scripts.campaign_20261110 import training_pipeline_status as status
 from scripts.campaign_20261110.contracts import write_json_atomic
 import copy
@@ -224,8 +225,10 @@ def test_repeated_a_control_is_separate_from_restoration_release_evidence(tmp_pa
     for name in ['restoration_control_aa_r1','batch_restoration_control_step_r2/control_aa']:
         folder=tmp_path/'training_pipeline_canaries/tray'/name
         write_json_atomic(folder/'request.json',{'diagnostic_control':'A_A','diagnostic_only':True,'production_released':False})
+        write_json_atomic(folder/'physics/report.json',{'success':True})
         write_json_atomic(folder/'physics/probe.json',{'schema':'isg-training-restoration-control-v1',
-            'request':status.ref(folder/'request.json'),'entries':[{'returncode':0,'result':{'success':True}}]*2})
+            'request':status.ref(folder/'request.json'),'entries':[{'returncode':0,'result':{'success':True},
+            'report':status.ref(folder/'physics/report.json')}]*2})
     observed=status.observe(tmp_path)
     assert observed['batch_stages']==[]
     assert len(observed['diagnostic_controls'])==2
@@ -306,3 +309,17 @@ def test_one_bad_record_does_not_hide_later_records_in_same_batch(tmp_path):
         ('bad','evidence_identity_failed'),('good','native_not_observed')]
     assert value['errors'][0]['candidate_id']=='bad'
     assert value['benchmark_credit']==0
+
+
+def test_physical_control_retains_observed_success_without_release(tmp_path):
+    request=tmp_path/'restoration_pristine/fresh_A/request.json'
+    write_json_atomic(request,{'diagnostic_control':'FRESH_A','diagnostic_only':True,'production_released':False,
+        'physical_candidate':{'path':'physical-proof','sha256':'p'*64}})
+    report=request.parent/'physics/episode/meta.json';write_json_atomic(report,{'success':True})
+    write_json_atomic(request.parent/'physics/probe.json',{'schema':'isg-training-physical-diagnostic-v1',
+        'request':status.ref(request),'entries':[{'report':status.ref(report),'returncode':0,'result':{'success':True}}]})
+    value=status.diagnostic_control_observation(tmp_path,request)
+    assert value['status']=='episodes_recorded' and value['successful_episodes']==1
+    assert value['release_eligible'] is False and value['benchmark_credit']==0
+    report.write_text('{}')
+    with pytest.raises(ValueError,match='report changed'):status.diagnostic_control_observation(tmp_path,request)

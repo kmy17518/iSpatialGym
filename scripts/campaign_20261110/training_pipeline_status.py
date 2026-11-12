@@ -12,6 +12,44 @@ from scripts.campaign_20261110.contracts import file_digest, require, write_json
 
 
 def read(path): return json.loads(Path(path).read_text())
+def diagnostic_control_observation(root, request):
+    """Report actual bounded control episodes without promoting them to release evidence."""
+    control=read(request);name=control.get('diagnostic_control')
+    candidate=control.get('physical_candidate')
+    require(control.get('diagnostic_only') is True and control.get('production_released') is False
+            and name in ('A_A','A_ABORT_A','FRESH_A',None)
+            and (name is not None or candidate), 'invalid reset control request')
+    maximum=1 if name=='FRESH_A' else (3 if name is None else 2)
+    row={'kind':'physical_restoration_diagnostic' if candidate else 'repeated_A_physics_control',
+         'control':name or 'ABA','request':ref(request),'status':'prepared','observed_at':timestamp(request),
+         'benchmark_credit':0,'release_eligible':False,
+         'scope':'Dated diagnostic observations only; physical overrides never establish exact production-config validation.'}
+    if candidate:row['physical_candidate']=candidate
+    submission=request.parent/'submission.json'
+    if submission.exists():
+        submitted=read(submission);require(submitted['request']==ref(request),'control submission identity differs')
+        row.update(status='submitted',submission=ref(submission),allocations=submitted['jobs'],scheduler_state='unavailable')
+    probe=request.parent/'physics/probe.json'
+    if probe.exists():
+        observed=read(probe)
+        expected='isg-training-physical-diagnostic-v1' if candidate else 'isg-training-restoration-control-v1'
+        require(observed['schema']==expected and observed['request']==ref(request),'control probe identity differs')
+        entries=observed['entries'];require(len(entries)<=maximum,'control episode bound exceeded')
+        for entry in entries:
+            report=Path(entry['report']['path']).resolve()
+            require(report.is_relative_to(Path(root).resolve()) and file_digest(report)==entry['report']['sha256'],
+                    'control episode report changed')
+        row.update(status='episodes_recorded',probe=ref(probe),episodes_observed=len(entries),
+                   observed_at=timestamp(probe),successful_episodes=sum(e.get('returncode')==0 and
+                   e.get('result',{}).get('success') is True for e in entries),
+                   controlled_interruptions=sum(e.get('expected_controlled_abort') is True for e in entries))
+    execution=request.parent/'execution_observation.json'
+    if execution.exists():row['execution_observation']=ref(execution)
+    failure=request.parent/'physics/failure.json'
+    if failure.exists():row.update(status='diagnostic_failed',failure=ref(failure))
+    return row
+
+
 def ref(path): return {'path': str(path), 'sha256': file_digest(path)}
 def timestamp(path): return datetime.fromtimestamp(Path(path).stat().st_mtime, timezone.utc).isoformat()
 
@@ -572,28 +610,10 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
             result['errors'].append({'path': str(path), 'error': f'{type(error).__name__}: {error}'})
     controls=set(base.glob('*/restoration_control*/request.json'))
     controls.update(base.glob('*/batch_restoration*/control_aa/request.json'))
+    controls.update(base.glob('*/restoration_pristine*/*/request.json'))
     for request in sorted(controls):
         try:
-            control=read(request)
-            require(control.get('diagnostic_control')=='A_A' and control.get('diagnostic_only') is True
-                    and control.get('production_released') is False,'invalid reset control request')
-            row={'kind':'repeated_A_physics_control','request':ref(request),'status':'prepared',
-                 'observed_at':timestamp(request),'benchmark_credit':0,'release_eligible':False,
-                 'scope':'Diagnostic reset-variability baseline only; cannot satisfy an A/B/A release gate.'}
-            submission=request.parent/'submission.json'
-            if submission.exists():
-                submitted=read(submission);require(submitted['request']==ref(request),'control submission identity differs')
-                row.update(status='submitted',submission=ref(submission),allocations=submitted['jobs'],scheduler_state='unavailable')
-            probe=request.parent/'physics/probe.json'
-            if probe.exists():
-                observed=read(probe)
-                require(observed['schema']=='isg-training-restoration-control-v1' and observed['request']==ref(request),
-                        'control probe identity differs')
-                entries=observed['entries'];require(len(entries)<=2,'control episode bound exceeded')
-                row.update(status='episodes_recorded',probe=ref(probe),episodes_observed=len(entries),
-                           observed_at=timestamp(probe),successful_episodes=sum(e.get('returncode')==0 and
-                           e.get('result',{}).get('success') is True for e in entries))
-            result['diagnostic_controls'].append(row)
+            result['diagnostic_controls'].append(diagnostic_control_observation(root, request))
         except Exception as error:
             result['errors'].append({'path':str(request),'error':f'{type(error).__name__}: {error}'})
     # Publish freshly joined instance outcomes before any potentially slow full
