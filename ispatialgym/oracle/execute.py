@@ -6950,6 +6950,15 @@ def pushable_arc_from(motions: Motions, arm: str, base: Tuple[float, float, floa
     q_pre = motions.backend.solve_ik(emb, {link: (C.as_tensor(pre[0]), C.as_tensor(pre[1]))}, q_seed=q_seed, sync_world=False)
     if q_pre is None:
         return -1, None
+    from ispatialgym.sampling import campaign_runtime
+    if campaign_runtime.contact_recovery('close_door_prepose_margin'):
+        # The checked close01 control found nominal 4.75 mm prepose error plus
+        # ordinary base tracking error exhausted the 5 mm execution IK bound.
+        # Prefer the same candidate set's accurate witnesses before driving.
+        predicted = motions.backend.fk([link], q_pre)[link][0]
+        residual = float(th.linalg.norm(C.as_tensor(predicted) - C.as_tensor(pre[0])))
+        if not math.isfinite(residual) or residual > .002:
+            return -1, None
     q = motions.backend.solve_ik(emb, {link: (C.as_tensor(contact[0]), C.as_tensor(contact[1]))}, q_seed=q_pre, sync_world=False)
     if q is None:
         return -1, None

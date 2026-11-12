@@ -111,6 +111,8 @@ def contact_recovery(option: str) -> bool:
                                    'inter_object_relation_satisfaction-touching_small_scale'),
         'marker_gentle_pinch': ('inter_object_relation_satisfaction-nextto_01',
                                 'inter_object_relation_satisfaction-nextto_small_scale'),
+        'close_door_prepose_margin': ('configuration_matching-articulation_close_large_scale_01',
+                                     'configuration_matching-articulation_close_large_scale'),
         'cap_capture_margin': ('configuration_matching-attachment_02',
                                 'configuration_matching-attachment'),
         'axial_magazine_contact_height': ('alignment-axial_04', 'alignment-axial'),
