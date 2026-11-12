@@ -223,7 +223,8 @@ def test_sequence_submission_requires_exact_member_config_and_does_not_mean_succ
 
 def test_repeated_a_control_is_separate_from_restoration_release_evidence(tmp_path):
     for name in ['restoration_control_aa_r1','batch_restoration_control_step_r2/control_aa',
-                 'restoration_pristine_lifecycle_r1','restoration_pristine_mass_r1/aborted_AA']:
+                 'restoration_pristine_lifecycle_r1','restoration_pristine_mass_r1/aborted_AA',
+                 'restoration_snapshot_scope_r1/successful_AA','restoration_integrated_cold_r1/fresh_A']:
         folder=tmp_path/'training_pipeline_canaries/tray'/name
         write_json_atomic(folder/'request.json',{'diagnostic_control':'A_A','diagnostic_only':True,'production_released':False})
         write_json_atomic(folder/'physics/report.json',{'success':True})
@@ -232,7 +233,7 @@ def test_repeated_a_control_is_separate_from_restoration_release_evidence(tmp_pa
             'report':status.ref(folder/'physics/report.json')}]*2})
     observed=status.observe(tmp_path)
     assert observed['batch_stages']==[]
-    assert len(observed['diagnostic_controls'])==4
+    assert len(observed['diagnostic_controls'])==6
     assert all(c['successful_episodes']==2 and c['release_eligible'] is False for c in observed['diagnostic_controls'])
     assert observed['benchmark_credit']==0
 

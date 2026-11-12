@@ -612,6 +612,8 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
     controls.update(base.glob('*/batch_restoration*/control_aa/request.json'))
     controls.update(base.glob('*/restoration_pristine*/request.json'))
     controls.update(base.glob('*/restoration_pristine*/*/request.json'))
+    controls.update(base.glob('*/restoration_snapshot_scope*/*/request.json'))
+    controls.update(base.glob('*/restoration_integrated_cold*/*/request.json'))
     for request in sorted(controls):
         try:
             result['diagnostic_controls'].append(diagnostic_control_observation(root, request))
