@@ -25,8 +25,10 @@ the supports they have shown to be rectangular / opaque. Other subtasks have no 
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import os
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -41,6 +43,8 @@ GLASS_TAG = "glass"
 #: the ``ground_isg`` skip reason of a pick row whose support a rule excludes (``support_candidates`` status ``not_grounded: ...``)
 SKIP_REASON = "excluded_support"
 DEFAULT_INVENTORY = os.path.join(ASSETS_ROOT, "icl", "require", "lib", "scene_inventory")
+INVENTORY_MANIFEST_ENV = "ISPATIALGYM_SUPPORT_INVENTORY_MANIFEST"
+INVENTORY_MANIFEST_SHA_ENV = "ISPATIALGYM_SUPPORT_INVENTORY_SHA256"
 
 
 class SupportRuleError(ValueError):
@@ -132,9 +136,65 @@ def _top_record(inventory: str, scene: str, name: str) -> Optional[dict]:
         return json.load(f).get("top") or None
 
 
+def _bound_private_top_record(scene: str, name: str) -> Optional[dict]:
+    """Use an exact measured B4 input only in the private scene that produced it.
+
+    The manifest locates evidence; it does not replace the rectangularity rule.
+    Original inventory files and every unlisted scene/support remain unchanged.
+    """
+    path = os.environ.get(INVENTORY_MANIFEST_ENV)
+    expected = os.environ.get(INVENTORY_MANIFEST_SHA_ENV)
+    if not path and not expected:
+        return None
+    if not path or not expected:
+        raise SupportRuleError("private B4 inventory requires its manifest and digest")
+
+    def bound_json(reference):
+        source = Path(reference["path"])
+        if not source.is_absolute():
+            raise SupportRuleError("private B4 evidence path must be absolute")
+        payload = source.read_bytes()
+        if hashlib.sha256(payload).hexdigest() != reference["sha256"]:
+            raise SupportRuleError("private B4 evidence digest differs: " + str(source))
+        return json.loads(payload)
+
+    try:
+        manifest = bound_json({"path": path, "sha256": expected})
+        if manifest["schema"] != "isg-private-support-inventory-v1":
+            raise SupportRuleError("unsupported private B4 inventory schema")
+        entries = [row for row in manifest["entries"] if (row["scene"], row["name"]) == (scene, name)]
+        if not entries:
+            return None
+        if len(entries) != 1:
+            raise SupportRuleError("ambiguous private B4 inventory entry")
+        entry = entries[0]
+        scene_dir = os.environ.get("ISPATIALGYM_STABLE_SCENE_DIR")
+        if not scene_dir or (Path(scene_dir) / (scene + "_stable.json")).resolve() != Path(entry["scene_file"]["path"]).resolve():
+            raise SupportRuleError("private B4 inventory is bound to a different stable scene")
+        bound_json(entry["scene_file"])
+        record = bound_json(entry["inventory_record"])
+        measured = bound_json(entry["measurement"])
+        if any(record[key] != entry[key] for key in ("scene", "name", "category", "model", "scale")):
+            raise SupportRuleError("private B4 support identity differs")
+        if (measured["native_inventory_record"] != entry["inventory_record"] or
+                measured["source_scene"] != entry["scene_file"] or
+                measured["object_name"] != name or measured["actual_scale"] != entry["scale"] or
+                measured["category"] != entry["category"] or measured["model"] != entry["model"]):
+            raise SupportRuleError("private B4 measurement identity differs")
+        top = record["top"]
+        hull = np.asarray(top["hull_xy"], dtype=float)
+        if top["resolution"] != .02 or hull.ndim != 2 or hull.shape[1] != 2 or len(hull) < 3 or not np.isfinite(hull).all():
+            raise SupportRuleError("private B4 measurement has no finite native top outline")
+        return top
+    except (KeyError, OSError, TypeError, json.JSONDecodeError) as exc:
+        raise SupportRuleError("invalid private B4 inventory evidence: " + str(exc)) from exc
+
+
 def top_rectangularity(scene: str, name: str, inventory: Optional[str] = None) -> Optional[float]:
     """:func:`rectangularity` of the B4 top outline of support ``name`` in ``scene``; None without a B4 record with a top outline."""
-    top = _top_record(inventory or DEFAULT_INVENTORY, scene, name)
+    top = _bound_private_top_record(scene, name) if inventory is None else None
+    if top is None:
+        top = _top_record(inventory or DEFAULT_INVENTORY, scene, name)
     hull = (top or {}).get("hull_xy") or []
     return rectangularity(hull) if len(hull) >= 3 else None
 
