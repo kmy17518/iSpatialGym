@@ -94,7 +94,11 @@ def observe(root, run_dir):
                     status.update(status='replay_failed',reason=gate.get('reasons',gate.get('result')))
                     state['classes'][cls]=status;continue
                 if not row['camera_exempt'] and len(allocation.get('member_gates',[]))<2:
-                    status['status']='awaiting_member_replay';state['classes'][cls]=status;continue
+                    source=source_stage(root,row,allocation)
+                    status.update(source)
+                    if source['status']=='awaiting_own_replay':
+                        status['status']='awaiting_member_replay'
+                    state['classes'][cls]=status;continue
                 if not allocation.get('terminal_evidence'):
                     status['status']='awaiting_terminal_evidence';state['classes'][cls]=status;continue
                 signature=digest({'row':row_ref,'allocation':allocation_ref,'gate':gate_ref})

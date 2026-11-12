@@ -10,12 +10,25 @@ def test_first_cycle_records_missing_inputs_and_awaits_two_member_gates(tmp_path
     wrapper=json.loads(Path(allocation['path']).read_text());wrapper['gate']=gate
     put(Path(allocation['path']),wrapper)
     monkeypatch.setattr(o,'reconcile',lambda *args:(_ for _ in ()).throw(AssertionError('must not claim before own member gates')))
+    monkeypatch.setattr(o,'source_stage',lambda *args:{'status':'awaiting_own_replay','successful_demo_reports':[{},{}]})
     state=o.observe(tmp_path,base)
     assert len(state['classes'])==100
     assert state['classes']['class0']['status']=='awaiting_member_replay'
     assert state['classes']['class1']['status']=='awaiting_authored_row'
     assert not (base/'acceptance/class0.json').exists()
     assert not (base/'acceptance_observer.lockdir').exists()
+
+
+def test_one_passed_gate_cannot_hide_terminal_insufficient_demos(tmp_path,monkeypatch):
+    base,row,allocation,gate=bound(tmp_path)
+    wrapper=json.loads(Path(allocation['path']).read_text());wrapper['gate']=gate
+    put(Path(allocation['path']),wrapper)
+    monkeypatch.setattr(o,'source_stage',lambda *args:{'status':'insufficient_successful_demos',
+        'successful_demo_reports':[{'path':'exact-positive-demo'}],'source_terminal_verified':True})
+    monkeypatch.setattr(o,'reconcile',lambda *args:(_ for _ in ()).throw(AssertionError('no claim')))
+    result=o.observe(tmp_path,base)['classes']['class0']
+    assert result['status']=='insufficient_successful_demos'
+    assert result['source_terminal_verified'] and result['validation_passed'] is False
 
 
 def test_failed_gate_remains_failure_without_resubmission(tmp_path,monkeypatch):
