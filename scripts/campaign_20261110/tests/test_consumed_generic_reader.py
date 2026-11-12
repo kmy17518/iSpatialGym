@@ -56,3 +56,13 @@ def test_generic_reader_rejects_wrong_pose_and_changed_grid(tmp_path, monkeypatc
     with pytest.raises(ValueError, match='pose or configuration'): m.native_read(ticket, terminal, maps, 'cluster', None, {})
     meta['pose_set']['dz_m'] = .03; v.write(path, meta); path.with_suffix('.npz').write_text('changed arrays')
     with pytest.raises(ValueError, match='Unbound generic'): m.native_read(ticket, terminal, maps, 'cluster', None, {})
+
+
+def test_registry_can_advance_only_to_exact_hashed_campaign_inputs(tmp_path):
+    registry = tmp_path / 'registry.json'; pointer = tmp_path / 'current.json'
+    items = [{'manifest': {'path': str(tmp_path / 'tickets.json'), 'sha256': 'pinned'}, 'output': str(tmp_path / 'reader')}]
+    v.write(registry, {'schema': 'isg-consumed-map-verifier-inputs-v1', 'owner': '/root', 'manifests': items})
+    v.write(pointer, {'path': str(registry), 'sha256': v.sha(registry)})
+    assert m.verifier_registry(tmp_path, pointer) == items
+    registry.write_text('{}')
+    with pytest.raises(ValueError, match='Input changed'): m.verifier_registry(tmp_path, pointer)

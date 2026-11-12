@@ -263,12 +263,28 @@ def run_cycles(callback, *, interval, max_cycles, stopped, clock=time):
             clock.sleep(max(0, min(1, started + interval - clock.monotonic())))
 
 
+def verifier_registry(root, pointer):
+    """Root may atomically point to a new immutable set of exact data inputs."""
+    root = Path(root).resolve(); pointer = Path(pointer).resolve()
+    require(pointer.is_relative_to(root), 'Verifier registry pointer outside campaign')
+    ref = json.loads(pointer.read_text())
+    require(Path(ref['path']).resolve().is_relative_to(root), 'Verifier registry outside campaign')
+    value = checked(ref, {})
+    require(value['schema'] == 'isg-consumed-map-verifier-inputs-v1' and value['owner'] == '/root', 'Unsupported verifier registry')
+    require(len(value['manifests']) <= 32, 'Unbounded verifier registry')
+    for item in value['manifests']:
+        require(Path(item['manifest']['path']).resolve().is_relative_to(root), 'Additional manifest outside campaign')
+        require(Path(item['output']).resolve().is_relative_to(root), 'Additional output outside campaign')
+    return value['manifests']
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for key in ('root', 'manifest', 'manifest-sha256', 'output'): parser.add_argument('--' + key, required=True)
     parser.add_argument('--route'); parser.add_argument('--route-sha256')
     parser.add_argument('--library-audit'); parser.add_argument('--library-audit-sha256')
     parser.add_argument('--additional-manifests'); parser.add_argument('--additional-manifests-sha256')
+    parser.add_argument('--additional-manifests-pointer')
     parser.add_argument('--max-seconds', type=int, default=15); parser.add_argument('--max-items', type=int, default=128)
     parser.add_argument('--watch', action='store_true'); parser.add_argument('--interval', type=int, default=30)
     parser.add_argument('--max-cycles', type=int, default=720)
@@ -278,6 +294,7 @@ def main():
     stopped = [False]
     additional = []
     additional_cursor = [0]
+    require(not (args.additional_manifests and args.additional_manifests_pointer), 'Choose immutable list or root registry pointer')
     if args.additional_manifests:
         extra = checked({'path': args.additional_manifests, 'sha256': args.additional_manifests_sha256}, {})
         require(extra['schema'] == 'isg-consumed-map-verifier-inputs-v1', 'Unsupported extra verifier inputs')
@@ -288,6 +305,7 @@ def main():
 
     def run():
         began = time.monotonic()
+        current_additional = verifier_registry(args.root, args.additional_manifests_pointer) if args.additional_manifests_pointer else additional
         with atomic_directory_lock(output / 'callback.lockdir'):
             report = reconcile(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
                                {'path': args.route, 'sha256': args.route_sha256} if args.route else None, args.output,
@@ -296,10 +314,10 @@ def main():
                 project_library_advancement(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
                                             {'path': args.library_audit, 'sha256': args.library_audit_sha256})
             print(json.dumps({k: report[k] for k in ('summary', 'verified_this_cycle', 'cycle_seconds')}), flush=True)
-            start = additional_cursor[0] % max(1, len(additional))
-            for offset in range(len(additional)):
+            start = additional_cursor[0] % max(1, len(current_additional))
+            for offset in range(len(current_additional)):
                 if time.monotonic() - began >= args.max_seconds: break
-                item = additional[(start + offset) % len(additional)]
+                item = current_additional[(start + offset) % len(current_additional)]
                 target = Path(item['output'])
                 require(target.resolve().is_relative_to(Path(args.root).resolve()) and target != output, 'Invalid additional verifier output')
                 target.mkdir(parents=True, exist_ok=True)
