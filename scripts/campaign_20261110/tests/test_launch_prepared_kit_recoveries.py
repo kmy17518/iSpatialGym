@@ -81,3 +81,12 @@ def test_both_immutable_recovery_proof_shapes_are_bound_exactly():
         launch.verify_prepared_recovery({'recovery': {'path': '/other', 'sha256': 'exact'}}, reference)
     with pytest.raises(ValueError, match='attempt bound'):
         launch.verify_prepared_recovery({'recovery': {'proof': reference, 'maximum_attempts': 2}}, reference)
+
+
+def test_contact_startup_failure_requires_no_completed_or_partial_map():
+    assert launch.startup_output_absent({'returncode': 1, 'native_done': False, 'map_files': []})
+    assert launch.startup_output_absent({'arms': [{'native_done': False}], 'map_files': []})
+    assert not launch.startup_output_absent({'returncode': -11, 'native_done': True, 'map_files': []})
+    assert not launch.startup_output_absent({'returncode': 1, 'native_done': False, 'map_files': ['partial']})
+    assert not launch.startup_output_absent({'arms': [], 'map_files': []})
+    assert not launch.startup_output_absent({'map_files': []})

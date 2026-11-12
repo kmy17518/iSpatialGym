@@ -1,4 +1,4 @@
-"""Finite root-only launcher for two exact changed startup recoveries.
+"""Finite root-only launcher for one or two exact changed startup recoveries.
 
 Default is read-only preflight. Existing physical claims are never rewritten;
 a durable attempt intent prevents ambiguous submissions from being retried.
@@ -56,6 +56,13 @@ def verify_prepared_recovery(prepared, expected):
     require(recovery.get('maximum_attempts', 1) == 1, 'Prepared attempt bound differs')
 
 
+def startup_output_absent(terminal):
+    if terminal.get('map_files'): return False
+    if 'arms' in terminal:
+        return bool(terminal['arms']) and all(a.get('native_done') is False for a in terminal['arms'])
+    return terminal.get('native_done') is False and terminal.get('returncode') == 1
+
+
 def verify_request(request_ref):
     request = checked(request_ref); manifest = checked(request['ticket']); proof = checked(request['recovery_proof'])
     require(request['schema'] == 'isg-root-reviewed-single-recovery-v1' and len(manifest['jobs']) == 1, 'Unsupported recovery')
@@ -69,7 +76,7 @@ def verify_request(request_ref):
     require(identity == key, 'Prepared identity differs')
     verify_prepared_recovery(prepared, request['recovery_proof'])
     terminal = checked(proof['previous_terminal']); checked(proof['previous_submission']); checked(proof['previous_claim'])
-    require(terminal['physical_dedup_key'] == key and not terminal['map_files'] and not any(a['native_done'] for a in terminal['arms']), 'Prior output is not the exact startup failure')
+    require(terminal['physical_dedup_key'] == key and startup_output_absent(terminal), 'Prior output is not the exact startup failure')
     require(sha(proof['previous_native_log']['path']) == proof['previous_native_log']['sha256'], 'Prior native log changed')
     require("ModuleNotFoundError: No module named 'omni.kit.usd'" in Path(proof['previous_native_log']['path']).read_text(), 'Startup diagnosis differs')
     script = next(r for r in ticket['scripts'] if Path(r['path']).name == 'job.sh')
@@ -128,7 +135,7 @@ def submit_once(request_ref, root, routes, *, execute=False, runner=subprocess.r
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('--manifest', required=True); parser.add_argument('--sha256', required=True); parser.add_argument('--execute', action='store_true'); args = parser.parse_args()
-    manifest = checked({'path': args.manifest, 'sha256': args.sha256}); require(len(manifest['requests']) == 2 and manifest['owner'] == '/root', 'Exactly two root-reviewed recoveries required')
+    manifest = checked({'path': args.manifest, 'sha256': args.sha256}); require(1 <= len(manifest['requests']) <= 2 and manifest['owner'] == '/root', 'One or two root-reviewed recoveries required')
     for item in manifest['helper_inputs']: require(sha(item['path']) == item['sha256'], 'Pinned capacity helper changed')
     helper = manifest['route_helper']; spec = importlib.util.spec_from_file_location('reviewed_fixed_recovery_routes', helper['path']); routes = importlib.util.module_from_spec(spec); spec.loader.exec_module(routes)
     results = [submit_once(item, Path(manifest['root']), routes, execute=args.execute) for item in manifest['requests']]
