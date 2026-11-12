@@ -124,7 +124,8 @@ def current_recording_renderer_source(root, request):
             and request.get('production_released') is False
             and type(request.get('benchmark_credit')) is int and request['benchmark_credit'] == 0
             and not request.get('integrated_renderer_candidate_v1')
-            and 'changed_payloads' not in request and 'integration_proof' not in request,
+            and 'changed_payloads' not in request and 'integration_proof' not in request
+            and request.get('runtime_compatibility') == request.get('current_recording_proof'),
             'new-recording renderer scope is ambiguous')
     proof = json.loads(checked(root, request['current_recording_proof']).read_text())
     require(proof.get('schema') == 'isg-current-recording-renderer-proof-v1'
@@ -136,7 +137,7 @@ def current_recording_renderer_source(root, request):
             and not base.get('current_recording_renderer_v1'), 'renderer base must be the checked common candidate')
     changed = {'candidate_runtime','parent_runtime','cold_driver','cold_requests','cold_verification',
                'scene_union_sha256','integrated_renderer_candidate_v1','integration_proof',
-               'current_recording_renderer_v1','current_recording_proof'}
+               'current_recording_renderer_v1','current_recording_proof','runtime_compatibility'}
     require({k:v for k,v in request.items() if k not in changed} ==
             {k:v for k,v in base.items() if k not in changed},
             'new-recording renderer changed sequence, physics, cleanup, or source configuration')

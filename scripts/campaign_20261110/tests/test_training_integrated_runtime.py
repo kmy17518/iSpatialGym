@@ -135,6 +135,7 @@ def current_recording_fixture(tmp_path):
     request.update(current_recording_renderer_v1=True,current_recording_proof=put('current_proof.json',proof),
         parent_runtime=base['candidate_runtime'],cold_driver=cold_driver,cold_requests=cold_requests,
         cold_verification=cold_verified,scene_union_sha256='new verified actual scenes')
+    request['runtime_compatibility']=request['current_recording_proof']
     return request,base,proof,new,put
 
 
