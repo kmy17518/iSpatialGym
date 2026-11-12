@@ -1181,7 +1181,9 @@ def tick(c, s3, state):
     stop = os.path.exists(os.path.join(VJ, "STOP_LAUNCH"))
     committed = sum(float(created[iid]["dph_total"]) * max(0.0, float(created[iid].get("max_lifetime_s",21600)) - (t-created[iid]["time"])) / 3600 for iid in live_ids)
     queue_reserve = activated_queue_reserve(C, states)
-    budget_left = min(float(C["budget_usd"]),3000.0) - float(C.get("transfer_reserve_usd",300.0)) - tot - committed - queue_reserve
+    # Each live lease and each newly accepted offer is reserved once. Queue
+    # planning cost overlaps those leases and is reported separately below.
+    budget_left = min(float(C["budget_usd"]),3000.0) - float(C.get("transfer_reserve_usd",300.0)) - tot - committed
     hourly = sum(float(i.get("dph_total") or 0) for i in live.values())
     if need > 0 and list_ok and not stop and len(live) < fleet_ceiling and budget_left > max(10.0, 2 * hourly):
         credit_snapshot = read_credit_snapshot(os.path.join(VJ,'funding_state.json'), tuple(c))
@@ -1236,7 +1238,8 @@ def tick(c, s3, state):
                        'fleet_scaling_mode':C.get('fleet_scaling_mode','fixed'),
                        'fleet_bound_from_ready_demand':fleet_ceiling,
                        'budget_remaining_after_commitments':budget_left,
-                       'activated_queue_reservation_usd':queue_reserve,
+                       'queued_work_planning_upper_cost_usd':queue_reserve,
+                       'queue_planning_cost_is_additional_commitment':False,
                        'funded_credit_remaining_by_account':{SHORT[name]:value for name,value in C['_rental_credit_remaining'].items()},
                        'max_contracts_per_machine':C.get('max_contracts_per_machine',4)}, stream, indent=2)
         os.replace(market_temporary, market_path)

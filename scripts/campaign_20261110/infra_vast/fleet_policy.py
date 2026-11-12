@@ -3,17 +3,19 @@ import math
 
 
 def activated_queue_reserve(config, states):
-    """Conservatively reserve unfinished activated durations as well as leases.
+    """Planning-only upper cost for queued work, excluding assigned jobs.
 
-    This intentionally also counts assigned jobs, matching the published
-    campaign budget checkpoint. It does not authorize or re-check any job.
+    This is not an additional lease commitment or an admission limit. Rental
+    admission reserves each actual offer's maximum lease cost exactly once.
+    Existing leases may execute these jobs, so this estimate must not be added
+    to their commitments as though the two were disjoint expenditures.
     """
     active = set(map(str, config.get('dispatch_job_ids', ())))
     rate = float(config['max_dph_gpu'])
     if not math.isfinite(rate) or rate < 0:
         raise ValueError('negative queue reservation rate')
     durations = [float(job.get('time_s', 10800)) for key, job in states.items()
-                 if str(key) in active and job.get('status') in ('queued', 'assigned')]
+                 if str(key) in active and job.get('status') == 'queued']
     if any(not math.isfinite(value) or value <= 0 for value in durations):
         raise ValueError('invalid activated job duration')
     return sum(durations) / 3600 * rate

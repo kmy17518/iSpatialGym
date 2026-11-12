@@ -4,13 +4,13 @@ from scripts.campaign_20261110.infra_vast.fleet_policy import rental_ceiling, ac
 
 
 class FleetPolicyTests(unittest.TestCase):
-    def test_queue_commitments_retain_assigned_work_but_not_terminal_or_inactive(self):
+    def test_queue_planning_does_not_double_count_assigned_leases(self):
         config={'dispatch_job_ids':['1',2,'3'],'max_dph_gpu':2}
         states={'1':{'status':'queued','time_s':1800},'2':{'status':'assigned','time_s':3600},
                 '3':{'status':'synced','time_s':7200},'4':{'status':'queued','time_s':10000}}
-        self.assertEqual(activated_queue_reserve(config,states),3)
+        self.assertEqual(activated_queue_reserve(config,states),1)
         states['1']['status']='failed'
-        self.assertEqual(activated_queue_reserve(config,states),2)
+        self.assertEqual(activated_queue_reserve(config,states),0)
         for invalid in (-1, float('nan'), float('inf')):
             with self.assertRaises(ValueError):
                 activated_queue_reserve(config, {'1':{'status':'queued','time_s':invalid}})
