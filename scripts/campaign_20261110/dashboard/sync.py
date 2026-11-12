@@ -42,6 +42,19 @@ def sync(output, ssh_options=()):
     previous = json.loads((output/'configuration_index_sync.json').read_text()) if (output/'configuration_index_sync.json').exists() else {}
     remote = remote.replace('print(json.dumps(data))',
         "idx=p.parent/'training_preparation/configuration_index.json'; stat=idx.stat() if idx.exists() else None; version=[stat.st_size,stat.st_mtime_ns] if stat else None; data['configuration_index_version']=version; data.update({'configuration_index.json':json.loads(idx.read_text())} if version and version!=%r else {}); print(json.dumps(data))" % previous.get('version'))
+    remote = remote.replace('print(json.dumps(data))', """
+import hashlib
+linked=(data.get('preparation_status.json') or {}).get('execution',{}).get('dependency_kind_readiness')
+if linked:
+    linked_path=pathlib.Path(linked['path']).resolve()
+    if linked_path.is_relative_to((p.parent/'training_preparation').resolve()) and linked_path.name=='dependency_kind_readiness.json':
+        linked_raw=linked_path.read_bytes()
+        if hashlib.sha256(linked_raw).hexdigest()==linked['sha256']:
+            linked_data=json.loads(linked_raw)
+            if linked_data.get('campaign_id')=='campaign_20261110':
+                data['dependency_readiness.json']={'campaign_id':'campaign_20261110','source':linked,'data':linked_data}
+print(json.dumps(data))
+""")
     # The fixed remote program reads only the allowlisted campaign audit files.
     command = "python3 - <<'PY'\n" + remote + "\nPY"
     result = subprocess.run(['ssh', '-oBatchMode=yes', '-oConnectTimeout=15',
@@ -64,6 +77,8 @@ def sync(output, ssh_options=()):
         audit = bundle.get(name) or {}
         if audit.get('campaign_id') == 'campaign_20261110':
             atomic(output / name, audit)
+    if bundle.get('dependency_readiness.json'):
+        atomic(output / 'dependency_readiness.json', bundle['dependency_readiness.json'])
     if bundle.get('goal_yield_report'):
         target=output.parent/'GOAL_GROUP_YIELD.md';temporary=target.with_suffix('.tmp')
         temporary.write_text(bundle['goal_yield_report']);temporary.replace(target)

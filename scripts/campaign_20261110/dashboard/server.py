@@ -97,6 +97,12 @@ def snapshot(root, inventory):
     pipeline_status, pss = read_source(root / 'dashboard/pipeline_status.json')
     execution, exs = read_source(root / 'dashboard/execution_ledger.json')
     preparation, prs = read_source(root / 'dashboard/preparation_status.json')
+    readiness, drs = read_source(root / 'dashboard/dependency_readiness.json')
+    expected_readiness = preparation.get('execution', {}).get('dependency_kind_readiness') if preparation else None
+    if readiness and (readiness.get('campaign_id') != 'campaign_20261110'
+                      or readiness.get('data', {}).get('campaign_id') != 'campaign_20261110' or not expected_readiness
+                      or readiness.get('source') != expected_readiness):
+        readiness = {}; drs = {'available':False,'error':'Dependency report does not match current preparation proof'}
     if execution and execution.get('campaign_id') != 'campaign_20261110':
         execution = {}; exs = {'available':False,'error':'Campaign identity mismatch'}
     if preparation and preparation.get('campaign_id') != 'campaign_20261110':
@@ -186,6 +192,10 @@ def snapshot(root, inventory):
         'pipeline_status': pipeline_status,
         'execution_ledger': compact_execution(execution) if execution else {}, 'execution_source': exs,
         'preparation_status': preparation, 'preparation_source': prs,
+        'dependency_readiness': {**{k:v for k,v in readiness.get('data', {}).items() if k != 'kinds'},
+            'kinds': [{k:v for k,v in row.items() if k not in ('exact_unresolved_request_ids','unresolved_inputs')}
+                      for row in readiness.get('data', {}).get('kinds', [])]} if readiness else {},
+        'dependency_readiness_source': drs,
         'pipeline_status_source': pss,
         'ik_observation': ik_observation,
         'ik_observation_source': iks,
@@ -252,6 +262,7 @@ class Handler(BaseHTTPRequestHandler):
                      'offset':offset,'limit':100,'rows':matching[offset:offset+100]}
             return self.send_body(200,json.dumps(sanitize(payload)).encode(),'application/json')
         audits = {'/reports/runtime-validation':'runtime_validation.json','/reports/deadline-checkpoint':'streaming_deadline_checkpoint.json', '/reports/execution-ledger':'execution_ledger.json', '/reports/preparation':'preparation_status.json', '/reports/capacity-recovery': 'capacity_recovery.json', '/reports/heldout-recovery': 'heldout_recovery.json', '/reports/reconciliation': 'reconciliation.json',
+            '/reports/dependency-readiness':'dependency_readiness.json',
             '/reports/canonical-validation': 'canonical_validation.json',
             '/reports/training-eligibility': 'training_eligibility.json',
             '/reports/training-production-gate': 'training_production_gate.json',

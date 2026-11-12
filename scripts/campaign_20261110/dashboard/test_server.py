@@ -59,6 +59,24 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertFalse(snapshot(self.root,self.root/'inventory')['deadline_checkpoint_source']['available'])
         self.assertEqual(self.request('GET','/reports/deadline-checkpoint')[0],404)
 
+    def test_dependency_readiness_requires_current_exact_preparation_join(self):
+        source={'path':'/campaign/training_preparation/frozen/dependency_kind_readiness.json','sha256':'abc'}
+        self.write('dashboard/preparation_status.json',{'campaign_id':'campaign_20261110',
+            'execution':{'dependency_kind_readiness':source}})
+        self.write('dashboard/dependency_readiness.json',{'campaign_id':'campaign_20261110','source':source,
+            'data':{'campaign_id':'campaign_20261110','required_logical':100,'kinds':[
+                {'kind':'reach','verified_logical':4,'required_logical':20,'exact_unresolved_request_ids':['large-list']}]}})
+        before=self.hashes();data=snapshot(self.root,self.root/'inventory')
+        self.assertEqual(data['dependency_readiness']['required_logical'],100)
+        self.assertNotIn('exact_unresolved_request_ids',data['dependency_readiness']['kinds'][0])
+        self.assertEqual(self.request('GET','/reports/dependency-readiness')[0],200)
+        self.assertEqual(before,self.hashes())
+        self.write('dashboard/preparation_status.json',{'campaign_id':'campaign_20261110',
+            'execution':{'dependency_kind_readiness':{**source,'sha256':'new-proof'}}})
+        data=snapshot(self.root,self.root/'inventory')
+        self.assertEqual(data['dependency_readiness'],{})
+        self.assertFalse(data['dependency_readiness_source']['available'])
+
     def test_runtime_suite_keeps_historical_and_fresh_results_separate(self):
         value={'campaign_id':'campaign_20261110','historical_accepted_classes':100,
                'historical_runtime_identities':40,'validation_passed':0,'required_classes':100,
