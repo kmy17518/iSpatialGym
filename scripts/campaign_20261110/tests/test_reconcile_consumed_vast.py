@@ -116,6 +116,26 @@ def test_stopped_or_stale_worker_is_never_preferred_and_unknown_budget_blocks(tm
     assert m.routing_capacity(capacity, metrics, policy, 1000)['reason'] == 'campaign_budget_unknown'
 
 
+def test_primary_only_ticket_overflows_when_secondary_alone_has_headroom(tmp_path):
+    path, _, policy, capacity, metrics = setup(tmp_path)
+    capacity.update(account_slots={'minyeong': 0, 'shiyuc': 48}, compatible_available_slots=48)
+    v.write(Path(policy['cluster_status_path']), {'capacity': capacity})
+    result = m.cycle(tmp_path, path, v.sha(path), timestamp=1000, gate=allowed)
+    assert result['capacity']['usable_cluster_slots'] == 44
+    assert len(result['ready']) == 1 and result['ready'][0]['gpu'] == 'RTX 4090'
+    primary = m.routing_capacity(capacity, metrics, policy, 1000, eligible_accounts=['minyeong'])
+    secondary = m.routing_capacity(capacity, metrics, policy, 1000, eligible_accounts=['shiyuc'])
+    assert primary['allow_overflow'] and primary['usable_cluster_slots'] == 0
+    assert not secondary['allow_overflow'] and secondary['usable_cluster_slots'] == 44
+
+
+def test_physical_reserve_does_not_subtract_from_account_quota(tmp_path):
+    _, _, policy, capacity, metrics = setup(tmp_path)
+    capacity.update(account_slots={'minyeong': 2, 'shiyuc': 48}, compatible_available_slots=48)
+    result = m.routing_capacity(capacity, metrics, policy, 1000, eligible_accounts=['minyeong'])
+    assert result['usable_cluster_slots'] == 2 and not result['allow_overflow']
+
+
 def test_unreviewed_or_changed_source_rejected_before_claim(tmp_path):
     path, ticket, policy, _, _ = setup(tmp_path)
     admission = Path(policy['admission_policy']['path']); value = json.loads(admission.read_text())

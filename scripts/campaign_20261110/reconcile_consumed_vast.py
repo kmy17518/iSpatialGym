@@ -22,7 +22,7 @@ def checked(ref):
     return json.loads(Path(ref['path']).read_text())
 
 
-def routing_capacity(capacity, metrics, policy, timestamp):
+def routing_capacity(capacity, metrics, policy, timestamp, *, eligible_accounts=None):
     """Keep both account observations distinct and reserve recovery slots."""
     reserve = policy['critical_reserved_physical_slots']
     native.require(type(reserve) is int and reserve >= 0, 'Invalid critical reserve')
@@ -32,7 +32,10 @@ def routing_capacity(capacity, metrics, policy, timestamp):
              all(type(capacity.get('account_slots', {}).get(a)) is int for a in ('minyeong', 'shiyuc')) and
              type(capacity.get('compatible_available_slots')) is int)
     account_slots = {a: capacity.get('account_slots', {}).get(a) if fresh else None for a in ('minyeong', 'shiyuc')}
-    usable = max(0, min(capacity['compatible_available_slots'], sum(account_slots.values())) - reserve) if fresh else None
+    eligible_accounts = list(eligible_accounts or ('minyeong', 'shiyuc'))
+    native.require(eligible_accounts and set(eligible_accounts) <= {'minyeong', 'shiyuc'}, 'Unknown prepared account route')
+    usable = min(max(0, capacity['compatible_available_slots'] - reserve),
+                 sum(account_slots[a] for a in eligible_accounts)) if fresh else None
     provider_fresh = metrics.get('account_listing_complete') and 0 <= timestamp - metrics.get('observed_at_unix', 0) <= 180
     idle = []
     if provider_fresh:
@@ -52,6 +55,7 @@ def routing_capacity(capacity, metrics, policy, timestamp):
               'campaign_budget_exhausted' if exposure >= 3000 else 'overflow_allowed')
     return {'reason': reason, 'allow_overflow': reason == 'overflow_allowed', 'usable_cluster_slots': usable,
             'account_slots': account_slots, 'critical_reserved_physical_slots': reserve,
+            'prepared_account_routes': eligible_accounts,
             'compatible_idle_workers': idle, 'observed_exposure_usd': exposure,
             'rental_owner': 'existing sole Vast controller; no rentals from this intake'}
 
@@ -106,8 +110,12 @@ def cycle(root, policy_path, expected_sha, *, execute=False, timestamp=None, tra
         claim = Path(row['claim_path']); receipt = Path(row['submission_path']); key = row['physical_dedup_key']
         if claim.exists() or receipt.exists():
             results.append({'physical_dedup_key': key, 'status': 'existing_physical_claim_or_receipt'}); continue
-        if not capacity['allow_overflow']:
-            results.append({'physical_dedup_key': key, 'status': capacity['reason']}); continue
+        row_capacity = routing_capacity(status.get('capacity', {}), metrics, policy, timestamp,
+                                        eligible_accounts=[row['ticket']['expected_account']])
+        if not row_capacity['allow_overflow']:
+            results.append({'physical_dedup_key': key, 'status': row_capacity['reason'],
+                            'prepared_account_routes': row_capacity['prepared_account_routes'],
+                            'usable_cluster_slots': row_capacity['usable_cluster_slots']}); continue
         try:
             checked(row['native_inputs']); job = Path(row['job_dir']); value = transport.verify(job, root)
             native.require(value['kind'] == 'attachment' and value['scenes'] == [] and
