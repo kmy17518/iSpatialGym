@@ -145,7 +145,7 @@ def project_library_advancement(root, manifest_ref, audit_ref):
         write(Path(root) / 'infra/coordinator_dispatch/preparation_verification' / (row['physical_dedup_key'] + '.json'), value)
 
 
-def reconcile(root, manifest_ref, route_ref, output, *, max_seconds=45, max_items=128, reader=native_read, timestamp=None):
+def reconcile(root, manifest_ref, route_ref, output, *, max_seconds=15, max_items=128, reader=native_read, timestamp=None):
     root, output = Path(root), Path(output)
     require(output.resolve().is_relative_to(root.resolve()), 'Callback output outside campaign')
     require(1 <= max_seconds <= 50 and 1 <= max_items <= 512, 'Unbounded callback')
@@ -217,12 +217,26 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for key in ('root', 'manifest', 'manifest-sha256', 'output'): parser.add_argument('--' + key, required=True)
     parser.add_argument('--route'); parser.add_argument('--route-sha256')
-    parser.add_argument('--library-audit'); parser.add_argument('--library-audit-sha256'); args = parser.parse_args()
+    parser.add_argument('--library-audit'); parser.add_argument('--library-audit-sha256')
+    parser.add_argument('--max-seconds', type=int, default=15); parser.add_argument('--max-items', type=int, default=128)
+    args = parser.parse_args()
     output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
     try:
         with atomic_directory_lock(output / 'callback.lockdir'):
+            # Native imports take ~28s on a fresh campaign interpreter. Root runs
+            # this finite CPU worker asynchronously; the verification scan has
+            # its own 15s budget and never claims the cold start was that short.
+            startup = time.time()
+            write(output / 'worker_startup.json', {'started_at': startup, 'owner': '/root/templates_assets',
+                  'phase': 'importing_native_reader', 'dispatch_authority': False})
+            from ispatialgym.grasping import schema as S, contact_policy as CP
+            from ispatialgym.sampling import reach_maps as RM
+            RM.robot_digest(); CP.DEFAULT.key('right')
+            write(output / 'worker_startup.json', {'started_at': startup, 'finished_at': time.time(),
+                  'cold_start_seconds': time.time() - startup, 'owner': '/root/templates_assets', 'phase': 'native_reader_ready'})
             report = reconcile(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
-                               {'path': args.route, 'sha256': args.route_sha256} if args.route else None, args.output)
+                               {'path': args.route, 'sha256': args.route_sha256} if args.route else None, args.output,
+                               max_seconds=args.max_seconds, max_items=args.max_items)
             if args.library_audit:
                 project_library_advancement(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
                                             {'path': args.library_audit, 'sha256': args.library_audit_sha256})
