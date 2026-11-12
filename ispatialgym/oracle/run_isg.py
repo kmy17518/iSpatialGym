@@ -2074,6 +2074,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         return exit_code, result
     finally:
         timings["total_s"] = time.time() - t_start
+        meta["execution_started_at_unix"] = t_start
+        meta["execution_finished_at_unix"] = time.time()
         meta["timings"] = timings
         meta["wall_time_s"] = timings["total_s"]
         # 2026-10-31 train-fast: the switches / tunables this process consulted (ispatialgym.fastflags) and the straight-arm counters

@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 import tempfile
 import unittest
-from scripts.campaign_20261110.runtime_validation_metrics import attempts, accounting, rates, register, reference, validate_row, json_lines, sample_distribution, vast_accounting
+from scripts.campaign_20261110.runtime_validation_metrics import attempts, accounting, rates, register, reference, validate_row, json_lines, sample_distribution, vast_accounting, member_timing
 
 
 class MetricsTest(unittest.TestCase):
@@ -54,6 +54,29 @@ class MetricsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory()as t:
             _,row=self.fixture(Path(t))
             with self.assertRaisesRegex(ValueError,'durable start'):attempts([self.event(row,event='finished')],row)
+
+    def test_native_success_milestones_and_censored_start_are_separate(self):
+        with tempfile.TemporaryDirectory()as t:
+            _,row=self.fixture(Path(t))
+            events=[self.event(row,t=10),self.event(row,event='finished',t=30,outcome='written'),
+                    self.event(row,ident='b',index=101,t=31),self.event(row,ident='b',index=101,event='finished',t=70,outcome='written'),
+                    self.event(row,ident='c',index=102,t=71)]
+            result=attempts(events,row)
+            self.assertEqual(result['native_written_milestones_seconds'],[20,60])
+            self.assertEqual(result['censored_native_started_at'],[71])
+
+    def test_demo_milestones_deduplicate_starts_and_expose_unknown_timing(self):
+        rows=[dict(instance_id=i,success=True,fingerprint=f,started_at=12,finished_at=end)
+              for i,f,end in [('a','poseA',30),('b','poseA',40),('c','poseB',50)]]
+        result=member_timing({'first_native_started_at':10},rows)
+        self.assertEqual(result['time_to_distinct_demo_members_seconds'],[20,40])
+        self.assertEqual(result['second_member_seconds'],40)
+        self.assertIsNone(result['third_member_seconds'])
+        self.assertIsNone(member_timing({'first_native_started_at':10},rows,camera=True)['second_member_seconds'])
+        rows.append(dict(instance_id='old',success=True,fingerprint='poseC',started_at=None,finished_at=None))
+        result=member_timing({'first_native_started_at':10},rows)
+        self.assertIsNone(result['first_member_seconds'])
+        self.assertEqual(result['successful_member_timing_unknown_ids'],['old'])
 
     def test_shared_allocation_counted_once(self):
         job={'backend':'slurm','job_id':'1','terminal':True,'allocated_gpu_seconds':3600}

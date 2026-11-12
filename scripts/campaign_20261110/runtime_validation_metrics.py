@@ -104,7 +104,14 @@ def attempts(events, row):
         elapsed = end['created_at'] - started[key]['created_at']; require(elapsed >= 0, 'negative attempt duration')
         durations.append(elapsed)
         if end.get('outcome') == 'rejected': failed.append(elapsed)
-    return {'attempted_instance_slots': len({e['index'] for e in started.values()}),
+    origin=min((e['created_at'] for e in started.values()),default=None)
+    written={}
+    for e in finished.values():
+        if e.get('outcome')=='written':written[e['index']]=min(written.get(e['index'],e['created_at']),e['created_at'])
+    return {'native_written_milestones_seconds': [t-origin for t in sorted(written.values())] if origin is not None else [],
+            'native_written_milestone_scope':'distinct published indices, not demo or accepted success',
+            'censored_native_started_at':[started[k]['created_at'] for k in sorted(set(started)-set(finished))],
+            'attempted_instance_slots': len({e['index'] for e in started.values()}),
             'native_draws': len(started), 'native_finished_draws': len(finished),
             'censored_native_draws': len(set(started) - set(finished)),
             'native_process_seconds': sum(durations), 'failed_native_process_seconds': sum(failed),
@@ -112,6 +119,29 @@ def attempts(events, row):
             'native_rejections': dict(Counter(e.get('reason') or 'unspecified' for e in finished.values() if e.get('outcome') == 'rejected')),
             'first_native_started_at': min((e['created_at'] for e in started.values()), default=None),
             'last_native_finished_at': max((e['created_at'] for e in finished.values()), default=None)}
+
+
+def member_timing(native, reports, *, camera=False):
+    """Durable epoch timestamps only; unknown timing never becomes zero yield."""
+    origin=native.get('first_native_started_at')
+    successes={};unknown=[];failures=Counter()
+    for row in reports:
+        if not row['success']:
+            failures[row.get('reason') or 'unspecified']+=1
+            continue
+        start,end=row.get('started_at'),row.get('finished_at')
+        if origin is None or start is None or end is None or row.get('fingerprint') is None:
+            unknown.append(row['instance_id']);continue
+        require(origin <= end and start <= end, 'invalid demo measurement chronology')
+        key=row['fingerprint'];successes[key]=min(successes.get(key,end),end)
+    times=sorted(end-origin for end in successes.values())
+    return {'origin':'first entered native draw; allocation startup measured separately',
+            'time_to_distinct_demo_members_seconds':times,
+            'first_member_seconds':times[0] if times and not unknown else None,
+            'second_member_seconds':times[1] if len(times)>1 and not unknown and not camera else None,
+            'third_member_seconds':times[2] if len(times)>2 and not unknown and not camera else None,
+            'successful_member_timing_unknown_ids':unknown,'demo_failure_causes':dict(failures),
+            'camera_exempt':camera,'production_timeout_selected':False}
 
 
 def accounting(rows):
@@ -368,7 +398,7 @@ def observe(run_dir):
                   'observed_at': time.time(), 'evidence': [], 'errors': [], 'jobs': [], 'native_attempts': {},
                   'strict_outcomes': None, 'suggested_time_limits': None,
                   'recommendation_confidence': 'Insufficient completed exact groups; retain registered limits.'}
-        events = []; process = []; demo_ids = set()
+        events = []; process = []; demo_ids = set(); demo_measurements=[]
         for job in jobs:
             try:
                 jid = str(job['job_id']); directory = Path(job['job_dir']); measured = account.get(jid)
@@ -394,17 +424,30 @@ def observe(run_dir):
                 stats = directory / 'job_stats.json'
                 if stats.exists():
                     st = json.loads(stats.read_text()); process.append({'job_id': jid, **{k:st.get(k) for k in ['sample_wall_s','collector_walls_s','world_load_s','attempts_s','reject_s','demo_meta','job_wall_s']}}); result['evidence'].append(reference(stats))
+                native_tros={p.name.removesuffix('-tro_state.json'):p for p in (directory/'inst').rglob('*-tro_state.json')}
                 for path in sorted((directory / 'demo').glob('*/meta.json')):
-                    meta = json.loads(path.read_text())
+                    meta = json.loads(path.read_text());fingerprint=None
                     if meta.get('success') is True:
                         from scripts.campaign_20261110.acceptance import report_passed
                         report_passed(meta, 'oracle')
                         require(Path(meta['provenance']['isg_root']).resolve() == Path(row['frozen_runtime']['path']).resolve(), 'demo runtime differs')
                         demo_ids.add(meta['instance_id'])
+                        if row.get('camera_exempt'):fingerprint=meta['instance_id']
+                        elif meta['instance_id'] in native_tros:
+                            from .goal_group_yield import member_start
+                            tro_path=native_tros[meta['instance_id']]
+                            fingerprint=member_start(json.loads(tro_path.read_text())['ispatialgym']['campaign'])
+                            result['evidence'].append(reference(tro_path))
+                    demo_measurements.append({'instance_id':meta.get('instance_id',path.parent.name),
+                        'success':meta.get('success') is True,'reason':meta.get('reason') or meta.get('error'),
+                        'fingerprint':fingerprint,'started_at':meta.get('execution_started_at_unix'),
+                        'finished_at':meta.get('execution_finished_at_unix'),'report':reference(path)})
                     result['evidence'].append(reference(path))
             except Exception as exc: result['errors'].append({'job_id': job.get('job_id'), 'error': type(exc).__name__ + ': ' + str(exc)})
         try: result['native_attempts'] = attempts(events, row)
         except Exception as exc: result['errors'].append({'error': 'native_attempt_identity: ' + str(exc)})
+        result['member_timing']=member_timing(result['native_attempts'],demo_measurements,camera=row.get('camera_exempt',False))
+        result['demo_measurements']=demo_measurements
         result['overlapping_process_timings'] = process
         result['cost'] = accounting(result['jobs'])
         if result['errors']:

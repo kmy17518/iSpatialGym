@@ -25,6 +25,21 @@ class GoalYieldTest(unittest.TestCase):
         self.assertEqual(result['observed_attempted_slots'],12)
         self.assertIsNone(result['successful_members_per_attempted_instance'])
 
+    def test_final_eligible_pair_rate_keeps_zero_attempts_and_unknowns(self):
+        rows=[dict(group(3),distinct_accepted_successes=3,distinct_eligible_successes=2),
+              dict(group(0),distinct_accepted_successes=0,distinct_eligible_successes=0),
+              dict(group(2),distinct_accepted_successes=2,distinct_eligible_successes=1),
+              dict(group(1),distinct_accepted_successes=1,distinct_eligible_successes=1)]
+        result=summarize(rows+[group(3,'pending')],[])
+        self.assertEqual(result['at_least_two_percent'],50)
+        self.assertEqual(result['at_least_two_accepted_percent'],50)
+        self.assertEqual(result['at_least_two_eligible_percent'],25)
+        rows[-1]['distinct_eligible_successes']=None
+        result=summarize(rows,[])
+        self.assertEqual(result['completed_groups'],4)
+        self.assertIsNone(result['at_least_two_eligible_percent'])
+        self.assertEqual(result['eligible_pair_unknown_groups'],1)
+
     def test_shared_job_cost_once_includes_zero_success_failed_job(self):
         jobs=[dict(job_id='1',terminal=True,backend='slurm',allocated_gpu_seconds=3600,activated_groups=['a','b']),
               dict(job_id='2',terminal=True,backend='slurm',allocated_gpu_seconds=3600,activated_groups=[])]

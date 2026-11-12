@@ -106,7 +106,7 @@ def fresh_group(gid, config, plan, path):
         'activated': False, 'sampling_closed': False, 'terminal': False, 'closure_sources': set(),
         'pending_execution': False, 'running_execution': False, 'assigned_unverified': False,
         'held_execution': False, 'unavailable_execution': False, 'accepted': Counter(), 'accepted_ids': [],
-        'acceptance_reasons': [], 'first_attempt_at': None, 'last_attempt_at': None,
+        'acceptance_reasons': [], 'eligible_ids': [], 'eligible_unknown_ids': [], 'first_attempt_at': None, 'last_attempt_at': None,
         'exact_instrumentation_jobs': set(), 'executed_jobs': set(), 'evidence_incomplete': []}
 
 
@@ -136,6 +136,8 @@ def summarize(groups, jobs):
     states = Counter(g['status'] for g in groups)
     completed = [g for g in groups if g['status'] == 'completed']
     hist = Counter(str(g['distinct_demo_successes']) for g in completed)
+    eligible_unknown = sum(g.get('distinct_eligible_successes') is None for g in completed)
+    accepted_unknown = sum(g.get('distinct_accepted_successes') is None for g in completed)
     accepted = Counter(); reasons = Counter(); outcomes = Counter()
     for g in completed:
         accepted.update(g['accepted']); reasons.update(g['rejections']); reasons.update(g['demo_rejections'])
@@ -161,6 +163,10 @@ def summarize(groups, jobs):
         'pending_running_unstarted': dict(states), 'success_histogram': {str(i): hist[str(i)] for i in range(4)},
         'more_than_three_successes': sum(n for k,n in hist.items() if int(k)>3),
         'at_least_two_percent': 100*sum(g['distinct_demo_successes'] >= 2 for g in completed)/len(completed) if completed else None,
+        'at_least_two_accepted_percent': 100*sum(g.get('distinct_accepted_successes',0)>=2 for g in completed)/len(completed) if completed and not accepted_unknown else None,
+        'at_least_two_eligible_percent': 100*sum(g.get('distinct_eligible_successes',0)>=2 for g in completed)/len(completed) if completed and not eligible_unknown else None,
+        'eligible_pair_unknown_groups': eligible_unknown,
+        'pair_rate_denominator': 'all completed noncamera attempts, including zero successes; pending/running separate',
         'distinct_successful_members': success, 'observed_attempted_slots': observed,
         'attempted_instances': observed if complete_denominator else None,
         'attempt_denominator_complete': complete_denominator,
@@ -202,6 +208,14 @@ def revision_comparisons(cohorts):
 def snapshot(root):
     root = Path(root).resolve(); started = time.time(); ev = Evidence(root)
     accepted, accepted_groups, allocation_sources = snapshot_allocations(root)
+    eligibility_path = root/'accounting/current_eligibility.json'
+    eligibility = {}
+    if eligibility_path.exists():
+        try:
+            doc=ev.read(eligibility_path,'current_eligibility')
+            require(doc.get('campaign_id')==CAMPAIGN,'eligibility campaign differs')
+            eligibility=doc.get('records',{})
+        except (OSError,ValueError,KeyError,TypeError) as error:ev.error(eligibility_path,error)
     groups = {}; jobs = []; excluded_camera = sum(str(r.get('task','')).startswith('camera_') for r in accepted)
     for path in sorted((root/'groups').glob('*/goal_plan.json')):
         try:
@@ -406,6 +420,10 @@ def snapshot(root):
         if gid not in groups:
             ev.error(root/'dataset/allocations.sqlite', ValueError('accepted group not observed: '+str(gid))); continue
         g = groups[gid]; g['accepted'][row['split']] += 1; g['accepted_ids'].append(row['instance_id'])
+        review=eligibility.get(row['instance_id'])
+        if not review or review.get('accepted_record_sha256') != digest({k:v for k,v in row.items() if k!='allocation_source'}) or review.get('group_id') != gid or review.get('split') != row['split']:
+            g['eligible_unknown_ids'].append(row['instance_id'])
+        elif review.get('current_eligible') is True:g['eligible_ids'].append(row['instance_id'])
     for path in sorted((root/'controllers').glob('*/state.json')):
         try:controller_outcomes(ev.read(path,'controller_group_outcomes'),groups,str(path))
         except (OSError,ValueError,KeyError,TypeError) as error:ev.error(path,error)
@@ -415,6 +433,10 @@ def snapshot(root):
             if path.exists():
                 rec = ev.read(path, 'acceptance_block'); g['acceptance_reasons'].append(str(rec.get('reason') or rec.get('error') or rec.get('message') or name))
         g['distinct_demo_successes'] = len({m['start_fingerprint'] for m in g['members'].values() if m['demo_success']})
+        def distinct(ids):
+            return len({g['members'][iid]['start_fingerprint'] for iid in ids if iid in g['members'] and g['members'][iid]['demo_success']})
+        g['distinct_accepted_successes'] = distinct(g['accepted_ids']) if all(iid in g['members'] and g['members'][iid]['demo_success'] for iid in g['accepted_ids']) else None
+        g['distinct_eligible_successes'] = distinct(g['eligible_ids']) if not g['eligible_unknown_ids'] and g['distinct_accepted_successes'] is not None else None
         g['raw_demo_successes'] = sum(m['demo_success'] for m in g['members'].values())
         g['duplicate_successful_members'] = g['raw_demo_successes'] - g['distinct_demo_successes']
         finished = all(m['demo_finished'] for m in g['members'].values())
