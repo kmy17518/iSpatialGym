@@ -110,9 +110,13 @@ def recorded_disembedding_evidence(template, anchor):
     runtime_group = campaign.get("runtime", {}).get("goal_group", {})
     for group in (summary_group, runtime_group):
         actual = group.get("actual_crowdedness")
-        require(isinstance(actual, (int, float)) and math.isfinite(actual) and 0 < actual <= 1
-                and math.isclose(actual, coverage, abs_tol=1e-6),
-                "recorded actual crowdedness differs from measured native geometry")
+        require(isinstance(actual, (int, float)) and math.isfinite(actual) and 0 < actual <= 1,
+                "recorded actual crowdedness outside physical fraction domain")
+    # The static profile and the sampled, settled world projections are distinct
+    # measurements. Historically only their buckets were compared; making those
+    # labels descriptive must not introduce a new equality tolerance between them.
+    require(summary_group["actual_crowdedness"] == runtime_group["actual_crowdedness"],
+            "recorded crowdedness differs between summary and TRO")
     require(summary_group.get("group_id") and summary_group.get("plan_sha256") and
             all(summary_group[k] == runtime_group.get(k) for k in ("group_id", "plan_sha256")),
             "recorded source group identities differ")

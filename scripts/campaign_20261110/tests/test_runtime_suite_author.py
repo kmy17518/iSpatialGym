@@ -107,11 +107,23 @@ def test_recorded_disembedding_rejects_incompatible_proof(tmp_path,change):
     elif change=='class':anchor['tro']['ispatialgym']['campaign']['class_id']='disembedding_02'
     elif change=='group_identity':group['plan_sha256']='c'*64
     rewrite_anchor_bytes(anchor)
-    if change in ('historical_range','not_strict','runtime_disagrees'):
+    if change in ('boundary','historical_range','not_strict','runtime_disagrees'):
         assert recorded_disembedding_range(template,anchor)[1] == 1
     else:
         with pytest.raises((AssertionError,ValueError)):
             recorded_disembedding_range(template,anchor)
+
+
+def test_recorded_disembedding_static_profile_and_sampled_projection_are_distinct(tmp_path):
+    from scripts.campaign_20261110.runtime_suite_author import recorded_disembedding_evidence
+    template,anchor=disembedding_anchor(tmp_path,.32)
+    for group in (anchor['summary']['campaign_goal_group'],
+                  anchor['tro']['ispatialgym']['campaign']['runtime']['goal_group']):
+        group['actual_crowdedness']=.299
+    rewrite_anchor_bytes(anchor)
+    evidence=recorded_disembedding_evidence(template,anchor)
+    assert evidence['coverage']==pytest.approx(.32)
+    assert evidence['historical_actual_crowdedness']==.299
 
 
 @pytest.mark.parametrize('source',['tro','summary','metadata'])

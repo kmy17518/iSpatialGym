@@ -108,8 +108,8 @@ def test_correction_terminal_path_accepts_no_worker_only_with_complete_terminal_
         r.failure(tmp_path,prior,put(Path(allocation['path']),body),[],correction_ref={'path':'verified','sha256':'x'})
 
 
-def test_ordinary_retry_cannot_change_bucket_with_unchanged_goal(tmp_path):
+def test_ordinary_retry_can_change_descriptive_bucket_with_unchanged_goal(tmp_path):
     base,prior,allocation,rowref,proposal=proposed(tmp_path)
     body=json.loads(Path(proposal['path']).read_text());row=json.loads(Path(rowref['path']).read_text())
     row['selected_bucket']=1;body['row']=put(Path(rowref['path']),row)
-    with pytest.raises(ContractError,match='selected strict bucket'):r.prepare(tmp_path,put(Path(proposal['path']),body))
+    assert r.prepare(tmp_path,put(Path(proposal['path']),body))
