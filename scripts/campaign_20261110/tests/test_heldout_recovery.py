@@ -38,7 +38,7 @@ def test_unknown_scheduler_state_is_not_pending_and_new_admission_is_not_old_fai
     assert recovery_state(3,[{'worker_status':'RUNNING'}],{'status':'external_submission'})=='running'
     assert recovery_state(3,[{'worker_status':'PENDING'}],{'status':'external_submission'})=='queued'
     assert recovery_state(6,[],{'status':'admitted'})=='ready_for_scoped_refill'
-    assert recovery_state(3,[],{'status':'external_submission'})=='awaiting_acceptance'
+    assert recovery_state(3,[],{'status':'external_submission'})=='computed_unverified'
     assert recovery_state(0,[],{'status':'failed'})=='complete'
 
 
@@ -117,3 +117,23 @@ def test_vast_fetch_upload_and_assignment_are_not_running_gpus(phase,status):
     assert row['worker_status']==status and not row['execution_verified']
     assert recovery_state(1,[row],{})=='awaiting_observation'
     assert recovery_state(1,[{'worker_status':'assigned'}],{})=='awaiting_observation'
+
+
+def test_preparation_retains_failed_attempts_and_never_infers_demo_acceptance():
+    from scripts.campaign_20261110.heldout_recovery import preparation_state
+    for stage,expected in [('blocked_native_geometry','failed_with_diagnosis'),
+            ('fresh_native_sample_bound','computed_unverified'),
+            ('candidate_materialized','inputs_unresolved'),
+            ('blocked_target_grasp_library','inputs_unresolved')]:
+        state,source=preparation_state([{'stage':stage,'reason':'actual evidence'}])
+        assert state==expected
+        assert source['reason']=='actual evidence'
+    assert preparation_state([]) is None
+
+
+def test_new_preparation_observation_does_not_invent_progress_timestamp(tmp_path):
+    import os
+    from scripts.campaign_20261110.heldout_recovery import evidence_epoch
+    p=tmp_path/'native.json';p.write_text('{}');os.utime(p,(100,100))
+    assert evidence_epoch([{'path':str(p),'observed_at':100000}])==100
+    assert evidence_epoch([{'path':str(tmp_path/'missing')}])==0

@@ -26,9 +26,30 @@ def recovery_state(remaining,jobs,latest):
     if status in ('native_preparation','engineering_blocked'):return 'engineering_blocked'
     if status=='native_passed':return 'awaiting_validation'
     if status in ('admitted','complete','retired_after_claim'):return 'ready_for_scoped_refill'
-    if status in ('external_submission','awaiting_replay','awaiting_gate'):return 'awaiting_acceptance'
+    if status in ('awaiting_replay','awaiting_gate','awaiting_acceptance'):return 'awaiting_acceptance'
+    if status=='external_submission':return 'computed_unverified'
+    if status in ('inputs_unresolved','ready_unsubmitted','computed_unverified','failed_with_diagnosis','explicitly_parked'):return status
     if status=='failed' or (latest or{}).get('reason'):return 'failed'
     return 'unattempted'
+
+def preparation_state(records):
+    """Preparation evidence establishes attempts/dependencies, never demo or replay passes."""
+    if not records:return None
+    latest=records[-1];stage=latest.get('stage','')
+    if stage=='blocked_native_geometry':state='failed_with_diagnosis'
+    elif stage=='fresh_native_sample_bound':state='computed_unverified'
+    else:state='inputs_unresolved'
+    return state,latest
+
+
+def evidence_epoch(records):
+    """Use original immutable artifact dates; report regeneration is not progress."""
+    stamps=[]
+    for source in records:
+        try:stamps.append(pathlib.Path(source['path']).stat().st_mtime)
+        except (OSError,KeyError,TypeError):pass
+    return max(stamps,default=0)
+
 
 def engineering_evidence_error(entry):
     """A stale mutable evidence reference must not freeze every quota observation."""
@@ -227,8 +248,9 @@ def publish(root):
             for r in st.get('records',{}).values():
                 if isinstance(r,dict)and r.get('admission_id'):observation(r,worker,cfg,st)
         except (OSError,ValueError,KeyError,TypeError)as exc:errors.append({'source':worker['name'],'error':type(exc).__name__+': '+str(exc)})
-    engineering=root/'infra/heldout_recovery/engineering_actions.json'
-    if engineering.exists():
+    for filename in ('engineering_actions.json','compute_actions.json','root_actions.json'):
+        engineering=root/'infra/heldout_recovery'/filename
+        if not engineering.exists():continue
         valid_scopes={(r['split'],r['class_id'])for r in rows}
         for entry in load(engineering)['rows']:
             key=(entry['split'],entry['class_id'])
@@ -242,7 +264,7 @@ def publish(root):
                     'controller_config':str(engineering),'configuration':None,'runtime':None,
                     'bucket':entry.get('bucket'),'job':None,'failures':[],'status':'engineering_evidence_unavailable',
                     'reason':evidence_error,'next_action':'Snapshot and re-audit this scope’s actual native/controller evidence; no job or success is inferred from the changed reference.',
-                    'last_progress_epoch':now,'observed_at':iso(now),'evidence':entry.get('evidence',[])})
+                    'last_progress_epoch':entry.get('observed_unix',0),'observed_at':iso(now),'evidence':entry.get('evidence',[])})
                 continue
             records=entry.get('jobs')or[None]
             for job in records:
@@ -253,7 +275,8 @@ def publish(root):
                         job.update(vast_job(job['job_id'],load(vp)))
                 observations[key].append({'controller':'owned_native_engineering','controller_state':str(engineering),'owner':entry.get('owner','/root/templates_assets'),
                     'controller_config':str(engineering),'configuration':entry.get('configuration'),
-                    'runtime':entry.get('runtime'),'bucket':entry.get('bucket'),'job':job,'failures':[],
+                    'runtime':entry.get('runtime'),'bucket':entry.get('bucket'),'job':job,'failures':entry.get('failures',[]),
+                    'stages':entry.get('stages',{}),'selected_inputs':entry.get('selected_inputs'),
                     'status':entry.get('status','native_preparation'),'reason':entry['blocker'],'next_action':entry['next_action'],
                     'last_progress_epoch':entry['observed_unix'],'observed_at':iso(now),'evidence':entry['evidence']})
     jobs=[o['job']for obs in observations.values()for o in obs if o['job']]
@@ -273,24 +296,33 @@ def publish(root):
         elif state=='awaiting_acceptance':
             blocker='Collection is terminal; own fresh replay or strict acceptance reconciliation is pending.'
             action='Reconcile this exact allocation through its own physics gate and acceptance; do not duplicate sampling.'
+        elif state=='computed_unverified':
+            blocker='Submitted work has no verified next-stage disposition in this ledger; terminal execution alone is not acceptance.'
+            action='Inspect exact native/demo outputs and own replay evidence, then dispatch the missing next stage or assign the actual failure.'
         elif state=='awaiting_observation':
             blocker='Backend state unavailable; the submission receipt does not establish running or pending GPUs.'
         elif state=='unattempted'and prep:
             blocker=prep[-1]['stage']+': '+prep[-1]['reason']
             action='Inspect exact candidate and unmet native dependencies in '+', '.join(e['path']for e in prep[-1]['evidence'])+'; prepare a bounded native geometry proof before demo/replay admission.'
+        if state=='unattempted'and prep:
+            state,prepared_latest=preparation_state(prep)
+            failures += [{'reason':prepared_latest['reason'],'evidence':prepared_latest.get('evidence',[])}] if state=='failed_with_diagnosis' else []
         if remain and (latest or{}).get('next_action'):
             action=latest['next_action']
         row.update(accepted=n,historical_accepted=rawcounts[countkey],remaining=remain,owner=(latest or{}).get('owner','/root/templates_assets'),state=state,blocker=blocker,next_action=action,
             configuration=(latest or{}).get('configuration'),runtime=(latest or{}).get('runtime'),controller=sorted(set(ownership[key]+[o['controller']for o in obs])),active_jobs=list(jobs.values()),
             last_accepted_at=iso(last[countkey]),last_accepted_time_kind='immutable committed-group export mtime; exact commit timestamp not recorded'if last[countkey]else'unavailable',
-            last_progress_at=iso(max([last[countkey]]+[o['last_progress_epoch']for o in same])),failures=failures,
+            last_progress_at=iso(max([last[countkey],evidence_epoch(prep[-1].get('evidence',[]))if prep else 0]+[o['last_progress_epoch']for o in same])),failures=failures,
+            observation_status='missing_exact_configuration'if remain and not(latest or{}).get('configuration')else'available',
+            stages=(latest or{}).get('stages',{}),selected_inputs=(latest or{}).get('selected_inputs'),
+            evidence=(latest or{}).get('evidence',[])or(prep[-1].get('evidence',[])if prep else []),
             flat_progress_investigation={'status':'active_validation'if jobs else'validated_refill_needed'if state=='ready_for_scoped_refill'else'actionable_failure'if state=='failed'else'no_active_scope'if remain else'quota_complete',
                 'controller_observations':same,'preparation':prep,'candidate_is_not_demo_or_replay_pass':True})
     summary={s:{'target':sum(r['target']for r in rows if r['split']==s),'accepted':sum(r['accepted']for r in rows if r['split']==s),
         'historical_accepted':sum(r['historical_accepted']for r in rows if r['split']==s),'remaining':sum(r['remaining']for r in rows if r['split']==s),
         'complete_buckets':sum(not r['remaining']for r in rows if r['split']==s),'total_buckets':sum(r['split']==s for r in rows)}for s in SPLITS}
     unmatched=[{'key':list(k),'accepted':v}for k,v in counts.items()if k not in {(r['split'],r['class_id'],r['bucket'])for r in rows}];require(not unmatched,'accepted held records fall outside frozen targets: '+str(unmatched))
-    value={'schema':'isg-heldout-recovery-ledger-v1','campaign_id':'campaign_20261110','observed_at':iso(now),'owner':'/root/templates_assets','summary':summary,'rows':rows,
+    value={'schema':'isg-heldout-recovery-ledger-v1','campaign_id':'campaign_20261110','observed_at':iso(now),'owner':'/root','summary':summary,'rows':rows,
         'sources':sources+snapshot_sources,'current_eligibility_ledger':lref,'errors':errors,'training_generation_authorized':False,
         'semantics':'All99 model classes and23 category/room task scopes enumerated from frozen100-class inventory and exact owner quotas. Bucket targets remain strict. Candidate preparation is separate from native/demo/replay/accepted proof. No collection action is performed by this audit.'}
     write_json_atomic(D/'ledger.json',value);print(json.dumps({'path':str(D/'ledger.json'),'summary':summary,'errors':len(errors),'rows':len(rows)}));return value
