@@ -2,10 +2,11 @@
 import argparse
 from collections import Counter
 from datetime import datetime, timezone
-import fcntl
 import hashlib
 import json
+import os
 from pathlib import Path
+import socket
 import subprocess
 import time
 
@@ -28,6 +29,17 @@ def atomic(path, value):
     temp = path.with_suffix('.tmp')
     temp.write_text(json.dumps(value, indent=2) + '\n')
     temp.replace(path)
+
+
+def snapshot(path):
+    raw = Path(path).read_bytes()
+    sha = hashlib.sha256(raw).hexdigest()
+    directory = ROOT / 'infra/preparation_root/observation_history'
+    directory.mkdir(exist_ok=True)
+    target = directory / (sha + '_' + Path(path).name)
+    if not target.exists():
+        target.write_bytes(raw)
+    return json.loads(raw), {'path': str(target), 'sha256': sha, 'original_path': str(path)}
 
 
 def observe_wave(name, now):
@@ -74,7 +86,7 @@ def observe_wave(name, now):
         elif candidates:
             path = candidates[0]
             try:
-                result = read(path)
+                result, result_source = snapshot(path)
                 assert result['unit_id'] == unit['id'] and result['request'] == source
                 assert result['benchmark_credit'] == 0 and result['production_authorization'] is False
                 if path == alternate:
@@ -82,11 +94,11 @@ def observe_wave(name, now):
                     assert relocation['request'] == source and relocation['unit_id'] == unit['id']
                     assert Path(relocation['actual_output']).resolve() == path.parent.resolve()
                     row['output_relocation'] = reference(path.parent / 'output_relocation.json')
-                row.update(status=result['status'], result=reference(path),
+                row.update(status=result['status'], result=result_source,
                            result_observed_at=result.get('finished_at', result.get('started_at')),
                            native_returncode=result.get('returncode'), elapsed_seconds=result.get('elapsed_seconds'),
                            reported_positive_components=result.get('positive_maps', result.get('positive_libraries')),
-                           reported_artifacts=result.get('artifacts', []), error=result.get('error'),
+                           reported_artifact_count=len(result.get('artifacts', [])), error=result.get('error'),
                            next_action=result.get('next_action', 'Observe terminal native result; no output inferred.'))
             except (ValueError, KeyError, AssertionError, OSError) as exc:
                 row.update(status='observation_or_identity_failure', error=repr(exc),
@@ -113,15 +125,17 @@ def publish():
                    'read_only_execution': True, 'collection_jobs_changed': False, 'production_authorization': False}
     target = directory / 'component_observation.json'
     atomic(target, observation)
+    _, observed_source = snapshot(target)
     worker_path = directory / 'worker.json'
     worker = read(worker_path)
     worker.setdefault('last_agent_engineering_observed_at', worker['observed_at'])
     worker.update(observed_at=now, status='persistent_component_observation',
                   active_jobs=[j for w in waves for j in w.get('active_jobs', [])],
-                  component_observation=reference(target),
+                  component_observation=observed_source,
                   engineering_observation_note='Worker timestamp reports persistent observation, not an interactive-agent heartbeat. Last agent engineering timestamp remains separate.',
                   next_action='Graph owner streams each exact positive artifact; root diagnoses failed motion/prefix components; compute dispatches exclusive ready units. Shared release checks remain separate.')
-    worker['evidence'] = [e for e in worker.get('evidence', []) if e.get('path') != str(target)] + [reference(target)]
+    worker['evidence'] = [e for e in worker.get('evidence', [])
+                          if e.get('original_path', e.get('path')) != str(target)] + [observed_source]
     atomic(worker_path, worker)
     print(json.dumps({'observed_at': now, 'waves': [{k: w.get(k) for k in ('name', 'physical_units', 'statuses', 'status')} for w in waves]}), flush=True)
 
@@ -130,11 +144,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--loop', action='store_true')
     args = parser.parse_args()
-    lock_path = ROOT / 'infra/preparation_root/observer.lock'
-    with lock_path.open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    # This campaign NFS mount does not support flock. Atomic directory creation
+    # gives one explicit owner; a crash leaves a named lease for reconciliation.
+    lock_path = ROOT / 'infra/preparation_root/observer.lease'
+    lock_path.mkdir()
+    lease = lock_path / 'owner.json'
+    lease.write_text(json.dumps({'pid': os.getpid(), 'hostname': socket.gethostname(),
+                                 'started_at': time.time(), 'worker': reference(__file__)}))
+    try:
         while True:
             publish()
             if not args.loop:
                 break
             time.sleep(60)
+    finally:
+        lease.unlink()
+        lock_path.rmdir()
