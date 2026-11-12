@@ -157,10 +157,22 @@ def project(root, scheduled, now, previous=None):
     ready = [r for r in required if r['ready_unsubmitted']]
     recent = [r for r in required if r['submitted_at'] is not None and 0 <= now-r['submitted_at'] <= 600]
     waiting = [now-r['manifest_ready_at'] for r in ready if r['manifest_ready_at'] is not None]
-    unexplained_idle = any(r['compatible_capacity_available'] and not r['blocker'] for r in ready) and not recent
+    # An empty admitted queue cannot establish an empty campaign queue. Surface
+    # an enumeration gap when capacity sits idle after the last real submission.
+    any_capacity = idle_vast > 0 or any(
+        s.get('capacity', {}).get('status') == 'observed'
+        and 0 <= now-(epoch(s.get('capacity', {}).get('observed_at')) or 0) <= 60
+        and s['capacity'].get('compatible_available_slots', 0) > policy.get('critical_reserved_physical_slots', 4)
+        for s in statuses.values())
+    inventory_complete = policy.get('preparation_inventory_complete') is True
+    unexplained_idle = (any(r['compatible_capacity_available'] and not r['blocker'] for r in ready)
+                        or not inventory_complete and any_capacity) and not recent
     idle_since = previous.get('unexplained_idle_since') or now if unexplained_idle else None
     if idle_since is not None and now-idle_since >= 300:
         errors.append({'kind': 'preparation_idle_capacity_stall', 'owner': '/root', 'idle_since': idle_since})
+    if not inventory_complete:
+        errors.append({'kind': 'preparation_campaign_ready_count_unknown', 'owner': '/root/templates_assets',
+                       'detail': 'Admitted queue is enumerated separately; remaining selected consumers need incremental manifests or exact per-item blockers'})
     prior = {e['exception_key']: e for e in previous.get('exceptions', [])}
     for error in errors:
         key = '|'.join(str(error.get(k, '')) for k in ('kind', 'requirement', 'account', 'source'))
@@ -170,6 +182,7 @@ def project(root, scheduled, now, previous=None):
     return {'schema': 'isg-preparation-flow-watchdog-v1', 'observed_at': now,
             'owner': 'existing read-only campaign monitor', 'root_response_owner': '/root',
             'admitted_queue_enumeration': 'complete' if complete else 'unknown',
+            'campaign_ready_count': len(ready) if inventory_complete and complete else None,
             'campaign_inventory_enumeration': 'incomplete; independent ready batches continue',
             'ready_count': len(ready) if complete else None, 'known_ready_count': len(ready),
             'oldest_ready_age_seconds': max(waiting, default=None),
