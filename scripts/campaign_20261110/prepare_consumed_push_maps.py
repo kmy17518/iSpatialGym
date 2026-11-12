@@ -42,7 +42,7 @@ def prepare(root, runtime, audit_path, cache_path, graph_path, output):
             supports[(row['inputs']['support_profile'], row['inputs']['height_slot'])] = (proof, read(proof['path']))
     namespace = root / 'infra/coordination/preparation_dispatch/consumed_asset_builds_r1'
     generator = {name: sha(runtime / name) for name in ['ispatialgym/sampling/contact_maps.py', 'ispatialgym/sampling/reach_maps.py',
-                 'ispatialgym/grasping/contact_library.py', 'ispatialgym/grasping/contact_policy.py', 'ispatialgym/grasping/contact_poses.py']}
+                 'ispatialgym/grasping/contact_library.py', 'ispatialgym/grasping/contact_policy.py', 'ispatialgym/sampling/v2/contact_poses.py']}
     runner = '''from pathlib import Path
 import hashlib,json,os,subprocess,sys,time
 D=Path(__file__).parent;p=json.loads((D/'prepared.json').read_text());sha=lambda x:hashlib.sha256(Path(x).read_bytes()).hexdigest()
