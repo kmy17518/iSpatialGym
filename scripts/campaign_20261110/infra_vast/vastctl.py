@@ -483,6 +483,23 @@ def stage(s3, rec, state):
     return spec
 
 
+def library_prebuild_reader():
+    """Load a controller-pinned reader independently of other helper imports."""
+    import hashlib
+    import importlib.util
+    path = os.environ.get('ISG_VAST_LIBRARY_READER')
+    if not path:
+        from scripts.campaign_20261110 import vast_prebuild
+        return vast_prebuild
+    source = Path(path)
+    if hashlib.sha256(source.read_bytes()).hexdigest() != os.environ.get('ISG_VAST_LIBRARY_READER_SHA256'):
+        raise ValueError('Pinned consumed-library reader changed')
+    spec = importlib.util.spec_from_file_location('isg_pinned_library_reader', source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def stage_native_dependency(s3, rec, state):
     """Use the existing private worker transport for an exact native canary."""
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
@@ -494,7 +511,7 @@ def stage_native_dependency(s3, rec, state):
     if diagnostic:
         from scripts.campaign_20261110 import vast_ik_probe as native
     elif prebuild:
-        from scripts.campaign_20261110 import vast_prebuild as native
+        native = library_prebuild_reader()
     elif contact_map:
         from scripts.campaign_20261110 import vast_contact_map as native
     elif map_prebuild:
