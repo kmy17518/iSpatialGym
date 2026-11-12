@@ -5625,6 +5625,13 @@ def _push_recontact_rounds(action, motions: Motions, state, targets: Dict[str, A
         angle = float(res)  # the residual in the push's sense (sign included)
         arc = [init_new] + [Pose(position=[float(v) for v in pq[0].tolist()], orientation=[float(v) for v in pq[1].tolist()])
                             for pq in (_rotate_pose_about(init_new, pivot_new, f * angle, geom.axis) for f in (0.5, 1.0))]
+        from .campaign_axial_contact import recontact_adjustment
+        lowering, height_note = recontact_adjustment(arm, [as_world_pose(p) for p in [pre_new] + arc], supports)
+        if lowering:
+            def lowered(p):
+                position=list(p.position); position[2]-=lowering
+                return Pose(position=position, orientation=list(p.orientation))
+            pre_new=lowered(pre_new); arc=[lowered(p) for p in arc]; init_new=arc[0]
         # the arc built from its known pivot / radius / angle (a three-point circle fit of a short residual arc falls back to a line)
         radius = float(th.linalg.norm((as_world_pose(init_new)[0] - pivot_new)[:2]))
         geom_new = PushGeometry("arc", C.quat_rotate(T[1], C.as_tensor(targets["direction"]).reshape(-1)[:3].float()), pivot=pivot_new, radius=radius,
@@ -5633,6 +5640,8 @@ def _push_recontact_rounds(action, motions: Motions, state, targets: Dict[str, A
                              "inward_m": round(inward, 4), "untouched_before": bool(still),
                              "object_shift_m": round(float(th.linalg.norm(T[0][:2] + C.quat_rotate(T[1], C.as_tensor(geom.pivot).float().reshape(-1))[:2]
                                                                           - C.as_tensor(geom.pivot).float().reshape(-1)[:2])), 4)}
+        if height_note is not None:
+            r['contact_height_adjustment']=height_note
         if geom_new.kind != "arc":
             r["error"] = "the moved arc is degenerate"
             rec["rounds"].append(r)
