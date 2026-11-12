@@ -97,3 +97,14 @@ def test_two_actual_member_replays_required_with_exact_native_and_demo_hashes(tm
     bad=json.loads(Path(second['path']).read_text());bad['demo_sha256']='0'*64
     second=put(Path(second['path']),bad)
     with pytest.raises(ContractError,match='identity differs'):a.member_replays(tmp_path,row,{'member_gates':[first,second]},review)
+
+
+def test_full_strict_bucket_is_quota_ineligible_while_other_buckets_remain(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    rows=[{'instance_id':'old'+str(i),'task':'object_scaling','class_id':'apple','split':'eval_standard','bucket':0} for i in range(3)]
+    monkeypatch.setattr('scripts.campaign_20261110.export_release.snapshot_allocations',lambda root:(rows,{},[]))
+    result,_,_=a.quota_snapshot(tmp_path,SimpleNamespace(task='object_scaling',class_id='apple'),[{'bucket':0}])
+    assert result['eligible_before']==3 and result['eligible'] is False
+    assert result['bucket_limits']=={'0':3,'1':4,'2':3}
+    result,_,_=a.quota_snapshot(tmp_path,SimpleNamespace(task='object_scaling',class_id='apple'),[{'bucket':1}])
+    assert result['eligible'] is True
