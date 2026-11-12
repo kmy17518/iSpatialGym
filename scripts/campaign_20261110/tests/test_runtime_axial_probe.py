@@ -1,5 +1,5 @@
 import pytest
-from scripts.campaign_20261110.runtime_axial_probe import expanded_scan, expanded_candidates
+from scripts.campaign_20261110.runtime_axial_probe import expanded_scan, expanded_candidates, approach_distance
 
 
 def test_only_candidate_limit_changes_preserving_exact_check_calls():
@@ -17,3 +17,11 @@ def test_checked_candidate_search_never_changes_noncampaign_path():
     assert expanded_candidates(source,256)==source.replace('order[:64]','order[:256]')
     with pytest.raises(ValueError):expanded_candidates(source,257)
     with pytest.raises(ValueError):expanded_candidates(source.replace('order[:64]','order[:100]'),256)
+
+
+def test_counterfactual_changes_only_pre_not_contact_arc_or_goal():
+    source='arc = unchanged_arc()\nreturn [C.pre_pose(p_init), p_init, arc[0], arc[1]]\n'
+    assert approach_distance(source,.10)==source
+    assert approach_distance(source,.05)==source.replace('C.pre_pose(p_init)','C.pre_pose(p_init, dist=0.05)')
+    with pytest.raises(ValueError):approach_distance(source,.01)
+    with pytest.raises(ValueError):approach_distance(source.replace('arc[1]','arc[2]'),.05)

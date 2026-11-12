@@ -21,6 +21,15 @@ def expanded_candidates(source, limit):
     return source.replace(old,'order[:'+str(limit)+'] if campaign_plan is not None else order[:6]')
 
 
+def approach_distance(source, distance):
+    """A counterfactual probe only; contact arc, goals and checkers are unchanged."""
+    if distance not in (.05,.10):raise ValueError('only paired10cm/5cm pre-approach experiment allowed')
+    old='return [C.pre_pose(p_init), p_init, arc[0], arc[1]]'
+    if source.count(old)!=1:raise ValueError('native axial contact chain differs')
+    if distance==.10:return source
+    return source.replace(old,'return [C.pre_pose(p_init, dist=0.05), p_init, arc[0], arc[1]]')
+
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--request',type=Path,required=True);a=p.parse_args()
     q=json.loads(a.request.read_text());root=Path(q['root']).resolve();output=Path(q['output']).resolve()
@@ -41,6 +50,7 @@ def main():
     from ispatialgym.sampling.v2.core import SamplerV2
     from ispatialgym.sampling.v2.tasks.alignment_axial import AlignmentAxial
     from ispatialgym.sampling.v2.ik import IKChecker
+    from ispatialgym.sampling.v2 import contact_poses
     import omnigibson as og
     module=sys.modules[AlignmentAxial.__module__]
     assert Path(module.__file__).resolve().is_relative_to(native)
@@ -51,8 +61,10 @@ def main():
     exec(compile(expanded_candidates(candidate_source,q.get('candidate_limit',64)),str(a.request)+'#checked-candidate-bound','exec'),namespace)
     original_scan=AlignmentAxial._scan_candidates;original_instance=AlignmentAxial.sample_instance;original_sample=SamplerV2.sample;original_writer=SamplerV2.write_instance
     original_waypoints=IKChecker.waypoints_ok;original_exact=IKChecker.exact
+    original_chain=contact_poses.axial_push_chain
     report={'schema':'isg-runtime-axial-search-probe-v1','request_sha256':sha(a.request),'started_at':time.time(),'native_runtime':str(native),'class_id':q['class_id'],'scan_limit':q['scan_limit'],'draws':[],'scans':[],'benchmark_credit':0,'eligible_for_acceptance':False,'writer_disabled':True}
     report['candidate_limit']=q.get('candidate_limit',64)
+    report['counterfactual_pre_approach_m']=q.get('pre_approach_m',.10)
     report['waypoint_checks']=[];contexts=[]
     def save():
         report['observed_at']=time.time();report['published_tro_files']=len(list(output.rglob('*-tro_state.json')))
@@ -100,6 +112,13 @@ def main():
     if q.get('trace_exact_waypoints'):
         assert sha(sys.modules[IKChecker.__module__].__file__)==q['native_ik_sha256']
         IKChecker.waypoints_ok=waypoints;IKChecker.exact=exact
+    if q.get('pre_approach_m',.10)!=.10:
+        assert sha(contact_poses.__file__)==q['native_contact_poses_sha256']
+        chain_namespace=dict(vars(contact_poses))
+        chain_source=textwrap.dedent(inspect.getsource(original_chain))
+        exec(compile(approach_distance(chain_source,q['pre_approach_m']),
+                     str(a.request)+'#counterfactual-pre-only','exec'),chain_namespace)
+        contact_poses.axial_push_chain=chain_namespace['axial_push_chain']
     argv=['--split','train','--template',q['template'],'--instances','1','--start-index',str(q['source_index']),'--max-attempts',str(q['max_draws']),'--customs',q['customs'],'--keep-template-scene','--no-write-back','--out',str(output/'native_prefix')]
     if q.get('bddl_root'):argv+=['--bddl-root',q['bddl_root']]
     report['sampler_arguments']=argv;save()
@@ -108,6 +127,7 @@ def main():
     finally:
         AlignmentAxial._scan_candidates=original_scan;AlignmentAxial.sample_instance=original_instance;SamplerV2.sample=original_sample;SamplerV2.write_instance=original_writer;og.shutdown=old_shutdown
         IKChecker.waypoints_ok=original_waypoints;IKChecker.exact=original_exact
+        contact_poses.axial_push_chain=original_chain
         report['finished_at']=time.time();save()
 
 if __name__=='__main__':main()
