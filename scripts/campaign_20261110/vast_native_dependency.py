@@ -103,16 +103,20 @@ def prepare(root,manifest,index,native,helper,original_wrapper,canonical_output,
         roots.append(Path(argv[argv.index(flag)+1]))
     environment=dict(entry.get('environment') or {})
     soap_screen='ISPATIALGYM_CAMPAIGN_SOAP_LIFT_FRAME_SCREEN'
-    require(set(environment)<={'ISPATIALGYM_STABLE_SCENE_DIR','ISPATIALGYM_INTERIORS',soap_screen},
+    camera_goal='ISPATIALGYM_CAMPAIGN_OBSTACLE_GOAL'
+    require(set(environment)<={'ISPATIALGYM_STABLE_SCENE_DIR','ISPATIALGYM_INTERIORS',soap_screen,camera_goal},
             'unrecognized native candidate environment')
     if soap_screen in environment:
         require(environment[soap_screen]=='1' and entry.get('class_id')=='inter_object_relation_satisfaction-ontop_large_scale_01',
                 'soap lift frame screen requires the audited exact soap class')
+    if camera_goal in environment:
+        require(environment[camera_goal]=='1' and entry.get('class_id','').startswith('camera_relocalization-obstructed-'),
+                'stationary obstacle goal requires an exact obstructed camera class')
     if environment.get('ISPATIALGYM_INTERIORS'):
         registry=Path(environment['ISPATIALGYM_INTERIORS'])
         require(registry.suffix=='.json' and registry.is_file(),
                 'native interior registry must be an explicit JSON file')
-    roots += [Path(value) for key,value in environment.items() if key!=soap_screen]
+    roots += [Path(value) for key,value in environment.items() if key not in (soap_screen,camera_goal)]
     paths=[manifest,wrapper,native/'.snapshot_commit',helper/'scripts/campaign_20261110/vast_native_dependency.py',
            helper/'scripts/campaign_20261110/job_native_dependency.sh']
     for path in roots:

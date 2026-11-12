@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+from collections import deque
 
 from scripts.campaign_20261110.infra_vast.cluster_return_capacity import probe as original_probe
 from scripts.campaign_20261110.infra_dispatch import backend_capacity
@@ -106,6 +107,24 @@ def pending_status(ticket):
     return 'ready'
 
 
+def dispatch_order(tickets):
+    """Keep critical work first and distribute preparation across task classes."""
+    priority={'pipeline':0,'canonical recovery':1,'heldout eval':2,'training preparation':3}
+    ordered=sorted(tickets,key=lambda row:(priority.get(row.get('workstream'),4),row.get('ready_since',0)))
+    groups={}
+    for ticket in ordered:
+        if ticket.get('workstream')=='training preparation':
+            key=ticket.get('class_id') or ticket.get('task') or ticket.get('stage') or ticket['id']
+            groups.setdefault(key,deque()).append(ticket)
+        elif priority.get(ticket.get('workstream'),4)<3:
+            yield ticket
+    active=deque(groups.values())
+    while active:
+        group=active.popleft();yield group.popleft()
+        if group:active.append(group)
+    yield from (t for t in ordered if priority.get(t.get('workstream'),4)>3)
+
+
 def submit(ticket, capacity, runner=subprocess.run):
     if pending_status(ticket) != 'ready':
         return None
@@ -188,10 +207,9 @@ def cycle(root, account, capacity_probe=probe):
             if jid in pending:known_pending.add(jid)
     queue_allowance=max(0,int(policy.get('critical_pending_limit',6))-len(known_pending)) if capacity.get('status')=='observed' else 0
     rows=[]
-    # Oldest ready request first; all streams get access, no final-production gate
-    # is used to block these separately authorized preparation and recovery jobs.
-    priority={'pipeline':0,'canonical recovery':1,'training preparation':2,'heldout eval':3}
-    for ticket in sorted(tickets,key=lambda row:(priority.get(row.get('workstream'),4),row.get('ready_since',0))):
+    # New camera/layout work must not sit behind hundreds of earlier queries
+    # for one model family. Existing claim receipts still prevent duplicate work.
+    for ticket in dispatch_order(tickets):
         try:
             state=pending_status(ticket)
             slots=int(ticket.get('gpu_slots',1));is_critical=ticket.get('workstream') in critical

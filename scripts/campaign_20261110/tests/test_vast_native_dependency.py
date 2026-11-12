@@ -187,3 +187,20 @@ def test_legacy_inputs_keep_the_original_bounds_and_changed_argv_is_rejected(tmp
     path.write_text(json.dumps(value));assert native.verified_bounds(native.verify(job))['subprocess_timeout_s']==2400
     value['argv'][value['argv'].index('--time-budget-s')+1]='3600';path.write_text(json.dumps(value))
     with pytest.raises(ValueError,match='sampler budget'):native.verify(job)
+
+
+@pytest.mark.parametrize('class_id,value,allowed', [
+    ('camera_relocalization-obstructed-hamper_1','1',True),
+    ('camera_relocalization-obstructed-hamper_1','0',False),
+    ('object_scaling-apple','1',False)])
+def test_stationary_camera_goal_is_exactly_scoped(tmp_path,monkeypatch,class_id,value,allowed):
+    manifest,runtime,helper,wrapper,out=fixture(tmp_path,monkeypatch)
+    source=json.loads(manifest.read_text());source['jobs'][0]['class_id']=class_id
+    source['jobs'][0]['environment']['ISPATIALGYM_CAMPAIGN_OBSTACLE_GOAL']=value
+    manifest.write_text(json.dumps(source))
+    if not allowed:
+        with pytest.raises(ValueError,match='exact obstructed camera'):
+            native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,600,'camera')
+        return
+    job=native.prepare(tmp_path,manifest,0,runtime,helper,wrapper,out,600,'camera')
+    assert native.verify(job)['environment']['ISPATIALGYM_CAMPAIGN_OBSTACLE_GOAL']=='1'

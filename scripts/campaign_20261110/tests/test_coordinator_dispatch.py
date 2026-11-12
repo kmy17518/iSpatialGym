@@ -85,3 +85,14 @@ def test_one_pending_job_does_not_block_independent_free_slots(monkeypatch):
     assert result['account_slots']['minyeong']==7
     assert result['account_slots']['shiyuc']==8
     assert result['compatible_available_slots']==8
+
+
+def test_new_preparation_classes_and_heldouts_are_not_starved_by_large_older_wave():
+    from scripts.campaign_20261110.coordinator_dispatch import dispatch_order
+    rows=[{'id':str(i),'class_id':'floating','workstream':'training preparation','ready_since':1}for i in range(100)]
+    rows += [{'id':'camera','class_id':'camera','workstream':'training preparation','ready_since':2},
+             {'id':'heldout','workstream':'heldout eval','ready_since':3},
+             {'id':'physics','workstream':'pipeline','ready_since':4}]
+    ordered=list(dispatch_order(rows))
+    assert [r['id']for r in ordered[:4]]==['physics','heldout','0','camera']
+    assert len(ordered)==len(rows) and len({r['id']for r in ordered})==len(rows)

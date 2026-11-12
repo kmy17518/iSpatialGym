@@ -33,8 +33,15 @@ def normalized_entry(query):
         native.require(argv.count(flag) == 1 and argv[argv.index(flag)+1] == expected,
                        'Query contract differs: '+flag)
     native.require('--no-write-back' in argv, 'Query must preserve source inputs')
-    argv[argv.index('--out')+1] = '${CAMPAIGN_OUT}/floating_feasibility/'+query['id']
-    return {'class_id':query['class_id'], 'scene':query['scene'], 'environment':{},
+    camera=query['class_id'].startswith('camera_relocalization-')
+    environment=query['environment'] if camera else {}
+    if camera:
+        native.require(environment=={'ISPATIALGYM_CAMPAIGN_OBSTACLE_GOAL':'1'}
+                       and query['class_id'].startswith('camera_relocalization-obstructed-'),
+                       'Camera transport requires the exact stationary-obstacle goal')
+    family='camera_feasibility' if camera else 'floating_feasibility'
+    argv[argv.index('--out')+1] = '${CAMPAIGN_OUT}/'+family+'/'+query['id']
+    return {'class_id':query['class_id'], 'scene':query['scene'], 'environment':environment,
             'sample_argv':argv, 'production_released':False,
             'source_query_sha256':query['request']['sha256'],
             'source_query_id':query['id'], 'physical_dedup_key':query['physical_dedup_key']}
@@ -47,14 +54,18 @@ def immutable_write(path, value):
         native.write(path, value)
 
 
-def run(root, manifest, expected_sha, helper, *, leave_for_cluster):
+def run(root, manifest, expected_sha, helper, *, leave_for_cluster, transport_name='vast_transport'):
     root, manifest, helper = map(lambda p:Path(p).resolve(), (root, manifest, helper))
     native.require(native.sha(manifest) == expected_sha, 'Source manifest changed')
     source = json.loads(manifest.read_text())
     native.require(source['campaign_id'] == root.name and source['benchmark_credit'] == 0
                    and source['production_authorized'] is False, 'Source purpose differs')
-    directory = root/'training_preparation/model_variant_inventory_r2/floating_feasibility_execution_r1'
-    transport = directory/'vast_transport';transport.mkdir(parents=True, exist_ok=True)
+    camera=all(q['class_id'].startswith('camera_relocalization-') for q in source['jobs'])
+    native.require(transport_name.replace('_','').isalnum(),'Invalid transport directory name')
+    family='camera_feasibility' if camera else 'floating_feasibility'
+    namespace='camera_query_execution_r1' if camera else 'floating_feasibility_execution_r1'
+    directory = root/'training_preparation/model_variant_inventory_r2'/namespace
+    transport = directory/transport_name;transport.mkdir(parents=True, exist_ok=True)
     for name in ('claims', 'receipts'):
         (directory/name).mkdir(parents=True, exist_ok=True)
     queries = source['jobs']
@@ -73,7 +84,13 @@ def run(root, manifest, expected_sha, helper, *, leave_for_cluster):
         try:
             entry = normalized_entry(query)
             for ref in query['input_refs']+[query['request']]:checked(ref)
-            original_release = Path(query['dependency_release'])
+            if camera:
+                original_release=transport/'camera_no_grasp_dependency'
+                for part in ('glib/models','maps'):
+                    p=original_release/part;p.mkdir(parents=True,exist_ok=True)
+                    (p/'.unused_by_camera').touch(exist_ok=True)
+                immutable_write(original_release/'anchors.json',{})
+            else:original_release = Path(query['dependency_release'])
             if str(original_release) not in releases:
                 release = transport/'releases'/original_release.name
                 if not release.exists():shutil.copytree(original_release, release)
@@ -83,7 +100,7 @@ def run(root, manifest, expected_sha, helper, *, leave_for_cluster):
                         relative = str(path.relative_to(original_release));digest=native.sha(path)
                         native.require(native.sha(release/relative)==digest, 'Library copy differs')
                         files[relative]=digest
-                native.require('anchors.json' in files and any(n.endswith('/library.json') for n in files),
+                native.require('anchors.json' in files and (camera or any(n.endswith('/library.json') for n in files)),
                                'Incomplete exact library release')
                 immutable_write(release/'release_manifest.json', {'files':files, 'source':query['request']})
                 releases[str(original_release)] = release
@@ -97,7 +114,7 @@ def run(root, manifest, expected_sha, helper, *, leave_for_cluster):
             job = root/'out/vast_native_dependency'/query['id']
             if not job.exists():
                 native.prepare(root, adapted, 0, query['native_runtime'], helper, wrapper,
-                               root/'materialized_runs/floating_feasibility'/query['id'],
+                               root/'materialized_runs'/family/query['id'],
                                reservation.start+index, query['id'], v2_root=release,
                                v2_manifest_sha256=native.sha(release/'release_manifest.json'))
             value=native.verify(job,root)
@@ -132,6 +149,6 @@ def run(root, manifest, expected_sha, helper, *, leave_for_cluster):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--root',required=True);p.add_argument('--manifest',required=True)
     p.add_argument('--sha256',required=True);p.add_argument('--helper',required=True)
-    p.add_argument('--leave-for-cluster',type=int,required=True);a=p.parse_args()
+    p.add_argument('--leave-for-cluster',type=int,required=True);p.add_argument('--transport-name',default='vast_transport');a=p.parse_args()
     native.require(a.leave_for_cluster>=0,'Invalid cluster reservation')
-    run(a.root,a.manifest,a.sha256,a.helper,leave_for_cluster=a.leave_for_cluster)
+    run(a.root,a.manifest,a.sha256,a.helper,leave_for_cluster=a.leave_for_cluster,transport_name=a.transport_name)

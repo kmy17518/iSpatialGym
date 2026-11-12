@@ -30,5 +30,15 @@ def test_rejects_changed_scope_or_expanded_bounds(change):
 def test_rejects_preexisting_index_or_different_draw_count():
     value=query();value['sample_argv']+=['--start-index','7']
     with pytest.raises(ValueError):normalized_entry(value)
+
+
+def test_camera_preserves_stationary_obstacle_goal_and_needs_no_grasp_release():
+    value=query();value.update(class_id='camera_relocalization-obstructed-hamper_1',
+                              environment={'ISPATIALGYM_CAMPAIGN_OBSTACLE_GOAL':'1'})
+    entry=normalized_entry(value)
+    assert entry['environment']==value['environment']
+    assert entry['sample_argv'][-1]=='${CAMPAIGN_OUT}/camera_feasibility/query_x'
+    value['environment']={}
+    with pytest.raises(ValueError,match='stationary-obstacle'):normalized_entry(value)
     value=query();value['sample_argv'][value['sample_argv'].index('--max-attempts')+1]='100'
     with pytest.raises(ValueError):normalized_entry(value)
