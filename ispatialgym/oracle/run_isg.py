@@ -1361,6 +1361,19 @@ def apply_driver_env(args) -> None:
     os.environ["ISG_VEC_LEAN_STEP"] = "1" if getattr(args, "lean_step", True) else "0"
 
 
+def qa_config_for_budget(budget, mode, max_action_steps=None):
+    """Resolve a finite action timeout while preserving every physical QA rule."""
+    cfg = QAConfig(max_episode_steps=budget["episode_cap"])
+    if max_action_steps is not None:
+        if type(max_action_steps) is not int or not 1 <= max_action_steps <= budget["max_steps"]:
+            raise ValueError("--max-action-steps must be a positive integer no larger than --max-steps")
+        cfg.max_action_steps = max_action_steps
+    elif mode != "oracle":
+        # A replay / policy episode is one stream action.
+        cfg.max_action_steps = budget["episode_cap"]
+    return cfg
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--config", default=None, help="YAML file of option values; command-line options override it")
@@ -1414,6 +1427,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="steps of the actions (policy steps, a replay, the oracle program; 30 Hz control steps); default: an eval dataset "
                         "instance max(300, round(1.5 x its demo's length)), else 3000. An oracle episode is cut at --max-steps + --settle-steps "
                         "(its epilogue), a replay / policy episode at --max-steps; without geometric success a policy runs to it")
+    p.add_argument("--max-action-steps", type=int, default=None,
+                   help="finite step limit for each action, no larger than --max-steps; default: 3000 for oracle, "
+                        "the episode budget for replay / policy. Other QA thresholds are unchanged")
     p.add_argument("--settle-steps", type=int, default=None,
                    help="the pose_settled window and the --settle-eval window, in steps, in every mode: oracle = its epilogue, exactly this "
                         "long and reserved in the step budget (default 45); replay = the demo's action rows and only the first this-many of "
@@ -1711,6 +1727,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         budget = INST.step_budget(length, args.max_steps, args.settle_steps, args.wallclock, mode=args.mode,
                                   demo_settle_steps=replay_n[1] if replay_n else None,
                                   instance_max_steps=dataset_rec.max_steps if dataset_rec else None)
+        qa_cfg = qa_config_for_budget(budget, args.mode, getattr(args, "max_action_steps", None))
+        budget["max_action_steps"] = qa_cfg.max_action_steps
         settle_eval = args.settle_eval == "on" or (args.settle_eval == "auto" and args.mode != "policy")
         meta.update({"budget": budget, "settle_eval": settle_eval, "settle_steps": budget["settle_steps"], "success_metric": args.success_metric})
         result.update({"instance": iid, **names, "activity": loader.activity, "variant": meta["variant"], "out": out_dir})
@@ -1905,10 +1923,6 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         meta["camera_in_zed"] = {"position": cam_in_zed[0].tolist(), "orientation": cam_in_zed[1].tolist(),
                                  "constant_dev_mm": 1000.0 * float(th.linalg.norm(cam_in_zed[0] - C.CAMERA_IN_ZED[0]))}
         state = SimState(env, task, robot, cam_key, cam_in_zed=cam_in_zed)
-        qa_cfg = QAConfig(max_episode_steps=budget["episode_cap"])
-        if args.mode != "oracle":
-            # a replay / policy run is a single stream action: the per-action cap would otherwise cut every episode at 3000 steps
-            qa_cfg.max_action_steps = budget["episode_cap"]
         monitors = Monitors(env, robot, qa_cfg, cam_key=cam_key, cam_in_zed=cam_in_zed)
         rec_cfg = RecorderConfig(hdf5=args.record in ("full", "hdf5"), lerobot=args.record == "full", views=tuple(args.record_view),
                                  video_size=args.video_size, all_cameras=args.all_cameras, frame_buffer=args.frame_buffer,
