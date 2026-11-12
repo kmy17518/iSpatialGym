@@ -122,3 +122,11 @@ def test_process_status_is_not_positive_native_map_acceptance(tmp_path, monkeypa
     report = json.loads((job/'result/contact_map_result.json').read_text())
     assert report['returncode'] == rc and report['positive_native_reader_required']
     assert report['benchmark_credit'] == 0 and len(calls) == 2
+
+
+def test_both_accounts_observed_but_only_one_has_pending_overflow(tmp_path):
+    root, job, lib = prepared(tmp_path); handoff, capacity = owner_and_capacity(root, job)
+    cap = json.loads(capacity.read_text()); cap['accounts']['shiyuc']['pending_gpu_jobs'] = 0; v.write(capacity,cap)
+    assert v.validate_capacity(capacity,root)['sha256'] == v.sha(capacity)
+    cap['accounts']['minyeong']['pending_gpu_jobs'] = 0; v.write(capacity,cap)
+    with pytest.raises(ValueError,match='no pending GPU overflow'):v.validate_capacity(capacity,root)

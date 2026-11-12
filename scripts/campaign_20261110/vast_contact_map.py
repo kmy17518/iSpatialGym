@@ -189,10 +189,11 @@ def validate_capacity(path, root):
     require(0 <= age <= 300, 'cluster-first observation stale')
     require(set(obs['accounts']) == {'minyeong', 'shiyuc'}, 'both cluster accounts must be observed')
     for account in obs['accounts'].values():
-        require(account['returncode'] == 0 and account['pending_gpu_jobs'] > 0,
-                'cluster independent pending overflow not verified')
+        require(account['returncode'] == 0 and type(account['pending_gpu_jobs']) is int and account['pending_gpu_jobs'] >= 0,
+                'cluster observation unavailable')
         ref = account['evidence']; source = Path(ref['path']).resolve()
         require(source.is_relative_to(Path(root)) and sha(source) == ref['sha256'], 'cluster evidence changed')
+    require(any(a['pending_gpu_jobs'] > 0 for a in obs['accounts'].values()), 'no pending GPU overflow observed')
     return {'path':str(p), 'sha256':sha(p)}
 
 
