@@ -18,6 +18,19 @@ DELTA = {'source_inputs_actions_changed':False, 'native_loader_changed_by_probe'
          'additional_physics_steps':0, 'additional_stop_play_pairs':0,
          'explicit_sdk_reconstructions':0, 'scope':'ordinary shared loader, exact repeated source only',
          'changed_models_or_augmentation_tested':False}
+REBUILD_DELTA = {**DELTA, 'native_loader_changed_by_probe':True,
+    'additional_stop_play_pairs':1, 'explicit_sdk_reconstructions':1,
+    'counter_scope':'per episode, cold and reused',
+    'scope':'shared late incoming-state reconstruction, exact repeated source only',
+    'boundary':'incoming_state_loaded_immediately_before_existing_first_reset_physics_step',
+    'reference_state_copied':False, 'static_properties_required_bit_identical':True,
+    'thresholds_changed':False}
+
+
+def physical_delta(request):
+    mode = request.get('physics_reconstruction')
+    require(mode in (None, 'late_incoming_v1'), 'unknown native reconstruction')
+    return REBUILD_DELTA if mode else DELTA
 
 
 def ref(path): return {'path':str(path), 'sha256':file_digest(path)}
@@ -33,7 +46,7 @@ def checked(root, reference):
 def scope(request):
     require(request.get('schema') == 'isg-retained-mechanism-replay-request-v1'
             and request.get('campaign_id') == 'campaign_20261110'
-            and request.get('control') in ORDERS and request.get('physical_delta') == DELTA
+            and request.get('control') in ORDERS and request.get('physical_delta') == physical_delta(request)
             and request.get('benchmark_credit') == 0 and request.get('production_released') is False
             and request.get('max_native_episodes') == len(ORDERS[request['control']])
             and request.get('timeout_seconds') == 1800,
@@ -77,8 +90,13 @@ def inputs(root, request_path, *, runtime=None):
     require(ref(runtime/'.snapshot_commit') == q['native_runtime'], 'mechanism candidate runtime differs')
     proof = json.loads(checked(root, q['runtime_proof']).read_text())
     require(proof['candidate_runtime'] == q['native_runtime'] and proof['source_manifest'] == q['source_manifest']
-            and proof['physical_delta'] == DELTA and proof['production_released'] is False,
+            and proof['physical_delta'] == physical_delta(q) and proof['production_released'] is False,
             'mechanism candidate proof differs')
+    if q.get('physics_reconstruction'):
+        for name in ('installed_api_bindings','installed_api_definition','installed_simulation_route_test'):
+            item = proof[name]
+            require(Path(item['path']).is_absolute() and file_digest(item['path']) == item['sha256'],
+                    'inspected native reconstruction API changed')
     actual = {str(p.relative_to(runtime)):file_digest(p) for folder in ('ispatialgym','scripts')
               for p in (runtime/folder).rglob('*.py') if p.is_file()}
     require(actual == proof['candidate_python_payloads'], 'integrated candidate payload changed')
@@ -107,6 +125,18 @@ def run(root, request_path, output, *, preflight=False):
     cleanups = []; abort = {'enabled':False}
     install_reset_boundary_probe(runner, final_pre_action=True, next_native_control_step=True,
                                  pending_cleanups=cleanups, abort_control=abort)
+    if q.get('physics_reconstruction'):
+        from .training_late_rebuild_probe import install
+        from ispatialgym.oracle.campaign_restore import restart_loaded_physics
+        def restart(meta, sim, *, execution=None, while_stopped=None):
+            require(meta.get('campaign_id') == root.name and meta.get('class_id') == source['class_id']
+                    and meta.get('runtime',{}).get('purpose') != 'training_production',
+                    'reconstruction source scope changed')
+            event = restart_loaded_physics(sim, while_stopped=while_stopped)
+            event['boundary'] = REBUILD_DELTA['boundary']
+            return event
+        install(runner, {'late_incoming_physics_rebuild_v1':True,
+                         'runtime_compatibility':q['runtime_proof']}, output, restart=restart)
     types = {'A_FAILURE_A':ControlledEpisodeFailure,'A_INTERRUPT_A':ControlledEpisodeInterrupt}
     tro = source['source_tro']['path']; demo = source['collector_demo']['path']
     signature = runner.instance_signature(tro); directory = runner.resolve_instance(tro)[1]
@@ -116,7 +146,7 @@ def run(root, request_path, output, *, preflight=False):
     result = {'schema':'isg-retained-mechanism-replay-observation-v1', 'request':ref(request_path),
         'source_manifest':q['source_manifest'], 'native_runtime':q['native_runtime'],
         'source_generation_runtime':source['generation_runtime'], 'source_collector_runtime':source['collector_runtime'],
-        'physical_delta':DELTA, 'entries':[], 'benchmark_credit':0, 'production_released':False,
+        'physical_delta':physical_delta(q), 'entries':[], 'benchmark_credit':0, 'production_released':False,
         'started_at':time.time(), 'world_compatibility':{'signature':signature,'native_check':reason}}
     try:
         with world_construction_counter(og) as world:

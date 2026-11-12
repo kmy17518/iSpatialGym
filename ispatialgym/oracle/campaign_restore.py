@@ -229,6 +229,16 @@ def restart_reused_world(meta, sim, *, execution=None, while_stopped=None):
         and _purpose_allowed(meta, execution),
         'native lifecycle diagnostic requires its exact bounded source scope')
     pristine_mass_enabled(meta, execution)  # Reject conflicting mass options before native mutation.
+    return restart_loaded_physics(sim, while_stopped=while_stopped)
+
+
+def restart_loaded_physics(sim, *, while_stopped=None):
+    """Perform one explicit stop/play without stepping or changing the loaded world.
+
+    The caller owns source authorization and the reconstruction boundary. This
+    primitive does not opt a source into restoration or rewrite its metadata.
+    """
+    from scripts.campaign_20261110.contracts import require
     require(sim.is_playing(),'native lifecycle restoration must start in playing state')
     settings=lambda:{'physics_dt':sim.get_physics_dt(),'rendering_dt':sim.get_rendering_dt(),
         'sim_step_dt':sim.get_sim_step_dt()}

@@ -146,10 +146,11 @@ def _reconstruct(loader, sim, restart, sdk, simulation_sdk, event):
     return event
 
 
-def install(runner, request, output):
+def install(runner, request, output, *, restart=None):
     from ispatialgym.oracle import campaign_restore as CR
     require(request.get('late_incoming_physics_rebuild_v1') is True, 'late reconstruction not requested')
     proof = json.loads(Path(request['runtime_compatibility']['path']).read_text())
+    restart = CR.restart_reused_world if restart is None else restart
     original = runner.InstanceLoader.restore; events = []; output = Path(output)
     def persist():
         write_json_atomic(output/'late_rebuild_audit.json', {'physical_delta': DELTA, 'events': events,
@@ -172,7 +173,7 @@ def install(runner, request, output):
                     observed.append(True)
                     event = {'instance_id': loader.iid, 'status': 'started'}; events.append(event)
                     try:
-                        reconstruct(loader, sim, CR.restart_reused_world,
+                        reconstruct(loader, sim, restart,
                             get_physx_interface(), get_physx_simulation_interface(), event)
                         event['status'] = 'completed'
                     except BaseException as error:
