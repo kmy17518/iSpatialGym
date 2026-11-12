@@ -18,6 +18,23 @@ PHYSICS = {'fresh_A': ('FRESH_A', [0]), 'fresh_B': ('FRESH_B', [1]),
 RENDER = {k: PHYSICS[k] for k in ('fresh_A', 'fresh_B', 'ABA')}
 
 
+def effective_probe_identity(request):
+    """Control labels and prose do not alter the hash-bound execution contract."""
+    require('scope' not in request or isinstance(request['scope'], str), 'probe scope must be descriptive text')
+    return digest({k: v for k, v in request.items()
+                   if k not in ('diagnostic_control', 'diagnostic_only', 'scope')})
+
+
+def additional_reconstruction_reference(document, request, name, specifications):
+    references = document.get('additional_reconstructions', {})
+    if request.get('late_incoming_physics_rebuild_v1') is True:
+        require(request.get('fixed_mass_baseline') is True and set(references) == set(specifications),
+                'complete separately declared late reconstruction matrix required')
+        return references[name]
+    require(not references, 'additional reconstruction evidence without its physical diagnostic request')
+    return None
+
+
 def one_world(probe, observations):
     construction = probe.get('world_construction', {})
     require(construction.get('attempted') == construction.get('completed') == 1 and
@@ -190,7 +207,7 @@ def _verify_stages(root, reference, started_at, stages, *, fixed_mass=False):
                     'sequential matrix stage runtime differs')
             # One immutable payload inventory per stage. Every control still has
             # its own checked request, kind/order, runtime, source and probe refs.
-            common=digest({k:v for k,v in request.items() if k not in ('diagnostic_control','diagnostic_only')})
+            common=effective_probe_identity(request)
             if compatibility_identity is None:
                 compatibility=verify_runtime_compatibility(root, request, records, Path(identity['path']).parent)
                 compatibility_identity=common
@@ -198,7 +215,9 @@ def _verify_stages(root, reference, started_at, stages, *, fixed_mass=False):
                     'sequential matrix runtime proof or effective request differs')
             if fixed_mass:
                 from .training_fixed_mass_verify import audit_persistence
-                audit_persistence(root, document['fixed_mass'][name], probe_ref, request, records, len(order))
+                extra = additional_reconstruction_reference(document, request, name, specifications)
+                audit_persistence(root, document['fixed_mass'][name], probe_ref, request, records, len(order),
+                                  additional_reconstruction_reference=extra)
             observations = []; case = []
             for ordinal, (entry, member) in enumerate(zip(probe['entries'], order)):
                 require(entry['canary_review'] == source_refs[member], 'sequential member order differs')
