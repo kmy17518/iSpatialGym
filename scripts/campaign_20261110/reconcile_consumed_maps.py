@@ -7,7 +7,9 @@ import argparse
 from collections import Counter
 from datetime import datetime
 import json
+import os
 from pathlib import Path
+import signal
 import time
 
 from scripts.campaign_20261110.vast_prebuild import require, sha, write
@@ -213,36 +215,61 @@ def reconcile(root, manifest_ref, route_ref, output, *, max_seconds=15, max_item
     write(state_path, state); write(output / 'status.json', status); return status
 
 
+def run_cycles(callback, *, interval, max_cycles, stopped, clock=time):
+    """Start-based cadence: a long scan never adds another full sleep interval."""
+    for index in range(max_cycles):
+        if stopped[0]: break
+        started = clock.monotonic(); callback()
+        if index + 1 >= max_cycles: break
+        while not stopped[0] and clock.monotonic() < started + interval:
+            clock.sleep(max(0, min(1, started + interval - clock.monotonic())))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for key in ('root', 'manifest', 'manifest-sha256', 'output'): parser.add_argument('--' + key, required=True)
     parser.add_argument('--route'); parser.add_argument('--route-sha256')
     parser.add_argument('--library-audit'); parser.add_argument('--library-audit-sha256')
     parser.add_argument('--max-seconds', type=int, default=15); parser.add_argument('--max-items', type=int, default=128)
+    parser.add_argument('--watch', action='store_true'); parser.add_argument('--interval', type=int, default=30)
+    parser.add_argument('--max-cycles', type=int, default=720)
     args = parser.parse_args()
     output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
-    try:
+    require(30 <= args.interval <= 60 and 1 <= args.max_cycles <= 2880, 'Unbounded watch cadence/lifetime')
+    stopped = [False]
+    def stop(signum, frame): stopped[0] = True
+    signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)
+
+    def run():
         with atomic_directory_lock(output / 'callback.lockdir'):
-            # Native imports take ~28s on a fresh campaign interpreter. Root runs
-            # this finite CPU worker asynchronously; the verification scan has
-            # its own 15s budget and never claims the cold start was that short.
-            startup = time.time()
-            write(output / 'worker_startup.json', {'started_at': startup, 'owner': '/root/templates_assets',
-                  'phase': 'importing_native_reader', 'dispatch_authority': False})
-            from ispatialgym.grasping import schema as S, contact_policy as CP
-            from ispatialgym.sampling import reach_maps as RM
-            RM.robot_digest(); CP.DEFAULT.key('right')
-            write(output / 'worker_startup.json', {'started_at': startup, 'finished_at': time.time(),
-                  'cold_start_seconds': time.time() - startup, 'owner': '/root/templates_assets', 'phase': 'native_reader_ready'})
             report = reconcile(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
                                {'path': args.route, 'sha256': args.route_sha256} if args.route else None, args.output,
                                max_seconds=args.max_seconds, max_items=args.max_items)
             if args.library_audit:
                 project_library_advancement(args.root, {'path': args.manifest, 'sha256': args.manifest_sha256},
                                             {'path': args.library_audit, 'sha256': args.library_audit_sha256})
+            print(json.dumps({k: report[k] for k in ('summary', 'verified_this_cycle', 'cycle_seconds')}), flush=True)
+            return report
+
+    try:
+        with atomic_directory_lock(output / ('watch_owner.lockdir' if args.watch else 'finite_owner.lockdir')):
+            startup = time.time()
+            write(output / 'worker_startup.json', {'started_at': startup, 'owner': '/root/templates_assets',
+                  'execution_owner': '/root', 'job_id': os.environ.get('SLURM_JOB_ID'),
+                  'phase': 'importing_native_reader', 'dispatch_authority': False})
+            from ispatialgym.grasping import schema as S, contact_policy as CP
+            from ispatialgym.sampling import reach_maps as RM
+            RM.robot_digest(); CP.DEFAULT.key('right')
+            write(output / 'worker_startup.json', {'started_at': startup, 'finished_at': time.time(),
+                  'cold_start_seconds': time.time() - startup, 'owner': '/root/templates_assets',
+                  'execution_owner': '/root', 'job_id': os.environ.get('SLURM_JOB_ID'), 'phase': 'native_reader_ready'})
+            def attempt():
+                try: run()
+                except FileExistsError:
+                    print(json.dumps({'callback': 'scan_lock_owned_elsewhere', 'output': args.output}), flush=True)
+            run_cycles(attempt, interval=args.interval, max_cycles=args.max_cycles if args.watch else 1, stopped=stopped)
     except FileExistsError:
         print(json.dumps({'callback': 'existing_lock_requires_owner_reconciliation', 'output': args.output})); return
-    print(json.dumps({k: report[k] for k in ('summary', 'verified_this_cycle', 'cycle_seconds')}))
 
 
 if __name__ == '__main__': main()

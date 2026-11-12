@@ -62,3 +62,18 @@ def test_two_backend_outputs_are_not_silently_merged(tmp_path):
     route=tmp_path/'route.json';v.write(route,{'source_manifest':ref,'jobs':[{'physical_dedup_key':ticket['dedup_key'],'job_dir':str(job)}]})
     report=m.reconcile(tmp_path,ref,{'path':str(route),'sha256':v.sha(route)},tmp_path/'callback',timestamp=1000)
     assert report['summary']=={'invalid_or_failed':1}and'Two backend'in report['rows'][0]['blocker']
+
+
+def test_watch_uses_start_based_cadence_and_stops_without_extra_cycle():
+    class Clock:
+        now=0
+        def monotonic(self):return self.now
+        def sleep(self,duration):self.now+=duration
+    clock=Clock();starts=[];durations=iter([12,35,12]);stopped=[False]
+    def callback():starts.append(clock.now);clock.now+=next(durations)
+    m.run_cycles(callback,interval=30,max_cycles=3,stopped=stopped,clock=clock)
+    assert starts==[0,30,65]and clock.now==77
+    starts=[];clock.now=0
+    def stop_callback():starts.append(clock.now);stopped[0]=True
+    stopped[0]=False;m.run_cycles(stop_callback,interval=30,max_cycles=10,stopped=stopped,clock=clock)
+    assert starts==[0]and clock.now==0
