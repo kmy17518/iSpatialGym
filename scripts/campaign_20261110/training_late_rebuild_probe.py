@@ -109,6 +109,11 @@ def reconstruct(loader, sim, restart, sdk, simulation_sdk, event=None):
 
 def _reconstruct(loader, sim, restart, sdk, simulation_sdk, event):
     scene = loader.env.scene
+    # The SDK operation reconstructs the complete loaded physics stage. A
+    # second live scene would require its own captured state and invariants.
+    require(len(sim.scenes) == 1 and sim.scenes[0] is scene,
+            'late reconstruction requires exactly the owned single loaded scene')
+    event['loaded_scene_count'] = 1
     state = own_full_state(scene); before = static_bodies(scene)
     objects = {obj.name: obj for obj in scene.objects}
     require(set(state['registry']['object_registry']) == set(objects), 'late full state omitted initialized actors')
@@ -133,7 +138,8 @@ def _reconstruct(loader, sim, restart, sdk, simulation_sdk, event):
     scene.load_state(state, serialized=False)
     event['after_static_bodies'] = static_bodies(scene)
     require(event['after_static_bodies'] == before, 'late reconstruction changed initialized static body properties')
-    require({obj.name: id(obj) for obj in scene.objects} == identities and sim.stage is stage,
+    require({obj.name: id(obj) for obj in scene.objects} == identities and sim.stage is stage
+            and len(sim.scenes) == 1 and sim.scenes[0] is scene,
             'late reconstruction replaced loaded world objects')
     event['after_root_poses'] = {obj.name: plain(obj.get_position_orientation()) for obj in scene.objects}
     event['static_body_properties_bit_identical'] = True

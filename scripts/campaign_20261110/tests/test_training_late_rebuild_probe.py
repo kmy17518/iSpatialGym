@@ -29,7 +29,7 @@ def native_fixture(changed_mass=False, extra_step=False):
         objects=[obj];object_registry=registry
         def dump_state(self,serialized):assert not serialized and registry._dump_filter(obj);return state
         def load_state(self,saved,serialized):assert not serialized and saved==state;calls.append('restore_full_state')
-    scene=Scene();loader=N(env=N(scene=scene),tro=N(meta=N(raw={'campaign':{'exact':'source'}})),_restoration_execution={'verified':True})
+    scene=Scene();sim.scenes=[scene];loader=N(env=N(scene=scene),tro=N(meta=N(raw={'campaign':{'exact':'source'}})),_restoration_execution={'verified':True})
     def restart(meta,simulation,execution,while_stopped):
         assert meta=={'exact':'source'} and execution=={'verified':True};calls.append('stop');sim.stopped=True;while_stopped();sim.stopped=False;calls.append('play')
         return {'observed_physics_step_calls':['unexpected']if extra_step else[],'physics_steps_requested':0}
@@ -67,6 +67,16 @@ def test_manual_attachment_route_is_rejected_before_mutation():
     loader,sim,restart,sdk,route,calls=native_fixture();route.get_attached_stage=lambda:1
     with pytest.raises(ContractError,match='timeline'):reconstruct(loader,sim,restart,sdk,route)
     assert calls==['stop']
+
+
+@pytest.mark.parametrize('inventory', ['empty', 'foreign', 'second_live_scene'])
+def test_global_reconstruction_rejects_unowned_scenes_before_native_mutation(inventory):
+    loader,sim,restart,sdk,route,calls=native_fixture()
+    sim.scenes={'empty':[], 'foreign':[object()],
+                'second_live_scene':[loader.env.scene,object()]}[inventory]
+    with pytest.raises(ContractError,match='owned single loaded scene'):
+        reconstruct(loader,sim,restart,sdk,route)
+    assert calls==[]
 
 
 def test_post_play_state_restore_cannot_hide_an_added_step_and_keeps_failure_audit():
