@@ -45,6 +45,7 @@ def main(args):
     canonical = {r["class_id"]: r for r in read(canonical_copy)["classes"]}
     pointer, policy, assets = active_policy(root)
     reserved_rooms = {(r["scene"], r["room"]) for r in policy["category_holdout_rooms"]}
+    existing = {j["physical_dedup_key"] for path in args.existing_requests for j in read(path)["jobs"]}
     scenes, jobs, blocked = {}, {}, []
     for c in read(scale_path)["rows"]:
         if not c["class_id"].startswith("camera_relocalization-") or c.get("is_canonical_eval_template"):
@@ -98,12 +99,17 @@ def main(args):
                 assert sha(bddl_source) == adaptation["runtime_bddl_sha256"]
             else:
                 matches = [p for base in (source_dir / "activity_definitions", source_dir.parent / "activity_definitions") for p in base.rglob("*.bddl") if sha(p) == meta["bddl_sha256"]]
-                assert len(set(matches)) == 1
+                # Historical camera sources retain identical BDDL copies in
+                # both template and activity directories. Their bytes, rather
+                # than their different paths, define the source contract.
+                assert matches and len({sha(p) for p in matches}) == 1
                 bddl_source = matches[0]
             entry["scenes"] = {scene: block}
             entry["generation"].update(templates_max=1, instances_per_template=1)
             physical = {"class_id": c["class_id"], "scene": scene, "room": room, "target": target, "customs": entry, "bddl_sha256": sha(bddl_source), "runtime_sha256": sha(runtime / ".snapshot_commit"), "stationary_obstacle_goal": obstructed}
             key = hashlib.sha256(json.dumps(physical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            if key in existing:
+                continue
             if key in jobs:
                 jobs[key]["configuration_ids"].append(c["configuration_id"])
                 continue
@@ -139,4 +145,5 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     for name in ("root", "output", "runtime"):
         p.add_argument("--" + name, required=True)
+    p.add_argument("--existing-requests", action="append", default=[])
     main(p.parse_args())
