@@ -13,6 +13,72 @@ from ispatialgym.oracle.campaign_batch import compare_saved_scenes
 SCHEMA='isg-model-pool-world-contract-v1'
 
 
+def isolated_member_scene(contract, document, active):
+    """Build one explicit union initialization without changing a source scene.
+
+    Inactive actors retain their exact initialized model/scale and serialized
+    articulation state. Their roots start in separate out-of-room parking
+    cells. Native collision/gravity/visibility isolation is a separate required
+    operation before any episode restore; a parked JSON pose does not prove it.
+    """
+    require(contract.get('schema') == SCHEMA and active in contract['initialized_actors'],
+            'unknown active pool member')
+    names = set(contract['initialized_actors'])
+    initial = document['objects_info']['init_info']
+    states = document['state']['registry']['object_registry']
+    require({n for n in initial if n.startswith('campaign_pool_')} == {active}
+            and set(initial) == set(states)
+            and initial[active] == contract['initialized_actors'][active],
+            'member scene identity differs from checked pool contract')
+    result = copy.deepcopy(document)
+    result['objects_info']['init_info'].update(copy.deepcopy(contract['initialized_actors']))
+    destinations = result['state']['registry']['object_registry']
+    isolation = {}
+    for ordinal, name in enumerate(sorted(names)):
+        flags = copy.deepcopy(contract['active_properties'][name])
+        if name != active:
+            state = copy.deepcopy(contract['source_actor_states'][name])
+            root = state.get('root_link', {})
+            require(all(k in root for k in ('pos', 'ori', 'lin_vel', 'ang_vel')),
+                    'inactive actor lacks a complete native root state')
+            root.update(pos=[40. + ordinal, 40., 5.], lin_vel=[0., 0., 0.], ang_vel=[0., 0., 0.])
+            destinations[name] = state
+            flags['visible'] = False
+            for link in flags['links'].values():
+                if link['gravity_disabled'] is not None:
+                    link['gravity_disabled'] = True
+                link['collisions'] = {shape: False for shape in link['collisions']}
+        isolation[name] = {'active': name == active, 'properties': flags,
+                           'state': copy.deepcopy(destinations[name])}
+    require(set(destinations) == set(result['objects_info']['init_info']),
+            'union scene object/state inventory differs')
+    return result, isolation
+
+
+def verify_pool_isolation(expected, observed, *, task_bindings, planner_names):
+    """Require native properties and actual planner exclusion for every actor."""
+    require(expected and expected.keys() == observed.keys(), 'native pool inventory differs')
+    active = {name for name, row in expected.items() if row['active']}
+    require(len(active) == 1 and active <= set(task_bindings.values()),
+            'selected actor lacks its exact task binding')
+    inactive = expected.keys() - active
+    require(not inactive.intersection(task_bindings.values()), 'inactive actor is task-bound')
+    for name, row in expected.items():
+        actual = observed[name]
+        require(actual['properties'] == row['properties'],
+                'native pool physical properties differ: '+name)
+        if not row['active']:
+            require(name not in planner_names and not actual.get('assisted_held')
+                    and not actual.get('attached_parent')
+                    and math.dist(actual['position'], row['state']['root_link']['pos']) <= 1e-6
+                    and all(abs(float(x)) <= 1e-7 for k in ('linear_velocity', 'angular_velocity')
+                            for x in actual[k]),
+                    'inactive actor remains physically or logically active: '+name)
+    return {'active': sorted(active), 'inactive': sorted(inactive),
+            'properties_verified': True, 'planner_exclusion_verified': True,
+            'scope': 'Native reads at this boundary only; export and per-step persistence require separate evidence.'}
+
+
 def checked(root, reference):
     path=Path(reference['path']).resolve()
     require(path.is_relative_to(Path(root).resolve()) and file_digest(path)==reference['sha256'],

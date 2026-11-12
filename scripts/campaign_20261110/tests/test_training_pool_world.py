@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 from scripts.campaign_20261110.contracts import ContractError
-from scripts.campaign_20261110.training_pool_world import cold_anchor_transform,scene_contract
+from scripts.campaign_20261110.training_pool_world import (
+    cold_anchor_transform,scene_contract,isolated_member_scene,verify_pool_isolation)
 
 
 def test_cold_anchor_rotates_offset_and_returns_to_original_pose():
@@ -51,3 +52,50 @@ def test_undeclared_physical_changes_fail_closed(change):
     elif change=='different_manifest':pool['manifest_sha256']='different'
     else:pool['active_properties']['campaign_pool_B']['visible']=False
     with pytest.raises(ContractError):scene_contract(docs,['campaign_pool_A','campaign_pool_B','campaign_pool_A'],{'sha256':'pool'})
+
+
+def test_each_union_member_preserves_its_exact_scene_and_other_fixed_scale_actor():
+    docs=scenes(); original=copy.deepcopy(docs)
+    contract=scene_contract(docs,['campaign_pool_A','campaign_pool_B','campaign_pool_A'],{'sha256':'pool'})
+    # Distinct accepted source backgrounds must be selected from B itself.
+    docs[1]['state']['registry']['object_registry']['support']['root_link']['pos'][0]=.001
+    union, isolation=isolated_member_scene(contract,docs[1],'campaign_pool_B')
+    assert union['state']['registry']['object_registry']['support']==docs[1]['state']['registry']['object_registry']['support']
+    assert union['state']['registry']['object_registry']['campaign_pool_B']==docs[1]['state']['registry']['object_registry']['campaign_pool_B']
+    assert union['objects_info']['init_info']['campaign_pool_A']==original[0]['objects_info']['init_info']['campaign_pool_A']
+    inactive=isolation['campaign_pool_A'];assert not inactive['active']
+    assert inactive['state']['root_link']['pos']==[40.,40.,5.]
+    assert inactive['properties']['scale']==[.9]*3 and not inactive['properties']['visible']
+    assert inactive['properties']['links']['base']=={'gravity_disabled':True,'collisions':{'shape':False}}
+    assert docs[0]==original[0] and docs[2]==original[2]
+
+
+def isolation_fixture():
+    docs=scenes();contract=scene_contract(docs,['campaign_pool_A','campaign_pool_B','campaign_pool_A'],{'sha256':'pool'})
+    _,expected=isolated_member_scene(contract,docs[0],'campaign_pool_A')
+    observed={name:{'properties':copy.deepcopy(row['properties']),
+              'position':row['state']['root_link']['pos'],
+              'linear_velocity':[0.,0.,0.],'angular_velocity':[0.,0.,0.],
+              'assisted_held':False,'attached_parent':None} for name,row in expected.items()}
+    return expected,observed
+
+
+@pytest.mark.parametrize('fault',['visible','collision','gravity','scale','planner','grasp','binding','motion'])
+def test_native_isolation_rejects_each_unreleased_inactive_effect(fault):
+    expected,observed=isolation_fixture();other=observed['campaign_pool_B']
+    bindings={'target':'campaign_pool_A'};planner=['campaign_pool_A']
+    if fault=='visible':other['properties']['visible']=True
+    elif fault=='collision':other['properties']['links']['base']['collisions']['shape']=True
+    elif fault=='gravity':other['properties']['links']['base']['gravity_disabled']=False
+    elif fault=='scale':other['properties']['scale']=[1.,1.,1.]
+    elif fault=='planner':planner.append('campaign_pool_B')
+    elif fault=='grasp':other['assisted_held']=True
+    elif fault=='binding':bindings['old_target']='campaign_pool_B'
+    else:other['linear_velocity'][0]=.01
+    with pytest.raises(ContractError):verify_pool_isolation(expected,observed,task_bindings=bindings,planner_names=planner)
+
+
+def test_native_isolation_accepts_only_exact_inactive_properties_and_exclusion():
+    expected,observed=isolation_fixture()
+    result=verify_pool_isolation(expected,observed,task_bindings={'target':'campaign_pool_A'},planner_names=['campaign_pool_A'])
+    assert result['inactive']==['campaign_pool_B'] and result['properties_verified']
