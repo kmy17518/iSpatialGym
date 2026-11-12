@@ -21,6 +21,7 @@ ALLOWED = {'scripts/campaign_20261110/'+name for name in (
 DELTA = {'fixed_initialized_actor_union': True, 'source_recordings_unchanged': True,
          'native_slot_start_load_writer_cameras_retained': True,
          'selection_scope': 'exact_checked_two_source_records_A_B_A',
+         'member_configuration': 'restore_each_exact_hash_bound_source_campaign_config_environment',
          'inactive_actor': 'parked_and_hidden_before_native_restoration_observation',
          'added_physics_steps': 0, 'added_stop_play_pairs': 0, 'explicit_sdk_reconstructions': 0,
          'proprio': 'native_loaded_state', 'collection_time_behavior_proprio_recorded': False,
@@ -115,7 +116,14 @@ def inputs(root, request_path):
         coldobs=checked(root,cold['controls'][control]['observation'])
         require(coldobs['request']==reference and coldobs['status']=='native_cold_render_passed', 'cold renderer observation differs')
         records.append(record);documents.append(document);requests.append(request);observations.append(coldobs)
-    require(requests[0]['source_environment']==requests[1]['source_environment'], 'renderer backend environment differs')
+    environment_keys = set(requests[0]['source_environment']) | set(requests[1]['source_environment'])
+    differences = {key for key in environment_keys
+                   if requests[0]['source_environment'].get(key) != requests[1]['source_environment'].get(key)}
+    require(differences <= {'ISPATIALGYM_CAMPAIGN_CONFIG'}, 'renderer backend environment differs')
+    for index, request in enumerate(requests):
+        path = Path(request['source_environment']['ISPATIALGYM_CAMPAIGN_CONFIG']).resolve()
+        require(path.is_relative_to(root) and ref(path) == q['member_campaign_configs'][index],
+                'renderer source member campaign configuration changed')
     source_request=checked(root,requests[0]['source_recording_request']); physical=checked(root,source_request['pool_contract'])
     names=[d['metadata']['ispatialgym']['model_pool']['active_names'][0] for d in documents]
     contract=scene_union(documents,names,'robot_r1',physical)
@@ -159,6 +167,8 @@ def run(root,request_path,output,preflight=False):
         nonlocal guard,identities,scene_identity
         index=len(result['entries']);require(index<len(wanted) and demo.dir==wanted[index],'native renderer order differs')
         member=q['sequence'][index];active=names[member];saved=demo.scene_file
+        os.environ.update(requests[member]['source_environment'])
+        for key in ('ISPATIALGYM_HEAD_CAMERA_ONLY','ISPATIALGYM_PHYSICS_ONLY'):os.environ.pop(key,None)
         require(digest(saved)==digest(documents[member]),'native loaded recorded scene differs')
         private,parking=member_scene(contract,saved,active)
         if guard is None:
