@@ -314,12 +314,36 @@ def publish_owned_outputs(root):
             if target != stat.st_mode: os.chmod(path, target)
 
 
-def find_allocation(root, identity):
+def retired_suite_allocations(root, payload):
+    """Exclude only exact proved never-started ancestors of this suite intent."""
+    from scripts.campaign_20261110.infra_dispatch_migration import suite_command, check_suite_replacement
+    from scripts.campaign_20261110.migration_routes import validate_claim
+    if not payload or not payload.get('migration_routing') or suite_command(root, payload['command']) is None:
+        return []
+    result = []; seen = set(); current = payload
+    while current.get('migration_routing'):
+        require(current['token'] not in seen, 'suite migration ancestry cycle'); seen.add(current['token'])
+        routing = validate_claim(root, current)
+        require(routing.get('source_receipt') and routing.get('source_allocation'),
+                'suite retirement requires exact source receipt allocation')
+        original = json.loads(Path(routing['source_intent']['path']).read_text())
+        check_suite_replacement(root, original, {'command': current['command']})
+        proof = json.loads(Path(routing['proof']['path']).read_text())
+        result.append(proof['original_allocation'])
+        current = original
+    return result
+
+
+def find_allocation(root, identity, *, payload=None):
+    retired = retired_suite_allocations(root, payload)
     matches = []
     for path in (root / 'manifests').glob('*allocations.tsv'):
         with path.open() as stream:
             matches.extend({**r, 'ledger': str(path)} for r in csv.DictReader(stream, delimiter='\t')
                            if r['key'] == identity['key'] and int(r['start']) == identity['start'])
+    # Full row equality includes job ID, output directory, ledger, tag and range.
+    # A different matching allocation still fails the ordinary ambiguity checks.
+    matches = [row for row in matches if row not in retired]
     require(len(matches) <= 1, 'ambiguous allocation; manual reconciliation required')
     if matches:
         row = matches[0]
@@ -355,7 +379,7 @@ def execute(root, path, backend, *, cluster_observation=None):
     receipt_path = root / 'dispatch/receipts' / (payload['token'] + '.json')
     with atomic_directory_lock(root / 'dispatch/locks' / (payload['token'] + '.lockdir')):
         prior = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
-        row = find_allocation(root, payload['identity'])
+        row = find_allocation(root, payload['identity'], payload=payload)
         if row:
             if prior.get('backend', backend).startswith('vast_'):
                 activate_vast(root, payload, row)
@@ -396,7 +420,7 @@ def execute(root, path, backend, *, cluster_observation=None):
                 receipt.setdefault('submission_logs', {})['dry' if dry else 'submit'] = str(log)
                 require(result.returncode == 0, 'submission failed; inspect ' + str(log))
                 if dry: verify_dry_indices(result.stdout, payload['identity'])
-            row = find_allocation(root, payload['identity'])
+            row = find_allocation(root, payload['identity'], payload=payload)
             require(row is not None, 'submit completed without ledger; reconcile before retry')
             receipt.update(status='submitted', allocation=row, completed_at=time.time())
             if backend.startswith('vast_'):

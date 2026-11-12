@@ -1,4 +1,5 @@
 import copy
+import csv
 import json
 from pathlib import Path
 import tempfile
@@ -128,6 +129,40 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(intent['identity']['start'],50000000)
         self.assertEqual(M.read(self.receipt)['allocation'],self.allocation)
         self.assertTrue(M.read(self.receipt)['migration']['never_started'])
+
+    def published_same_range_replacement(self):
+        payload=self.suite_payload();D.shared_json(self.root/'dispatch/ready/old.json',payload)
+        ledger=self.root/'manifests/dispatch_old_allocations.tsv'
+        allocation={**self.allocation,'tag':'goal_groups','ledger':str(ledger)}
+        with ledger.open('w')as stream:
+            writer=csv.DictWriter(stream,fieldnames=[k for k in allocation if k!='ledger'],delimiter='\t');writer.writeheader();writer.writerow({k:v for k,v in allocation.items()if k!='ledger'})
+        D.shared_json(self.receipt,{'status':'submitted','allocation':allocation})
+        with patch('scripts.campaign_20261110.runtime_suite.authorize',return_value={'row':'exact'}):
+            replacement=M.fresh_replacement(self.root,payload,'new',50000000)
+            proof={'never_started':True,'original_allocation':allocation,'after':{'accounting':{'state':'CANCELLED','start':'Unknown'}},'final_execution_proof':{'nonempty_execution_artifacts':[]}}
+            D.shared_json(self.root/'dispatch/migrations/old/request.json',{'owner':'minyeong','source_payload':payload,'source_receipt':str(self.receipt),'replacement':replacement,'record':{'allocation':allocation,'migration':proof}})
+            with patch.object(M.getpass,'getuser',return_value='minyeong'):M.publish(self.root)
+        return M.read(self.root/'dispatch/ready/new.json'),allocation
+
+    def test_suite_lookup_ignores_only_exact_cancelled_ancestor(self):
+        payload,old=self.published_same_range_replacement()
+        with patch('scripts.campaign_20261110.runtime_suite.authorize',return_value={'row':'exact'}):
+            self.assertIsNone(D.find_allocation(self.root,payload['identity'],payload=payload))
+            with self.assertRaisesRegex(ValueError,'allocated identity differs'):
+                D.find_allocation(self.root,payload['identity'])
+            target=self.root/'manifests/new_allocations.tsv';new={**old,'jobid':'456','tag':'new','job_dir':str(self.root/'out/new')}
+            with target.open('w')as stream:
+                writer=csv.DictWriter(stream,fieldnames=[k for k in new if k!='ledger'],delimiter='\t');writer.writeheader();writer.writerow({k:v for k,v in new.items()if k!='ledger'})
+            self.assertEqual(D.find_allocation(self.root,payload['identity'],payload=payload)['jobid'],'456')
+
+    def test_suite_lookup_cannot_ignore_other_job_or_started_source(self):
+        payload,old=self.published_same_range_replacement();ledger=Path(old['ledger']);text=ledger.read_text();ledger.write_text(text.replace('123\t','999\t'))
+        with patch('scripts.campaign_20261110.runtime_suite.authorize',return_value={'row':'exact'}):
+            with self.assertRaisesRegex(ValueError,'allocated identity differs'):
+                D.find_allocation(self.root,payload['identity'],payload=payload)
+            ledger.write_text(text);proof=Path(payload['migration_routing']['proof']['path']);value=M.read(proof);value['after']['accounting']['start']='now';D.shared_json(proof,value);payload['migration_routing']['proof']['sha256']=D.file_digest(proof)
+            with self.assertRaisesRegex(ValueError,'never-started'):
+                D.find_allocation(self.root,payload['identity'],payload=payload)
 
     def test_queue_and_camera_owner_remain_with_existing_controller(self):
         payload = copy.deepcopy(self.payload)
