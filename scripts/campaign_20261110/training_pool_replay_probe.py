@@ -120,6 +120,7 @@ def run(root, request_path, output):
               'exportable': False, 'active_only_export_verified': False,
               'scope': 'Native source action replay and planner exclusion only. Full-union diagnostic recording; '
                        'active-only export and cold/reused rendering are not verified.', 'entries': []}
+    final_isolation = []
     try:
         with pool.world_construction_counter(og) as construction:
             result['world_construction'] = construction
@@ -141,6 +142,14 @@ def run(root, request_path, output):
                 write_json_atomic(output/'probe.json', result)
                 require(current.get('planner_observed') is True, 'native pool planner boundary missing')
                 require(code == 0 and entry.get('success') is True, 'native pool action replay failed')
+                scene = shared['env'].scene
+                _, expected = pool.isolated_member_scene(contract,
+                    json.loads(Path(member['scene']['path']).read_text()), member['active'])
+                bindings = {k: v.name for k, v in shared['task'].object_scope.items() if hasattr(v, 'name')}
+                measured = pool.native_isolation(scene, shared['robot'], expected, bindings, None)
+                final_isolation.append({'ordinal': ordinal, 'tro': member['tro'],
+                                        'phase': 'after_native_action_replay', 'isolation': measured})
+                write_json_atomic(output/'pool_final_isolation.json', {'observations': final_isolation})
             require(construction == {'attempted': 1, 'completed': 1}, 'pool replay rebuilt its loaded world')
         inputs(root, request_path)
         return result
