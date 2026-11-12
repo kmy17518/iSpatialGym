@@ -49,7 +49,7 @@ def project(root, scheduled, now, previous=None):
         status = read(directory/('status_'+account+'.json'), errors)
         statuses[account] = status
         observed = epoch(status.get('last_reconciliation_at'))
-        if observed is None or now-observed > 60 or observed > now:
+        if observed is None or now-observed > 60 or observed > now+5:
             errors.append({'kind': 'preparation_dispatcher_missed_two_cycles', 'account': account,
                            'last_reconciliation_at': observed, 'owner': '/root'})
         if 'requests' not in status or status.get('errors'):
@@ -111,7 +111,7 @@ def project(root, scheduled, now, previous=None):
             account = ticket['expected_account']; dispatch = statuses[account]
             cap = dispatch.get('capacity', {}); cap_at = epoch(cap.get('observed_at'))
             slots = None
-            if cap.get('status') == 'observed' and cap_at is not None and 0 <= now-cap_at <= 60:
+            if cap.get('status') == 'observed' and cap_at is not None and -5 <= now-cap_at <= 60:
                 slots = min(cap.get('account_slots', {}).get(account, 0),
                             max(0, cap.get('compatible_available_slots', 0)-policy.get('critical_reserved_physical_slots', 4)))
             blocked = status_rows.get(ticket['claim_path'], {}).get('blocker')

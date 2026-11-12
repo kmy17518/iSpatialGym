@@ -81,3 +81,10 @@ def test_ambiguous_submission_never_ready_or_retried(tmp_path):
     value=project(tmp_path,[],1000)
     assert value['ready_count']==0 and value['items'][0]['submitted_at'] is None
     assert any(e['kind']=='preparation_submission_requires_reconciliation' for e in value['exceptions'])
+
+
+def test_report_published_during_monitor_read_is_not_a_missed_cycle(tmp_path):
+    d,_,_=fixture(tmp_path,submitted=True)
+    p=d/'status_minyeong.json';s=json.loads(p.read_text());s['last_reconciliation_at']=1001;p.write_text(json.dumps(s))
+    value=project(tmp_path,[],1000)
+    assert not any(e['kind']=='preparation_dispatcher_missed_two_cycles' for e in value['exceptions'])

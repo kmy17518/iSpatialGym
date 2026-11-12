@@ -55,6 +55,7 @@ def accounting(job_ids):
 
 
 def project(root, live_jobs, capacity, now=None, accountant=accounting):
+    fixed_observation_time = now
     now = now or dt.datetime.now(dt.timezone.utc).timestamp()
     errors, metadata, evidence = [], {}, []
     registry, registry_ref = read_source(Path(root)/'infra/coordination/ownership.json', errors)
@@ -168,7 +169,10 @@ def project(root, live_jobs, capacity, now=None, accountant=accounting):
     try:
         spec = importlib.util.spec_from_file_location('preparation_flow_watchdog', Path(__file__).with_name('preparation_watchdog.py'))
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
-        preparation_flow = module.publish(root, rows, now)
+        # Accounting may take seconds; do not compare a newer dispatcher report
+        # with the monitor's earlier start time and mislabel it as future/stale.
+        flow_now = now if fixed_observation_time is not None else dt.datetime.now(dt.timezone.utc).timestamp()
+        preparation_flow = module.publish(root, rows, flow_now)
         errors.extend(preparation_flow['exceptions'])
     except (OSError, ValueError, KeyError, TypeError) as exc:
         errors.append({'kind': 'preparation_ready_count_unknown', 'owner': '/root', 'detail': str(exc)})
