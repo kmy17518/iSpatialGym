@@ -1,7 +1,8 @@
 """Bounded native support-edge/navigation/visibility measurements; never writes instances.
 
-This consumes the full eight-model geometry superset. It does not establish the
-historical 28-draw selection rule, grasp reach, task program, settling or replay.
+This consumes the full eight-model geometry superset or its hash-bound native
+admissible draw selection. It does not establish grasp reach, task program,
+settling or replay.
 """
 import argparse
 import hashlib
@@ -41,6 +42,11 @@ def verify(request):
     assert len(source['historical_superset_draws']) == len(geometry['draws']) == 56
     assert geometry['superset_draws_fit'] == 56 and not geometry['historical_selected_scope_complete']
     assert all(row['ready'] for row in source['objects'])
+    if q.get('placement_strategy') == 'native_edge_pair':
+        rule = read(q['inputs']['draw_rule']['path'])
+        assert rule['source_request'] == q['inputs']['source_request'] and rule['geometry'] == q['inputs']['geometry']
+        assert rule['rule_provenance_resolved'] and rule['admissible_maximum_draw_count'] == 28
+        assert set(rule['all_eight_selected_models']) == set(source['historical_budget_models'])
     for ref in [source['native_code'], source['configuration'], source['source_metadata'], source['source_customs'],
                 source['stable_scene'], source['support_probe'], source['active_binding_pool']]+[r['asset']for r in source['objects']]:
         assert digest(ref['path']) == ref['sha256'], ref['path']
@@ -110,6 +116,7 @@ def run(request, output):
             return C.camera_pose(ikc.q_locked(st),base_pose=(th.tensor([x,y,kit.floor_z+C.NOMINAL_BASE_Z]),G.quat_from_yaw(yaw)),cam_in_zed=kit.cam_in_zed)
         sampler.camera_pose_at = camera
         pose = lambda value:tuple(th.tensor(v)for v in value)
+        native_pairs = q.get('placement_strategy') == 'native_edge_pair'
         src_key,dst_key,target_key='tray/uekqey','tray/hvlfig','cellulose_tape/kavsnx'
         pair=geometry['two_tray_footprint_fit']['pose']; sp,dp=pose(pair['source']),pose(pair['destination'])
         for key,pp in [(src_key,sp),(dst_key,dp)]:
@@ -135,8 +142,12 @@ def run(request, output):
                     row['trunk_sweep_free']=TT.trunk_sweep_free(sampler,st)
                     if not row['trunk_sweep_free']:continue
                     cam=camera(st);row['both_trays_inside_margin']=all(TT.in_frame(sampler,cam,G.local_points_world(hulls[key],pp),float(source['generation']['image_margin']))for key,pp in [(src_key,sp),(dst_key,dp)])
-                    if not row['both_trays_inside_margin']:continue
+                    if not native_pairs and not row['both_trays_inside_margin']:continue
                     usable.append(st)
+                    if native_pairs:
+                        # This pass measures support/body space. The native
+                        # placement and visibility gates below select the pair.
+                        continue
                     start=Stance('room_park',(float(parked[0]),float(parked[1]),edge.yaw),tr,0.)
                     try:
                         path=NAV.plan_path(kit,start,st,rooms=source['rooms']);row['navigation']={'passed':True,'path':path.to_sidecar()}
@@ -151,20 +162,53 @@ def run(request, output):
         by_edge={}
         for st in usable:by_edge.setdefault(st.edge.name,[]).append(st)
         views=[rows[i]for i in range(max([len(v)for v in by_edge.values()]or[0]))for rows in by_edge.values()if i<len(rows)][:24]
-        for draw in geometry['draws']:
-            if time.monotonic()>deadline:report['time_bound_reached']=True;break
-            park_all(); placements={src_key:sp,dst_key:dp,target_key:G.compose(sp,pose(draw['target_pose']))}
-            placements.update({key:G.compose(sp,pose(pp))for key,pp in draw['distractor_poses'].items()})
-            row={'index':draw['index'],'models':draw['models'],'active_alias_draw':draw['active_alias_draw'],'attempts':[],'status':'no_verified_view'}
+        pair_views = [(st, sp, dp, {}) for st in views]
+        draws = geometry['draws']
+        if native_pairs:
+            from types import MethodType
+            sampler.hull, sampler.top = hulls, top
+            sampler.src_role, sampler.dst_role = src_key, dst_key
+            sampler._tray_yaw = MethodType(Disembedding._tray_yaw, sampler)
+            floor = SimpleNamespace(cells_local=th.tensor(geometry['trays'][src_key]['cells']))
+            pair_views = []
             for st in views:
+                cam = camera(st)
+                for depth in (.70, .80, .90):
+                    pp = Disembedding._tray_pose_centred(sampler, src_key, floor, st, st.world(depth, 0.))
+                    if not top.polygon_supported(world.footprint(hulls[src_key], pp), margin=TT.SUPPORT_MARGIN):continue
+                    if not TT.in_frame(sampler,cam,G.local_points_world(hulls[src_key],pp),float(source['generation']['image_margin'])):continue
+                    for side in (-1., 1.):
+                        sampler.dest_side = side
+                        try:
+                            dest, _, diag = Disembedding._place_destination(sampler, np.random.default_rng(0), st, st, cam, pp)
+                        except Reject:continue
+                        assert not TT._polygons_overlap(world.footprint(hulls[src_key],pp),world.footprint(hulls[dst_key],dest),float(source['generation']['destination_gap_min_m']))
+                        pair_views.append((st,pp,dest,{'native_destination':diag,'depth':depth,'side':side}))
+            rule=read(q['inputs']['draw_rule']['path']);indices={d['geometry_index']for d in rule['selected_draws']}
+            draws=[d for d in draws if d['index']in indices]
+            assert len(draws)==28 and {k for d in draws for k in d['models']}==set(rule['all_eight_selected_models'])
+            report['draw_rule']=q['inputs']['draw_rule'];report['rule_provenance_resolved']=True
+            report['remaining_checks'].remove('selected_draw_count_policy_provenance')
+            report['native_pair_view_candidates']=len(pair_views)
+            report['placement_strategy']='native_edge_pair'
+            report['destination_frame_rule']='Native _place_destination visible-width boundary; destination is exempt from the full 5-percent frame margin.'
+        for draw in draws:
+            if time.monotonic()>deadline:report['time_bound_reached']=True;break
+            row={'index':draw['index'],'models':draw['models'],'active_alias_draw':draw['active_alias_draw'],'attempts':[],'status':'no_verified_view'}
+            for st,source_pose,destination_pose,pair_info in pair_views:
+                if time.monotonic()>deadline:report['time_bound_reached']=True;break
+                park_all();placements={src_key:source_pose,dst_key:destination_pose,target_key:G.compose(source_pose,pose(draw['target_pose']))}
+                placements.update({key:G.compose(source_pose,pose(pp))for key,pp in draw['distractor_poses'].items()})
                 cam=camera(st)
-                if not all(TT.in_frame(sampler,cam,G.local_points_world(hulls[k],pp),float(source['generation']['image_margin']))for k,pp in placements.items()):continue
-                attempt={'stance':st.to_sidecar()};row['attempts'].append(attempt)
+                if not all(TT.in_frame(sampler,cam,G.local_points_world(hulls[k],pp),float(source['generation']['image_margin']))for k,pp in placements.items()if not native_pairs or k!=dst_key):continue
+                attempt={'stance':st.to_sidecar(),**pair_info};row['attempts'].append(attempt)
                 try:
                     occ=Disembedding._measure_occlusion(sampler,st,placements,target_key,draw['models'],dst_key)
                     kit.sync_world();attempt['whole_body_with_layout']=ikc.stance_collision_free(st)
                     if not attempt['whole_body_with_layout']:continue
-                    attempt['native_occlusion']=occ;row['status']='native_frame_occlusion_and_stance_passed';break
+                    attempt['native_occlusion']=occ
+                    attempt['source_pose']=[v.tolist()for v in source_pose];attempt['destination_pose']=[v.tolist()for v in destination_pose]
+                    row['status']='native_frame_occlusion_and_stance_passed';break
                 except (Reject,NAV.NavigationError) as exc:attempt['rejection']=str(exc)
             report['draws'].append(row);write(output/f'draw_{draw["index"]:03d}.json',row);write(output/'result.json',report)
             print(json.dumps({'draw':draw['index'],'status':row['status']}),flush=True)
