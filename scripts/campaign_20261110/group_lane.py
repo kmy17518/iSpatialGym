@@ -298,15 +298,14 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
         # Read the same canonical template and cross-split asset constraints as
         # the claim path, without creating or replacing any dataset database.
         if state_path.exists():
-            import shutil
             import tempfile
+            from scripts.campaign_20261110.storage import snapshot_published_sqlite
             from scripts.campaign_20261110.current_eligibility import install_quota_view
             with tempfile.TemporaryDirectory(prefix='isg-suite-history-', dir='/tmp') as directory:
                 local = Path(directory)/'history.sqlite'
-                # Pin a coherent immutable database under its writer lock;
-                # slow evidence joins below operate only on that local copy.
-                with atomic_directory_lock(state_path.with_suffix('.lockdir')):
-                    shutil.copyfile(state_path, local)
+                # Writers publish complete replacement inodes. Pin one open
+                # version while allowing independent quota claims to proceed.
+                snapshot_published_sqlite(state_path, local)
                 with sqlite3.connect(f'file:{local}?mode=ro', uri=True) as db:
                     install_quota_view(root, db)
                     pins = {v[0] for v in db.execute('SELECT DISTINCT template FROM current_members WHERE split=? AND task=? AND class_id=?',

@@ -1,6 +1,7 @@
 """Durable campaign state on storage that does not implement POSIX locks."""
 from contextlib import closing, contextmanager
 import errno
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -66,6 +67,35 @@ def _check_database(path):
     with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as db:
         if db.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
             raise RuntimeError("Campaign quota database failed integrity check")
+
+
+def snapshot_published_sqlite(source, destination):
+    """Pin one immutable published inode without acquiring the writer lock.
+
+    Campaign writers modify local databases and publish with atomic replacement.
+    An already-open file therefore remains a coherent version during a publish.
+    Reject in-place mutation or shared SQLite sidecars; open SQLite only locally.
+    This function is for read-only audits, never quota transactions.
+    """
+    source, destination = Path(source), Path(destination)
+    def sidecars():
+        return any(Path(str(source)+suffix).exists() for suffix in ('-wal','-journal','-shm'))
+    if sidecars(): raise RuntimeError('published database has a shared SQLite sidecar')
+    with source.open('rb') as incoming, destination.open('xb') as outgoing:
+        before = os.fstat(incoming.fileno())
+        shutil.copyfileobj(incoming, outgoing)
+        after = os.fstat(incoming.fileno())
+    identity = lambda value:(value.st_dev,value.st_ino,value.st_size,value.st_mtime_ns)
+    if identity(before) != identity(after) or sidecars():
+        raise RuntimeError('published database changed in place during snapshot')
+    if destination.stat().st_size != before.st_size:
+        raise RuntimeError('published database snapshot is incomplete')
+    _check_database(destination)
+    return {'source':str(source),'sha256':hashlib.sha256(destination.read_bytes()).hexdigest(),
+            'device':before.st_dev,'inode':before.st_ino,'size':before.st_size,
+            'mtime_ns':before.st_mtime_ns,'observed_at':time.time(),
+            'method':'open immutable published inode; local SQLite integrity check',
+            'writer_lock_acquired':False}
 
 
 @contextmanager

@@ -81,3 +81,34 @@ def test_uncheckpointed_sidecars_and_corruption_are_not_published(tmp_path):
     with pytest.raises(sqlite3.DatabaseError):
         with storage.local_sqlite_transaction(state):
             pytest.fail("Corrupt state accepted")
+
+
+def test_snapshot_pins_old_complete_inode_during_atomic_publication(tmp_path,monkeypatch):
+    source=tmp_path/'published.sqlite';replacement=tmp_path/'next.sqlite';local=tmp_path/'copy.sqlite'
+    write_value(source,1);write_value(replacement,2)
+    before=source.read_bytes();copy=storage.shutil.copyfileobj
+    def concurrent_publish(incoming,outgoing):
+        replacement.replace(source)
+        copy(incoming,outgoing)
+    monkeypatch.setattr(storage.shutil,'copyfileobj',concurrent_publish)
+    with storage.atomic_directory_lock(source.with_suffix('.lockdir')):
+        proof=storage.snapshot_published_sqlite(source,local)
+    assert local.read_bytes()==before and source.read_bytes()!=before
+    assert proof['sha256']==storage.hashlib.sha256(before).hexdigest()
+    assert proof['writer_lock_acquired'] is False
+    with sqlite3.connect(local) as db:
+        assert db.execute('SELECT value FROM values_').fetchall()==[(1,)]
+
+
+def test_snapshot_rejects_inplace_change_and_shared_sidecars(tmp_path,monkeypatch):
+    source=tmp_path/'published.sqlite';write_value(source,1)
+    sidecar=Path(str(source)+'-wal');sidecar.write_bytes(b'active')
+    with pytest.raises(RuntimeError,match='sidecar'):
+        storage.snapshot_published_sqlite(source,tmp_path/'blocked.sqlite')
+    sidecar.unlink();copy=storage.shutil.copyfileobj
+    def mutate(incoming,outgoing):
+        with source.open('ab') as stream:stream.write(b'inplace')
+        copy(incoming,outgoing)
+    monkeypatch.setattr(storage.shutil,'copyfileobj',mutate)
+    with pytest.raises(RuntimeError,match='changed in place'):
+        storage.snapshot_published_sqlite(source,tmp_path/'changed.sqlite')

@@ -91,6 +91,20 @@ def test_regression_releases_writer_lock_before_readonly_evidence_join(tmp_path,
     assert path.read_bytes()==before
 
 
+def test_regression_pins_published_state_while_writer_has_its_own_lock(tmp_path):
+    from scripts.campaign_20261110.storage import atomic_directory_lock
+    f,review=candidate(tmp_path,0);claim(tmp_path,f,review)
+    path=tmp_path/'dataset/quotas.sqlite3';before=path.read_bytes()
+    f2,review2=candidate(tmp_path,1)
+    before_result=regression(tmp_path,f2,review2)
+    with atomic_directory_lock(path.with_suffix('.lockdir')):
+        result=regression(tmp_path,f2,review2)
+        assert path.with_suffix('.lockdir').is_dir()
+    assert result['validation_passed']
+    assert result==before_result
+    assert path.read_bytes()==before
+
+
 def test_suite_marked_source_cannot_enter_legacy_single_gate_claim(tmp_path):
     f,review=candidate(tmp_path,0)
     (f.job/'job.env').write_text('ISPATIALGYM_RUNTIME_SUITE_RUN=current100\n')
