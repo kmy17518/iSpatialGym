@@ -58,6 +58,8 @@ def test_native_reader_checks_every_id_consumed_and_keeps_initial_background(sim
     flat=torch.zeros(4)
     result=verify_serialized(owner,flat,{'A','B'},'A',{'A','B','background'},True)
     assert result['object_names']==['A','background']
+    import hashlib
+    assert result['serialized_float32_sha256']==hashlib.sha256(flat.numpy().tobytes()).hexdigest()
     owner.deserialize=lambda flat:({'registry':{'object_registry':{'A':{}}}},len(flat))
     assert verify_serialized(owner,flat,{'A','B'},'A',{'A','B','background'},False)['object_names']==['A']
     with pytest.raises(ContractError,match='omitted'):verify_serialized(owner,flat,{'A','B'},'A',{'A','B','background'},True)

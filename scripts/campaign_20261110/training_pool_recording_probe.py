@@ -1,5 +1,6 @@
 """Active-only diagnostic recordings without filtering internal pool snapshots."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -89,7 +90,8 @@ def verify_serialized(owner, flat, initialized, active, all_scene_names, initial
     if initial:
         require(names == set(all_scene_names)-inactive, 'initial state omitted background or active actors')
     return {'initial': initial, 'native_reader': type(owner).__name__, 'elements': int(flat.numel()),
-            'object_names': sorted(names), 'inactive_names_absent': True}
+            'object_names': sorted(names), 'inactive_names_absent': True,
+            'serialized_float32_sha256': hashlib.sha256(flat.detach().cpu().float().contiguous().numpy().tobytes()).hexdigest()}
 
 
 def active_document(document, source, source_metadata, initialized, active, properties, bindings, robot_poses,
