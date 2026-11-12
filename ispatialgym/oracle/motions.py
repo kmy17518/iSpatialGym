@@ -1171,6 +1171,25 @@ class Motions:
         it cannot), a joint-space plan goes to the point ``protect_above_m`` above ``goal_pose`` (its IK seeded at ``q_goal``
         - the goal's branch - when given), checked against the protected objects, then a straight descent reaches
         ``goal_pose``. Returns ``(done, why)``; nothing after the lift has moved when it returns False."""
+        above_m = float(self.cfg.protect_above_m)
+        from ispatialgym.oracle import campaign_protected_transit as CPT
+        if CPT.enabled(P):
+            import numpy as np
+            from ispatialgym.grasping import hand_geometry as HG
+            hand = HG.load(arm)
+            if hand.source != 'usd_collision':
+                raise SkillError('plan_failed', 'geometry above-goal proposal requires native USD hand collision hulls')
+            gp0, gq0 = as_world_pose(goal_pose)
+            # The hull extrema at the closed/open endpoints also bound every
+            # intermediate finger opening, since the finger slides linearly.
+            points = np.concatenate([hand.points(finger_q=(q, q))[0]
+                                     for q in (hand.finger_closed, hand.finger_open)])
+            boxes = [(name, th.stack(obj.aabb).detach().cpu().numpy()) for name, obj in P['objects']]
+            above_m, proof = CPT.above_offset(gp0.detach().cpu().numpy(), gq0.detach().cpu().numpy(),
+                points, boxes, baseline=above_m, clearance=float(P['inflation']))
+            self.protect_events.append({'check': 'geometry_above_proposal', 'leg': P['leg'],
+                'arm': arm, 'hand_geometry_digest': hand.digest, **proof})
+            log.info('PROTECT geometry above-goal proposal: %s', proof)
         up = th.tensor([0.0, 0.0, float(self.cfg.protect_lift_m)])
         here = self.eef_pose(arm)
         ign_objs, ign_links = getattr(self, "_protect_ignores", ((), ()))
@@ -1203,7 +1222,7 @@ class Motions:
         except TypeError:
             self.backend.update_world(ignore_objects=ign_objs)
         gp, gq = as_world_pose(goal_pose)
-        above = (gp.float() + th.tensor([0.0, 0.0, float(self.cfg.protect_above_m)]), gq.float())
+        above = (gp.float() + th.tensor([0.0, 0.0, above_m]), gq.float())
         q_start = self.backend.q_full()
         idx = self.robot.arm_control_idx[arm]
         q_above = None
@@ -1229,7 +1248,7 @@ class Motions:
             return False, f"{lifted}; the plan to the point above still passes {viol[0]['object']} at {viol[0]['clearance_m']} m"
         yield from self.execute_joint_trajectory(res.q_traj, arms=[arm])
         yield from self.arm_along(arm, [(gp.float(), gq.float())], soft_pos_tol=self.cfg.diff_ik_soft_pos_tol_free)
-        return True, f"{lifted}; above the goal by {self.cfg.protect_above_m:.2f} m ({'goal branch' if q_above is not None else 'pose goal'}), straight down"
+        return True, f"{lifted}; above the goal by {above_m:.2f} m ({'goal branch' if q_above is not None else 'pose goal'}), straight down"
 
     def _plan_detour(self, arm: str, q_traj: Any) -> Optional[Dict[str, Any]]:
         """The hand path of a planned transit that detours past the via-above's - longer than ``protect_detour_ratio`` x
