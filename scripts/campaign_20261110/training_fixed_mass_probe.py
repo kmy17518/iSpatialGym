@@ -9,6 +9,7 @@ DELTA = {'name': 'fixed_tray_mass_inertia_baseline_v1',
          'boundary': 'world_initialized_before_first_episode_restore',
          'cold_physical_operations_changed': True, 'warm_physical_operations_changed': True,
          'additional_physics_steps': 0, 'task_input_files_changed': False,
+         'initial_actor_reconstruction': 'one_stop_author_both_trays_play_before_baseline',
          'thresholds_changed': False, 'stock_mass_restored_between_episodes': False}
 ALLOWED = {'scripts/campaign_20261110/training_fixed_mass_probe.py',
            'scripts/campaign_20261110/tests/test_training_fixed_mass_probe.py',
@@ -84,19 +85,42 @@ def _read(link):
     return state
 
 
-def _write(link, state):
-    import torch
+def _author_inertia(link, state):
     import omnigibson as og
     from pxr import UsdPhysics,Gf
+    require(og.sim.is_stopped(), 'inertial USD edits require stopped physics')
     vals,quat=principal_inertia(state['inertia'])
     with og.sim.editing_usd():
         api=UsdPhysics.MassAPI.Apply(link.prim)
         api.CreateMassAttr().Set(float(state['mass_kg']))
         api.CreateDiagonalInertiaAttr().Set(Gf.Vec3f(*vals))
         api.CreatePrincipalAxesAttr().Set(Gf.Quatf(quat[3],Gf.Vec3f(*quat[:3])))
+
+
+def _write(link, state):
+    import torch
+    import omnigibson as og
+    require(og.sim.is_playing(), 'native inertia write requires rebuilt playing world')
     view=link._rigid_prim_view;inertia=view.get_inertias();masses=view.get_masses()
     view.set_masses(torch.as_tensor([state['mass_kg']],dtype=masses.dtype,device=masses.device))
     view.set_inertias(torch.as_tensor(state['inertia'],dtype=inertia.dtype,device=inertia.device))
+
+
+def initialize_inertial_actors(targets, campaign, execution, restart, sim):
+    # Capture all desired tensors before invalidating any actor. Author both
+    # trays while stopped, then use the measured no-step native lifecycle to
+    # reconstruct actors and their meta links together. A live update_handles
+    # is insufficient: PhysX has already dropped the tray's fillable meta link.
+    def author():
+        for link, expected in targets.values():
+            _author_inertia(link, expected)
+    lifecycle=restart(campaign,sim,execution=execution,while_stopped=author)
+    require(lifecycle is not None and lifecycle['observed_physics_step_calls']==[]
+            and lifecycle['physics_steps_requested']==0,
+            'initial inertial reconstruction lacks no-step lifecycle proof')
+    for link, expected in targets.values():
+        _write(link, expected)
+    return lifecycle
 
 
 def matches(state, expected):
@@ -146,10 +170,11 @@ def install_fixed_mass_baseline(runner, request, output):
             vals,quat=principal_inertia(desired['inertia'])
             desired.update(usd_mass_authored=True,usd_mass=desired['mass_kg'],
                            usd_diagonal_inertia=vals,usd_principal_axes=quat)
-            stock[str(link.prim_path)]=before;_write(link,desired)
+            stock[str(link.prim_path)]=before
             targets[str(link.prim_path)]=(link,desired);objects.append(obj)
         require(len(targets)==2,'fixed baseline tray inventory differs')
-        record('world_initialized_after_one_override',stock=stock)
+        lifecycle=initialize_inertial_actors(targets,campaign,loader._restoration_execution,restart,og.sim)
+        record('world_initialized_after_one_override',stock=stock,initial_actor_reconstruction=lifecycle)
         # Ordinary scene.save does not prove inertial persistence. Keep a required
         # companion baseline with explicit USD/native values and exact source IDs.
         loader._scene_state0=copy.deepcopy(loader.env.scene.dump_state(serialized=False))

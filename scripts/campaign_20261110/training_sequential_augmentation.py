@@ -144,10 +144,22 @@ def verify_rendering(root,reference,started_at):
     return _verify_stages(root,reference,started_at,(('rendering',RENDER),))
 
 
-def _verify_stages(root, reference, started_at, stages):
+def verify_fixed_mass_physics(root, reference, started_at):
+    """New cold A/B baselines for the explicit fixed-mass experiment only.
+
+    Cold physical operations intentionally changed. Preserve old references,
+    but compare every reused episode against new independent references using
+    the existing strict reset, pre-action and first-action tolerances.
+    This proves no rendering path and grants no production release.
+    """
+    return _verify_stages(root,reference,started_at,(('physics',PHYSICS),),fixed_mass=True)
+
+
+def _verify_stages(root, reference, started_at, stages, *, fixed_mass=False):
     document = checked(root, reference)
     full=len(stages)==2
-    require(document.get('schema') == ('isg-sequential-augmentation-verification-input-v1'if full else
+    require(document.get('schema') == ('isg-fixed-mass-physics-verification-input-v1'if fixed_mass else
+                'isg-sequential-augmentation-verification-input-v1'if full else
                 'isg-sequential-rendering-verification-input-v1') and
             set(document['execution']) == {stage for stage,_ in stages} and
             all(set(document.get(stage,{}))==set(specs)and set(document['execution'][stage])==set(specs)
@@ -163,6 +175,8 @@ def _verify_stages(root, reference, started_at, stages):
             execution=verify_probe_execution(root,probe_ref,document['execution'][stage][name])
             request_ref = probe['request']; checked(root, request_ref)
             request, records = inputs(root, request_ref['path'])
+            require(bool(request.get('fixed_mass_baseline')) == fixed_mass,
+                    'fixed mass experiment requires its separate physics verifier')
             prospective_anchor=prospective_anchor or request.get('sequential_anchor_rebase')is True
             require(request.get('sequential_augmentation') is True and not request.get('physical_candidate') and
                     request.get('diagnostic_control') == control and probe['kind'] == expected_kind and
@@ -182,6 +196,9 @@ def _verify_stages(root, reference, started_at, stages):
                 compatibility_identity=common
             require(common==compatibility_identity and compatibility==probe['runtime_compatibility'],
                     'sequential matrix runtime proof or effective request differs')
+            if fixed_mass:
+                from .training_fixed_mass_verify import audit_persistence
+                audit_persistence(root, document['fixed_mass'][name], probe_ref, request, records, len(order))
             observations = []; case = []
             for ordinal, (entry, member) in enumerate(zip(probe['entries'], order)):
                 require(entry['canary_review'] == source_refs[member], 'sequential member order differs')
@@ -254,23 +271,27 @@ def _verify_stages(root, reference, started_at, stages):
             return (entry['boundaries'][-1] if stage == 'physics' else entry['observation'])['loaded_state']
         augmentation_changes[stage]=observed_augmentation_change(root,
             [sources[digest(ref)]['export_record'] for ref in source_refs],loaded('fresh_A'),loaded('fresh_B'))
-        if prospective_anchor:
+        if prospective_anchor and not fixed_mass:
             require(stage=='physics'and set(document.get('prior_cold_references',{}))=={'fresh_A','fresh_B'},
                     'prospective warm repair requires original cold A and B evidence')
             for name,member in(('fresh_A',0),('fresh_B',1)):
                 cold_compatibility[name]=verify_original_cold(root,document['prior_cold_references'][name],
                     source_refs[member],cases[name][0],started_at)
         results[stage] = stage_results
-    return {'schema': 'isg-sequential-augmentation-verification-v1'if full else'isg-sequential-rendering-verification-v1', 'input': reference,
+    return {'schema': 'isg-fixed-mass-physics-verification-v1'if fixed_mass else
+                'isg-sequential-augmentation-verification-v1'if full else'isg-sequential-rendering-verification-v1', 'input': reference,
             'status': 'verified', 'runtimes': runtimes, 'sources': source_refs, 'stages': results,
             'verified_stages':[stage for stage,_ in stages],'full_matrix_verified':full,
             'original_cold_compatibility':cold_compatibility,
+            'cold_physical_operations_changed':fixed_mass,
+            'fixed_mass_evidence':document.get('fixed_mass') if fixed_mass else None,
             'independent_processes': len(all_processes), 'observed_augmentation_changes':augmentation_changes,
             'checks': ['changed lighting and fixed-actor parking',
                 'one actual Environment construction per process', 'exact native task/model/scale/room/assets',
-                'independent A and B references', 'A/B/A restoration', 'exact rendered artifacts']+
+                'independent A and B references', 'A/B/A restoration']+
+                (['mass and inertia USD/native persistence'] if fixed_mass else ['exact rendered artifacts'])+
                 (['successful A/A cleanup','failed A/A cleanup','interrupted A/A cleanup',
-                  'unchanged reset/first-action tolerances']if full else[]),
+                  'unchanged reset/first-action tolerances']if full or fixed_mass else[]),
             'production_released': False, 'benchmark_credit': 0}
 
 

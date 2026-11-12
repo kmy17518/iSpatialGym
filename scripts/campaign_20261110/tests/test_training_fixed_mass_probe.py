@@ -53,14 +53,19 @@ def test_installer_captures_overridden_baseline_once_and_detects_restart_inertia
         objects['tray.n.01_'+str(i)]=obj
         s=state(np.diag([.001,.002,.003]));s.update(mass_kg=.4,usd_mass=.4)
         memory[link.prim_path]=s
-    monkeypatch.setitem(sys.modules,'omnigibson',NS())
+    monkeypatch.setitem(sys.modules,'omnigibson',NS(sim=NS()))
     monkeypatch.setattr(F,'_read',lambda link:copy.deepcopy(memory[link.prim_path]))
     def write(link,s):events.append('override');memory[link.prim_path]=copy.deepcopy(s)
     monkeypatch.setattr(F,'_write',write)
     monkeypatch.setattr(CR,'pristine_mass_enabled',lambda *a:True)
     def capture(*a,**kw):events.append('capture');return copy.deepcopy(memory)
     monkeypatch.setattr(CR,'capture_pristine_mass',capture)
-    monkeypatch.setattr(CR,'restart_reused_world',lambda *a,**kw: events.append('restart'))
+    def restart(*a,**kw):
+        events.append('restart')
+        if kw.get('while_stopped'): kw['while_stopped']()
+        return {'observed_physics_step_calls':[],'physics_steps_requested':0}
+    monkeypatch.setattr(CR,'restart_reused_world',restart)
+    monkeypatch.setattr(F,'_author_inertia',lambda *a:events.append('author_stopped'))
     source=tmp_path/'source.json';source.write_text('{}\n');campaign={'campaign_id':'campaign_20261110'}
     class Loader:
         def __init__(self):
@@ -76,7 +81,7 @@ def test_installer_captures_overridden_baseline_once_and_detects_restart_inertia
     request={'fixed_mass_baseline':True,'production_released':False,'runtime_compatibility':{'sha256':'exact'}}
     F.install_fixed_mass_baseline(NS(InstanceLoader=Loader),request,tmp_path)
     loader=Loader();loader.build_env()
-    assert events==['build','override','override','capture']
+    assert events==['build','restart','author_stopped','author_stopped','override','override','capture']
     assert campaign=={'campaign_id':'campaign_20261110'} and source.read_text()=='{}\n'
     assert loader._scene_state0=={'original_positions':'exact'}
     assert loader._restore_complete_snapshot()=='restored'
@@ -91,3 +96,24 @@ def test_installer_captures_overridden_baseline_once_and_detects_restart_inertia
         CR.restart_reused_world({},None)
     audit=json.loads((tmp_path/'fixed_mass_audit.json').read_text())
     assert audit['events'][-1]['passed']is False and not audit['production_released']
+
+
+def test_all_actors_authored_stopped_before_any_native_tensor_access(monkeypatch):
+    import scripts.campaign_20261110.training_fixed_mass_probe as F
+    events=[]
+    targets={'A':('A',{}),'B':('B',{})}
+    monkeypatch.setattr(F,'_author_inertia',lambda link,s:events.append(('author',link)))
+    monkeypatch.setattr(F,'_write',lambda link,s:events.append(('native',link)))
+    def restart(meta,sim,*,execution,while_stopped):
+        events.append('stop');while_stopped();events.append('play')
+        return {'observed_physics_step_calls':[],'physics_steps_requested':0}
+    F.initialize_inertial_actors(targets,{},None,restart,None)
+    assert events==['stop',('author','A'),('author','B'),'play',('native','A'),('native','B')]
+
+
+def test_initial_reconstruction_rejects_unmeasured_or_stepping_lifecycle(monkeypatch):
+    import scripts.campaign_20261110.training_fixed_mass_probe as F
+    monkeypatch.setattr(F,'_write',lambda *a:pytest.fail('native tensor write before lifecycle proof'))
+    for evidence in [None,{'observed_physics_step_calls':['step'],'physics_steps_requested':0}]:
+        with pytest.raises(ContractError,match='no-step lifecycle proof'):
+            F.initialize_inertial_actors({'A':('A',{})},{},None,lambda *a,**kw:evidence,None)
