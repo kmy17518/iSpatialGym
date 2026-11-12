@@ -187,9 +187,13 @@ def build(root, now=None):
         jobs = [{**j, 'status':scheduler[str(j['job_id'])]['state'],
                  'scheduler_observation':refs['capacity']} if not j.get('never_started') and
                 str(j.get('job_id')) in scheduler else j for j in r.get('jobs',[])]
-        activity = worker_activity({'worker_observed_at': refs['capacity'].get('observed_at')
-                                    if scheduler else r.get('last_execution_observed_at'),
-                                    'active_jobs': jobs}, now)
+        activity = worker_activity({'worker_observed_at': r.get('last_execution_observed_at'),
+                                    'active_jobs': [j for j in jobs if 'scheduler_observation' not in j]}, now)
+        scheduled = worker_activity({'worker_observed_at':refs['capacity'].get('observed_at'),
+                                     'active_jobs':[j for j in jobs if 'scheduler_observation' in j]}, now)
+        activity['active_work'] += scheduled['active_work']
+        activity['reported_work'] = jobs
+        activity['scheduler_activity_observation'] = scheduled['activity_observation']
         stages = {s:stage() for s in STAGES}
         if r.get('dispatch_receipt'): stages['submitted']=stage(r['dispatch_receipt'])
         if 'native_written_observed' in observed:

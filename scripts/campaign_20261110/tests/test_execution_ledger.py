@@ -179,5 +179,16 @@ class ExecutionLedgerTests(unittest.TestCase):
         self.assertEqual(r['active_work'],[])
         self.assertEqual(r['reported_work'],[{'job_id':'unknown'}])
 
+    def test_fresh_capacity_does_not_refresh_another_stale_worker_job(self):
+        self.put('capacity',{'observed_at':1700,'accounts':{'minyeong':{
+            'jobs':[{'id':'actual','state':'RUNNING'}]}}})
+        self.put('current_runtime',{'observed_at':1700,'run_id':'fresh','rows':[{
+            'class_id':'class','last_execution_observed_at':1000,
+            'jobs':[{'job_id':'actual'},{'job_id':'old','status':'running'}]}]})
+        r=build(self.root,1701)['rows'][0]
+        self.assertEqual([j['job_id'] for j in r['active_work']],['actual'])
+        self.assertEqual(r['activity_observation']['state'],'stale')
+        self.assertEqual(r['scheduler_activity_observation']['state'],'current_worker_report')
+
 
 if __name__=='__main__':unittest.main()
