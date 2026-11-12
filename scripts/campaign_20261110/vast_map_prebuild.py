@@ -1,5 +1,6 @@
 """Exact native-library/height reach-map preparation on private campaign workers."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -58,6 +59,80 @@ def copy_measured_proofs(root, job, records):
 
 def library_environment(root, v2_root=None):
     return {}
+
+
+def consumed_ticket(root, tickets, index, native):
+    """Accept one reviewed map recipe, never an arbitrary native command."""
+    source = json.loads(tickets.read_text())
+    require(source['schema'] == 'isg-preparation-dispatch-tickets-v1' and type(index) is int and
+            0 <= index < len(source['jobs']), 'invalid consumed map source')
+    ticket = source['jobs'][index]; key = ticket['physical_dedup_key']
+    require(ticket['computation_kind'] == 'reach_map' and ticket['consumer_kind'] == 'tabletop', 'unsupported consumed map kind')
+    require(re.fullmatch(r'[a-f0-9]{64}', key) and key == ticket['dedup_key'], 'physical map key differs')
+    require(ticket['native_time_seconds'] == 1500 and ticket['hard_time_seconds'] == 1800 and
+            ticket['benchmark_credit'] == 0 and ticket['production_authorized'] is False, 'map bounds or purpose differ')
+    for field in ('claim_path', 'submission_path'):
+        path = Path(ticket[field])
+        require(path.is_relative_to(root / 'infra/coordination/preparation_dispatch') and path.name == key + '.json', 'map claim ownership differs')
+    files = {}
+    for ref in ticket['input_refs'] + ticket['scripts'] + [ticket['prepared'], ticket['runtime_ref']]:
+        path = Path(ref['path'])
+        require(path.resolve().is_relative_to(root) and sha(path) == ref['sha256'], 'consumed map input changed: ' + str(path))
+        require(str(path) not in files or files[str(path)] == ref['sha256'], 'conflicting map input hash')
+        files[str(path)] = ref['sha256']
+    require(ticket['runtime_ref']['path'] == str(native / '.snapshot_commit'), 'map runtime differs')
+    prepared = json.loads(Path(ticket['prepared']['path']).read_text()); identity = prepared['physical_identity']
+    require(prepared['native_runtime'] == str(native) and prepared['physical_dedup_key'] == key and
+            hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(',', ':')).encode()).hexdigest() == key, 'map fingerprint differs')
+    commands = prepared['native_argv_by_arm']
+    require(len(commands) == 1 and set(commands) <= {'left', 'right'}, 'consumed map requires one exact arm')
+    arm, argv = next(iter(commands.items()))
+    require(argv[:7] == ['python', '-u', '-m', 'ispatialgym.sampling.reach_maps', 'compute', '--kind', 'tabletop'], 'map entrypoint differs')
+    expected = ['--jobs', '--glib', '--anchors', '--heights', '--arm', '--shard', '--out', '--mode', '--lattice', '--seeds', '--trunk-eligibility']
+    require(len(argv) == 29 and argv[7::2] == expected, 'map arguments differ')
+    args = dict(zip(argv[7::2], argv[8::2]))
+    require(args['--arm'] == arm and args['--shard'] == '0/1' and args['--mode'] == 'full' and
+            args['--lattice'] == '0.08' and args['--seeds'] == '8' and args['--trunk-eligibility'] == 'per_d_e', 'map computation differs')
+    require(args['--jobs'] in files and args['--anchors'] in files, 'map selected inputs are unbound')
+    entries = json.loads(Path(args['--jobs']).read_text()); require(len(entries) == 1, 'map must contain one library')
+    entry = entries[0]
+    require((entry['kind'], entry['constraint']) in {('attachment', 'attachment_free'), ('tabletop', 'tabletop')}, 'map library kind differs')
+    library = Path(args['--glib']) / 'models' / entry['id'] / 'library.json'
+    require(files.get(str(library)) == identity['library_sha256'] and sha(library) == identity['library_sha256'], 'map library is unbound')
+    require(args['--heights'] == prepared['height'] and float(args['--heights']) == identity['height'] and
+            identity['arms'] == [arm] and any(a['key'] == args['--heights'] for a in json.loads(Path(args['--anchors']).read_text())['anchors']), 'map height/arm differs')
+    require(ticket['configuration_ids'] == prepared['configuration_ids'] and bool(ticket['configuration_ids']), 'map consumer differs')
+    return ticket, prepared, entry, library, args, files
+
+
+def prepare_consumed(root, tickets, index, native, helper, token):
+    root, tickets, native, helper = map(lambda p: Path(p).resolve(), (root, tickets, native, helper))
+    require(re.fullmatch(r'[A-Za-z0-9_-]+', token), 'unsafe map token')
+    require(tickets.is_relative_to(root / 'training_preparation') and native.is_relative_to(root / 'code') and helper.is_relative_to(root / 'code'), 'map roots differ')
+    ticket, prepared, entry, library, args, files = consumed_ticket(root, tickets, index, native)
+    job = root / 'out/vast_map_prebuild' / token; require(not job.exists(), 'map token already has evidence'); job.mkdir(parents=True)
+    copied = job / 'inputs/glib/models' / entry['id']; copied.mkdir(parents=True)
+    library_files = {}
+    for src in library.parent.iterdir():
+        require(src.is_file() and not src.is_symlink() and src.suffix.lower() not in DENIED_SUFFIXES and str(src) in files, 'unbound native library payload')
+        dst = copied / src.name; shutil.copyfile(src, dst); require(sha(dst) == files[str(src)], 'library copy differs'); library_files[str(dst)] = sha(dst)
+    selected = job / 'selected_jobs.json'; write(selected, [entry])
+    anchors = job / 'anchors.json'; shutil.copyfile(args['--anchors'], anchors)
+    env = {'ISGE_CODE': str(native), 'ISGF_ROOT': str(root), 'ISGF_NATIVE_HELPER': str(helper)}
+    (job / 'job.env').write_text(''.join(k + '=' + shlex.quote(v) + '\n' for k, v in env.items()))
+    for path in (tickets, selected, anchors, job / 'job.env', helper / 'scripts/campaign_20261110/vast_prebuild.py',
+                 helper / 'scripts/campaign_20261110/vast_map_prebuild.py', helper / 'scripts/campaign_20261110/job_map_prebuild.sh'):
+        files[str(path)] = sha(path)
+    unit = {'job': entry, 'arms': list(prepared['native_argv_by_arm']), 'height': prepared['height']}
+    value = {'schema': SCHEMA, 'campaign_id': root.name, 'campaign_root': str(root), 'job_dir': str(job), 'snapshot': str(native),
+             'helper_snapshot': str(helper), 'source_request': str(tickets), 'entry_index': index, 'source_consumed_map_ticket': True,
+             'selected_manifest': str(selected), 'private_glib': str(copied.parent.parent), 'anchors': str(anchors), 'unit': unit,
+             'files': files, 'library_files': library_files, 'seed_map_files': {}, 'kind': 'tabletop_maps', 'scenes': [],
+             'original_entry': {**entry, 'class_id': 'dependency-consumed-tabletop-map', 'task': 'reach_map_preparation'},
+             'time_limit_s': 1500, 'allocation_time_s': 1800, 'new_native_instances': 0, 'benchmark_credit': 0, 'production_released': False,
+             **{k: ticket[k] for k in ('physical_dedup_key', 'claim_path', 'submission_path', 'configuration_ids')}}
+    write(job / 'native_inputs.json', value); (job / 'sample.log').symlink_to('result/native_' + unit['arms'][0] + '.log')
+    return job
 
 
 def prepare(root, plan, index, native, helper, token):
@@ -131,6 +206,16 @@ def verify(job, root=None):
     require(value['kind'] == 'tabletop_maps' and value['new_native_instances'] == 0 and value['production_released'] is False, 'map purpose differs')
     for name, expected in {**value['files'], **value['library_files'], **value.get('seed_map_files', {})}.items():
         require(Path(name).resolve().is_relative_to(root) and sha(name) == expected, 'map input changed: '+name)
+    if value.get('source_consumed_map_ticket'):
+        ticket, prepared, entry, library, args, _ = consumed_ticket(root, Path(value['source_request']), value['entry_index'], Path(value['snapshot']))
+        require(value['unit'] == {'job': entry, 'arms': list(prepared['native_argv_by_arm']), 'height': prepared['height']}, 'consumed map unit differs')
+        require(value['time_limit_s'] == 1500 and value['allocation_time_s'] == 1800 and value['scenes'] == [] and value['benchmark_credit'] == 0, 'consumed map bounds differ')
+        for field in ('physical_dedup_key', 'claim_path', 'submission_path', 'configuration_ids'):
+            require(value[field] == ticket[field], 'consumed map physical ownership differs')
+        require(json.loads(Path(value['selected_manifest']).read_text()) == [entry] and sha(value['anchors']) == sha(args['--anchors']), 'consumed selected inputs differ')
+        expected = {str(Path(value['private_glib']) / 'models' / entry['id'] / p.name): sha(p) for p in library.parent.iterdir() if p.is_file()}
+        require(value['library_files'] == expected and all(Path(p).is_relative_to(job / 'inputs/glib') for p in expected), 'consumed library closure differs')
+        return value
     doc = json.loads(Path(value['source_plan']).read_text()); unit = doc['units'][value['unit_index']]
     require(value['unit'] == unit and doc['runtime'] == value['snapshot'], 'map unit changed')
     dependencies = Path(unit['source_dependencies']['path'])
@@ -167,10 +252,12 @@ def enqueue(job, root, gpu='RTX 4090'):
         except FileExistsError: jid += 1
     record = {'id': jid, 'job_kind': 'native_dependency', 'name': 'isg261110_map_prebuild',
               'script': str(Path(value['helper_snapshot'])/'scripts/campaign_20261110/job_map_prebuild.sh'),
-              'job_dir': str(job), 'time_s': 9600, 'cpus': 9, 'mem': '48G', 'acct': 'vision', 'part': 'svl',
+              'job_dir': str(job), 'time_s': value.get('allocation_time_s', 9600), 'cpus': 9, 'mem': '48G', 'acct': 'vision', 'part': 'svl',
               'log': str(root/'slurm'/('map_prebuild_'+str(jid)+'.log')), 'cwd': str(root),
               'submitted': time.time(), 'submitted_by': 'typed_map_prebuild', 'gpu': gpu,
               'native_inputs_sha256': sha(job/'native_inputs.json')}
+    for field in ('physical_dedup_key', 'claim_path', 'submission_path'):
+        if field in value: record[field] = value[field]
     target = root/'vast/queue'/(str(jid)+'.json'); write(target, record)
     write(receipt, {'id': jid, 'record_sha256': sha(target), 'activated': False}); return str(jid)
 

@@ -66,7 +66,7 @@ def project(graph, scales):
                         'current_ready_unsubmitted_jobs': None},
             'gaps': ['Join newly verified physical libraries/maps without reusing historical job liveness.',
                      'Expand actual customs-bound lean/overhang/interior/floor/tray/attachment/prefix data where the inherited graph was generic or absent.',
-                     'Resolve generic maps by robot/config/height/arm only, removing target/scene identity from physical dedup.',
+                     'Resolve generic maps by robot/config/height/arm/pose_set, including native object-height-derived dz; remove target/scene labels from physical dedup.',
                      'Retain all exact canonical100 inputs and map their existing release closures; no extra validation campaign.',
                      'Resolve remaining exact scale/height/interior/contact metadata only when consumed by selected data builders.']}
 

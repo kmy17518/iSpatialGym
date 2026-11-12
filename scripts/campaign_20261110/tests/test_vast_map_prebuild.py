@@ -99,3 +99,53 @@ def test_unrelated_external_and_symlink_proofs_are_rejected(tmp_path,monkeypatch
     doc=json.loads(plan.read_text());dep=Path(doc['units'][0]['source_dependencies']['path']);requests=json.loads(dep.read_text())
     requests['requests'][0]['stable_scene']['path']=str(allowed);v.write(dep,requests);doc['units'][0]['source_dependencies']['sha256']=v.sha(dep);v.write(plan,doc)
     with pytest.raises(ValueError,match='outside approved'):v.prepare(root,plan,0,native,helper,'symlink')
+
+
+def consumed_fixture(root):
+    plan,native,helper,library=fixture(root)
+    base=plan.parent; old=json.loads(plan.read_text()); unit=old['units'][0]; entry=unit['job']
+    entry.update(kind='attachment',constraint='attachment_free')
+    selected=base/'jobs.json';v.write(selected,[entry]);anchors=base/'anchors.json'
+    identity={'kind':'tabletop','library_identity':'test-native-identity','library_sha256':v.sha(library),'height':.8126,'arms':['right']}
+    key=v.hashlib.sha256(json.dumps(identity,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    ref=lambda p:{'path':str(p),'sha256':v.sha(p)}
+    inputs=[ref(p)for p in [library,library.parent/'geometry.json',selected,anchors,native/'.snapshot_commit']]
+    argv=['python','-u','-m','ispatialgym.sampling.reach_maps','compute','--kind','tabletop','--jobs',str(selected),
+          '--glib',str(library.parents[2]),'--anchors',str(anchors),'--heights','.8126','--arm','right','--shard','0/1','--out',str(base/'maps'),
+          '--mode','full','--lattice','0.08','--seeds','8','--trunk-eligibility','per_d_e']
+    prepared=base/'prepared.json';v.write(prepared,{'physical_dedup_key':key,'physical_identity':identity,'native_runtime':str(native),
+           'native_argv_by_arm':{'right':argv},'height':'.8126','configuration_ids':['selected-config']})
+    ticket={'computation_kind':'reach_map','consumer_kind':'tabletop','physical_dedup_key':key,'dedup_key':key,
+            'native_time_seconds':1500,'hard_time_seconds':1800,'benchmark_credit':0,'production_authorized':False,
+            'input_refs':inputs,'scripts':[],'prepared':ref(prepared),'runtime_ref':ref(native/'.snapshot_commit'),
+            'configuration_ids':['selected-config'],'expected_account':'minyeong'}
+    for field,name in [('claim_path','claims'),('submission_path','receipts')]:
+        ticket[field]=str(root/'infra/coordination/preparation_dispatch/consumed_asset_builds_r1'/name/(key+'.json'))
+    tickets=base/'tickets.json';v.write(tickets,{'schema':'isg-preparation-dispatch-tickets-v1','jobs':[ticket]})
+    return tickets,native,helper,library,ticket
+
+
+def test_consumed_attachment_map_preserves_physical_claim_and_finite_bounds(tmp_path):
+    tickets,native,helper,library,ticket=consumed_fixture(tmp_path)
+    job=v.prepare_consumed(tmp_path,tickets,0,native,helper,'consumed');value=v.verify(job,tmp_path)
+    assert value['physical_dedup_key']==ticket['dedup_key']and value['claim_path']==ticket['claim_path']
+    assert value['unit']['arms']==['right']and value['unit']['job']['constraint']=='attachment_free'
+    assert value['time_limit_s']==1500 and value['scenes']==[]
+    jid=v.enqueue(job,tmp_path);queued=json.loads((tmp_path/'vast/queue'/(jid+'.json')).read_text())
+    assert queued['time_s']==1800 and queued['physical_dedup_key']==ticket['dedup_key']
+    assert not Path(ticket['claim_path']).exists() and not(tmp_path/'vast/config.json').exists()
+
+
+@pytest.mark.parametrize('change',['scene_command','altered_height','unbound_library','missing_payload','changed_claim'])
+def test_consumed_map_rejects_broadened_or_changed_recipe(tmp_path,change):
+    tickets,native,helper,library,ticket=consumed_fixture(tmp_path)
+    prepared=Path(ticket['prepared']['path']);value=json.loads(prepared.read_text())
+    if change=='scene_command':value['native_argv_by_arm']['right'][3]='ispatialgym.sampling.sample_isg'
+    elif change=='altered_height':value['native_argv_by_arm']['right'][14]='.9'
+    elif change=='unbound_library':ticket['input_refs']=[r for r in ticket['input_refs']if r['path']!=str(library)]
+    elif change=='missing_payload':library.unlink()
+    else:ticket['claim_path']=str(tmp_path/'unrelated/claim.json')
+    v.write(prepared,value);ticket['prepared']['sha256']=v.sha(prepared)
+    v.write(tickets,{'schema':'isg-preparation-dispatch-tickets-v1','jobs':[ticket]})
+    with pytest.raises((ValueError,OSError)):v.prepare_consumed(tmp_path,tickets,0,native,helper,'bad')
+    assert not(tmp_path/'vast/queue').exists()

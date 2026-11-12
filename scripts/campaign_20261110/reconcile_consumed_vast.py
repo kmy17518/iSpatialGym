@@ -12,6 +12,7 @@ from pathlib import Path
 import time
 
 from scripts.campaign_20261110 import vast_prebuild as native
+from scripts.campaign_20261110 import vast_map_prebuild as maps
 from scripts.campaign_20261110.infra_dispatch import shared_json
 from scripts.campaign_20261110.production_gate import check_job
 from scripts.campaign_20261110.storage import atomic_directory_lock
@@ -67,10 +68,13 @@ def reviewed_routes(root, policy):
     for source in policy['sources']:
         if not source.get('enabled'): continue
         route = checked(source['route'])
-        native.require(route['schema'] == 'isg-consumed-library-vast-route-v1', 'Unsupported typed library route')
+        route_types = {'isg-consumed-library-vast-route-v1': ('grasp_library', 'attachment_free', 'attachment'),
+                       'isg-consumed-map-vast-route-v1': ('reach_map', 'tabletop', 'tabletop_maps')}
+        native.require(route['schema'] in route_types, 'Unsupported typed consumed route')
+        computation, consumer, native_kind = route_types[route['schema']]
         approved = next((a for a in admission['approved_manifests'] if a['manifest'] == route['source_manifest']), None)
-        native.require(approved is not None and approved['computation_kind'] == 'grasp_library' and
-                       approved['consumer_kind'] == 'attachment_free', 'Library source is outside reviewed admission')
+        native.require(approved is not None and approved['computation_kind'] == computation and
+                       approved['consumer_kind'] == consumer, 'Library/map source is outside reviewed admission')
         original = checked(route['source_manifest'])
         for row in route['jobs']:
             ticket = original['jobs'][row['source_index']]
@@ -80,12 +84,13 @@ def reviewed_routes(root, policy):
                 native.require(row[field] == ticket[field] and Path(row[field]).parent == Path(approved[namespace]) and
                                Path(row[field]).name == key + '.json', 'Shared physical claim differs')
             native.require(ticket['configuration_ids'] and ticket['expected_account'] == approved['account'], 'Selected consumer identity differs')
-            rows.append({'route': source['route'], 'source_manifest': route['source_manifest'], 'ticket': ticket, **row})
+            rows.append({'route': source['route'], 'source_manifest': route['source_manifest'], 'ticket': ticket, **row,
+                         'native_kind': native_kind})
     native.require(len({r['physical_dedup_key'] for r in rows}) == len(rows), 'Duplicate physical route')
     return rows
 
 
-def cycle(root, policy_path, expected_sha, *, execute=False, timestamp=None, transport=native, gate=check_job):
+def cycle(root, policy_path, expected_sha, *, execute=False, timestamp=None, transport=native, map_transport=maps, gate=check_job):
     root = Path(root).resolve(); timestamp = time.time() if timestamp is None else timestamp
     policy_ref = {'path': str(policy_path), 'sha256': expected_sha}; policy = checked(policy_ref)
     native.require(policy['schema'] == 'isg-consumed-library-intake-v1' and policy['owner'] == '/root' and
@@ -117,17 +122,20 @@ def cycle(root, policy_path, expected_sha, *, execute=False, timestamp=None, tra
                             'prepared_account_routes': row_capacity['prepared_account_routes'],
                             'usable_cluster_slots': row_capacity['usable_cluster_slots']}); continue
         try:
-            checked(row['native_inputs']); job = Path(row['job_dir']); value = transport.verify(job, root)
-            native.require(value['kind'] == 'attachment' and value['scenes'] == [] and
+            selected_transport = map_transport if row['native_kind'] == 'tabletop_maps' else transport
+            checked(row['native_inputs']); job = Path(row['job_dir']); value = selected_transport.verify(job, root)
+            native.require(value['kind'] == row['native_kind'] and value['scenes'] == [] and
                            value['physical_dedup_key'] == key and value['claim_path'] == str(claim) and
-                           value['submission_path'] == str(receipt), 'Typed library route identity differs')
+                           value['submission_path'] == str(receipt), 'Typed consumed route identity differs')
+            if row['native_kind'] == 'tabletop_maps':
+                native.require(value.get('source_consumed_map_ticket') is True, 'Map is not an exact consumed recipe')
             decision = gate(root, job, kind='native_dependency'); native.require(decision['allowed'], str(decision))
             gpu = idle[len(ready)] if len(ready) < len(idle) else policy['default_gpu']
             ready.append({'physical_dedup_key': key, 'job_dir': str(job), 'gpu': gpu})
             if not execute: continue
             record = {'physical_dedup_key': key, 'backend': 'vast', 'dispatch_owner': '/root',
                       'owner': '/root/templates_assets', 'workstream': 'training preparation',
-                      'stage': 'consumed attachment-free library', 'source': row['source_manifest'],
+                      'stage': 'consumed ' + row['native_kind'], 'source': row['source_manifest'],
                       'job_dir': str(job), 'native_inputs_sha256': row['native_inputs']['sha256'],
                       'observed_at': timestamp, 'intake_policy': policy_ref, 'benchmark_credit': 0,
                       'production_released': False}
@@ -137,7 +145,7 @@ def cycle(root, policy_path, expected_sha, *, execute=False, timestamp=None, tra
             except FileExistsError:
                 results.append({'physical_dedup_key': key, 'status': 'another_backend_claimed'}); continue
             shared_json(receipt, {**record, 'status': 'submitting'})
-            jid = transport.enqueue(job, root, gpu=gpu)
+            jid = selected_transport.enqueue(job, root, gpu=gpu)
             shared_json(receipt, {**record, 'status': 'submitted', 'job_id': str(jid)})
             submitted.append({'job_id': str(jid), 'receipt': str(receipt), 'physical_dedup_key': key})
         except (OSError, ValueError, KeyError, TypeError) as exc:

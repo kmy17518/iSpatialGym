@@ -6,22 +6,24 @@ import pytest
 
 from scripts.campaign_20261110 import reconcile_consumed_vast as m
 from scripts.campaign_20261110 import vast_prebuild as v
+from scripts.campaign_20261110 import vast_map_prebuild as maps
 from scripts.campaign_20261110.tests.test_vast_prebuild import attachment_fixture
+from scripts.campaign_20261110.tests.test_vast_map_prebuild import consumed_fixture
 
 
-def setup(root):
-    tickets, native, helper, _, ticket = attachment_fixture(root)
+def setup(root, map_route=False):
+    tickets, native, helper, _, ticket = (consumed_fixture if map_route else attachment_fixture)(root)
     ticket['expected_account'] = 'minyeong'
     v.write(tickets, {'schema': 'isg-preparation-dispatch-tickets-v1', 'jobs': [ticket]})
-    job = v.prepare_consumed_attachment(root, tickets, 0, native, helper, 'attachment')
+    job = (maps.prepare_consumed if map_route else v.prepare_consumed_attachment)(root, tickets, 0, native, helper, 'attachment')
     ref = lambda p: {'path': str(p), 'sha256': v.sha(p)}
     admission = root / 'training_preparation/admission.json'
     v.write(admission, {'schema': 'isg-consumed-preparation-admission-v1', 'approved_manifests': [
-        {'manifest': ref(tickets), 'computation_kind': 'grasp_library', 'consumer_kind': 'attachment_free',
+        {'manifest': ref(tickets), 'computation_kind': 'reach_map' if map_route else 'grasp_library', 'consumer_kind': 'tabletop' if map_route else 'attachment_free',
          'account': 'minyeong', 'claim_namespace': str(Path(ticket['claim_path']).parent),
          'receipt_namespace': str(Path(ticket['submission_path']).parent)}]})
     route = root / 'training_preparation/route.json'
-    v.write(route, {'schema': 'isg-consumed-library-vast-route-v1', 'source_manifest': ref(tickets),
+    v.write(route, {'schema': 'isg-consumed-map-vast-route-v1' if map_route else 'isg-consumed-library-vast-route-v1', 'source_manifest': ref(tickets),
                    'jobs': [{'source_index': 0, 'physical_dedup_key': ticket['dedup_key'],
                              'claim_path': ticket['claim_path'], 'submission_path': ticket['submission_path'],
                              'job_dir': str(job), 'native_inputs': ref(job / 'native_inputs.json')}]})
@@ -45,6 +47,29 @@ def setup(root):
 
 
 def allowed(*args, **kwargs): return {'allowed': True}
+
+
+def test_consumed_map_overflow_uses_exact_claim_and_does_not_reactivate(tmp_path):
+    path, ticket, policy, capacity, _ = setup(tmp_path, map_route=True)
+    capacity.update(account_slots={'minyeong': 0, 'shiyuc': 48}, compatible_available_slots=48)
+    v.write(policy['cluster_status_path'], {'capacity': capacity})
+    result = m.cycle(tmp_path, path, v.sha(path), execute=True, timestamp=1000, gate=allowed)
+    assert len(result['submitted']) == 1 and result['ready'][0]['gpu'] == 'RTX 4090'
+    receipt = json.loads(Path(ticket['submission_path']).read_text())
+    queue = json.loads((tmp_path / 'vast/queue' / (receipt['job_id'] + '.json')).read_text())
+    assert queue['time_s'] == 1800 and queue['physical_dedup_key'] == ticket['dedup_key']
+    assert queue['script'].endswith('job_map_prebuild.sh')
+    v.write(tmp_path / 'vast/config.json', {'budget_usd': 3000, 'dispatch_job_ids': []})
+    assert m.cycle(tmp_path, path, v.sha(path), execute=True, timestamp=1000, gate=allowed)['submitted'] == []
+    assert json.loads((tmp_path / 'vast/config.json').read_text())['dispatch_job_ids'] == []
+
+
+def test_consumed_map_claimed_by_cluster_is_skipped(tmp_path):
+    path, ticket, _, _, _ = setup(tmp_path, map_route=True)
+    claim = Path(ticket['claim_path']); claim.parent.mkdir(parents=True); claim.write_text('cluster assignment')
+    result = m.cycle(tmp_path, path, v.sha(path), execute=True, timestamp=1000, gate=allowed)
+    assert not result['submitted'] and result['results'][0]['status'] == 'existing_physical_claim_or_receipt'
+    assert claim.read_text() == 'cluster assignment'
 
 
 def test_dry_run_prefers_live_idle_worker_and_never_claims_or_enqueues(tmp_path):
