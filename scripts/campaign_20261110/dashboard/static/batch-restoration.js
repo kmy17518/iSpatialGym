@@ -28,16 +28,18 @@ async function refreshPipeline(){
     if(!response.ok)throw Error(`HTTP ${response.status}`);
     const value=await response.json();
     if(value.campaign_id!=='campaign_20261110')throw Error('Campaign identity mismatch');
-    const rows=(value.records||[]).filter(row=>row.batch==='tray_changed_augmentation_r1'||row.batch==='tray_changed_augmentation_b_seed_r2');
+    const rows=(value.records||[]).filter(row=>row.batch?.startsWith('tray_changed_augmentation'));
     if(!rows.length)throw Error('Changed-augmentation records unavailable');
     const nodes=rows.map(row=>{
       const p=document.createElement('p');const review=row.review||{};
-      const name=row.start===50303100?'A':row.start===50303200?'Original B':'B repair';
+      const name=row.start===50303100?'Original A':row.start===50303200?'Original B':
+        row.batch.includes('_a_')?'A repair':row.batch.includes('_b_')?'B repair':row.candidate_id;
       const status=row.status||'unavailable';
       const native=row.native?`native ${row.native.written} written, observed ${observedText(row.native.observed_at)}`:'native result unavailable';
       const demo=review.demo_completed!=null?`; demo ${review.demo_successful}/${review.demo_completed} successful`:'';
       const job=review.allocation?.jobid?`; collector ${review.allocation.jobid}`:'';
-      const failure=review.error?` Failed check: ${review.error}.`:'';
+      const failureMessage=review.error||review.failure_evidence?.goal_occlusion?.first?.message||review.failure_evidence?.reasons?.join(', ');
+      const failure=failureMessage?` Failed check: ${failureMessage}.`:'';
       const next=review.next_action?` Next action: ${review.next_action}.`:'';
       p.textContent=`${name} (${row.start}): ${status.replaceAll('_',' ')}. ${native}${demo}${job}.${failure}${next} Stage observation: ${observedText(review.observed_at||row.last_observed_at)}. Owner: dataset_contract; dispatch: compute.`;
       p.className='pending';return p;
