@@ -31,7 +31,11 @@ def isolated_member_scene(contract, document, active):
             and initial[active] == contract['initialized_actors'][active],
             'member scene identity differs from checked pool contract')
     result = copy.deepcopy(document)
-    result['objects_info']['init_info'].update(copy.deepcopy(contract['initialized_actors']))
+    # Keep construction order identical in independent A/B worlds. Starting
+    # with each source's active actor would otherwise reverse native pool IDs.
+    result['objects_info']['init_info'] = {
+        **{name: value for name, value in result['objects_info']['init_info'].items() if name not in names},
+        **{name: copy.deepcopy(contract['initialized_actors'][name]) for name in sorted(names)}}
     destinations = result['state']['registry']['object_registry']
     isolation = {}
     for ordinal, name in enumerate(sorted(names)):
@@ -52,6 +56,8 @@ def isolated_member_scene(contract, document, active):
                            'state': copy.deepcopy(destinations[name])}
     require(set(destinations) == set(result['objects_info']['init_info']),
             'union scene object/state inventory differs')
+    result['state']['registry']['object_registry'] = {
+        name: destinations[name] for name in result['objects_info']['init_info']}
     return result, isolation
 
 

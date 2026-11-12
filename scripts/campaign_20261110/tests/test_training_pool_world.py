@@ -68,6 +68,9 @@ def test_each_union_member_preserves_its_exact_scene_and_other_fixed_scale_actor
     assert inactive['properties']['scale']==[.9]*3 and not inactive['properties']['visible']
     assert inactive['properties']['links']['base']=={'gravity_disabled':True,'collisions':{'shape':False}}
     assert docs[0]==original[0] and docs[2]==original[2]
+    first,_=isolated_member_scene(contract,docs[0],'campaign_pool_A')
+    assert list(first['objects_info']['init_info'])==list(union['objects_info']['init_info'])
+    assert list(first['state']['registry']['object_registry'])==list(union['state']['registry']['object_registry'])
 
 
 def isolation_fixture():
