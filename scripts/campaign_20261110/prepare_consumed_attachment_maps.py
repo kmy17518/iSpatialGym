@@ -118,6 +118,7 @@ v.update(finished_at=time.time(),map_files=[{'path':str(x),'sha256':sha(x)}for x
 (D/'terminal.json').write_text(json.dumps(v,indent=2)+'\\n');sys.exit(0 if all(a['returncode']==0 and a['native_done']for a in v['arms'])and v['map_files']else 2)
 '''
     compile(runner, 'run.py', 'exec'); tickets = []; units = []
+    namespace = root / 'infra/coordination/preparation_dispatch/consumed_asset_builds_r1'
     for _, unit in sorted(grouped.items()):
         row = unit['source']; entry = row['entry']; arms = sorted(unit['arms']); assert arms and set(arms) <= {'left', 'right'}
         if family != 'attachment':
