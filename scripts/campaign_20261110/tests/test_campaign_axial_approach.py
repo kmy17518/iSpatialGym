@@ -134,6 +134,17 @@ def test_path_selection_requires_both_exact_scoped_options(monkeypatch):
     assert not A.path_selection_enabled()
 
 
+def test_wider_stance_search_requires_strict_program_path_scope(monkeypatch):
+    import ispatialgym.sampling.campaign_axial_approach as A
+    monkeypatch.setenv('ISPATIALGYM_AXIAL_CHECKED_STANCE_SEARCH', '1')
+    monkeypatch.setattr(A, 'path_selection_enabled', lambda: False)
+    assert A.checked_stance_limits() == (64, 6)
+    monkeypatch.setattr(A, 'path_selection_enabled', lambda: True)
+    assert A.checked_stance_limits() == (256, 24)
+    monkeypatch.delenv('ISPATIALGYM_AXIAL_CHECKED_STANCE_SEARCH')
+    assert A.checked_stance_limits() == (64, 6)
+
+
 def test_program_path_rejects_failed_original_and_actual_branch_without_replacing_witness(monkeypatch):
     from types import SimpleNamespace
     import torch

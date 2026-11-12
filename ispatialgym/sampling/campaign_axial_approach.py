@@ -16,6 +16,19 @@ def path_selection_enabled():
         'ISPATIALGYM_AXIAL_PATH_SELECTION', '0') == '1'
 
 
+def checked_stance_limits():
+    """Bound a prospective search after the strict endpoint/path screens.
+
+    The earlier wider search used the failing 10 cm/open-finger endpoint
+    checks. R10's corrected checks reached an arc but could not retreat from
+    its nearest stances. Permit more *existing checked* Phase-2 candidates;
+    every map, IK, path and settled-program check still applies.
+    """
+    if path_selection_enabled() and os.environ.get('ISPATIALGYM_AXIAL_CHECKED_STANCE_SEARCH', '0') == '1':
+        return 256, 24
+    return 64, 6
+
+
 def check_program_push_path(sampler, chain, stance, direction, target, support):
     """Reject proposals that already fail the unchanged native program path.
 

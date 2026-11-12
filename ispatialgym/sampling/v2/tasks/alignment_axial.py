@@ -506,7 +506,8 @@ class AlignmentAxial(SamplerV2):
             for o in self.world.spawned.values():
                 self.world.park(o, list(self.world.spawned).index(o.name))
             self.kit.sync_world()
-            scan_order = order[:64] if campaign_plan is not None else order[:6]
+            from ispatialgym.sampling.campaign_axial_approach import checked_stance_limits
+            scan_order = order[:checked_stance_limits()[0]] if campaign_plan is not None else order[:6]
             scan = self._scan_candidates(rng, init, scan_order)
             plan = [(k, (d, f)) for k, d, f in scan]
             self._a5_scan = {"candidates": len(scan_order), "push_feasible": len(scan), "paired": sum(1 for _k, d, _f in scan if self._draw_paired(d))}
@@ -925,7 +926,8 @@ class AlignmentAxial(SamplerV2):
             if d is None:
                 continue
             (paired if self._draw_paired(d) else push_only).append((int(k), d, fails))
-            if self._campaign_scan_rejections is not None and len(paired) + len(push_only) >= 6:
+            from ispatialgym.sampling.campaign_axial_approach import checked_stance_limits
+            if self._campaign_scan_rejections is not None and len(paired) + len(push_only) >= checked_stance_limits()[1]:
                 break
         return paired + push_only
 
