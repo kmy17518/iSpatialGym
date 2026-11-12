@@ -13,6 +13,17 @@ from scripts.campaign_20261110.immutable_file_audit import ImmutableFileAudit
 SCHEMA = 'isg-map-cluster-return-request-v1'
 
 
+def prepared_targets(root, account, source_plan):
+    root = Path(root)
+    roots = {'minyeong': root, 'shiyuc': Path('/vision/u/shiyuc/minyeong') / root.name}
+    if account not in roots:
+        raise ValueError('unknown cluster owner')
+    base = roots[account] / 'training_preparation' / Path(source_plan).parent.name
+    # Immutable original closures remain intact. Cross-account returns get a
+    # separate prepared manifest, checked by the same native identity guards.
+    return tuple(base / name for name in ('build_dispatch_r1', 'build_dispatch_return_r1'))
+
+
 def unrepresented_claims(claims, observed_at):
     """Claims still consume capacity until actual starts precede the observation."""
     result = set()
@@ -73,12 +84,9 @@ def validate(root, request, job, active_staging, heartbeat_jobs, remote_jobs, no
     if request['unit_index'] != inputs['unit_index'] or request['source_plan']['path'] != inputs['source_plan'] or file_hash(inputs['source_plan']) != request['source_plan']['sha256']:
         raise ValueError('exact map plan/unit changed')
     account = request['account']
-    roots = {'minyeong': root, 'shiyuc': Path('/vision/u/shiyuc/minyeong') / root.name}
-    if account not in roots:
-        raise ValueError('unknown cluster owner')
-    target = roots[account] / 'training_preparation' / Path(inputs['source_plan']).parent.name / 'build_dispatch_r1'
     prepared = request['prepared']
-    if Path(prepared['path']) != target / 'prepared.json' or file_hash(prepared['path']) != prepared['sha256']:
+    target = Path(prepared['path']).parent
+    if target not in prepared_targets(root, account, inputs['source_plan']) or Path(prepared['path']).name != 'prepared.json' or file_hash(prepared['path']) != prepared['sha256']:
         raise ValueError('owned cluster preparation changed')
     rows = json.loads(Path(prepared['path']).read_text())['units']
     unit = next((u for u in rows if u['index'] == request['unit_index']), None)

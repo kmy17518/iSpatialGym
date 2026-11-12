@@ -29,6 +29,27 @@ def account_root(root, account):
     return root if account == 'minyeong' else Path('/vision/u/shiyuc/minyeong') / root.name
 
 
+def owned_preparation(root, inputs, account_slots):
+    """Prefer original parity only when that account has usable capacity."""
+    preferred = 'shiyuc' if inputs['unit_index'] % 2 else 'minyeong'
+    for account in (preferred, 'minyeong' if preferred == 'shiyuc' else 'shiyuc'):
+        if account_slots.get(account, 0) <= 0:
+            continue
+        for target in protocol.prepared_targets(root, account, inputs['source_plan']):
+            prepared = target / 'prepared.json'
+            if not prepared.is_file():
+                continue
+            unit = next((u for u in read(prepared)['units'] if u['index'] == inputs['unit_index']), None)
+            if unit is None:
+                continue
+            if any((Path(unit['output']) / name).exists() for name in ('started.json', 'terminal.json')):
+                raise ValueError('owned unit already executed')
+            if protocol.digest(unit['script']) != unit['script_sha256']:
+                raise ValueError('owned unit script changed')
+            return account, target, unit
+    return None
+
+
 def select(root):
     base = root / 'vast/cluster_return'
     base.mkdir(parents=True, exist_ok=True)
@@ -52,6 +73,10 @@ def select(root):
                 if r['expires_at'] >= now:
                     pending_requests[str(r['job_id'])] = r
         available = max(0, slots-len(outstanding | set(pending_requests)))
+        reserved = {str(c['job_id']): c['account'] for c in claims if str(c['job_id']) in outstanding}
+        reserved.update({jid: row['account'] for jid, row in pending_requests.items()})
+        account_slots = {account: max(0, count - sum(owner == account for owner in reserved.values()))
+                         for account, count in capacity['account_slots'].items()}
         queued = dispatch_order(states, read(root / 'vast/config.json'))
         # Paid ready workers keep useful compatible demand while remaining units
         # return to actually available cluster capacity, without a fleet ceiling.
@@ -72,16 +97,11 @@ def select(root):
             try:
                 inputs = read(directory / 'native_inputs.json')
                 index = inputs['unit_index']
-                account = 'shiyuc' if index % 2 else 'minyeong'
-                if sum(r['account'] == account for r in chosen) >= capacity['account_slots'].get(account, 0):
+                selection = owned_preparation(root, inputs, account_slots)
+                if selection is None:
                     continue
-                target = account_root(root, account) / 'training_preparation' / Path(inputs['source_plan']).parent.name / 'build_dispatch_r1'
+                account, target, unit = selection
                 prepared = target / 'prepared.json'
-                unit = next(u for u in read(prepared)['units'] if u['index'] == index)
-                if any((Path(unit['output']) / name).exists() for name in ('started.json', 'terminal.json')):
-                    continue
-                if protocol.digest(unit['script']) != unit['script_sha256']:
-                    raise ValueError('owned unit script changed')
                 chosen.append({'schema': protocol.SCHEMA, 'campaign_id': root.name, 'job_id': jid,
                                'account': account, 'observed_at': now, 'expires_at': now+180,
                                'queue': ref(root / 'vast/queue' / (jid+'.json')),
@@ -89,6 +109,7 @@ def select(root):
                                'source_plan': ref(inputs['source_plan']), 'unit_index': index,
                                'prepared': ref(prepared), 'unit': unit,
                                'wrapper': ref(target / 'pinned.sh'), 'runner': ref(target / 'run.py')})
+                account_slots[account] -= 1
             except Exception as error:
                 errors.append({'job_id': jid, 'error': str(error)})
         if chosen:
@@ -164,7 +185,7 @@ def submit(root, account):
                         report['recoveries'].append({'status': 'withdrawn_before_submission',
                             'path': release.withdraw(root, path, ack, attempt, current)})
                         continue
-                    wrapper = Path(ack['prepared']['path']).parent / 'pinned.sh'
+                    wrapper = Path(ack['wrapper']['path'])
                     command = ['sbatch', '--parsable', '--nice=1000', '-A', 'vision', '-p', 'svl,viscam',
                                '--exclude=svl9', '--gres=gpu:titanrtx:1', '--array='+str(ack['unit_index']),
                                '-c', '8', '--mem=48G', '--time=02:00:00', '-J', 'isg261110_map_return',

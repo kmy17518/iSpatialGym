@@ -143,3 +143,46 @@ def test_changed_launch_code_prevents_claim(tmp_path):
     Path(request['runner']['path']).write_text('changed run.py')
     with pytest.raises(ValueError, match='launch code changed'):
         cr.validate(root, request, job, set(), set(), set(), 1001)
+
+
+def test_even_unit_can_use_available_secondary_immutable_closure(tmp_path, monkeypatch):
+    from scripts.campaign_20261110.infra_vast import cluster_return_client as client
+    root, request, job, _, _ = fixture(tmp_path)
+    source = Path(request['prepared']['path']).parent
+    secondary = tmp_path / 'secondary/build_dispatch_return_r1'
+    secondary.mkdir(parents=True)
+    script = secondary / 'job.sh'; script.write_text('exact same native map command')
+    unit = {'index': 0, 'script': str(script), 'script_sha256': cr.digest(script),
+            'output': str(secondary / 'units/0')}
+    cr.write(secondary / 'prepared.json', {'units': [unit]})
+    monkeypatch.setattr(cr, 'prepared_targets', lambda r, account, p:
+                        (source,) if account == 'minyeong' else (secondary,))
+    inputs = {'unit_index': 0, 'source_plan': request['source_plan']['path']}
+    assert client.owned_preparation(root, inputs, {'minyeong': 0, 'shiyuc': 1}) == ('shiyuc', secondary, unit)
+    assert client.owned_preparation(root, inputs, {'minyeong': 1, 'shiyuc': 1})[0] == 'minyeong'
+    assert client.owned_preparation(root, inputs, {'minyeong': 0, 'shiyuc': 0}) is None
+    cr.write(Path(unit['output']) / 'started.json', {'job_id': 123})
+    with pytest.raises(ValueError, match='already executed'):
+        client.owned_preparation(root, inputs, {'minyeong': 0, 'shiyuc': 1})
+
+
+def test_separate_return_manifest_requires_exact_owned_location_and_hash(tmp_path):
+    import shutil
+    root, request, job, _, _ = fixture(tmp_path)
+    original = Path(request['prepared']['path']).parent
+    original_digest = cr.digest(original / 'prepared.json')
+    target = original.with_name('build_dispatch_return_r1')
+    shutil.copytree(original, target)
+    unit = dict(request['unit'])
+    unit['output'] = str(target / 'units/0'); unit['script'] = str(target / 'units/0/job.sh')
+    cr.write(target / 'prepared.json', {'units': [unit], 'copied_library_files': {}})
+    request['unit'] = unit
+    for field, name in [('prepared', 'prepared.json'), ('wrapper', 'pinned.sh'), ('runner', 'run.py')]:
+        request[field] = {'path': str(target/name), 'sha256': cr.digest(target/name)}
+    assert cr.validate(root, request, job, set(), set(), set(), 1001)['prepared'] == request['prepared']
+    assert cr.digest(original / 'prepared.json') == original_digest
+    moved = target.with_name('unreviewed_other_directory')
+    shutil.copytree(target, moved)
+    request['prepared'] = {'path': str(moved/'prepared.json'), 'sha256': cr.digest(moved/'prepared.json')}
+    with pytest.raises(ValueError, match='preparation changed'):
+        cr.validate(root, request, job, set(), set(), set(), 1001)
