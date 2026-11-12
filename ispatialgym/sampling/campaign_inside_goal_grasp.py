@@ -1,5 +1,24 @@
 """Keep a bounded native pick proposal only when its fixed inside goal is reachable."""
 import copy
+import math
+
+
+def goal_stance_order(order, candidates, anchor):
+    """Rank existing checked stances by the measured goal-side robot pose.
+
+    The old source's pick focus need not suit a goal-compatible grasp. Preserve
+    fresh target draws at each native candidate's own focus and all later gates.
+    """
+    if not anchor:
+        return order
+    def distance(index):
+        st = candidates[int(index)]
+        yaw = float(st.base_pose2d[2]) - float(anchor['base_pose2d'][2])
+        return (math.dist([float(v) for v in st.base_pose2d[:2]], anchor['base_pose2d'][:2])
+                + .3 * abs(math.atan2(math.sin(yaw), math.cos(yaw)))
+                + abs(float(st.translate) - float(anchor['translate']))
+                + abs(float(st.tilt) - float(anchor['tilt'])))
+    return sorted((int(i) for i in order), key=lambda i: (distance(i), i))
 
 
 def fixed_goal_grasp_predicate(s):

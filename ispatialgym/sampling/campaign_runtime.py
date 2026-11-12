@@ -123,6 +123,8 @@ def contact_recovery(option: str) -> bool:
         'cap_geometry_above_pregrasp': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
         'inside_goal_grasp_proposal': ('inter_object_relation_satisfaction-inside_01',
                                       'inter_object_relation_satisfaction-inside_small_scale'),
+        'inside_goal_stance_proposal': ('inter_object_relation_satisfaction-inside_01',
+                                       'inter_object_relation_satisfaction-inside_small_scale'),
         'inside_top_grasp_proposal': ('inter_object_relation_satisfaction-inside_01',
                                       'inter_object_relation_satisfaction-inside_small_scale'),
         'axial_magazine_contact_height': ('alignment-axial_04', 'alignment-axial'),
@@ -152,7 +154,7 @@ def contact_recovery(option: str) -> bool:
                 all(abs(float(v) - spec[2]) <= 1e-7 for v in objects[0].default_scale)
                 for role, spec in expected.items()),
                 'cereal brace gap belongs to its exact canonical models and scales')
-        if option == 'inside_goal_grasp_proposal':
+        if option in ('inside_goal_grasp_proposal', 'inside_goal_stance_proposal'):
             require(template.split == 'eval_standard' and all(
                 [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == role] == [spec]
                 for role, spec in {'target': ('brussels_sprouts', 'mbkrxe', (1., 1., 1.)),

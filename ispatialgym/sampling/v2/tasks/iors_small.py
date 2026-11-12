@@ -2822,6 +2822,10 @@ class IORSSmall(SamplerV2):
             order = prioritize_written_stances(order, cands, hints)
             if source_stance is not None and not written:
                 TT._count(self, 'campaign_' + self.relation + '.source_stance_ranked')
+            if campaign_runtime.contact_recovery('inside_goal_stance_proposal'):
+                from ispatialgym.sampling.campaign_inside_goal_grasp import goal_stance_order
+                order = goal_stance_order(order, cands, source_stance)
+                TT._count(self, 'campaign_inside.goal_stance_ranked')
         for k in order[:6]:
             cand = cands[int(k)]
             pdc_c = pdc.get(id(cand))

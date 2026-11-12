@@ -6,24 +6,40 @@ import pytest
 import torch as th
 
 from ispatialgym.sampling import campaign_runtime as CR
-from ispatialgym.sampling.campaign_inside_goal_grasp import fixed_goal_grasp_predicate
+from ispatialgym.sampling.campaign_inside_goal_grasp import fixed_goal_grasp_predicate, goal_stance_order
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.stances import GraspRecord, SidecarDraft, Stance
 from scripts.campaign_20261110.contracts import ContractError
 
 
-def test_goal_grasp_policy_is_exact_template_scoped(monkeypatch):
+@pytest.mark.parametrize('option', ['inside_goal_grasp_proposal', 'inside_goal_stance_proposal'])
+def test_goal_grasp_policy_is_exact_template_scoped(monkeypatch, option):
     objects = [NS(role='target', category='brussels_sprouts', model='mbkrxe', default_scale=(1.,)*3),
                NS(role='partner', category='bowl', model='belcml', default_scale=(1.,)*3)]
     t = NS(class_id='inter_object_relation_satisfaction-inside_01', task='inter_object_relation_satisfaction-inside_small_scale',
-           split='eval_standard', objects=objects, scene_setup={'recovery_options': {'inside_goal_grasp_proposal': True}})
+           split='eval_standard', objects=objects, scene_setup={'recovery_options': {option: True}})
     monkeypatch.setattr(CR, 'active', lambda: False)
-    assert not CR.contact_recovery('inside_goal_grasp_proposal')
+    assert not CR.contact_recovery(option)
     monkeypatch.setattr(CR, 'active', lambda: True)
     monkeypatch.setattr(CR, 'configuration', lambda: (None, t, None, None))
-    assert CR.contact_recovery('inside_goal_grasp_proposal')
+    assert CR.contact_recovery(option)
     objects[1].model = 'other'
-    with pytest.raises(ContractError): CR.contact_recovery('inside_goal_grasp_proposal')
+    with pytest.raises(ContractError): CR.contact_recovery(option)
+
+
+def test_goal_stance_ranking_keeps_native_pool_and_fresh_pick_focus():
+    anchor = {'base_pose2d': [1., 2., 0.], 'translate': 0., 'tilt': -.6, 'focus': [0., 0., .8]}
+    candidates = [NS(base_pose2d=(1., 2., 0.), translate=0., tilt=-.6, focus=[.3, .2, .8]),
+                  NS(base_pose2d=(1.5, 2., 0.), translate=0., tilt=-.6, focus=[0., 0., .8]),
+                  NS(base_pose2d=(1., 2., 0.), translate=0., tilt=-.6, focus=[.4, .2, .8]),
+                  NS(base_pose2d=(1., 2., 0.), translate=0., tilt=0., focus=[0., 0., .8])]
+    order = [1, 3, 2, 0]
+    ranked = goal_stance_order(order, candidates, anchor)
+    assert ranked == [0, 2, 1, 3] and set(ranked) == set(order)
+    assert order == [1, 3, 2, 0] and candidates[0].focus == [.3, .2, .8]
+    assert goal_stance_order(order, candidates, None) is order
+    # A candidate absent from the filtered native pool is never introduced.
+    assert goal_stance_order([1, 3], candidates, anchor) == [1, 3]
 
 
 def test_full_native_place_screen_keeps_partner_and_restores_candidate_state(monkeypatch):
