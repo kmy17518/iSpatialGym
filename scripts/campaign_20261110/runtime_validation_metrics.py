@@ -167,6 +167,65 @@ def scheduler(job_ids):
     return result, {'command': command, 'timezone': 'UTC', 'stdout': proc.stdout, 'observed_at': time.time()}
 
 
+def vast_accounting(root, job, evidence_dir, now=None):
+    """Join actual immutable worker attempts; shared rental startup stays separate."""
+    root = Path(root); now = time.time() if now is None else now
+    jid = str(job['job_id']); state_path = root/'vast/state/jobs'/(jid+'.json')
+    data = state_path.read_bytes(); state = json.loads(data)
+    require(str(state['id']) == jid and Path(state['job_dir']).resolve() == Path(job['job_dir']).resolve(),
+            'Vast job identity differs')
+    retained = Path(evidence_dir)/(jid+'_'+hashlib.sha256(data).hexdigest()+'.json')
+    retained.parent.mkdir(parents=True, exist_ok=True)
+    if not retained.exists(): retained.write_bytes(data)
+    evidence = [reference(retained)]; attempts_by_id = {}; parts = []; missing = []
+    for path in sorted((root/'vast/state/attempts'/jid).glob('*.json')):
+        item = json.loads(path.read_text()); done = item['done']; aid = item['attempt_id']
+        require(item['schema'] == 'isg-vast-attempt-v1' and str(item['job_id']) == jid and
+                str(done['id']) == jid and done['attempt_id'] == aid and
+                Path(done['job_dir']).resolve() == Path(job['job_dir']).resolve(), 'Vast attempt identity differs')
+        require(aid not in attempts_by_id, 'duplicate Vast attempt identity')
+        require(done.get('gpu_count') == 1, 'multi-GPU rental cost allocation is unavailable')
+        begin_path = root/'vast/state/cost_provenance'/('assignment_begin_'+hashlib.sha256(('assignment_begin\0'+aid).encode()).hexdigest()+'.json')
+        begin = json.loads(begin_path.read_text())
+        require(begin['kind'] == 'assignment_begin' and begin['identity'] == aid and
+                str(begin['job_id']) == jid and str(begin['instance']) == str(item['instance']) and
+                begin['assignment_started_unix'] == item['assigned_unix'], 'Vast assignment provenance differs')
+        require(Path(begin['scope']['job_dir']).resolve() == Path(job['job_dir']).resolve(), 'Vast assignment scope differs')
+        times = [item['assigned_unix'], done['fetch_started_unix'], done['runtime_started_unix'],
+                 done['runtime_ended_unix'], done['upload_finished_unix']]
+        require(all(isinstance(t, (int, float)) and not isinstance(t, bool) and 0 < t <= now for t in times)
+                and times == sorted(times), 'Vast worker timestamps invalid')
+        part = {'attempt_id': aid, 'instance': str(item['instance']), 'terminal': True, 'rc': done.get('rc'),
+                'allocated_gpu_seconds': times[-1]-times[0], 'assignment_to_fetch_seconds': times[1]-times[0],
+                'fetch_seconds': times[2]-times[1], 'runtime_seconds': times[3]-times[2],
+                'upload_seconds': times[4]-times[3], 'assignment': reference(begin_path), 'attempt': reference(path)}
+        attempts_by_id[aid] = part; parts.append(part); evidence.extend([part['assignment'], part['attempt']])
+    tries = int(state.get('tries', 0)); require(tries >= len(parts), 'Vast try count contradicts preserved attempts')
+    terminal = state.get('status') in ('synced', 'failed')
+    # A current worker heartbeat supplies a censored lower bound, never a guessed end.
+    if state.get('status') == 'assigned' and len(parts) < tries:
+        begin = checked(state['cost_assignment_begin']); aid = begin['identity']
+        require(str(begin['job_id']) == jid and str(begin['instance']) == str(state['instance']) and
+                begin['assignment_started_unix'] == state['assigned'] and
+                Path(begin['scope']['job_dir']).resolve() == Path(job['job_dir']).resolve(), 'current Vast assignment differs')
+        hb_path = root/'vast/worker_heartbeats'/(str(state['instance'])+'.json')
+        hb_data = hb_path.read_bytes(); hb = json.loads(hb_data)['heartbeat']; running = hb.get('running', {}).get(jid)
+        if aid not in attempts_by_id and running and 0 <= now-hb['time'] <= 180 and hb['time'] >= state['assigned']:
+            hb_retained = Path(evidence_dir)/('heartbeat_'+hashlib.sha256(hb_data).hexdigest()+'.json')
+            if not hb_retained.exists(): hb_retained.write_bytes(hb_data)
+            parts.append({'attempt_id': aid, 'instance': str(state['instance']), 'terminal': False,
+                          'allocated_gpu_seconds': hb['time']-state['assigned'],
+                          'observed_through': hb['time'], 'phase': running.get('phase'), 'cpus': running.get('cpus'),
+                          'assignment': state['cost_assignment_begin'], 'heartbeat': reference(hb_retained)})
+            evidence.extend([state['cost_assignment_begin'], reference(hb_retained)])
+    if len(parts) != tries: missing.append('Unobserved or lost worker attempts: '+str(tries-len(parts)))
+    seconds = sum(p['allocated_gpu_seconds'] for p in parts)
+    return {'backend': 'vast', 'job_id': jid, 'state': state.get('status'), 'terminal': terminal,
+            'allocated_gpu_seconds': None if missing else seconds, 'known_attempt_gpu_seconds': seconds,
+            'attempts': parts, 'missing_cost_evidence': missing, 'evidence': evidence,
+            'cost_boundary': 'Assignment through actual upload completion, including failed attempts; runtime is an overlapping component. Shared rental provisioning/idle is separate.'}
+
+
 def json_lines(path):
     lines = Path(path).read_bytes().splitlines(keepends=True); output = []
     for i, line in enumerate(lines):
@@ -245,8 +304,11 @@ def observe(run_dir):
             try:
                 jid = str(job['job_id']); directory = Path(job['job_dir']); measured = account.get(jid)
                 if job['backend'] == 'vast':
-                    measured = {'backend': 'vast', 'job_id': jid, 'terminal': False, 'allocated_gpu_seconds': None,
-                                'state': 'requires_exact_worker_attempt_and_rental_provenance'}
+                    try:
+                        measured = vast_accounting(run_dir.parents[1], job, run_dir/'measurements/vast_states')
+                    except Exception as exc:
+                        measured = {'backend': 'vast', 'job_id': jid, 'terminal': False, 'allocated_gpu_seconds': None,
+                                    'state': 'cost_evidence_unavailable', 'error': type(exc).__name__+': '+str(exc)}
                 if measured is None:
                     measured = {'backend': job['backend'], 'job_id': jid, 'state': 'unavailable',
                                 'terminal': False, 'allocated_gpu_seconds': None}

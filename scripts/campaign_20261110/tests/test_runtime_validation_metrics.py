@@ -1,8 +1,9 @@
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
-from scripts.campaign_20261110.runtime_validation_metrics import attempts, accounting, rates, register, reference, validate_row, json_lines, sample_distribution
+from scripts.campaign_20261110.runtime_validation_metrics import attempts, accounting, rates, register, reference, validate_row, json_lines, sample_distribution, vast_accounting
 
 
 class MetricsTest(unittest.TestCase):
@@ -74,6 +75,45 @@ class MetricsTest(unittest.TestCase):
 
     def test_low_sample_distribution_is_explicit(self):
         self.assertEqual(sample_distribution([9])['n'],1);self.assertEqual(sample_distribution([9,3])['median'],6);self.assertIsNone(sample_distribution([])['median'])
+
+    def vast_fixture(self, root):
+        job={'job_id':'900001','job_dir':str(root/'out/source')}
+        def put(path, value):
+            path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(value));return reference(path)
+        aid='900001_1_abc';begin={'kind':'assignment_begin','identity':aid,'job_id':'900001','instance':'42','assignment_started_unix':10,'scope':{'job_dir':job['job_dir']}}
+        begin_ref=put(root/'vast/state/cost_provenance'/('assignment_begin_'+hashlib.sha256(('assignment_begin\0'+aid).encode()).hexdigest()+'.json'),begin)
+        done={'id':'900001','attempt_id':aid,'job_dir':job['job_dir'],'gpu_count':1,'fetch_started_unix':12,'runtime_started_unix':15,'runtime_ended_unix':35,'upload_finished_unix':40,'rc':1}
+        attempt=root/'vast/state/attempts/900001'/(''+aid+'.json');put(attempt,{'schema':'isg-vast-attempt-v1','job_id':'900001','attempt_id':aid,'instance':'42','assigned_unix':10,'done':done})
+        state=root/'vast/state/jobs/900001.json';put(state,{'id':'900001','job_dir':job['job_dir'],'status':'failed','tries':1,'cost_assignment_begin':begin_ref,'instance':'42','assigned':10})
+        return job,state,attempt,put
+
+    def test_vast_failed_attempt_includes_fetch_and_upload_once(self):
+        with tempfile.TemporaryDirectory()as t:
+            root=Path(t);job,state,attempt,put=self.vast_fixture(root);out=vast_accounting(root,job,root/'evidence',now=100)
+            self.assertEqual(out['allocated_gpu_seconds'],30);self.assertEqual(out['attempts'][0]['runtime_seconds'],20);self.assertTrue(out['terminal'])
+            self.assertEqual(accounting([out,out])['observed_allocated_gpu_hours'],30/3600)
+
+    def test_vast_foreign_attempt_fails_identity(self):
+        with tempfile.TemporaryDirectory()as t:
+            root=Path(t);job,state,attempt,put=self.vast_fixture(root);v=json.loads(attempt.read_text());v['done']['job_dir']=str(root/'foreign');put(attempt,v)
+            with self.assertRaisesRegex(ValueError,'attempt identity'):vast_accounting(root,job,root/'evidence',now=100)
+
+    def test_vast_lost_history_cannot_disappear_from_cost(self):
+        with tempfile.TemporaryDirectory()as t:
+            root=Path(t);job,state,attempt,put=self.vast_fixture(root);v=json.loads(state.read_text());v['tries']=2;put(state,v)
+            out=vast_accounting(root,job,root/'evidence',now=100);self.assertIsNone(out['allocated_gpu_seconds']);self.assertEqual(out['known_attempt_gpu_seconds'],30)
+
+    def test_vast_live_cost_requires_fresh_exact_heartbeat(self):
+        with tempfile.TemporaryDirectory()as t:
+            root=Path(t);job,state,attempt,put=self.vast_fixture(root);attempt.unlink();v=json.loads(state.read_text());v['status']='assigned';put(state,v)
+            put(root/'vast/worker_heartbeats/42.json',{'heartbeat':{'time':30,'running':{'900001':{'phase':'run','cpus':'1-9'}}}})
+            out=vast_accounting(root,job,root/'evidence',now=100);self.assertEqual(out['allocated_gpu_seconds'],20);self.assertFalse(out['terminal'])
+            stale=vast_accounting(root,job,root/'evidence',now=1000);self.assertIsNone(stale['allocated_gpu_seconds'])
+
+    def test_vast_timestamp_and_assignment_mismatch_rejected(self):
+        with tempfile.TemporaryDirectory()as t:
+            root=Path(t);job,state,attempt,put=self.vast_fixture(root);v=json.loads(attempt.read_text());v['done']['upload_finished_unix']=20;put(attempt,v)
+            with self.assertRaisesRegex(ValueError,'timestamps'):vast_accounting(root,job,root/'evidence',now=100)
 
 
 if __name__=='__main__':unittest.main()
