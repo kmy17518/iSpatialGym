@@ -80,6 +80,13 @@ def read_demo_results(job):
     except OSError:pass
     return results
 
+
+def observation_waits_for_demo(entry, successes, request):
+    """No successful demo means there is nothing this observer may dispatch."""
+    return (not successes and entry.get('status') in ('waiting_for_demo','demo_missing','demo_failed')
+            and not entry.get('replay_job_id') and not entry.get('vast_migration')
+            and not pending_retry(entry, request))
+
 def archive_diagnosed_launcher_gate(entry, request, root, active):
     """Preserve explicitly diagnosed launcher evidence before a new strict replay.
 
@@ -261,7 +268,7 @@ def main():
         retry_requests=read(a.root/'validation/replay_retry_requests.json',{}).get('requests',{})
         raw_rows=len(rows);rows=order_ledger_rows(rows,state['gates'],retry_requests)
         scan={'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'ledger_rows':raw_rows,
-              'unique_rows':len(rows),'terminal_observations_reused':0,'source_authorizations_checked':0}
+              'unique_rows':len(rows),'terminal_observations_reused':0,'awaiting_demo_observations':0,'source_authorizations_checked':0}
         progresspath=a.root/'validation/controller_progress.json'
         for position,row in enumerate(rows):
             jid=row['jobid'];job=pathlib.Path(row['job_dir']);entry=state['gates'].setdefault(jid,{'source_job_id':jid,'key':row['key'],'source_job_dir':str(job),'status':'waiting_for_demo'})
@@ -270,6 +277,17 @@ def main():
             successes=[x for x in source_results if x.get('success') is True]
             entry['demo_successes']=len(successes)
             entry['demo_failures']=sum(x.get('success') is False for x in source_results)
+            if observation_waits_for_demo(entry,successes,retry_requests.get(jid)):
+                scan['awaiting_demo_observations']+=1
+                if jid not in active:
+                    vast_state=read(a.root/'vast/state/jobs'/f'{jid}.json',{})
+                    vast_queued=(a.root/'vast/queue'/f'{jid}.json').exists() and vast_state.get('status','queued') in ('queued','assigned')
+                    if not vast_queued:entry['status']='demo_failed' if source_results else 'demo_missing'
+                entry['waiting_reason']='successful_demo_required_before_replay_authorization'
+                if position%50==0:
+                    atomic(progresspath,{**scan,'phase':'awaiting_demo','position':position,'source_job_id':jid,
+                        'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat()})
+                continue
             if terminal_observation_unchanged(entry,row,retry_requests.get(jid)):
                 scan['terminal_observations_reused']+=1
                 # Updating this heartbeat never changes the gate's observation

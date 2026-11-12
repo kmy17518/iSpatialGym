@@ -1,6 +1,6 @@
 import json
 import pytest
-from scripts.campaign_20261110.controller_validation import terminal_observation_unchanged, order_ledger_rows
+from scripts.campaign_20261110.controller_validation import terminal_observation_unchanged, order_ledger_rows, observation_waits_for_demo
 
 
 def fixture(tmp_path):
@@ -42,3 +42,17 @@ def test_explicit_retry_and_new_work_precede_history_and_duplicates():
 def test_changed_ledger_identity_is_not_silently_deduplicated():
     rows=[{'jobid':'1','job_dir':p,'key':'x','code':'n'}for p in ('one','two')]
     assert len(order_ledger_rows(rows,{},{}))==2
+
+
+@pytest.mark.parametrize('status',['waiting_for_demo','demo_failed','demo_missing'])
+def test_jobs_without_success_cannot_authorize_or_dispatch_replay(status):
+    entry={'status':status}
+    assert observation_waits_for_demo(entry,[],None)
+    assert not observation_waits_for_demo(entry,[{'success':True}],None)
+    assert not observation_waits_for_demo(entry,[],{'request_id':'retry'})
+
+
+@pytest.mark.parametrize('field',['replay_job_id','vast_migration'])
+def test_existing_replay_or_migration_still_reconciles_without_demo_results(field):
+    entry={'status':'waiting_for_demo',field:'existing'}
+    assert not observation_waits_for_demo(entry,[],None)
