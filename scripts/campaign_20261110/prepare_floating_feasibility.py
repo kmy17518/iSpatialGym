@@ -11,10 +11,38 @@ from collections import Counter
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
 import time
+
+
+def verify_floating_consumer(release, target, arm):
+    """Exercise the sampler's real lookup, scale/policy checks and grasp reader."""
+    from ispatialgym.sampling import grasp_library as GL
+    from ispatialgym.grasping import schema as GS
+
+    key = target["category"] + "__" + target["model"] + "__f"
+    previous = {name: os.environ.get(name) for name in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_V2_ONLY")}
+    try:
+        os.environ.update(ISPATIALGYM_GRASP_LIBRARY_V2=str(Path(release) / "glib"), ISPATIALGYM_V2_ONLY="1")
+        resolved = GL.resolve_key(target["category"], target["model"], key, ["floating"])
+        assert resolved == key
+        lib = GL.v2_entry(resolved)
+        assert lib is not None and lib.floating
+        assert lib.scale == GS.canonical_scale(target["applied_scale"])
+        assert lib.data["arm"] == arm
+        assert all(lib.data[k] == target[k] for k in ("category", "model", "dataset"))
+        grasps = GL.load_grasps(resolved)
+        assert grasps and all(g.meta["library"] == "v2" for g in grasps)
+        return {"key": key, "library": lib.path, "arm": arm, "scale": list(lib.scale), "native_reader_grasps": len(grasps)}
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 def main(args):
@@ -136,12 +164,13 @@ def main(args):
                     dest = release / "glib/models" / lp.parent.name
                     shutil.copytree(lp.parent, dest)
                     routed = read(dest / "library.json")
-                    routed["legacy_key"] = target["category"] + "__" + target["model"]
+                    routed["legacy_key"] = target["category"] + "__" + target["model"] + "__f"
                     assert {k: v for k, v in routed.items() if k != "legacy_key"} == {k: v for k, v in lib.items() if k != "legacy_key"}
                     write(dest / "library.json", routed)
                     (release / "maps").mkdir()
                     write(release / "anchors.json", {})
-                    proof = {"source": library_ref, "routed": ref(dest / "library.json"), "alias_only": True, "arm": arm, "native_motion_dependency": motion, "files": [ref(p) for p in release.rglob("*") if p.is_file()], "benchmark_credit": 0}
+                    consumer = verify_floating_consumer(release, target, arm)
+                    proof = {"source": library_ref, "routed": ref(dest / "library.json"), "alias_only": True, "arm": arm, "native_motion_dependency": motion, "consumer_lookup": consumer, "files": [ref(p) for p in release.rglob("*") if p.is_file()], "benchmark_credit": 0}
                     write(release / "release.json", proof)
                     releases[release_key] = release
                 release = releases[release_key]
