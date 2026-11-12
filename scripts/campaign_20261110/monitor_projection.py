@@ -176,10 +176,19 @@ def project(root, live_jobs, capacity, now=None, accountant=accounting):
         errors.extend(preparation_flow['exceptions'])
     except (OSError, ValueError, KeyError, TypeError) as exc:
         errors.append({'kind': 'preparation_ready_count_unknown', 'owner': '/root', 'detail': str(exc)})
+    joint_schedule = {}
+    try:
+        spec = importlib.util.spec_from_file_location('joint_readiness_forecast', Path(__file__).with_name('joint_readiness.py'))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        joint_schedule = module.publish(root, preparation_flow, dt.datetime.now(dt.timezone.utc).timestamp() if fixed_observation_time is None else now)
+        errors.extend(joint_schedule.get('exceptions', []))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        errors.append({'kind': 'joint_readiness_forecast_unknown', 'owner': '/root', 'detail': str(exc)})
     return {'schema': SCHEMA, 'schema_version': 1, 'campaign_id': 'campaign_20261110', 'observed_at': now,
             'owner': 'existing local campaign monitor', 'cadence_seconds': 45, 'jobs_observed_at': now, 'jobs': rows, 'workers': workers,
             'backlog': backlog, 'exceptions': errors, 'capacity': capacity, 'capacity_blockers': registry.get('capacity_blockers', []),
-            'evidence': evidence, 'utilization_status': 'unmeasured', 'preparation_flow': preparation_flow}
+            'evidence': evidence, 'utilization_status': 'unmeasured', 'preparation_flow': preparation_flow,
+            'joint_schedule': joint_schedule}
 
 
 def publish(root, live_jobs, capacity):
