@@ -1,7 +1,7 @@
 from copy import deepcopy
 import pytest
 from scripts.campaign_20261110.contracts import ContractError
-from scripts.campaign_20261110.training_sequential_augmentation import one_world,compare_physics_reference
+from scripts.campaign_20261110.training_sequential_augmentation import one_world,compare_physics_reference,observed_augmentation_change
 from scripts.campaign_20261110.contracts import digest
 
 
@@ -33,6 +33,66 @@ def test_independent_reference_checks_final_lighting_and_reset_mass():
     b=deepcopy(a);b['boundaries'][0]['native_dynamics_context']['dynamic_roots']['target']['mass']=3.
     b['boundaries'][0]['native_dynamics_context_sha256']=digest(b['boundaries'][0]['native_dynamics_context'])
     with pytest.raises(ContractError,match='mass'):compare_physics_reference(a,b)
+
+
+def augmentation_fixture(tmp_path, mutation=None):
+    import json
+    from scripts.campaign_20261110.contracts import file_digest
+    def put(name,value):
+        path=tmp_path/name;path.write_text(json.dumps(value))
+        return {'path':str(path),'sha256':file_digest(path)}
+    stable=put('stable.json',{'objects_info':{'init_info':{'chair':{'args':{'fixed_base':True}}}},
+        'state':{'registry':{'object_registry':{'chair':{'root_link':{'pos':[1.,2.,3.],'ori':[0.,0.,0.,1.]}}}}}})
+    records=[];states=[]
+    for index,factor in enumerate((1.2,.9)):
+        color_factor=1.02 if index==0 else .98
+        lighting={'schema':'isg-lighting-v1','intensity_factor':factor,'skybox_color_factors':[color_factor,1.,1.]}
+        position=[20.,30.,-1000.] if index==0 else [1.,2.,3.]
+        perturbations={'lighting':lighting,'removed_objects':['chair'] if index==0 else []}
+        augmentation={'lighting':{'request':lighting,'fixtures':{'lamp':{'default':1000.,'applied':1000.*factor}},
+            'skybox':{'default':{'intensity':500.,'color':[1.,1.,1.]},
+                      'applied':{'intensity':500.*factor,'color':[color_factor,1.,1.]}}},
+            'moved_objects':{'chair':{'moved_to':position}} if index==0 else {}}
+        state={'objects':{'chair':{'fixed_base':True,'position':position.copy(),'orientation':[0.,0.,0.,1.]},
+            'target':{'position':[float(index),0.,0.]}},'lights':{'lamp':1000.*factor},
+            'skybox':{'intensity':500.*factor,'color':[color_factor,1.,1.]}}
+        if mutation:mutation(index,augmentation,state)
+        tro=put(f'tro{index}.json',{'ispatialgym':{'campaign':{'perturbations':perturbations,
+            'runtime':{'augmentation':augmentation}}}})
+        records.append({'template':{'scene_setup':{'sequential_augmentation_base':{'scene':stable}}},
+                        'perturbations':perturbations,'artifacts':{'tro':tro}})
+        states.append(state)
+    return records,states
+
+
+def test_changed_augmentation_requires_measured_declared_actor_and_lighting(tmp_path):
+    records,states=augmentation_fixture(tmp_path)
+    result=observed_augmentation_change(tmp_path,records,*states)
+    assert result['changed_fixtures']==['lamp'] and result['skybox_changed'] is True
+    assert result['parking_displacement_m']['chair']>1000.
+    assert result['native_source_positions_and_lighting_checked'] is True
+
+
+@pytest.mark.parametrize('fault',['unchanged_lighting','unchanged_parking','wrong_skybox',
+    'missing_actor','wrong_orientation','no_material_light_change','no_material_parking_change','nonfinite'])
+def test_changed_augmentation_rejects_consistently_wrong_cold_and_reused_states(tmp_path,fault):
+    def mutate(index,augmentation,state):
+        if fault=='no_material_light_change':
+            augmentation['lighting']['fixtures']['lamp']['applied']=0.
+            augmentation['lighting']['skybox']['applied']={'intensity':0.,'color':[0.,0.,0.]}
+            state['lights']['lamp']=0.;state['skybox']={'intensity':0.,'color':[0.,0.,0.]}
+        if fault=='no_material_parking_change' and index==0:
+            augmentation['moved_objects']['chair']['moved_to']=[1.,2.,3.]
+            state['objects']['chair']['position']=[1.,2.,3.]
+        if index!=1:return
+        if fault=='unchanged_lighting':state['lights']['lamp']=1200.
+        if fault=='unchanged_parking':state['objects']['chair']['position']=[20.,30.,-1000.]
+        if fault=='wrong_skybox':state['skybox']['color']=[1.2,1.,1.]
+        if fault=='missing_actor':state['objects'].pop('chair')
+        if fault=='wrong_orientation':state['objects']['chair']['orientation']=[1.,0.,0.,0.]
+        if fault=='nonfinite':state['objects']['chair']['position'][0]=float('nan')
+    records,states=augmentation_fixture(tmp_path,mutate)
+    with pytest.raises(ContractError):observed_augmentation_change(tmp_path,records,*states)
 
 
 def cleanup_fixture(tmp_path,monkeypatch,mutation=None):

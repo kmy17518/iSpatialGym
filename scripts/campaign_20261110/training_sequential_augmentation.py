@@ -3,6 +3,7 @@
 Independent references, ordinary success, ordinary failure and interruption are
 separate witnesses. This audit neither dispatches nor releases production.
 """
+import math
 from pathlib import Path
 
 from .contracts import digest, file_digest, require
@@ -38,6 +39,71 @@ def compare_physics_reference(reference, reused):
     same_reset_boundary(reference['step']['after'], reused['step']['after'])
 
 
+def observed_augmentation_change(root, records, first, second):
+    """Prove real light/parking changes, even if cold and reused paths share a bug."""
+    require(len(records) == 2, 'two augmentation sources required')
+    def vector(value, length):
+        require(isinstance(value, (list, tuple)) and len(value) == length and
+                all(type(x) in (int, float) and math.isfinite(x) for x in value),
+                'invalid native augmentation vector')
+        return value
+    def near(actual, expected):
+        return (type(actual) in (int, float) and type(expected) in (int, float) and
+                math.isfinite(actual) and math.isfinite(expected) and
+                abs(actual-expected) <= 1e-5*max(1., abs(expected)))
+    stable_refs=[]; native=[]
+    for row in records:
+        setup=row['template']['scene_setup']
+        stable_refs.append(setup.get('sequential_augmentation_base', {}).get('scene') or
+                           setup['training_height_dependency']['stable_scene'])
+        tro=checked(root,row['artifacts']['tro'])['ispatialgym']['campaign']
+        require(tro['perturbations'] == row['perturbations'], 'native augmentation source differs')
+        native.append(tro['runtime']['augmentation'])
+    require(stable_refs[0] == stable_refs[1], 'augmentation stable references differ')
+    stable=checked(root,stable_refs[0]); states=stable['state']['registry']['object_registry']
+    parked=[set(row['perturbations']['removed_objects']) for row in records]
+    changed=parked[0] ^ parked[1]
+    require(changed, 'augmentation has no declared parking transition')
+    require(records[0]['perturbations']['lighting'] != records[1]['perturbations']['lighting'],
+            'augmentation has no declared lighting transition')
+    for row, source, observation, removed in zip(records,native,(first,second),parked):
+        light=source['lighting']
+        require(light['request'] == row['perturbations']['lighting'], 'native lighting request differs')
+        require(set(observation['lights']) == set(light['fixtures']), 'native lighting fixture inventory differs')
+        require(all(near(observation['lights'][name],value['applied']) for name,value in light['fixtures'].items()),
+                'observed fixture lighting does not match declared augmentation')
+        sky=light['skybox']['applied']; actual=observation['skybox']
+        require(near(actual['intensity'],sky['intensity']) and
+                all(near(a,b) for a,b in zip(vector(actual['color'],3),vector(sky['color'],3))),
+                'observed skybox does not match declared augmentation')
+        for name in parked[0] | parked[1]:
+            info=stable['objects_info']['init_info'][name]['args']
+            require(info.get('fixed_base') is True and name in observation['objects'] and
+                    observation['objects'][name]['fixed_base'] is True,
+                    'declared parking actor missing or not fixed in native observation')
+            obj=observation['objects'][name]; baseline=states[name]['root_link']
+            expected=source['moved_objects'][name]['moved_to'] if name in removed else baseline['pos']
+            require(math.dist(vector(obj['position'],3),vector(expected,3)) <= .002,
+                    'observed parking position does not match declared augmentation: '+name)
+            qa,qb=vector(obj['orientation'],4),vector(baseline['ori'],4)
+            norm=math.sqrt(sum(x*x for x in qa)*sum(x*x for x in qb))
+            require(norm > 0 and 2*math.acos(min(1.,abs(sum(x*y for x,y in zip(qa,qb)))/norm)) <= 1e-4,
+                    'observed parking orientation differs from stable scene: '+name)
+    require(first['lights'].keys() == second['lights'].keys(), 'native lighting inventories differ')
+    light_changed=[name for name in first['lights'] if not near(first['lights'][name],second['lights'][name])]
+    sky_changed=(not near(first['skybox']['intensity'],second['skybox']['intensity']) or
+                 any(not near(a,b) for a,b in zip(first['skybox']['color'],second['skybox']['color'])))
+    require(light_changed or sky_changed, 'declared lighting changed but native lighting did not')
+    distances={name:math.dist(first['objects'][name]['position'],second['objects'][name]['position'])
+               for name in sorted(changed)}
+    require(all(distance > .004 for distance in distances.values()),
+            'declared parking changed but native actor position did not')
+    return {'status':'verified_observed_changes','changed_fixtures':light_changed,
+            'skybox_changed':sky_changed,'parking_displacement_m':distances,
+            'native_source_positions_and_lighting_checked':True,
+            'independent_reference_state_sha256':[digest(first),digest(second)]}
+
+
 def verify(root, reference, started_at):
     document = checked(root, reference)
     require(document.get('schema') == 'isg-sequential-augmentation-verification-input-v1' and
@@ -47,6 +113,7 @@ def verify(root, reference, started_at):
             set(document['execution']['rendering']) == set(RENDER),
             'complete independent-reference/success/failure/interruption matrix required')
     sources = {}; source_refs = None; runtimes = {}; artifacts = set(); results = {}; all_processes = set()
+    augmentation_changes = {}
     for stage, specifications in (('physics', PHYSICS), ('rendering', RENDER)):
         cases = {}; stage_results = {}
         expected_kind = 'physics_action_open_loop' if stage == 'physics' else 'kinematic_observation_rendering'
@@ -132,10 +199,16 @@ def verify(root, reference, started_at):
                 independent = cases['fresh_A' if episode['member'] == 0 else 'fresh_B'][0]
                 if stage == 'physics': compare_physics_reference(independent, episode)
                 else: same_loaded_state(independent['observation']['loaded_state'], episode['observation']['loaded_state'])
+        def loaded(case):
+            entry=cases[case][0]
+            return (entry['boundaries'][-1] if stage == 'physics' else entry['observation'])['loaded_state']
+        augmentation_changes[stage]=observed_augmentation_change(root,
+            [sources[digest(ref)]['export_record'] for ref in source_refs],loaded('fresh_A'),loaded('fresh_B'))
         results[stage] = stage_results
     return {'schema': 'isg-sequential-augmentation-verification-v1', 'input': reference,
             'status': 'verified', 'runtimes': runtimes, 'sources': source_refs, 'stages': results,
-            'independent_processes': len(all_processes), 'checks': ['changed lighting and fixed-actor parking',
+            'independent_processes': len(all_processes), 'observed_augmentation_changes':augmentation_changes,
+            'checks': ['changed lighting and fixed-actor parking',
                 'one actual Environment construction per process', 'exact native task/model/scale/room/assets',
                 'independent A and B references', 'A/B/A restoration', 'successful A/A cleanup',
                 'failed A/A cleanup', 'interrupted A/A cleanup', 'unchanged reset/first-action tolerances',
