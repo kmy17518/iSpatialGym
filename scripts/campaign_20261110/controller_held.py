@@ -348,6 +348,10 @@ def source_environment(job, *, root):
         require(env.get(classroom_keys[1]) == str(provider) and provider.resolve() == provider
                 and (provider / "usd/isgm10.usd").is_file(), "held classroom provider closure differs")
         keys += classroom_keys
+    from scripts.campaign_20261110.source_support_inventory import checked_context
+    support_inventory = checked_context(env, root)
+    if support_inventory:
+        keys += tuple(support_inventory['environment'])
     return [key + "=" + env[key] for key in keys if env.get(key)], env.get("START_PER_ATTEMPT") == "0"
 
 

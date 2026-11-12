@@ -296,6 +296,9 @@ def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_
     names = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR",
              "ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY")
     extras = [name + "=" + original_env[name] for name in names if original_env.get(name)]
+    from scripts.campaign_20261110.source_support_inventory import checked_context
+    support_inventory=checked_context(original_env,root)
+    if support_inventory:extras += [name+'='+value for name,value in support_inventory['environment'].items()]
     registry=source_registry_context(original_env,root)
     if registry:extras += [name+'='+value for name,value in registry['environment'].items()]
     extras += ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"]
@@ -312,6 +315,8 @@ def prepare_queue(spec, state, decision, cfg, root, template, save, *, prepared_
         record['index_reservation']=index_proof
     if registry is not None:
         record['source_environment_audit']=registry
+    if support_inventory is not None:
+        record['source_support_inventory']=support_inventory
     if spec.get('dispatch_backends'):
         record['dispatch_backends'] = spec['dispatch_backends']
     elif template.task == 'alignment-world_vertical':

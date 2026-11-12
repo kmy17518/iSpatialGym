@@ -322,6 +322,10 @@ def prepare(proof, allocation, cfg, root, *, prepared_source=None, prepared_indi
     keys = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR",
             "ISPATIALGYM_CAMPAIGN_PROTECTED_CARRY")
     extras = [k + "=" + env[k] for k in keys if env.get(k)] + ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"]
+    from scripts.campaign_20261110.source_support_inventory import checked_context
+    support_inventory = checked_context(env, root)
+    if support_inventory:
+        extras += [name + '=' + value for name, value in support_inventory['environment'].items()]
     registry = groups.source_registry_context(env, root)
     if registry:
         extras += [name + '=' + value for name, value in registry['environment'].items()]
@@ -338,6 +342,7 @@ def prepare(proof, allocation, cfg, root, *, prepared_source=None, prepared_indi
         "admission_id": identity, "source_proof": proof, "v2_root": v2_root}
     if index_proof is not None:record['index_reservation']=index_proof
     if registry is not None:record['source_environment_audit']=registry
+    if support_inventory is not None:record['source_support_inventory']=support_inventory
     backends = cfg.get('dispatch_backends')
     if backends is None and template.task == 'alignment-world_vertical':
         # Native wall provenance includes provider JSON symlinks. Keep those
