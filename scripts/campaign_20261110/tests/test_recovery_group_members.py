@@ -96,3 +96,21 @@ def test_missing_legacy_label_cannot_authorize_credit_or_production(tmp_path,key
     qr,review=fixture(tmp_path);p=Path(qr['path']);q=json.loads(p.read_text());q.pop('current100_r1_credit');q[key]=value
     p.write_text(json.dumps(q));qr=m.reference(p);v=json.loads(review.read_text());v['request']=qr;review.write_text(json.dumps(v))
     with pytest.raises(ContractError):m.member_projection(tmp_path,qr,review,102,tmp_path/'projection')
+
+
+@pytest.mark.parametrize('schema',['isg-canonical-six-group-batch-v1','isg-canonical-group-batch-v1'])
+def test_exact_parent_batches_project_complete_members_without_rewriting(tmp_path,schema):
+    qr,review=fixture(tmp_path);original=m.reference(review)
+    batch=tmp_path/'batch.json';batch.write_text(json.dumps({'schema':schema,'benchmark_credit':0,
+        'requests':[{'class_id':'class','request':qr}]}));br=m.reference(batch)
+    result=m.run(tmp_path,br)
+    assert len(result['prepared'])==3 and result['submitted_jobs']==[]
+    assert m.reference(batch)==br and m.reference(review)==original
+    Path(qr['path']).write_text('{}')
+    with pytest.raises(ContractError):m.run(tmp_path,br)
+
+
+@pytest.mark.parametrize('schema,credit',[('unknown',0),('isg-canonical-group-batch-v1',1)])
+def test_batch_admission_does_not_authorize_unknown_schema_or_credit(tmp_path,schema,credit):
+    batch=tmp_path/'batch.json';batch.write_text(json.dumps({'schema':schema,'benchmark_credit':credit,'requests':[]}))
+    with pytest.raises(ContractError):m.run(tmp_path,m.reference(batch))

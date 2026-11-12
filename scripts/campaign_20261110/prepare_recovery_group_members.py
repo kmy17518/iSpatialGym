@@ -222,7 +222,11 @@ def register(root, prepared_paths):
 
 def run(root, batch_ref, *, register_members=False):
     root = Path(root).resolve(); batch = json.loads(checked(root, batch_ref).read_text()); prepared = []; pending = []
-    require(batch['schema'] == 'isg-canonical-six-group-batch-v1' and batch['benchmark_credit'] == 0, 'unapproved parent batch')
+    # The independently authored touching group uses the generic batch name.
+    # Both containers bind exact request hashes; checked_member_source still
+    # enforces the same finite, zero-credit three-member native contract.
+    require(batch['schema'] in ('isg-canonical-six-group-batch-v1', 'isg-canonical-group-batch-v1') and
+            batch['benchmark_credit'] == 0, 'unapproved parent batch')
     for row in batch['requests']:
         parent = checked(root, row['request']); review = parent.parent/'native_review.json'
         if not review.exists(): pending.append(row['class_id']); continue
