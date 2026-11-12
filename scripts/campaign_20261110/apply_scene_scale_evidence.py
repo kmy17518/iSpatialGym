@@ -1,4 +1,4 @@
-"""Apply exact source-verified scene scales, retaining immutable old identities.
+"""Apply source-verified scene scales or persisted native target scale draws.
 
 This changes input resolution only. Changed query inputs lose all cached positive
 status until native verification; unchanged physical evidence is retained.
@@ -34,22 +34,40 @@ def apply(expansion, proof, jobs, source_verification):
         row = deepcopy(original)
         edits = []
         for measured in proofs.get(row['configuration_id'], {}).get('roles', []):
-            if measured['state'] != 'literal_exact_scene_scale_observed':
+            state = measured['state']
+            if state not in ('literal_exact_scene_scale_observed', 'literal_persisted_target_scale_draw'):
                 continue
-            source = measured['scene_source']
+            profile_draw = state == 'literal_persisted_target_scale_draw'
+            source = measured['native_default_source'] if profile_draw else measured['scene_source']
             checked = source_verification['sources'].get(source['path'], {})
-            if checked.get('sha256') != source['sha256'] or (not measured.get('binding_unambiguous') and digest(measured) not in source_verification.get('identical_scale_roles', [])):
-                raise ValueError('unverified scene identity or ambiguous binding')
+            if checked.get('sha256') != source['sha256']:
+                raise ValueError('unverified native source identity')
+            if profile_draw:
+                if (not row['class_id'].startswith('inter_object_relation_satisfaction-')
+                        or '_large_scale_' not in row['class_id'] or measured['role'] != 'target'
+                        or row.get('object_scale_slot') not in (0, 1)
+                        or row['object_scale_slot'] != measured.get('object_scale_slot')
+                        or digest(measured) not in source_verification.get('verified_profile_roles', [])):
+                    raise ValueError('unverified or inapplicable target scale draw')
+            elif not measured.get('binding_unambiguous') and digest(measured) not in source_verification.get('identical_scale_roles', []):
+                raise ValueError('ambiguous scene binding')
             scale = measured['applied_scale']
             if len(scale) != 3 or not all(isinstance(v, (int, float)) and math.isfinite(v) and v > 0 for v in scale):
                 raise ValueError('invalid measured scale')
             matches = [r for r in row['roles'] if all(r[k] == measured[k] for k in ('role', 'model_key', 'asset_sha256'))]
             if len(matches) != 1 or matches[0]['applied_scale'] is not None:
                 raise ValueError('evidence does not identify exactly one unresolved role')
-            matches[0].update(applied_scale=scale, scale_rule='literal_exact_scene_initialization', scene_scale_evidence=source,
-                              scene_matching_instances=measured['matching_instances'])
+            rule = 'target_two_persisted_draws' if profile_draw else 'literal_exact_scene_initialization'
+            matches[0].update(applied_scale=scale, scale_rule=rule)
+            if profile_draw:
+                if matches[0].get('scale_profile') != measured['scale_profile']:
+                    raise ValueError('target scale profile identity changed')
+                matches[0]['persisted_scale_evidence'] = measured['profile_source']
+                matches[0]['native_default_evidence'] = source
+            else:
+                matches[0].update(scene_scale_evidence=source, scene_matching_instances=measured['matching_instances'])
             edits.append(measured)
-            if not measured.get('binding_unambiguous'):
+            if not profile_draw and not measured.get('binding_unambiguous'):
                 row.setdefault('unresolved_scene_bindings', []).append(measured['role'])
         old_id = original['configuration_id']
         if edits:
@@ -79,7 +97,8 @@ def apply(expansion, proof, jobs, source_verification):
                         if value['applied_scale'] not in (None, edit['applied_scale']):
                             raise ValueError('conflicting dependency role scale')
                         value['applied_scale'] = edit['applied_scale']
-                        value['scale_rule'] = 'literal_exact_scene_initialization'
+                        value['scale_rule'] = ('target_two_persisted_draws' if edit['state'] ==
+                                               'literal_persisted_target_scale_draw' else 'literal_exact_scene_initialization')
                     # Support descriptors omit asset/model, but carry exact scene object.
                     if (edit['role'] == 'support' and value.get('scene') == row['scene']
                             and value.get('object') in edit['matching_instances'] and 'selected_scale' in value):

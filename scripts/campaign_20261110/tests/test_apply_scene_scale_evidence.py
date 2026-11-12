@@ -1,6 +1,6 @@
 from copy import deepcopy
 import pytest
-from scripts.campaign_20261110.apply_scene_scale_evidence import apply
+from scripts.campaign_20261110.apply_scene_scale_evidence import apply, digest
 
 
 def fixture():
@@ -43,4 +43,36 @@ def test_fail_closed_on_mismatched_evidence(bad):
     if bad=='changed_source': args[3]['sources']['scene.json']['sha256']='wrong'
     if bad=='wrong_asset': measured['asset_sha256']='wrong'
     if bad=='already_scaled': args[0]['rows'][0]['roles'][0]['applied_scale']=[1,1,1]
+    with pytest.raises(ValueError): apply(*args)
+
+
+def profile_fixture():
+    args = fixture(); row = args[0]['rows'][0]
+    row.update(class_id='inter_object_relation_satisfaction-under_large_scale_01', object_scale_slot=1)
+    row['roles'][0]['scale_profile'] = 'profile'
+    proof = args[1]['rows'][0]['roles'][0]
+    proof.update(state='literal_persisted_target_scale_draw', native_default_source=proof['scene_source'],
+                 profile_source={'path':'profile.json','sha256':'profilehash'}, scale_profile='profile', object_scale_slot=1)
+    args[3]['verified_profile_roles'] = [digest(proof)]
+    args[2]['rows'][0]['unresolved_inputs'].append('native physical pair fit')
+    return args
+
+
+def test_persisted_target_draw_preserves_physical_pair_fit_gate():
+    expansion, jobs, receipt = apply(*profile_fixture())
+    role = expansion['rows'][0]['roles'][0]
+    assert role['applied_scale'] == [1,2,3] and role['scale_rule'] == 'target_two_persisted_draws'
+    assert 'scene_scale_evidence' not in role
+    query = next(r for r in jobs['rows'] if r['kind'] == 'query')
+    assert query['status'] == 'blocked' and query['unresolved_inputs'] == ['native physical pair fit']
+    assert not query['evidence'] and query['physical_artifact_id'] is None
+
+
+@pytest.mark.parametrize('bad', ['profile', 'slot', 'class', 'unverified'])
+def test_target_profile_does_not_resolve_replacement_or_other_scale(bad):
+    args = profile_fixture(); row = args[0]['rows'][0]
+    if bad == 'profile': row['roles'][0]['scale_profile'] = 'wrong'
+    if bad == 'slot': row['object_scale_slot'] = 0
+    if bad == 'class': row['class_id'] = 'configuration_matching-articulation_open_large_scale_01'
+    if bad == 'unverified': args[3]['verified_profile_roles'] = []
     with pytest.raises(ValueError): apply(*args)
