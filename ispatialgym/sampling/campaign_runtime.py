@@ -120,6 +120,7 @@ def contact_recovery(option: str) -> bool:
         'cap_capture_margin': ('configuration_matching-attachment_02',
                                 'configuration_matching-attachment'),
         'cap_source_stance_proposal': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
+        'cap_geometry_above_pregrasp': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
         'inside_goal_grasp_proposal': ('inter_object_relation_satisfaction-inside_01',
                                       'inter_object_relation_satisfaction-inside_small_scale'),
         'inside_top_grasp_proposal': ('inter_object_relation_satisfaction-inside_01',
@@ -162,11 +163,16 @@ def contact_recovery(option: str) -> bool:
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('hinged_jar', 'jnjtrl', (1.0, 1.0, 1.0))],
                     'held jar brace belongs to its exact ready default-scale category model')
-        if option in ('cap_capture_margin', 'cap_vertical_final_retreat', 'cap_source_stance_proposal'):
+        if option in ('cap_capture_margin', 'cap_vertical_final_retreat', 'cap_source_stance_proposal',
+                      'cap_geometry_above_pregrasp'):
             require(template.split == 'eval_standard' and
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('cap', 'xxqyrt', (1.0, 1.0, 1.0))],
                     'cap capture margin belongs to its exact default-scale canonical model')
+        if option == 'cap_geometry_above_pregrasp':
+            require([(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'partner'] ==
+                    [('lemonade_bottle', 'yprkek', (1.0, 1.0, 1.0))],
+                    'cap pregrasp geometry belongs to its exact canonical bottle')
         if option in ('axial_magazine_contact_height', 'axial_magazine_contact_inward_1cm', 'axial_magazine_radial_escape'):
             require(template.split == 'eval_standard' and
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==

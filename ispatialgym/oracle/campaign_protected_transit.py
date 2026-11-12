@@ -4,9 +4,12 @@ import numpy as np
 
 
 def enabled(context):
-    return (bool(os.environ.get('ISPATIALGYM_CAMPAIGN_CONFIG')) and
-            os.environ.get('ISPATIALGYM_PROTECT_ABOVE_GEOMETRY', '0') == '1' and
-            context.get('leg') == 'pre_grasp')
+    if not os.environ.get('ISPATIALGYM_CAMPAIGN_CONFIG') or context.get('leg') != 'pre_grasp':
+        return False
+    if os.environ.get('ISPATIALGYM_PROTECT_ABOVE_GEOMETRY', '0') == '1':
+        return True
+    from ispatialgym.sampling import campaign_runtime
+    return campaign_runtime.contact_recovery('cap_geometry_above_pregrasp')
 
 
 def above_offset(position, orientation, hand_points, protected_aabbs, *, baseline, clearance):
