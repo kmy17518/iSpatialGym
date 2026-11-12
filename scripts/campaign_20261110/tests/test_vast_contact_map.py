@@ -158,3 +158,63 @@ def test_typed_dependency_gate_rejects_unverifiable_identity(tmp_path, change):
     else:
         value['benchmark_credit'] = 1; v.write(job/'native_inputs.json',value)
     assert not gate.check_job(root, job, kind='native_dependency')['allowed']
+
+
+def copied_fixture(tmp_path):
+    root, request, native, helper, lib = fixture(tmp_path)
+    doc = json.loads(request.read_text()); unit = doc['units'][0]
+    model = Path(unit['model_dir'])
+    original_model = Path('/vision/u/shiyuc/private/campaign_20261110/glib/models')/model.name
+    original_library = original_model.parent.parent.parent/'brace/models'/model.name/'library.json'
+    library = json.loads(lib.read_text()); library['object']['source'] = str(original_model)
+    v.write(lib, library); unit['object'] = copy.deepcopy(library['object'])
+    unit['source_library']['sha256'] = v.sha(lib)
+    unit['original_source_library'] = {'path':str(original_library), 'sha256':v.sha(lib)}
+    files = {str(original_library):{'destination':str(lib),'sha256':v.sha(lib)}}
+    for p in model.iterdir():
+        files[str(original_model/p.name)] = {'destination':str(p),'sha256':v.sha(p)}
+    proof = root/'training_preparation/readcopy/verified_copy.json'
+    v.write(proof, {'schema':'isg-internal-exact-dependency-readcopy-v1','campaign_id':root.name,
+                    'all_bytes_identical':True,'local_download':False,'files':files})
+    unit['readcopy_proof'] = {'path':str(proof),'sha256':v.sha(proof)}
+    unit['source_files'][str(proof)] = v.sha(proof)
+    v.write(request,doc)
+    return root, request, native, helper, lib, proof
+
+
+def test_exact_internal_copy_preserves_original_source_and_library_bytes(tmp_path):
+    root, request, native, helper, lib, proof = copied_fixture(tmp_path)
+    before = lib.read_bytes()
+    job = v.prepare(root,request,0,native,helper,'copied')
+    value = v.verify(job)
+    assert lib.read_bytes() == before
+    assert value['source_model_identity']['mode'] == 'verified_internal_readcopy'
+    assert value['source_relocation']['before'] == json.loads(before)['object']['source']
+    assert not (root/'vast/queue').exists()
+
+
+@pytest.mark.parametrize('change', ['missing_proof','wrong_entry','wrong_original_library','missing_geometry',
+                                   'wrong_geometry_hash','wrong_destination','unverified_copy'])
+def test_unbound_internal_copy_cannot_prepare_transport(tmp_path, change):
+    root, request, native, helper, lib, proof = copied_fixture(tmp_path)
+    doc = json.loads(request.read_text()); unit = doc['units'][0]; data=json.loads(proof.read_text())
+    if change == 'missing_proof': unit.pop('readcopy_proof')
+    elif change == 'wrong_entry': unit['entry_id']='another_entry'
+    elif change == 'wrong_original_library': unit['original_source_library']['path'] += '.other'
+    else:
+        geometry=next(k for k in data['files'] if k.endswith('/geometry.obj'))
+        if change == 'missing_geometry': del data['files'][geometry]
+        elif change == 'wrong_geometry_hash': data['files'][geometry]['sha256']='0'*64
+        elif change == 'wrong_destination': data['files'][unit['original_source_library']['path']]['destination']=unit['model_dir']+'/library.json'
+        else: data['all_bytes_identical']=False
+        v.write(proof,data);unit['readcopy_proof']['sha256']=v.sha(proof);unit['source_files'][str(proof)]=v.sha(proof)
+    v.write(request,doc)
+    with pytest.raises(ValueError): v.prepare(root,request,0,native,helper,'rejected')
+    assert not (root/'out/vast_contact_map/rejected').exists()
+
+
+def test_copy_proof_change_invalidates_prepared_payload(tmp_path):
+    root, request, native, helper, lib, proof = copied_fixture(tmp_path)
+    job=v.prepare(root,request,0,native,helper,'copied')
+    data=json.loads(proof.read_text());data['files'].clear();v.write(proof,data)
+    with pytest.raises(ValueError):v.verify(job)

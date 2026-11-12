@@ -53,6 +53,60 @@ def validate_unit(doc, index, native):
     return unit
 
 
+def source_model_identity(root, unit, original):
+    """Bind an internal readcopy to the original contact geometry, byte for byte.
+
+    The native library keeps its original object.source. A copied geometry
+    directory is usable only when the immutable copy proof maps that exact old
+    path and contact library to the files pinned by this request.
+    """
+    root = Path(root).resolve()
+    model = Path(unit['model_dir']).resolve()
+    source = Path(original['object']['source'])
+    require(model.is_relative_to(root) and source.is_absolute(), 'contact model source escaped')
+    if str(source) == str(model):
+        return {'mode': 'direct', 'source': str(source), 'model_dir': str(model), 'files': {}}
+    ref = unit.get('readcopy_proof') or {}
+    path = Path(ref.get('path', '')).resolve()
+    require(path.is_relative_to(root/'training_preparation') and path.is_file()
+            and sha(path) == ref.get('sha256')
+            and unit['source_files'].get(str(path)) == ref['sha256'],
+            'copied contact source lacks pinned readcopy proof')
+    proof = json.loads(path.read_text())
+    require(proof.get('schema') == 'isg-internal-exact-dependency-readcopy-v1'
+            and proof.get('campaign_id') == root.name
+            and proof.get('all_bytes_identical') is True
+            and proof.get('local_download') is False,
+            'contact readcopy proof identity differs')
+    require(source.name == model.name == unit['entry_id'], 'copied contact entry differs')
+    old_library = unit.get('original_source_library') or {}
+    current_library = unit['source_library']
+    require(old_library.get('sha256') == current_library['sha256'], 'original contact library hash differs')
+    mappings = proof.get('files', {})
+    copied = {}
+
+    def mapped(old_path, expected, exact_destination=None):
+        row = mappings.get(str(old_path)) or {}
+        destination = Path(row.get('destination', '')).resolve()
+        require(row.get('sha256') == expected and destination.is_relative_to(root/'training_preparation')
+                and destination.is_file() and sha(destination) == expected,
+                'contact readcopy mapping absent or changed: '+str(old_path))
+        if exact_destination is not None:
+            require(destination == Path(exact_destination).resolve(), 'contact library readcopy destination differs')
+        copied[str(destination)] = expected
+
+    mapped(old_library.get('path', ''), current_library['sha256'], current_library['path'])
+    geometry_files = {name: expected for name, expected in unit['source_files'].items()
+                      if Path(name).resolve().parent == model}
+    require({'library.json', 'geometry.json', 'geometry.obj', 'rests.json'} <=
+            {Path(name).name for name in geometry_files}, 'incomplete copied contact geometry')
+    for name, expected in geometry_files.items():
+        require(sha(name) == expected, 'copied contact model changed')
+        mapped(source/Path(name).name, expected)
+    return {'mode': 'verified_internal_readcopy', 'source': str(source), 'model_dir': str(model),
+            'proof': ref, 'original_source_library': old_library, 'files': copied}
+
+
 def prepare(root, request, index, native, helper, token):
     root, request, native, helper = [Path(p).resolve() for p in (root, request, native, helper)]
     require(root.name == 'campaign_20261110' and request.is_relative_to(root/'training_preparation'), 'wrong contact campaign')
@@ -70,7 +124,8 @@ def prepare(root, request, index, native, helper, token):
     original = json.loads(Path(unit['source_library']['path']).read_text())
     require(original['object'] == unit['object'], 'contact library object identity differs')
     source_model = Path(unit['model_dir']).resolve()
-    require(original['object']['source'] == str(source_model), 'contact model source differs')
+    source_identity = source_model_identity(root, unit, original)
+    files.update(source_identity['files'])
     job = root/'out/vast_contact_map'/token
     require(not job.exists(), 'contact token already has evidence')
     job.mkdir(parents=True)
@@ -96,7 +151,8 @@ def prepare(root, request, index, native, helper, token):
     value = {'schema':SCHEMA, 'campaign_id':root.name, 'campaign_root':str(root), 'job_dir':str(job),
              'snapshot':str(native), 'helper_snapshot':str(helper), 'source_plan':str(request), 'unit_index':index,
              'unit':unit, 'files':files, 'library_files':model_files, 'private_contact_root':str(job/'inputs/contacts'),
-             'native_library':str(library), 'source_relocation':{'before':str(source_model),'after':str(model)},
+             'native_library':str(library), 'source_relocation':{'before':original['object']['source'],'after':str(model)},
+             'source_model_identity':source_identity,
              'kind':'contact_maps', 'scenes':[], 'time_limit_s':6900, 'new_native_instances':0,
              'benchmark_credit':0, 'production_released':False}
     write(job/'native_inputs.json', value); (job/'sample.log').symlink_to('result/native.log')
@@ -118,6 +174,10 @@ def verify(job, root=None):
     doc = json.loads(Path(value['source_plan']).read_text())
     require(value['unit'] == validate_unit(doc, value['unit_index'], Path(value['snapshot'])), 'contact source unit changed')
     original = json.loads(Path(value['unit']['source_library']['path']).read_text())
+    identity = source_model_identity(root, value['unit'], original)
+    # Earlier direct-source payloads remain valid, but cannot use the new copy path.
+    require(value.get('source_model_identity', identity if identity['mode'] == 'direct' else None) == identity,
+            'contact source copy identity changed')
     relocated = json.loads(Path(value['native_library']).read_text())
     require(relocated['object']['source'] == value['source_relocation']['after'], 'contact relocation changed')
     relocated['object']['source'] = value['source_relocation']['before']
