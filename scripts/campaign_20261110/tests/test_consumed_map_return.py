@@ -114,3 +114,34 @@ def test_failed_durable_claim_cannot_publish_or_recover_false_ack(tmp_path):
     saved=[]
     repeated=cr.reconcile(tmp_path,{'9001':job},set(),{},set(),lambda j:saved.append(j),now=1002)
     assert not repeated['acknowledged'] and not saved
+
+
+def test_optional_route_helper_is_hash_bound_and_client_only(tmp_path, monkeypatch):
+    helper = tmp_path/'routes.py'; helper.write_text("def probe(): return {'status': 'sentinel'}\n")
+    monkeypatch.setenv('ISG_CONSUMED_RETURN_ROUTE_HELPER', str(helper))
+    monkeypatch.setenv('ISG_CONSUMED_RETURN_ROUTE_HELPER_SHA256', '0'*64)
+    with pytest.raises(ValueError, match='Route helper identity'):
+        cr.probe()
+    monkeypatch.setenv('ISG_CONSUMED_RETURN_ROUTE_HELPER_SHA256', cr.sha(helper))
+    assert cr.probe() == {'status': 'sentinel'}
+
+
+def test_client_routed_submit_keeps_durable_intent_and_prepared_identity(tmp_path, monkeypatch):
+    _, job, _, ticket = fixture(tmp_path); calls = []
+    monkeypatch.setattr(cr.time, 'time', lambda: 1001)
+    cr.reconcile(tmp_path, {'9001': job}, set(), {}, set(), lambda j: cr.write(tmp_path/'vast/state/jobs/9001.json', j), now=1001)
+    command = ['sbatch', '--parsable', '--account=viscam', '--partition=viscam', '--gres=gpu:a40:1', ticket['command'][-1]]
+    routing = {'command': command, 'route': {'node': 'viscam2'}, 'prepared_command': ticket['command']}
+    helper = SimpleNamespace(reserve_unobserved_receipts=lambda r, c: c, route_ticket=lambda t, c, a: routing)
+    monkeypatch.setattr(cr, 'client_route_helper', lambda: helper)
+    cap = lambda: {'status': 'observed', 'observed_at': 1001, 'account_slots': {'minyeong': 1},
+                   'compatible_available_slots': 1, 'preparation_slots': 1, 'probe': {'jobs': []}}
+    def run(argv, **kwargs):
+        intent = cr.read(next((cr.base(tmp_path)/'submission_intents').glob('*.json')))
+        assert intent['command'] == argv == command and intent['prepared_command'] == ticket['command']
+        calls.append(argv); return SimpleNamespace(returncode=0, stdout='1234\n', stderr='')
+    assert len(cr.submit(tmp_path, 'minyeong', cap, run)['submitted']) == 1
+    assert not cr.submit(tmp_path, 'minyeong', cap, run)['submitted']
+    receipt = cr.read(ticket['submission_path'])
+    assert receipt['prepared_command'] == ticket['command'] and receipt['command'] == command
+    assert receipt['previous_vast_receipt']['job_id'] == '9001' and len(calls) == 1
