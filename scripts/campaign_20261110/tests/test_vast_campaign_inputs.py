@@ -5,12 +5,33 @@ import unittest
 from unittest.mock import patch
 
 from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, sha, QUEUE_ENV
-from scripts.campaign_20261110.infra_vast.campaign_inputs import compatible_gpus, uncovered_jobs, worker_can_run
+from scripts.campaign_20261110.infra_vast.campaign_inputs import compatible_gpus, ordered_gpu_offers, uncovered_jobs, worker_can_run
 from scripts.campaign_20261110.infra_vast.campaign_inputs import QUEUE_SCHEMAS
 from scripts.campaign_20261110.infra_vast.campaign_inputs import drained_workers, rental_accounts, drained_worker_finished
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_explicit_rtx_alternatives_reuse_compatible_idle_capacity(self):
+        config = {'gpus':['RTX 4090','RTX 3090','RTX A5000','L40S','H100','RTX 4080'],
+                  'allow_rtx_24gb_substitution':True,'vram_per_job_gb':20,'max_jobs_per_instance':1}
+        compatible = compatible_gpus('RTX 4090', config)
+        self.assertEqual(compatible, ['L40S','RTX 3090','RTX 4090','RTX A5000'])
+        job = {'id':'map','gpu':'RTX 4090','compatible_gpus':compatible,'time_s':1800}
+        live = {'cheap':{'gpu_name':'RTX 3090'}, 'unsupported':{'gpu_name':'H100'}}
+        heartbeat = {key:{'phase':'ready','slots':1} for key in live}
+        plan, remaining = assignment_plan([job], live, heartbeat, {}, {}, 100)
+        self.assertEqual([(iid, row['id']) for iid, _, row in plan], [('cheap','map')])
+        self.assertEqual(remaining, [])
+        self.assertEqual(uncovered_jobs([job],live,heartbeat,{}, {},100), [])
+        for changes in [{'vram_per_job_gb':24},{'max_jobs_per_instance':2},{'allow_rtx_24gb_substitution':False}]:
+            self.assertEqual(compatible_gpus('RTX 4090',{**config,**changes}),['RTX 4090'])
+        self.assertEqual(compatible_gpus('H100',config),['H100'])
+
+    def test_offer_order_compares_prices_across_gpu_models_and_deduplicates(self):
+        expensive={'id':1,'gpu_name':'L40S','_per_job':1.1,'cpu_cores_effective':32}
+        cheap={'id':2,'gpu_name':'RTX 3090','_per_job':.2,'cpu_cores_effective':16}
+        self.assertEqual([x['id'] for x in ordered_gpu_offers([expensive,cheap,expensive])],[2,1])
+
     def test_idle_worker_is_not_retained_for_jobs_that_cannot_finish_before_lease_expiry(self):
         worker={'gpu_name':'RTX 4090'}
         creation={'time':0,'max_lifetime_s':21600}

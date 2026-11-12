@@ -16,10 +16,24 @@ QUEUE_SCHEMAS = ('isg-held-goal-queue-v1','isg-pair-goal-queue-v1','isg-surface-
 
 def compatible_gpus(requested, config):
     proven = {'RTX 4090', 'RTX 5090'}
+    # Explicitly enabled RTX alternatives retain the provider/worker resource
+    # checks. Exclude compute-only cards and RTX models with less than 24GB.
+    rtx_24gb = proven | {'RTX 3090', 'RTX 3090 Ti', 'RTX A5000', 'RTX A6000',
+                        'RTX 6000Ada', 'L40', 'L40S', 'TITAN RTX'}
+    if (config.get('allow_rtx_24gb_substitution') and requested in rtx_24gb
+            and float(config['vram_per_job_gb']) <= 20 and int(config['max_jobs_per_instance']) == 1):
+        return sorted(rtx_24gb.intersection(config['gpus']))
     if (config.get('allow_proven_gpu_substitution') and requested in proven
             and float(config['vram_per_job_gb']) <= 20 and int(config['max_jobs_per_instance']) == 1):
         return sorted(proven.intersection(config['gpus']))
     return [requested]
+
+
+def ordered_gpu_offers(offers):
+    """Compare all compatible models by actual per-job price, once per offer."""
+    unique = {str(offer['id']): offer for offer in offers}
+    return sorted(unique.values(), key=lambda offer: (
+        float(offer['_per_job']), -float(offer.get('cpu_cores_effective') or 0), str(offer['id'])))
 
 
 def gpu_matches(job, gpu):
