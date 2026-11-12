@@ -236,10 +236,18 @@ def _allocate(rows, *, split, q, eval_counts, train_count, train_capacity=None):
 
 
 def claim_group(review, template, reservations, *, reservation_hashes, root, started_at, state_path, training_room_plan=None,
-                validation_only=False):
+                validation_only=False, suite_context=None):
     root, state_path = Path(root).resolve(), Path(state_path).resolve()
     require(state_path.is_relative_to(root), "quota database outside campaign")
     require(review.get("group_closed") is True, "cannot allocate an open goal group")
+    environment_path=Path(review['source_job'])/'job.env'
+    if environment_path.exists():
+        from scripts.campaign_20261110.production_gate import read_environment
+        environment=read_environment(environment_path)
+        if any(k.startswith('ISPATIALGYM_RUNTIME_SUITE_') for k in environment):
+            require(suite_context is not None, 'runtime suite requires its dedicated actual-member replay acceptance owner')
+            from scripts.campaign_20261110.runtime_suite_acceptance import verify_claim_context
+            verify_claim_context(root,review,suite_context)
     # Re-read the actual reports, source hashes and gate rather than trusting a
     # previously generated review file or a controller's claimed success.
     fresh = audit_job(review["source_job"], review["gate"]["path"], root=root, started_at=started_at,
@@ -402,6 +410,8 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                               "binding_pool": template.scene_setup.get("binding_pool")}
                     if final == 'train' and production is not None:
                         record.update(production)
+                    if suite_context is not None:
+                        record['runtime_suite_validation']=suite_context
                     db.execute("INSERT INTO members VALUES (?,?,?,?,?,?,?,?)",
                                (iid, gid, final, task, scope, row["bucket"], conceptual, canonical_json(record)))
                 record = {"schema": "isg-group-assignment-v1", "campaign_id": review["campaign_id"], "group_id": gid,
@@ -412,6 +422,8 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                           "goal_reuse_policy": GOAL_REUSE_POLICY,
                           "training_policy": {"per_class_cap":class_cap,"room_policy":room_policy},
                           "members": [json.loads(value[0]) for value in db.execute("SELECT record FROM members WHERE group_id=? ORDER BY id", (gid,))]}
+                if suite_context is not None:
+                    record['runtime_suite_validation']=suite_context
                 destination = root / "dataset/groups" / (gid + ".json")
                 if destination.exists():
                     require(read(destination) == record, "orphan group export has different content")

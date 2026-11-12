@@ -76,6 +76,14 @@ def test_regression_rejects_singleton_and_invalid_bucket(tmp_path):
     with pytest.raises(c.ContractError,match='outside task buckets'):regression(tmp_path,f2,review)
 
 
+def test_suite_marked_source_cannot_enter_legacy_single_gate_claim(tmp_path):
+    f,review=candidate(tmp_path,0)
+    (f.job/'job.env').write_text('ISPATIALGYM_RUNTIME_SUITE_RUN=current100\n')
+    with pytest.raises(c.ContractError,match='dedicated actual-member'):
+        claim(tmp_path,f,review)
+    assert not (tmp_path/'dataset').exists()
+
+
 def test_strict_eval_bucket_caps_with_train_siblings_and_idempotent_export(tmp_path):
     for index in range(4):
         f, review = candidate(tmp_path, index)

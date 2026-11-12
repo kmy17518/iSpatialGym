@@ -91,7 +91,8 @@ def audit(root, row_ref, allocation_ref, gate_ref):
         review=audit_job(job,gate_ref['path'],root=root,started_at=since,group_closed=True,
                          group_id=row['group_id'],member_ids=sorted(replay_proofs))
         validation = claim_group(review,template,policy[1],reservation_hashes=policy[2],root=root,
-            started_at=since,state_path=Path(root)/'dataset/allocations.sqlite',validation_only=True)
+            started_at=since,state_path=Path(root)/'dataset/allocations.sqlite',validation_only=True,
+            suite_context={'row':row_ref,'allocation':allocation_ref,'gate':gate_ref})
         require(validation.get('validation_passed') is True, 'strict regression audit did not pass')
         validation['member_replays']=replay_proofs
     require(review['campaign_id'] == 'campaign_20261110' and review['class_id'] == row['class_id'] and review['validation_key'] == config['validation_key'],
@@ -131,6 +132,16 @@ def member_replays(root,row,allocation,review):
         proven[iid]={'gate':gate_ref,'report':reference(path),'tro_sha256':member['tro_sha256'],'demo_sha256':member['demo_sha256']}
     require(len(proven)>=2,'awaiting_member_replay: fewer than two distinct native replay successes')
     return proven
+
+
+def verify_claim_context(root,review,context):
+    row,allocation,config,job,gate=scope(root,context['row'],context['allocation'],context['gate'])
+    require(not row['camera_exempt'] and Path(review['source_job']).resolve()==job and
+            review['validation_key']==config['validation_key'] and review['group_id']==row['group_id'],
+            'suite claim review differs from exact executed row')
+    proofs=member_replays(root,row,allocation,review)
+    require(review.get('selected_member_ids')==sorted(proofs), 'suite claim includes a member without its actual successful replay')
+    return proofs
 
 
 def quota_snapshot(root, template, members):
@@ -178,7 +189,8 @@ def reconcile(root, row_ref, allocation_ref, gate_ref, *, claim=True):
         policy=active_policy(root)
         allocation_result=(_claim_camera(root,template,review,timestamp(row['run_started_at']),policy) if row['camera_exempt'] else
             claim_group(review,template,policy[1],reservation_hashes=policy[2],root=root,
-                started_at=timestamp(row['run_started_at']),state_path=Path(root)/'dataset/allocations.sqlite'))
+                started_at=timestamp(row['run_started_at']),state_path=Path(root)/'dataset/allocations.sqlite',
+                suite_context={'row':row_ref,'allocation':allocation_ref,'gate':gate_ref}))
     # Read actual canonical assignments after the ordinary owner transaction.
     after,rows,groups=quota_snapshot(root,template,validation['members'])
     ids={m['instance_id'] for m in review['members']}
