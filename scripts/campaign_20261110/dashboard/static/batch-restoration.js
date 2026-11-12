@@ -20,6 +20,12 @@ async function refreshEvidence(){
       p.textContent=`${row.stage||row.kind||'stage unavailable'} / ${row.control}: ${row.status||'status unavailable'}; job ${row.job_id||'unavailable'}; scheduler ${row.scheduler_state||'unavailable'}; verification ${row.verification_status||'not verified'}. ${row.next_action||''} Observed ${observedText(row.observed_at||matrix.observed_at)}.`;
       if(row.verification_status!=='verified')p.className='pending';return p;
     }));
+    const prospective=matrix?.prospective_controls||[];
+    byId('prospective-observation').textContent=prospective.length?`${prospective.length} fresh physics controls. Original failures remain above; completed jobs require strict verification. Observed ${observedText(matrix.observed_at)}.`:'UNAVAILABLE: no authoritative observation for the repaired physics controls.';
+    byId('prospective-controls').replaceChildren(...prospective.map(row=>{
+      const p=document.createElement('p');p.className=row.verification_status==='verified'?'':'pending';
+      p.textContent=`${row.control}: ${row.status||'status unavailable'}; job ${row.job_id||'unavailable'}; scheduler ${row.scheduler_state||'unavailable'}; verification ${row.verification_status||'not verified'}. ${row.next_action||''}`;return p;
+    }));
     for(const episode of value.episodes){
       let card=byId(episode.id);
       if(!card){card=document.createElement('article');card.id=episode.id;const h=document.createElement('h2');const p=document.createElement('p');const video=document.createElement('video');video.controls=true;video.preload='metadata';video.playsInline=true;video.src=episode.url;const link=document.createElement('a');link.href=episode.url;link.textContent='Open video';card.append(h,p,video,document.createElement('br'),link);byId('episodes').append(card);}
