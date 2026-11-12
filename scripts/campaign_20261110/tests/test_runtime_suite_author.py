@@ -119,3 +119,26 @@ def test_recorded_disembedding_checks_saved_bytes(tmp_path,source):
     path.write_text('{}')
     with pytest.raises((AssertionError,ValueError)):
         recorded_disembedding_range(template,anchor)
+
+
+@pytest.mark.parametrize('joint,names,values,upper,expected',[
+    ('j_link0',['j_link0'],[0.501782238483429],0.872664749622345,((.5,1.),1)),
+    ('j_right_lid',['j_left_lid','j_right_lid'],[0.,0.7382742166519165],2.356194257736206,((0.,.5),0)),
+])
+def test_recorded_small_opening_actual_source_goals(joint,names,values,upper,expected):
+    # Exact cwkvib/cdmmwy anchors from the immutable current100 range audit.
+    # The second source has two joints: use the designated lid, not joint zero.
+    from copy import deepcopy
+    template=SimpleNamespace(task='configuration_matching-articulation_open_small_scale',
+                             objects=[SimpleNamespace(role='target',instance='target',joint=joint)])
+    anchor={'template_meta':{'template_facts':{'limits':[0.,upper]}},
+            'joint_names':{'target':names},'planned_goal_joints':{'target':values}}
+    before=deepcopy(anchor)
+    assert recorded_opening_range(template,anchor)==expected
+    assert anchor==before
+
+
+def test_recorded_opening_range_does_not_choose_closing_start_bucket():
+    template=SimpleNamespace(task='configuration_matching-articulation_close_large_scale')
+    with pytest.raises(AssertionError,match='requires opening'):
+        recorded_opening_range(template,{})

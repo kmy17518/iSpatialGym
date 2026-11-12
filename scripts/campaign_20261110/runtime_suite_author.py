@@ -68,6 +68,8 @@ def group_range(template, counts):
 def recorded_opening_range(template, anchor):
     """Bind a fixed approved joint goal to its actual strict bucket."""
     from scripts.campaign_20261110.controller_groups import ranges
+    assert template.task in ("configuration_matching-articulation_open_small_scale",
+                             "configuration_matching-articulation_open_large_scale"), "recorded goal range requires opening"
     targets = [obj for obj in template.objects if obj.role == "target"]
     assert len(targets) == 1 and targets[0].joint
     target = targets[0]
@@ -199,7 +201,8 @@ def author(root, run_dir, catalog_path, ordinal):
         anchor = g.successful_anchor(catalog["anchor_job"],campaign_root=root,ledger=catalog["anchor_ledger"],
                                     campaign_started_at=float(read(run_dir/"campaign_start.json")["campaign_started_at"]))
         anchor["goal_proposal_source"] = "approved_recorded_goal_as_input_only; fresh_current_runtime_members_required"
-        if template.task == "configuration_matching-articulation_open_large_scale":
+        if template.task in ("configuration_matching-articulation_open_small_scale",
+                             "configuration_matching-articulation_open_large_scale"):
             magnitude, bucket = recorded_opening_range(template, anchor)
         elif template.task == "disembedding":
             recorded_range_evidence = recorded_disembedding_evidence(template, anchor)
