@@ -27,7 +27,7 @@ def _reservation(root, proof, row, initial):
                     'retry overlaps another reserved interval')
 
 
-def _row(root, row_ref, prior_ref, number, reservation, pointer, base):
+def _row(root, row_ref, prior_ref, number, reservation, pointer, base, correction_ref=None):
     row=checked(root,row_ref);prior=checked(root,prior_ref)
     require(type(number) is int and 1<=number<=2 and row.get('attempt_number')==number,
             'retry attempt number exceeds bounded budget')
@@ -38,6 +38,12 @@ def _row(root, row_ref, prior_ref, number, reservation, pointer, base):
     require(row['release']==pointer['release'] and row.get('previous_row')==prior_ref,
             'retry belongs to another release or prior attempt')
     require(row['fresh_start']!=prior['fresh_start'], 'retry reuses original indices')
+    require(row.get('input_correction')==correction_ref, 'retry correction binding differs')
+    if correction_ref:
+        from .runtime_suite_correction import recorded_range
+        recorded_range(root,correction_ref,prior_ref,row)
+    else:
+        require(row.get('selected_bucket')==prior.get('selected_bucket'), 'retry changes selected strict bucket')
     _reservation(root,reservation,row,checked(root,pointer['index_reservation']))
     if row['camera_exempt']:
         require(row['goal_plan'] is None and row['group_id'] is None and row['fresh_count']==1,
@@ -50,6 +56,7 @@ def _row(root, row_ref, prior_ref, number, reservation, pointer, base):
         # New indices/group and a measured time allowance may change; target,
         # geometry, source proposals, strict bucket, and every QA option may not.
         ignored={'group_id','created_at','budget_seconds'}
+        if correction_ref:ignored.add('crowdedness_range')
         require({k:v for k,v in old.items() if k not in ignored}==
                 {k:v for k,v in new.items() if k not in ignored}, 'retry changes physical goal or checks')
         if 'budget_seconds' in new:
@@ -58,15 +65,21 @@ def _row(root, row_ref, prior_ref, number, reservation, pointer, base):
     return row
 
 
-def failure(root, previous_row, allocation_ref, failed_gates):
+def failure(root, previous_row, allocation_ref, failed_gates, *, correction_ref=None):
     """Require a terminal actual attempt; absent evidence is not a failure."""
     from .runtime_suite_observer import source_stage
     from .training_diversity import _terminal_jobs
-    row,allocation,config,job=executed_scope(root,previous_row,allocation_ref)
+    if correction_ref:
+        from .runtime_suite_acceptance import allocated_scope
+        row,allocation,config,job=allocated_scope(root,previous_row,allocation_ref)
+    else:
+        row,allocation,config,job=executed_scope(root,previous_row,allocation_ref)
     terminal=checked(root,allocation['terminal_evidence'])
     expected={(str(record['job_id']),record['backend']) for record in allocation.get('records',[])}
     require(expected<={(j['job_id'],j['backend']) for j in terminal['jobs']},
             'retry terminal evidence omits an owned stage job')
+    require(any(j['job_id']==str(allocation['allocation']['jobid']) and j['stage'] in ('native','collection')
+                for j in terminal['jobs']), 'retry terminal evidence omits source allocation')
     # Acceptance may select two successes early. A new attempt instead waits
     # for every owned prior job, including optional member replays, to finish.
     _terminal_jobs(root,{'jobs':terminal['jobs']},terminal,time.time())
@@ -77,6 +90,12 @@ def failure(root, previous_row, allocation_ref, failed_gates):
         current_receipt=json.loads(current.read_text())
         require(not current_receipt.get('migration') and current_receipt.get('allocation')==receipt['allocation'],
                 'retry must reconcile existing migration ownership first')
+    if correction_ref:
+        # A positively proven invalid input may be canceled before execution.
+        # This is never evidence of a physical failure, and does not authorize
+        # an ordinary no-start retry or bypass terminal migration ownership.
+        return {'failure_kind':'input_authoring_mismatch','input_correction':correction_ref,
+                'all_prior_jobs_terminal':True,'physical_failure_inferred':False}
     stage=source_stage(root,row,allocation)
     require(stage['source_terminal_verified'], 'retry source is not terminal')
     require(stage['status']!='native_not_started_terminal', 'no-start source needs routing reconciliation, not a fresh attempt')
@@ -133,9 +152,11 @@ def prepare(root, proposal_ref):
     if number>1:
         previous=checked(root,pointer['attempt_registry'])['attempts'][row['class_id']][-1]
         require(budget==previous['max_attempts'], 'retry cannot expand registered attempt budget')
-    _row(root,proposal['row'],rows[-1],number,proposal['reservation'],pointer,base)
+    correction=proposal.get('input_correction')
+    _row(root,proposal['row'],rows[-1],number,proposal['reservation'],pointer,base,correction)
     diagnosis=_diagnosis(root,proposal['diagnosis'],rows[-1],proposal['allocation'],proposal.get('failed_gates',[]))
-    measured=failure(root,rows[-1],proposal['allocation'],proposal.get('failed_gates',[]))
+    require(diagnosis.get('input_correction')==correction, 'diagnosis correction binding differs')
+    measured=failure(root,rows[-1],proposal['allocation'],proposal.get('failed_gates',[]),correction_ref=correction)
     result_path=base/'acceptance'/(row['class_id']+'.json')
     if result_path.exists():
         result=json.loads(result_path.read_text())
@@ -146,6 +167,7 @@ def prepare(root, proposal_ref):
               'diagnosis':proposal['diagnosis'],'allocation':proposal['allocation'],
               'failed_gates':proposal.get('failed_gates',[]),'failure':measured,
               'dispatch_authorized':False,'production_authorization':False}
+    if correction:prepared['input_correction']=correction
     # Fresh terminal observations may need a new review revision while the
     # proposed row remains unchanged. Preserve every prepared revision.
     return immutable(Path(proposal['row']['path']).parent/'prepared_authorizations'/(digest(prepared)+'.json'),prepared)
@@ -162,8 +184,11 @@ def verify_registered(root, entry, prior_ref, number, pointer, base):
             approval.get('approved') is True and approval.get('prepared')==entry['prepared'] and
             approval.get('diagnosis')==prepared['diagnosis'] and approval.get('automatic_retry') is False,
             'retry lacks explicit exact approval')
-    _diagnosis(root,prepared['diagnosis'],prior_ref,prepared['allocation'],prepared['failed_gates'])
-    _row(root,entry['row'],prior_ref,number,prepared['reservation'],pointer,base)
+    diagnosis=_diagnosis(root,prepared['diagnosis'],prior_ref,prepared['allocation'],prepared['failed_gates'])
+    correction=prepared.get('input_correction')
+    require(diagnosis.get('input_correction')==correction and
+            approval.get('input_correction')==correction, 'approval/diagnosis correction binding differs')
+    _row(root,entry['row'],prior_ref,number,prepared['reservation'],pointer,base,correction)
     return prepared
 
 

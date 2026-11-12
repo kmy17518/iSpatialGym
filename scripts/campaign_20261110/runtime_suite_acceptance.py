@@ -30,9 +30,8 @@ def template_from(config):
     return Template(**value)
 
 
-def executed_scope(root, row_ref, allocation_ref):
-    from .production_gate import read_environment
-    from .training_diversity import _terminal_jobs
+def allocated_scope(root, row_ref, allocation_ref):
+    """Verify dispatch identity even when the worker was canceled before startup."""
     root = Path(root).resolve(); row = checked(root,row_ref); wrapper = checked(root,allocation_ref)
     require(wrapper['row'] == row_ref, 'allocation references another suite row')
     allocation = wrapper['allocation']; job = Path(allocation['job_dir']).resolve()
@@ -49,7 +48,15 @@ def executed_scope(root, row_ref, allocation_ref):
         matches = [r for r in csv.DictReader(stream,delimiter='\t') if r.get('jobid') == str(allocation['jobid'])]
     require(len(matches) == 1 and all(str(matches[0][k]) == str(allocation[k])
             for k in ('jobid','job_dir','code','start','n')), 'suite allocation is absent or ambiguous in its ledger')
-    environment = read_environment(job/'job.env'); config = checked(root,row['campaign_config'])
+    return row, wrapper, checked(root,row['campaign_config']), job
+
+
+def executed_scope(root, row_ref, allocation_ref):
+    from .production_gate import read_environment
+    from .training_diversity import _terminal_jobs
+    row, wrapper, config, job = allocated_scope(root, row_ref, allocation_ref)
+    allocation = wrapper['allocation']
+    environment = read_environment(job/'job.env')
     require(environment.get('ISPATIALGYM_RUNTIME_SUITE_ROW_SHA256') == row_ref['sha256'] and
             Path(environment['ISPATIALGYM_RUNTIME_SUITE_ROW']).resolve() == Path(row_ref['path']).resolve(),
             'worker environment belongs to another row')
