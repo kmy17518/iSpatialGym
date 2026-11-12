@@ -6,7 +6,7 @@ from pathlib import Path
 from scripts.campaign_20261110.contracts import file_digest, require, validate_campaign_block
 
 
-def selected_records(manifest, demo_dirs):
+def selected_records(manifest, demo_dirs, *, sequential_augmentation=False, slots=1):
     """Select accepted episodes only, with one exact rendering configuration."""
     records = {}
     for line in Path(manifest).read_text().splitlines():
@@ -20,8 +20,16 @@ def selected_records(manifest, demo_dirs):
     require(wanted and (len(set(wanted)) == len(wanted) or probe_repeat), "empty or duplicated campaign render input")
     require(all(path in records for path in wanted), "render input is not in accepted manifest")
     selected = {path: records[path] for path in wanted}
-    require(len({row["render_compatibility_sha256"] for row in selected.values()}) == 1,
-            "campaign rendering batch mixes scene, scale, light or validation configuration")
+    if sequential_augmentation:
+        from ispatialgym.oracle.campaign_batch import record_scope
+        require(slots == 1, 'sequential lighting requires exactly one renderer slot')
+        # Independent A-only/B-only references retain the full audited pair
+        # contract, while DemoSource consumes only the requested episode list.
+        record_scope(list(records.values()))
+        return records
+    else:
+        require(len({row["render_compatibility_sha256"] for row in selected.values()}) == 1,
+                "campaign rendering batch mixes scene, scale, light or validation configuration")
     return selected
 
 

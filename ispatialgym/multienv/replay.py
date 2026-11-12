@@ -596,6 +596,7 @@ def main(argv=None) -> int:
     ap.add_argument("--done-file", default=None, help="--watch: no more demos come once this file exists")
     ap.add_argument("--claims", default=None, help="--watch: claim directory shared by several replayers of one demo root")
     ap.add_argument("--campaign-manifest", default=None, help="accepted campaign instances.jsonl; verify inputs and restore exact augmentations")
+    ap.add_argument("--sequential-augmentation", action="store_true", help="explicit single-slot, fixed-inventory lighting/parking sequence")
     ap.add_argument("--poll-s", type=float, default=5.0)
     ap.add_argument("--root", required=True, help="LeRobot root dir: one dataset per slot, <root>/<repo prefix>_slot<k>")
     ap.add_argument("--task", required=True, help="task name written into the datasets (the variant)")
@@ -641,12 +642,15 @@ def main(argv=None) -> int:
     if args.watch and not args.done_file:
         ap.error("--watch needs --done-file")
     campaign_records = None
+    if args.sequential_augmentation and (not args.campaign_manifest or int(args.slots) != 1):
+        ap.error('sequential augmentation requires an exact campaign manifest and one slot')
     if args.campaign_manifest:
         if args.watch or args.scene != "recorded" or args.tiled or args.delta_load:
             ap.error("campaign rendering requires a fixed accepted list, --scene recorded, individual cameras and full state loads")
         from ispatialgym.multienv.campaign_rendering import selected_records
 
-        campaign_records = selected_records(args.campaign_manifest, demo_dirs)
+        campaign_records = selected_records(args.campaign_manifest, demo_dirs,
+            sequential_augmentation=args.sequential_augmentation, slots=int(args.slots))
     n_slots = max(1, int(args.slots) if args.watch else min(int(args.slots), len(demo_dirs)))
     tiled = args.tiled and n_slots > 1
     t_start = time.time()
@@ -663,6 +667,12 @@ def main(argv=None) -> int:
 
     import omnigibson as og
     from omnigibson.macros import gm
+
+    if args.sequential_augmentation:
+        from ispatialgym.oracle import run_isg
+        from ispatialgym.oracle.campaign_batch import saved_world_scope
+
+        saved_world_scope(run_isg, list(campaign_records.values()))
 
     for name, value in (("ENABLE_TRANSITION_RULES", False), ("ENABLE_TILED_RENDERING", tiled), ("VISUAL_ONLY", True)):
         if getattr(gm, name) != value:

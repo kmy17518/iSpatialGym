@@ -5,6 +5,7 @@ A modern CPU helper must re-audit the resulting evidence before any release.
 """
 import argparse
 import ast
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -84,13 +85,22 @@ def inputs(root,request):
             require(path.is_relative_to(root) and file_digest(path)==artifact['sha256'],'probe input changed')
         records.append(row)
     require(len(records)==2 and records[0]['instance_id']!=records[1]['instance_id'],'probe needs two distinct canaries')
-    require(records[0]['render_compatibility_sha256']==records[1]['render_compatibility_sha256'],
-            'probe cannot bypass production configuration isolation')
+    if value.get('sequential_augmentation') is True:
+        from ispatialgym.oracle.campaign_batch import record_scope
+        record_scope(records)
+    else:
+        require(records[0]['render_compatibility_sha256']==records[1]['render_compatibility_sha256'],
+                'probe cannot bypass production configuration isolation')
     return value,records
 
 
-def shared_world_proof(runner, records):
+def shared_world_proof(runner, records, *, sequential_augmentation=False):
     """Use the production signature and saved-scene checks for template copies."""
+    if sequential_augmentation:
+        from ispatialgym.oracle.campaign_batch import saved_world_scope
+        contract=saved_world_scope(runner,records)
+        return {'signature':contract['schema'], 'compatible_template_dirs':contract['compatible_template_dirs'],
+                'sequential_augmentation':contract, 'method':contract['method']}
     paths=[r['artifacts']['tro']['path'] for r in records]
     signatures=[runner.instance_signature(path) for path in paths]
     require(signatures[0]==signatures[1],'production world signatures differ')
@@ -181,7 +191,15 @@ class ControlledEpisodeAbort(RuntimeError):
     """A named diagnostic interruption handled by the ordinary episode finally."""
 
 
-def abort_after_native_control_step(env, destination):
+class ControlledEpisodeFailure(RuntimeError):
+    """Exercise an ordinary failed episode without changing any requested step."""
+
+
+class ControlledEpisodeInterrupt(KeyboardInterrupt):
+    """Exercise the native BaseException cleanup path in the bounded test only."""
+
+
+def abort_after_native_control_step(env, destination, exception_type=ControlledEpisodeAbort):
     """Complete one unchanged requested action, then exercise native error cleanup."""
     step = env.step
     original = vars(env).get('step')
@@ -194,8 +212,8 @@ def abort_after_native_control_step(env, destination):
         cleanup()
         step(*args, **kwargs)
         destination.update(native_control_calls_completed=1, physics_steps_added=0,
-                           exception_type='ControlledEpisodeAbort', injected=True)
-        raise ControlledEpisodeAbort('bounded restoration cleanup control after one native action')
+                           exception_type=exception_type.__name__, injected=True)
+        raise exception_type('bounded restoration cleanup control after one native action')
     env.step = interrupted
     return cleanup
 
@@ -261,7 +279,8 @@ def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_
         if abort_control is not None and abort_control.get('enabled') is True:
             destination = {}
             loader.report['campaign_restoration']['controlled_abort'] = destination
-            cleanup = abort_after_native_control_step(loader.env, destination)
+            cleanup = abort_after_native_control_step(loader.env, destination,
+                abort_control.get('exception_type', ControlledEpisodeAbort))
             if pending_cleanups is not None: pending_cleanups.append(cleanup)
         return result
     runner.InstanceLoader.restore=observed_restore
@@ -273,14 +292,38 @@ def episode_order(value, kind):
     control = value.get('diagnostic_control')
     if control is None:
         return [0, 1, 0]
-    require(control in ('A_A', 'A_ABORT_A', 'FRESH_A') and kind == 'physics_action_open_loop'
+    allowed_physics=('A_A', 'A_ABORT_A', 'A_FAILURE_A', 'A_INTERRUPT_A', 'FRESH_A', 'FRESH_B')
+    require(control in allowed_physics and
+            (kind == 'physics_action_open_loop' or
+             (control in ('FRESH_A', 'FRESH_B') and value.get('sequential_augmentation') is True))
             and value.get('diagnostic_only') is True
             and value.get('production_released') is False,
             'unsupported or non-diagnostic restoration control')
-    return [0] if control == 'FRESH_A' else [0, 0]
+    return [0] if control == 'FRESH_A' else ([1] if control == 'FRESH_B' else [0, 0])
+
+
+@contextmanager
+def world_construction_counter(og):
+    """Count actual native Environment calls; preserve every argument/result."""
+    constructor=og.Environment
+    proof={'attempted':0,'completed':0,'method':'omnigibson.Environment', 'instrumentation_only':True}
+    def observed(*args,**kwargs):
+        proof['attempted']+=1
+        result=constructor(*args,**kwargs)
+        proof['completed']+=1
+        return result
+    og.Environment=observed
+    try:yield proof
+    finally:og.Environment=constructor
 
 
 def run(root,request,output,kind):
+    import omnigibson as og
+    with world_construction_counter(og) as construction:
+        return _run(root,request,output,kind,construction)
+
+
+def _run(root,request,output,kind,construction):
     root=Path(root).resolve();output=Path(output).resolve()
     require(output.is_relative_to(root) and not output.exists(),'probe output must be new and private')
     value,records=inputs(root,request);output.mkdir(parents=True)
@@ -301,6 +344,7 @@ def run(root,request,output,kind):
             'request':{'path':str(Path(request).resolve()),'sha256':file_digest(request)},
             'probe_runtime':{'path':str(runtime),'sha256':file_digest(runtime)},'entries':entries,
             'runtime_compatibility':compatibility,
+            'world_construction':construction,
             'accepted':False,'eligible_for_goal':False,'quota_consumed':0}
     if value.get('diagnostic_control'):
         common.update(schema='isg-training-restoration-control-v1', diagnostic_control=value['diagnostic_control'],
@@ -319,7 +363,9 @@ def run(root,request,output,kind):
         require(fast_on('COLLECTOR_PREBUILD'),'production template compatibility is disabled')
         pending_cleanups=[]
         abort_control = {'enabled': False}
-        if value.get('diagnostic_control') == 'A_ABORT_A':
+        interruption_types={'A_ABORT_A':ControlledEpisodeAbort,'A_FAILURE_A':ControlledEpisodeFailure,
+                            'A_INTERRUPT_A':ControlledEpisodeInterrupt}
+        if value.get('diagnostic_control') in interruption_types:
             require(value.get('observe_reset_boundary') is True and
                     value.get('observe_final_pre_action') is True and
                     value.get('observe_next_native_control_step') is True,
@@ -332,12 +378,15 @@ def run(root,request,output,kind):
                 pending_cleanups=pending_cleanups, abort_control=abort_control)
             common['reset_boundary_diagnostic']=True
             common['final_pre_action_diagnostic']=value.get('observe_final_pre_action') is True
-        world=shared_world_proof(run_isg,records)
+        world=shared_world_proof(run_isg,records,sequential_augmentation=value.get('sequential_augmentation') is True)
         common['world_compatibility']=world
         shared={'signature':world['signature'],
                 'compatible_template_dirs':set(map(os.path.abspath,world['compatible_template_dirs']))}
+        if world.get('sequential_augmentation'):
+            shared['sequential_augmentation']=world['sequential_augmentation']
         for ordinal,index in enumerate(order):
-            abort_control['enabled'] = value.get('diagnostic_control') == 'A_ABORT_A' and ordinal == 0
+            abort_control['enabled'] = value.get('diagnostic_control') in interruption_types and ordinal == 0
+            abort_control['exception_type']=interruption_types.get(value.get('diagnostic_control'),ControlledEpisodeAbort)
             row=records[index];destination=output/('episode_'+str(ordinal))
             argv=['--instance',row['artifacts']['tro']['path'],'--mode','replay',
                   '--replay',row['artifacts']['demo']['path'],'--record','hdf5','--no-goal-override','--out',str(destination)]
@@ -354,8 +403,9 @@ def run(root,request,output,kind):
                 saved = json.loads(report.read_text())
                 interruption = saved.get('loader', {}).get('campaign_restoration', {}).get('controlled_abort', {})
                 require(code != 0 and result.get('success') is False and
-                        result.get('error', '').startswith('ControlledEpisodeAbort(') and
+                        result.get('error', '').startswith(abort_control['exception_type'].__name__+'(') and
                         interruption.get('injected') is True and
+                        interruption.get('exception_type')==abort_control['exception_type'].__name__ and
                         interruption.get('native_control_calls_completed') == 1,
                         'native episode did not execute the exact controlled-abort cleanup path')
                 entries[-1]['expected_controlled_abort'] = True
@@ -368,13 +418,14 @@ def run(root,request,output,kind):
         manifest=output/'canaries.jsonl';manifest.write_text(''.join(json.dumps(r)+'\n'for r in records))
         listing=output/'demos.txt';listing.write_text(''.join(str(Path(records[i]['artifacts']['demo']['path']).parent)+'\n'for i in order))
         results=output/'results.jsonl'
+        extra=['--sequential-augmentation'] if value.get('sequential_augmentation') is True else []
         code=replay.main(['--demos','@'+str(listing),'--campaign-manifest',str(manifest),
             '--root',str(output/'rendered'),'--task',records[0]['variant'],'--slots','1',
-            '--scene','recorded','--results',str(results),'--repo-prefix','training_probe'])
+            '--scene','recorded','--results',str(results),'--repo-prefix','training_probe']+extra)
         rows=[(i,json.loads(line))for i,line in enumerate(results.read_text().splitlines())]
         episodes=[(i,row)for i,row in rows if row.get('tag')=='REPLAY_DEMO']
         outputs=[{'path':str(p),'sha256':file_digest(p)}for p in sorted((output/'rendered').rglob('*'))if p.is_file()]
-        require(code==0 and len(episodes)==3 and outputs,'native renderer did not produce three episodes and files')
+        require(code==0 and len(episodes)==len(order) and outputs,'native renderer did not produce the requested episodes and files')
         for ordinal,(line,row)in enumerate(episodes):
             require(Path(row['demo']).name==records[order[ordinal]]['instance_id'],'render order differs')
             entries.append({'canary_review':value['canaries'][order[ordinal]],
@@ -382,6 +433,8 @@ def run(root,request,output,kind):
         write_json_atomic(output/'probe.json',common)
     # Recheck all source bytes after running; no source state or goal rewrites.
     inputs(root,request)
+    require(construction['attempted']==construction['completed']==1,
+            'batch did not execute exactly one native Environment construction')
     return common
 
 

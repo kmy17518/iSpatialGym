@@ -535,6 +535,8 @@ class InstanceLoader:
         from ispatialgym.sampling.scene_variants import block_trav_map_from_meta, patch_trav_map_from_meta
 
         # the scene variant's freed footprints (template) and the instance's blocked footprints on the planner map
+        if getattr(self, '_sequential_augmentation', None) is not None:
+            self._floor_map_before_augmentation = _copy_map(self.env.scene.trav_map.floor_map[0])
         self.report["trav_cells_freed"] = patch_trav_map_from_meta(self.env.scene, self.tmeta)
         self._floor_map_template = _copy_map(self.env.scene.trav_map.floor_map[0])
         self.report["trav_cells_blocked"] = block_trav_map_from_meta(self.env.scene, self.tro.meta.scene or {})
@@ -590,6 +592,8 @@ class InstanceLoader:
                        "template_dir": self.template_dir, "template_key": (template_key(self.template_dir, self.tmeta) if fast_on("COLLECTOR_PREBUILD") else None), "floor_map": self._floor_map_template, "scene_state0": self._scene_state0,
                        "pristine_mass0": getattr(self, "_pristine_mass0", None),
                        "build_report": {k: v for k, v in self.report.items() if k != "trav_cells_blocked"}})
+        if getattr(self, '_sequential_augmentation', None) is not None:
+            shared['floor_map_before_augmentation'] = self._floor_map_before_augmentation
 
     def attach(self, shared: Dict[str, Any]):
         """``--queue``: this instance in the world of the previous one (same template, :func:`instance_signature`) instead of
@@ -642,6 +646,14 @@ class InstanceLoader:
         self.env.scene.trav_map.floor_map[0] = _copy_map(shared["floor_map"])
         self._floor_map_template = shared["floor_map"]
         self.report.update(shared["build_report"])
+        if shared.get('sequential_augmentation') is not None:
+            from ispatialgym.oracle.campaign_batch import restore_parking
+            from ispatialgym.sampling.scene_variants import patch_trav_map_from_meta
+
+            self.report['sequential_augmentation'] = restore_parking(self, shared['sequential_augmentation'])
+            self.env.scene.trav_map.floor_map[0] = _copy_map(shared['floor_map_before_augmentation'])
+            self.report['trav_cells_freed'] = patch_trav_map_from_meta(self.env.scene, self.tmeta)
+            self._floor_map_template = _copy_map(self.env.scene.trav_map.floor_map[0])
         self.report["trav_cells_blocked"] = block_trav_map_from_meta(self.env.scene, self.tro.meta.scene or {})
         self.report["reused_world"] = True
         return self.env
@@ -1721,6 +1733,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
 
         # ---------------------------------------------------------------- environment + loader contract
         t0 = time.time()
+        if shared is not None and shared.get('sequential_augmentation') is not None:
+            loader._sequential_augmentation = shared['sequential_augmentation']
         if shared is not None and shared.get("env") is not None:
             env = loader.attach(shared)
         else:
