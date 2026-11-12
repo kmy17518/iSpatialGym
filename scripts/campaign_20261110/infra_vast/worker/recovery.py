@@ -28,6 +28,22 @@ def verified_job(row, root=CAMPAIGN_ROOT):
     job = Path(row['job_dir']).resolve()
     if not job.is_relative_to(root / 'out') or not str(row['job_id']).isdigit():
         raise ValueError('recovery job outside exact campaign output')
+    if row.get('kind') == 'tabletop_maps':
+        manifest = job/'native_inputs.json'
+        if not job.is_relative_to(root/'out/vast_map_prebuild') or digest(manifest) != row['native_inputs_sha256']:
+            raise ValueError('map recovery manifest differs from stopped assignment')
+        value = json.loads(manifest.read_text())
+        if (value.get('schema') != 'isg-vast-map-prebuild-v1' or value.get('campaign_root') != str(root)
+                or value.get('job_dir') != str(job) or value.get('kind') != 'tabletop_maps'
+                or value.get('new_native_instances') != 0 or value.get('production_released') is not False):
+            raise ValueError('map recovery purpose differs')
+        for name, expected in {**value['files'], **value['library_files'], **value.get('seed_map_files', {})}.items():
+            path = Path(name).resolve()
+            if not path.is_relative_to(root) or digest(path) != expected:
+                raise ValueError('map recovery input changed')
+        return job
+    if row.get('kind') not in (None, 'training'):
+        raise ValueError('unknown recovery job kind')
     env = {}
     for line in (job / 'job.env').read_text().splitlines():
         if '=' in line:
@@ -58,8 +74,12 @@ def s5(*args):
 
 
 def recover(value, instance, *, root=CAMPAIGN_ROOT, work_root=Path('/work/training_gate_recovery')):
-    if value.get('purpose') != 'preserve_stopped_training_artifacts' or not value.get('jobs'):
+    purposes = {'preserve_stopped_training_artifacts': (None, 'training'),
+                'preserve_stopped_map_artifacts': ('tabletop_maps',)}
+    if value.get('purpose') not in purposes or not value.get('jobs'):
         raise ValueError('invalid bounded recovery purpose')
+    if any(row.get('kind') not in purposes[value['purpose']] for row in value['jobs']):
+        raise ValueError('recovery job kind differs from authorized purpose')
     prefix = os.environ['ISG_S3'].rstrip('/')
     if not prefix.endswith('/jobs/og-isg261110'): raise ValueError('recovery storage scope differs')
     work = Path(work_root) / str(instance)
@@ -79,8 +99,9 @@ def recover(value, instance, *, root=CAMPAIGN_ROOT, work_root=Path('/work/traini
         if tar.returncode or zip_result.returncode: raise RuntimeError('recovery archive failed')
         key = prefix + '/recovery/training_gate_20261111/' + str(instance) + '/' + archive.name
         s5('cp', str(archive), key)
+        native_paths = (job/'result/maps').rglob('map__*') if row.get('kind') == 'tabletop_maps' else (job/'inst').rglob('*-tro_state.json')
         native = [{'path':str(p), 'sha256':digest(p), 'bytes':p.stat().st_size}
-                  for p in (job/'inst').rglob('*-tro_state.json') if p.is_file()]
+                  for p in native_paths if p.is_file()]
         report['jobs'].append({**row, 'archive_key':key, 'archive_sha256':digest(archive),
                                'archive_bytes':archive.stat().st_size, 'native_files':native})
     report['finished_unix'] = time.time()

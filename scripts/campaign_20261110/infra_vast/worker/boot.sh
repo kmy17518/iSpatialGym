@@ -55,7 +55,7 @@ self_destroy() {
   sleep infinity
 }
 # Every new boot checks private control before any GPU initialization or job
-# dispatch. A stopped training disk can only archive its original files.
+# dispatch. An explicitly protected stopped disk only archives its original files.
 POLICY=/work/campaign_boot_policy.json
 if ! $S5 cp "$ISG_S3/bundle/boot_policy.json" "$POLICY" >/dev/null 2>&1; then
   heartbeat recovery_blocked "private boot policy unavailable"
@@ -73,7 +73,7 @@ if ! mode=$(bash "$RUN/boot_mode.sh" "$CONTROL" "$ISG_INSTANCE"); then
   sleep infinity
 fi
 if [[ "$mode" == recover ]]; then
-  heartbeat recovery "archive existing stopped training outputs only"
+  heartbeat recovery "archive exact authorized stopped outputs only"
   if timeout 1200 "$ENVP/bin/python" "$RUN/recovery.py" recover "$POLICY" "$ISG_INSTANCE" > "$LOG/recovery.log" 2>&1; then
     upload_logs
     heartbeat recovery_complete "awaiting cluster archive verification"
