@@ -143,7 +143,9 @@ def prepare(root, proposal_ref):
               'diagnosis':proposal['diagnosis'],'allocation':proposal['allocation'],
               'failed_gates':proposal.get('failed_gates',[]),'failure':measured,
               'dispatch_authorized':False,'production_authorization':False}
-    return immutable(Path(proposal['row']['path']).parent/'prepared_authorization.json',prepared)
+    # Fresh terminal observations may need a new review revision while the
+    # proposed row remains unchanged. Preserve every prepared revision.
+    return immutable(Path(proposal['row']['path']).parent/'prepared_authorizations'/(digest(prepared)+'.json'),prepared)
 
 
 def verify_registered(root, entry, prior_ref, number, pointer, base):
