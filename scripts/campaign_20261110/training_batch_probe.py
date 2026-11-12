@@ -32,6 +32,9 @@ def verify_saved_checker_delta(base, runtime, proof):
 def verify_runtime_compatibility(root, request, records, runtime):
     """Recheck the narrow observation-only runtime against native source bytes."""
     root=Path(root).resolve();runtime=Path(runtime).resolve()
+    if request.get('selected_pool_world') is True:
+        from .training_pool_probe import verify_runtime
+        return verify_runtime(root, request, records, runtime)
     if request.get('physical_candidate'):
         from .training_pristine_probe import verify_candidate
         return verify_candidate(root, request, records, runtime)
@@ -168,7 +171,10 @@ def inputs(root,request):
             require(path.is_relative_to(root) and file_digest(path)==artifact['sha256'],'probe input changed')
         records.append(row)
     require(len(records)==2 and records[0]['instance_id']!=records[1]['instance_id'],'probe needs two distinct canaries')
-    if value.get('sequential_augmentation') is True:
+    if value.get('selected_pool_world') is True:
+        from .training_pool_probe import verify_inputs
+        verify_inputs(root, value, records)
+    elif value.get('sequential_augmentation') is True:
         from ispatialgym.oracle.campaign_batch import record_scope
         record_scope(records)
     else:

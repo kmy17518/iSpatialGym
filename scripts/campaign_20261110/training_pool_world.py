@@ -74,14 +74,14 @@ def verify_pool_isolation(expected, observed, *, task_bindings, planner_names):
         require(actual['properties'] == row['properties'],
                 'native pool physical properties differ: '+name)
         if not row['active']:
-            require(name not in planner_names and not actual.get('assisted_held')
+            require((planner_names is None or name not in planner_names) and not actual.get('assisted_held')
                     and not actual.get('attached_parent')
                     and math.dist(actual['position'], row['state']['root_link']['pos']) <= 1e-6
                     and all(abs(float(x)) <= 1e-7 for k in ('linear_velocity', 'angular_velocity')
                             for x in actual[k]),
                     'inactive actor remains physically or logically active: '+name)
     return {'active': sorted(active), 'inactive': sorted(inactive),
-            'properties_verified': True, 'planner_exclusion_verified': True,
+            'properties_verified': True, 'planner_exclusion_verified': planner_names is not None,
             'scope': 'Native reads at this boundary only; export and per-step persistence require separate evidence.'}
 
 
