@@ -71,6 +71,17 @@ def test_optional_other_replay_does_not_block_selected_terminal_member(tmp_path)
     with pytest.raises(ContractError,match='active'):a.scope(tmp_path,row,put(Path(allocation['path']),wrapper),gate)
 
 
+def test_later_optional_member_preserves_and_reaudits_committed_group(tmp_path,monkeypatch):
+    base,row,allocation,gate=bound(tmp_path)
+    prior={'status':'accepted','row':row,'validation_passed':True,'selected_members':['first','second']}
+    ref=put(base/'acceptance/class0.json',prior);verified=[]
+    monkeypatch.setattr(a,'audit',lambda *args:pytest.fail('must not create a different review for committed group'))
+    def verify(root,result_ref):
+        verified.append(result_ref);assert result_ref==ref;return prior
+    monkeypatch.setattr(a,'verify_result',verify)
+    assert a.reconcile(tmp_path,row,allocation,gate)==prior and verified==[ref]
+
+
 def test_regression_full_quota_has_no_claim_and_is_reaudited(tmp_path,monkeypatch):
     from types import SimpleNamespace
     base,row_ref,allocation_ref,gate_ref=bound(tmp_path)

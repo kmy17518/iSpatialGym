@@ -209,9 +209,17 @@ def _claim_camera(root, template, review, since, policy):
 def reconcile(root, row_ref, allocation_ref, gate_ref, *, claim=True):
     from .group_lane import claim_group
     from .reservation_policy import active_policy
-    row,allocation,template,review,validation = audit(root,row_ref,allocation_ref,gate_ref)
     from .runtime_suite import active
     base=active(root)[4]
+    row_identity=checked(root,row_ref)
+    target=base/'acceptance'/(row_identity['class_id']+'.json')
+    if target.exists():
+        prior=checked(root,reference(target))
+        if prior.get('status')=='accepted' and prior.get('row')==row_ref:
+            # A later optional replay updates cost history, not the immutable
+            # already-committed group review. Re-audit its exact selected pair.
+            return verify_result(root,reference(target))
+    row,allocation,template,review,validation = audit(root,row_ref,allocation_ref,gate_ref)
     work=base/'evidence'/row['class_id']/digest({'row':row_ref,'allocation':allocation_ref,'gate':gate_ref})
     review_ref=immutable(work/'review.json',review); validation_ref=immutable(work/'regression.json',validation)
     quota,_,_=quota_snapshot(root,template,validation['members'])
@@ -252,7 +260,6 @@ def reconcile(root, row_ref, allocation_ref, gate_ref, *, claim=True):
         'strict_review':review_ref,'regression_audit':validation_ref,'quota_evidence':quota_ref,
         'members':members,'distinct_successful_members':None if row['camera_exempt'] else len(members),
         'quota':quota,'claim_result':allocation_result,'production_authorization':False}
-    target=base/'acceptance'/(row['class_id']+'.json')
     if target.exists():
         prior=json.loads(target.read_text());immutable(work/('prior_'+digest(prior)+'.json'),prior)
     immutable(work/('result_'+digest(result)+'.json'),result)
