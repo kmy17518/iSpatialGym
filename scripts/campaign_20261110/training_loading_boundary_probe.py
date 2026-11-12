@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import traceback
 
 from .contracts import require, write_json_atomic
 from .training_loading_boundary_contract import inputs, native_boundary, ref, validate_sequence
@@ -70,11 +71,16 @@ def run(root, request_path, output, *, preflight=False, runner=subprocess.run):
             with (output/('segment_'+str(ordinal)+'.log')).open('w') as log:
                 completed = runner(command, stdout=log, stderr=subprocess.STDOUT, timeout=remaining,
                                    env=environment)
+            exit_path = output/('segment_'+str(ordinal)+'_exit.json')
+            write_json_atomic(exit_path,
+                              {'ordinal': ordinal, 'returncode': completed.returncode,
+                               'request': ref(request_path), 'native_runtime': q['native_runtime']})
             path = destination/'loading_boundary.json'; segment = json.loads(path.read_text())
             require(completed.returncode == segment['returncode']
                     and segment['request'] == ref(request_path)
                     and segment['native_runtime'] == q['native_runtime'], 'native child exit or identity differs')
             segment['boundary_observation'] = ref(path)
+            segment['child_exit_observation'] = ref(exit_path)
             result['segments'].append(segment)
             child = json.loads(Path(segment['probe']['path']).read_text()); children.append(child)
             result['world_loads'] += child['world_construction']['completed']
@@ -93,6 +99,21 @@ def run(root, request_path, output, *, preflight=False, runner=subprocess.run):
     return result
 
 
+def shutdown_and_exit(code, native, *, exit_process=os._exit):
+    """Preserve native queue restart status across Isaac's teardown handlers."""
+    sys.stdout.flush(); sys.stderr.flush()
+    if native is not None:
+        try:
+            native.shutdown()
+        except SystemExit as error:
+            if error.code not in (None, 0):
+                traceback.print_exc(); code = 1
+        except BaseException:
+            traceback.print_exc(); code = 1
+    sys.stdout.flush(); sys.stderr.flush()
+    exit_process(code)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(); parser.add_argument('--root', required=True)
     parser.add_argument('--request', required=True); parser.add_argument('--output', required=True)
@@ -102,7 +123,6 @@ if __name__ == '__main__':
         if args.segment is None: value = run(args.root, args.request, args.output, preflight=args.preflight)
         else: code, value = run_segment(args.root, args.request, args.output, args.segment)
         print(json.dumps(value), flush=True)
-    finally:
-        native = sys.modules.get('omnigibson')
-        if native is not None: native.shutdown()
-    raise SystemExit(code)
+    except BaseException:
+        traceback.print_exc(); code = 1
+    shutdown_and_exit(code, sys.modules.get('omnigibson'))

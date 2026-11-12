@@ -100,3 +100,29 @@ def test_input_binding_keeps_sources_runtime_and_actual_room_metadata(tmp_path):
     (tmp_path/'template1/template_meta.json').write_text((tmp_path/'template0/template_meta.json').read_text())
     with pytest.raises(ValueError,match='distinct retained worlds'):
         contract.inputs(tmp_path,path,runtime=runtime,source_reader=reader)
+
+
+def test_retained_cold_runtime_bridge_rejects_physics_or_unreviewed_payloads(tmp_path):
+    import json
+    old=tmp_path/'old';new=tmp_path/'new'
+    helper='scripts/campaign_20261110/training_loading_boundary_probe.py'
+    inventories=[]
+    for directory,body in [(old,'old'),(new,'exit-repair')]:
+        (directory/'ispatialgym').mkdir(parents=True);(directory/'ispatialgym/physics.py').write_text('unchanged')
+        path=directory/helper;path.parent.mkdir(parents=True);path.write_text(body)
+        (directory/'.snapshot_commit').write_text(body)
+        inventories.append({str(p.relative_to(directory)):contract.file_digest(p)for p in directory.rglob('*.py')})
+    q={'native_runtime':contract.ref(new/'.snapshot_commit')};cold={'native_runtime':contract.ref(old/'.snapshot_commit')}
+    proof={'schema':'isg-loading-supervision-only-runtime-v1','cold_runtime':cold['native_runtime'],
+           'candidate_runtime':q['native_runtime'],'physics_changes':[],'benchmark_credit':0,
+           'cold_python_payloads':inventories[0],'candidate_python_payloads':inventories[1],
+           'reviewed_changed_payloads':{helper:{'cold':inventories[0][helper],'candidate':inventories[1][helper]}}}
+    path=tmp_path/'bridge.json';path.write_text(json.dumps(proof));q['cold_runtime_compatibility']=contract.ref(path)
+    assert contract.cold_runtime(tmp_path,q,cold)==old
+    (new/'ispatialgym/physics.py').write_text('changed')
+    with pytest.raises(ValueError,match='inventory changed'):contract.cold_runtime(tmp_path,q,cold)
+    proof['candidate_python_payloads']['ispatialgym/physics.py']=contract.file_digest(new/'ispatialgym/physics.py')
+    proof['reviewed_changed_payloads']['ispatialgym/physics.py']={'cold':inventories[0]['ispatialgym/physics.py'],
+        'candidate':proof['candidate_python_payloads']['ispatialgym/physics.py']}
+    path.write_text(json.dumps(proof));q['cold_runtime_compatibility']=contract.ref(path)
+    with pytest.raises(ValueError,match='physical payload change'):contract.cold_runtime(tmp_path,q,cold)

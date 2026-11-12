@@ -157,6 +157,36 @@ def executed_job(root, observation, execution):
     return job
 
 
+def cold_runtime(root, request, cold):
+    """Verify a reviewed supervisor-only revision before retaining old colds."""
+    if cold['native_runtime'] == request['native_runtime']:
+        return checked(root, cold['native_runtime']).parent
+    proof = json.loads(checked(root, request['cold_runtime_compatibility']).read_text())
+    require(proof.get('schema') == 'isg-loading-supervision-only-runtime-v1'
+            and proof['cold_runtime'] == cold['native_runtime']
+            and proof['candidate_runtime'] == request['native_runtime']
+            and proof.get('physics_changes') == [] and proof.get('benchmark_credit') == 0,
+            'cold runtime bridge identity or scope differs')
+    before = checked(root, proof['cold_runtime']).parent
+    after = checked(root, proof['candidate_runtime']).parent
+    def payloads(directory):
+        return {str(p.relative_to(directory)):file_digest(p)
+                for folder in ('ispatialgym', 'scripts') for p in (directory/folder).rglob('*.py')
+                if p.is_file()}
+    old, new = payloads(before), payloads(after)
+    require(old == proof['cold_python_payloads'] and new == proof['candidate_python_payloads'],
+            'cold runtime bridge payload inventory changed')
+    changed = {name:{'cold':old.get(name), 'candidate':new.get(name)}
+               for name in old.keys() | new.keys() if old.get(name) != new.get(name)}
+    allowed = {'scripts/campaign_20261110/training_loading_boundary_probe.py',
+               'scripts/campaign_20261110/training_loading_boundary_contract.py',
+               'scripts/campaign_20261110/tests/test_training_loading_boundary_probe.py',
+               'scripts/campaign_20261110/tests/test_training_loading_boundary_contract.py'}
+    require(changed == proof['reviewed_changed_payloads'] and set(changed) <= allowed
+            and bool(changed), 'cold bridge includes an unreviewed or physical payload change')
+    return before
+
+
 def verify(root, request_ref, observation_ref, cold_references, execution, cold_executions):
     """Strict cold/full-action comparison; never grants production release."""
     import os
@@ -173,8 +203,14 @@ def verify(root, request_ref, observation_ref, cold_references, execution, cold_
     for segment in observed['segments']:
         child = json.loads(checked(root, segment['probe']).read_text()); children.append(child)
         boundary = json.loads(checked(root, segment['boundary_observation']).read_text())
-        require(boundary == {k:v for k,v in segment.items() if k != 'boundary_observation'}
+        require(boundary == {k:v for k,v in segment.items()
+                             if k not in ('boundary_observation', 'child_exit_observation')}
                 and str(boundary['scheduler_job_id']) == job, 'child boundary provenance differs')
+        if q.get('child_exit_observation_required') or 'child_exit_observation' in segment:
+            actual_exit = json.loads(checked(root, segment['child_exit_observation']).read_text())
+            require(actual_exit == {'ordinal': segment['ordinal'], 'returncode': segment['returncode'],
+                                    'request': request_ref, 'native_runtime': q['native_runtime']},
+                    'actual child process exit differs from native boundary')
     accounting = validate_sequence(q, observed, children)
     require(set(cold_references) == set(cold_executions) == {'0', '1'},
             'independent cold A and B references and execution proofs required')
@@ -182,10 +218,14 @@ def verify(root, request_ref, observation_ref, cold_references, execution, cold_
     for key, reference in cold_references.items():
         cold = json.loads(checked(root, reference).read_text())
         cold_job = executed_job(root, cold, cold_executions[key])
-        cold_q, _, _ = inputs(root, checked(root, cold['request']))
+        cold_native = cold_runtime(root, q, cold)
+        cold_q, cold_sources, _ = inputs(root, checked(root, cold['request']), runtime=cold_native)
         require(cold_q['control'] == ('FRESH_A' if key == '0' else 'FRESH_B')
-                and cold_q['sources'] == q['sources'] and cold_q['native_runtime'] == q['native_runtime'],
-                'independent cold source or runtime differs')
+                and all(a['row'] == b['row'] and a['environment'] == b['environment']
+                        and {k:v for k,v in a['request'].items() if k not in ('native_runtime','runtime_proof')}
+                        == {k:v for k,v in b['request'].items() if k not in ('native_runtime','runtime_proof')}
+                        for a,b in zip(cold_sources,sources)),
+                'independent cold source or physical execution settings differ')
         cold_children = [json.loads(checked(root, s['probe']).read_text()) for s in cold['segments']]
         validate_sequence(cold_q, cold, cold_children)
         require(reference != observation_ref and cold['scheduler_job_id'] != observed['scheduler_job_id'],

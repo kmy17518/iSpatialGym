@@ -38,3 +38,24 @@ def test_unexpected_child_exit_preserves_failure_without_starting_next_world(tmp
     with pytest.raises(ValueError,match='exit or identity'):probe.run(tmp_path,request,tmp_path/'output',runner=runner)
     saved=json.loads((tmp_path/'output/probe.json').read_text())
     assert len(calls)==1 and saved['status']=='failed' and saved['world_loads']==0
+    assert json.loads((tmp_path/'output/segment_0_exit.json').read_text())['returncode']==1
+
+
+@pytest.mark.parametrize('code', [0, 1, 75])
+@pytest.mark.parametrize('teardown_exit', [False, True])
+def test_native_teardown_cannot_replace_declared_exit_status(code, teardown_exit):
+    calls=[]
+    def shutdown():
+        calls.append('shutdown')
+        if teardown_exit: raise SystemExit(0)
+    probe.shutdown_and_exit(code, SimpleNamespace(shutdown=shutdown), exit_process=calls.append)
+    assert calls==['shutdown', code]
+
+
+@pytest.mark.parametrize('error', [RuntimeError('teardown failed'), SystemExit(3), KeyboardInterrupt()])
+@pytest.mark.parametrize('code', [0, 75])
+def test_unexpected_teardown_failure_cannot_be_reported_as_success(code, error):
+    exits=[]
+    def shutdown(): raise error
+    probe.shutdown_and_exit(code, SimpleNamespace(shutdown=shutdown), exit_process=exits.append)
+    assert exits==[1]
