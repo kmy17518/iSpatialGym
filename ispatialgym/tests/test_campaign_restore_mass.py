@@ -54,6 +54,6 @@ def test_readback_must_match_serialized_mass():
 def test_loader_applies_mass_before_native_reset_and_retains_later_constraints():
     tree=ast.parse(Path('ispatialgym/oracle/run_isg.py').read_text())
     cls=next(n for n in tree.body if isinstance(n,ast.ClassDef)and n.name=='InstanceLoader')
-    method=next(n for n in cls.body if isinstance(n,ast.FunctionDef)and n.name=='restore')
+    method=next(n for n in cls.body if isinstance(n,ast.FunctionDef)and n.name=='_restore_complete_snapshot')
     calls={getattr(n.func,'id',getattr(n.func,'attr','')):n.lineno for n in ast.walk(method)if isinstance(n,ast.Call)}
     assert calls['restore_serialized_mass_before_reset']<calls['load_tro_instance']<calls['_restore_constraints']

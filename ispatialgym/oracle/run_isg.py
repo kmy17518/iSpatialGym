@@ -628,6 +628,12 @@ class InstanceLoader:
         from ispatialgym.sampling import predicates as PRED
 
         self.report["pair_records_reset"] = PRED.reset_pair_records(self.env.scene)
+        from ispatialgym.oracle.campaign_restore import restart_reused_world
+
+        lifecycle = restart_reused_world(self.tro.meta.raw.get("campaign") or {}, og.sim,
+                                         execution=self._restoration_execution)
+        if lifecycle is not None:
+            self.report["reuse_native_lifecycle"] = lifecycle
         # every scene object (poses, velocities, joints of doors / drawers, object states) back to the template's, so that
         # only the TRO decides where this instance starts - as in a fresh process
         self.env.scene.load_state(copy.deepcopy(shared["scene_state0"]), serialized=False)
@@ -643,6 +649,15 @@ class InstanceLoader:
     # -- the loader contract --------------------------------------------------------------------------------------
 
     def restore(self, settle_physics_steps: int = 25):
+        """Restore with complete native snapshots, then reinstate the episode filter."""
+        from ispatialgym.oracle.campaign_restore import complete_scene_snapshot_scope
+
+        with complete_scene_snapshot_scope(self.tro.meta.raw.get("campaign") or {},
+                                           self.env.scene, self.report,
+                                           execution=self._restoration_execution):
+            return self._restore_complete_snapshot(settle_physics_steps)
+
+    def _restore_complete_snapshot(self, settle_physics_steps: int = 25):
         """TRO → simulator, then the §3.14 restores, a settle with the task entities held, the snapshot, one reset."""
         env, task, robot = self.env, self.task, self.robot
         try:  # i7-attachfix: the attach rule's join list is per process - this episode's joins start here

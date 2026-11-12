@@ -66,7 +66,7 @@ def test_pristine_capture_lifecycle_precedes_constraint_mutation():
     assert 'capture_pristine_mass' in source('build_env')
     assert 'capture_pristine_mass' not in source('attach')+source('restore')
     assert "shared.get('pristine_mass0')" in source('attach')
-    restore=source('restore')
+    restore=source('_restore_complete_snapshot')
     assert restore.index('restore_pristine_mass(')<restore.index('task.load_tro_instance(')<restore.index('self._restore_constraints(')
 
 

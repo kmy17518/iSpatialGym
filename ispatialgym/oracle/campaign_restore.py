@@ -1,6 +1,7 @@
 """Explicit canary-only restoration of serialized task root motion."""
 from __future__ import annotations
 import math
+from contextlib import contextmanager
 from scripts.campaign_20261110.contracts import require, digest
 
 
@@ -214,3 +215,76 @@ def restore_serialized_mass_before_reset(meta, physical, bindings, records, *, a
             'physics_steps_added': 0, 'pose_or_goal_changes': False,
             'source': 'exact immutable TRO extras.constraints mass records',
             'later_constraint_restore_unchanged': True}
+
+
+def restart_reused_world(meta, sim, *, execution=None):
+    """Use the native warm-world lifecycle before restoring the saved scene."""
+    from scripts.campaign_20261110.contracts import require
+    options=meta.get('scene_setup',{}).get('restoration_options',{})
+    enabled=options.get('reuse_native_lifecycle_v1')
+    if enabled is None or enabled is False:return None
+    require(enabled is True and options.get('pristine_mass_before_reset_v1')is True
+        and meta.get('campaign_id')=='campaign_20261110'and meta.get('split')=='train'
+        and meta.get('class_id')=='disembedding_07'and meta.get('task')=='disembedding'
+        and _purpose_allowed(meta, execution),
+        'native lifecycle diagnostic requires its exact bounded source scope')
+    pristine_mass_enabled(meta, execution)  # Reject conflicting mass options before native mutation.
+    require(sim.is_playing(),'native lifecycle restoration must start in playing state')
+    settings=lambda:{'physics_dt':sim.get_physics_dt(),'rendering_dt':sim.get_rendering_dt(),
+        'sim_step_dt':sim.get_sim_step_dt()}
+    clock=lambda:{'current_time':sim.current_time,'current_time_step_index':sim.current_time_step_index}
+    before=settings();before_clock=clock();calls=[];wrapped=[]
+    for obj,name in [(sim,'step_physics'),(sim._sim_context,'step')]:
+        native=getattr(obj,name);had=name in vars(obj);saved=vars(obj).get(name)
+        def observed(*args,_native=native,_name=name,**kwargs):
+            calls.append(_name)
+            return _native(*args,**kwargs)
+        setattr(obj,name,observed);wrapped.append((obj,name,had,saved))
+    try:
+        sim.stop();require(sim.is_stopped(),'native stop did not finish')
+        sim.play();require(sim.is_playing(),'native play did not finish')
+    finally:
+        for obj,name,had,saved in reversed(wrapped):
+            if had:setattr(obj,name,saved)
+            else:delattr(obj,name)
+    require(not calls,'native lifecycle introduced a physics stepping call')
+    require(settings()==before,'native lifecycle changed simulator time-step settings')
+    return {'revision':'reuse_native_lifecycle_v1','boundary':'attach_after_constraint_cleanup_before_scene_state_load',
+        'native_calls':['stop','play'],'observed_physics_step_calls':calls,'physics_steps_requested':0,
+        'time_step_settings_before':before,'time_step_settings_after':settings(),
+        'clock_before':before_clock,'clock_after':clock(),'source_poses_actions_goals_unchanged':True,
+        'scope':'Exact opted-in restoration; native clock reset is recorded, solver parameters unchanged.'}
+
+
+@contextmanager
+def complete_scene_snapshot_scope(meta, scene, report, *, execution=None):
+    """Keep per-step recording filters out of the native loader snapshots."""
+    from scripts.campaign_20261110.contracts import require
+    options = meta.get('scene_setup', {}).get('restoration_options', {})
+    enabled = options.get('complete_scene_snapshot_v1')
+    if enabled is None or enabled is False:
+        yield
+        return
+    require(enabled is True and options.get('pristine_mass_before_reset_v1') is True
+            and meta.get('campaign_id') == 'campaign_20261110'
+            and meta.get('split') == 'train' and meta.get('class_id') == 'disembedding_07'
+            and meta.get('task') == 'disembedding'
+            and _purpose_allowed(meta, execution),
+            'complete snapshot restoration requires its exact authorized source')
+    pristine_mass_enabled(meta, execution)  # Validate the complete option set before changing the filter.
+    registry = getattr(scene, 'object_registry', None)
+    require(registry is not None and hasattr(registry, '_dump_filter')
+            and callable(getattr(registry, 'set_dump_filter', None)),
+            'native scene snapshot registry filter is unavailable')
+    prior = registry._dump_filter
+    record = {'revision': 'complete_scene_snapshot_v1', 'physics_steps_added': 0,
+              'scope': 'All native loader snapshots; recorded episode filter unchanged',
+              'prior_filter_restored': False}
+    report['complete_scene_snapshot'] = record
+    try:
+        registry.set_dump_filter(lambda obj: True)
+        yield
+    finally:
+        registry.set_dump_filter(prior)
+        require(registry._dump_filter is prior, 'native scene recording filter was not restored')
+        record['prior_filter_restored'] = True
