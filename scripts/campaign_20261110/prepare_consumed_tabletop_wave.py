@@ -46,7 +46,8 @@ def main(root, runtime, graph_path, old_inventory, output):
     rows = []; blocked = []; seen = set()
     for dep in graph['rows']:
         if dep['kind'] != 'tabletop_grasp_library' or dep['status'] != 'verified': continue
-        if not all(c.startswith('inter_object_relation_satisfaction-') and 'large_scale' not in c for c in dep['required_by_classes']): continue
+        if not all(c.startswith('inter_object_relation_satisfaction-') and 'large_scale' not in c and
+                   not c.startswith('inter_object_relation_satisfaction-inside_') for c in dep['required_by_classes']): continue
         source = dep['artifact']; path = Path(source['path'])
         if str(path) in seen: continue
         seen.add(str(path))

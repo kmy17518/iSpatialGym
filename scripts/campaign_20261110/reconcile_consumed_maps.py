@@ -139,9 +139,49 @@ def checked_hash(ref, cache):
     require(cache[ref['path']] == ref['sha256'], 'Input changed: ' + ref['path'])
 
 
+def account_root(account):
+    return Path('/vision/u/shiyuc/minyeong/campaign_20261110' if account == 'shiyuc' else
+                '/vision/u/minyeong/projects/isg_home/campaign_20261110')
+
+
+def peer_verification(ticket, receipt, account, cache):
+    """Project an owning-account native proof; private map payloads stay there."""
+    executing = receipt.get('expected_account', ticket.get('expected_account', 'minyeong'))
+    if receipt.get('backend') == 'vast': executing = 'minyeong'
+    if executing == account: return None
+    require(executing in {'minyeong', 'shiyuc'}, 'Unknown executing account')
+    base = account_root(executing)
+    peer = base / 'infra/coordinator_dispatch/preparation_verification' / (ticket['physical_dedup_key'] + '.json')
+    row = {'status': 'delegated_verification_pending', 'verification_account': executing,
+           'peer_sidecar_path': str(peer), 'blocker': 'Owning-account native verifier has not published a terminal proof',
+           'verified_files': []}
+    # Secondary workers never import primary proofs or write a competing sidecar.
+    if account != 'minyeong' or not peer.exists(): return row
+    side = json.loads(peer.read_text())
+    require(side['physical_dedup_key'] == ticket['physical_dedup_key'], 'Peer verification key differs')
+    if side['status'] not in {'verified_positive', 'verified_zero', 'failed'}: return row
+    if side['status'] == 'failed':
+        return {**row, 'status': 'peer_native_verification_failed', 'blocker': side.get('blocker'), 'peer_sidecar': {'path': str(peer), 'sha256': sha(peer)}}
+    proof_ref = next((r for r in side['evidence'] if '/verifications/' in r['path']), None)
+    require(proof_ref is not None and Path(proof_ref['path']).is_relative_to(base), 'Peer native proof missing')
+    proof = checked(proof_ref, cache)
+    primary_prepared = checked(ticket['prepared'], cache); peer_prepared = checked(receipt['prepared'], cache)
+    require(primary_prepared['physical_identity'] == peer_prepared['physical_identity'], 'Peer physical input identity differs')
+    require(proof['physical_dedup_key'] == ticket['physical_dedup_key'] and proof.get('native_reader_passed') is True and
+            str(proof['job_id']) == str(receipt['job_id']), 'Peer proof execution identity differs')
+    require(proof['status'] in {'verified_positive', 'valid_zero'}, 'Peer proof disposition differs')
+    terminal = checked(proof['terminal'], cache)
+    require(terminal['physical_dedup_key'] == ticket['physical_dedup_key'] and
+            terminal['prepared_sha256'] == receipt['prepared']['sha256'], 'Peer terminal preparation differs')
+    require(not (Path(ticket['prepared']['path']).parent / 'terminal.json').exists(), 'Both account outputs exist for one physical claim')
+    return {**row, **{k: proof[k] for k in ('status', 'native_reader_passed', 'positive_cells', 'verification_at', 'verification_started_at', 'terminal_at', 'terminal')},
+            'verification': proof_ref, 'peer_verified_files': proof['verified_files'], 'peer_sidecar': {'path': str(peer), 'sha256': sha(peer)},
+            'blocker': None, 'configuration_readiness_claimed': False, 'benchmark_credit': 0}
+
+
 def sidecar(root, row, *, running=False):
     status = ('running' if running else {'valid_zero': 'verified_zero', 'invalid_or_failed': 'failed',
-              'observation_unavailable': 'failed', 'computed_unverified': 'pending'}.get(row['status'], row['status']))
+              'observation_unavailable': 'failed', 'peer_native_verification_failed': 'failed', 'computed_unverified': 'pending'}.get(row['status'], row['status']))
     if status not in {'running', 'pending', 'failed', 'verified_positive', 'verified_zero'}: return
     value = {'physical_dedup_key': row['physical_dedup_key'], 'owner': '/root/templates_assets',
              'terminal_at': row.get('terminal_at'), 'terminal_time_source': 'native_builder_terminal_artifact',
@@ -187,6 +227,7 @@ def project_library_advancement(root, manifest_ref, audit_ref):
 
 def reconcile(root, manifest_ref, route_ref, output, *, max_seconds=15, max_items=128, reader=native_read, timestamp=None):
     root, output = Path(root), Path(output)
+    account = 'shiyuc' if str(root).startswith('/vision/u/shiyuc/') else 'minyeong'
     require(output.resolve().is_relative_to(root.resolve()), 'Callback output outside campaign')
     require(1 <= max_seconds <= 50 and 1 <= max_items <= 512, 'Unbounded callback')
     timestamp = time.time() if timestamp is None else timestamp; cache = {}; manifest = checked(manifest_ref, cache)
@@ -209,6 +250,12 @@ def reconcile(root, manifest_ref, route_ref, output, *, max_seconds=15, max_item
                 value = json.loads(receipt.read_text()); row['submission'] = {'path': str(receipt), 'sha256': sha(receipt)}
                 row['submitted_at'] = epoch(value.get('submitted_at') or value.get('observed_at'))
                 row['job_id'] = value.get('job_id')
+                delegated = peer_verification(ticket, value, account, cache)
+                if delegated is not None:
+                    row.update(delegated)
+                    state['rows'][key] = row; rows.append(row)
+                    if account == 'minyeong': sidecar(root, row)
+                    continue
             found = locate_terminal(ticket, routes.get(key))
             if found is None:
                 row['status'] = 'awaiting_terminal' if receipt.exists() else 'claimed_unresolved' if Path(ticket['claim_path']).exists() else 'ready_unsubmitted'

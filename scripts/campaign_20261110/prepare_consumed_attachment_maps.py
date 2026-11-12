@@ -50,7 +50,8 @@ def prepare(root, runtime, graph_path, audit_path, output, *, family='attachment
         if dep['kind'] != 'tabletop_reach_map': continue
         classes = dep['required_by_classes']
         if family == 'attachment' and not any(c.startswith('configuration_matching-attachment_') for c in classes): continue
-        if family == 'tabletop' and not all(c.startswith('inter_object_relation_satisfaction-') and 'large_scale' not in c for c in classes): continue
+        if family == 'tabletop' and not all(c.startswith('inter_object_relation_satisfaction-') and 'large_scale' not in c and
+                                          not c.startswith('inter_object_relation_satisfaction-inside_') for c in classes): continue
         if family == 'attachment' and dep['inputs']['arm'] != 'right':
             missing['retired_no_left_tabletop_consumer'] += 1
             continue

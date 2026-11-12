@@ -77,3 +77,23 @@ def test_watch_uses_start_based_cadence_and_stops_without_extra_cycle():
     def stop_callback():starts.append(clock.now);stopped[0]=True
     stopped[0]=False;m.run_cycles(stop_callback,interval=30,max_cycles=10,stopped=stopped,clock=clock)
     assert starts==[0]and clock.now==0
+
+
+def test_secondary_proof_projection_keeps_private_payload_on_owner(tmp_path, monkeypatch):
+    primary=tmp_path/'primary';peer=tmp_path/'secondary';monkeypatch.setattr(m,'account_root',lambda account:peer)
+    pp=primary/'prepared.json';sp=peer/'prepared.json';v.write(pp,{'physical_identity':{'height':.7}});v.write(sp,{'physical_identity':{'height':.7}})
+    ref=lambda p:{'path':str(p),'sha256':v.sha(p)}
+    ticket={'physical_dedup_key':'key','expected_account':'minyeong','prepared':ref(pp)}
+    receipt={'expected_account':'shiyuc','prepared':ref(sp),'job_id':'42'}
+    assert m.peer_verification(ticket,receipt,'minyeong',{})['status']=='delegated_verification_pending'
+    terminal=peer/'terminal.json';v.write(terminal,{'physical_dedup_key':'key','prepared_sha256':v.sha(sp)})
+    proof=peer/'reader/verifications/key/proof.json';v.write(proof,{'physical_dedup_key':'key','job_id':'42','native_reader_passed':True,
+        'status':'verified_positive','positive_cells':5,'verification_at':100,'verification_started_at':90,'terminal_at':80,
+        'terminal':ref(terminal),'verified_files':[{'path':str(peer/'unreadable_private_grid.npz'),'sha256':'owner_verified'}]})
+    side=peer/'infra/coordinator_dispatch/preparation_verification/key.json';v.write(side,{'physical_dedup_key':'key','status':'verified_positive','evidence':[ref(proof)]})
+    result=m.peer_verification(ticket,receipt,'minyeong',{})
+    assert result['status']=='verified_positive'and result['verified_files']==[]
+    assert result['verification_at']==100 and len(result['peer_verified_files'])==1
+    v.write(sp,{'physical_identity':{'height':.8}});receipt['prepared']=ref(sp)
+    import pytest
+    with pytest.raises(ValueError,match='physical input identity'):m.peer_verification(ticket,receipt,'minyeong',{})
