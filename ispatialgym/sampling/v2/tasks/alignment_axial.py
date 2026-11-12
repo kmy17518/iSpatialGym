@@ -638,7 +638,11 @@ class AlignmentAxial(SamplerV2):
                         return True, res, ([q_pre, q_c, q_goal] if q_c is not None else [q_pre]), ""
 
                     # the two wrist turns of the class by the orientation rule (owner 2026-09-27)
-                    chosen, dec_push = O.choose(self.ikc, "right", props, evaluate, self.ikc.q_locked(manip), camera_idx=[1], stage=f"axial push {pitch:.0f}")
+                    from ispatialgym.sampling.campaign_axial_approach import choose_push_with_pre_fallback
+                    chosen, dec_push = choose_push_with_pre_fallback(
+                        props, lambda options: O.choose(self.ikc, "right", options, evaluate,
+                            self.ikc.q_locked(manip), camera_idx=[1], stage=f"axial push {pitch:.0f}"),
+                        C.pre_pose, enabled=bool(os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG")))
                     if chosen is None:
                         push_fails.extend(f"{pitch:.0f}°: {o.get('why', '')}" for o in dec_push["options"] if not o.get("ok"))
                         continue
