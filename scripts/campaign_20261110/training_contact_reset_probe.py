@@ -47,6 +47,9 @@ def verify_runtime(root, request, records, runtime, verify_parent):
             and proof['candidate_runtime'] == {'path': str(runtime/'.snapshot_commit'),
                                                'sha256': file_digest(runtime/'.snapshot_commit')},
             'contact reset runtime identity differs')
+    api = runtime/'Behavior-1K/OmniGibson/omnigibson/utils/usd_utils.py'
+    require(proof.get('native_contact_api') == {'path': str(api), 'sha256': file_digest(api)},
+            'reviewed native contact API implementation differs')
     inherited = {**request, 'runtime_compatibility': proof['parent_compatibility'],
                  'probe_runtime_sha256': parent_ref['sha256']}
     inherited.pop('reset_contact_cache_before_step_v1')
@@ -118,7 +121,11 @@ def install(runner, request, output):
             and request.get('production_released') is False,
             'contact reset experiment not requested')
     import torch
+    import inspect
     from omnigibson.utils.usd_utils import RigidContactAPI
+    proof = json.loads(Path(request['runtime_compatibility']['path']).read_text())
+    require(file_digest(inspect.getfile(type(RigidContactAPI))) == proof['native_contact_api']['sha256'],
+            'loaded native contact API differs from reviewed implementation')
     restore = runner.InstanceLoader.restore; events = []; output = Path(output)
     def restored(loader, *args, **kwargs):
         task = loader.task; load = task.load_tro_instance
