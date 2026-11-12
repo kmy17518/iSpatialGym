@@ -654,9 +654,9 @@ def main(argv=None) -> int:
 
         campaign_records = selected_records(args.campaign_manifest, demo_dirs,
             sequential_augmentation=args.sequential_augmentation, slots=int(args.slots))
-    if args.diagnostic_episode_fault and (not args.sequential_augmentation or
+    if args.diagnostic_episode_fault and (not args.campaign_manifest or int(args.slots) != 1 or
             os.environ.get("ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE") != "1"):
-        ap.error("episode-fault control requires an explicit sequential campaign probe")
+        ap.error("episode-fault control requires an explicit single-slot campaign probe")
     n_slots = max(1, int(args.slots) if args.watch else min(int(args.slots), len(demo_dirs)))
     tiled = args.tiled and n_slots > 1
     t_start = time.time()

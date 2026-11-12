@@ -18,6 +18,8 @@ PARENT_COMMIT = 'a7f490047d5b4d7abdb6426ff047a6a39c293514'
 ALLOWED = {'scripts/campaign_20261110/'+name for name in (
     'training_pool_render_scene.py', 'training_pool_renderer_probe.py',
     'tests/test_training_pool_render_scene.py', 'tests/test_training_pool_renderer_probe.py')}
+CLEANUP_PAYLOADS = {'ispatialgym/multienv/replay.py', 'ispatialgym/multienv/campaign_render_cleanup.py',
+                    'ispatialgym/tests/test_campaign_render_cleanup.py'}
 DELTA = {'fixed_initialized_actor_union': True, 'source_recordings_unchanged': True,
          'native_slot_start_load_writer_cameras_retained': True,
          'selection_scope': 'exact_checked_two_source_records_A_B_A',
@@ -30,6 +32,41 @@ DELTA = {'fixed_initialized_actor_union': True, 'source_recordings_unchanged': T
 
 
 def ref(path): return {'path': str(path), 'sha256': file_digest(path)}
+
+
+def declared_delta(request):
+    fault = request.get('renderer_cleanup')
+    require(fault in (None, 'failure', 'interruption'), 'unknown renderer cleanup control')
+    if fault is None: return DELTA
+    return {**DELTA, 'native_writer_cleanup': {
+        'fault': fault, 'boundary': 'after_one_recorded_native_action',
+        'aborted_sequence_position': 0, 'followthrough_sequence_positions': [1, 2],
+        'aborted_output_kept': False, 'native_abort_and_same_writer_reuse': True}}
+
+
+def checked_episode_results(rows, wanted, fault):
+    """An aborted prefix is evidence of cleanup, never a completed episode."""
+    observed = [r for r in rows if r.get('tag') in ('REPLAY_DEMO', 'REPLAY_EPISODE_ABORTED')]
+    require(len(observed) == len(wanted) and [r['demo'] for r in observed] == wanted,
+            'native renderer completed a different sequence')
+    aborted = [r for r in observed if r['tag'] == 'REPLAY_EPISODE_ABORTED']
+    completed = [r for r in observed if r['tag'] == 'REPLAY_DEMO']
+    require(all(r['kept'] is True for r in completed), 'native renderer dropped a required completed episode')
+    if fault is None:
+        require(not aborted, 'unexpected native renderer abort')
+    else:
+        require(len(aborted) == 1 and observed[0] is aborted[0] and aborted[0]['kept'] is False,
+                'renderer must abort only the first exact episode')
+        proof = aborted[0]['cleanup']
+        require(proof['exception_type'] == {'failure':'ControlledRenderFailure',
+                                           'interruption':'ControlledRenderInterrupt'}[fault]
+                and proof['boundary'] == 'after_native_writer_action' and proof['frames_observed'] == 2
+                and proof['native_writer_abort_called'] is True and proof['trajectory_buffer_empty'] is True
+                and proof['dataset_pending_frames'] is False and proof['writer_aborted'] is True
+                and proof['physics_steps_added'] == proof['render_ticks_added'] == 0
+                and proof['expected_controlled_failure'] is True,
+                'native renderer cleanup did not prove the exact one-action fault')
+    return completed, aborted
 
 
 def capture_scene_input(document):
@@ -114,7 +151,7 @@ def prohibit_native_mutation(sim, events):
 def inputs(root, request_path):
     q = json.loads(Path(request_path).read_text())
     require(q['schema'] == 'isg-pool-native-render-reuse-request-v1' and q['sequence'] == [0,1,0]
-            and q['physical_delta'] == DELTA and q['benchmark_credit'] == 0
+            and q['physical_delta'] == declared_delta(q) and q['benchmark_credit'] == 0
             and q['production_released'] is False, 'unbounded renderer scope')
     runtime = Path(__file__).resolve().parents[2]; parent = Path(q['parent_runtime']['path']).parent
     require(ref(runtime/'.snapshot_commit') == q['candidate_runtime']
@@ -125,7 +162,9 @@ def inputs(root, request_path):
              for p in (tree/folder).rglob('*.py') if p.is_file()}
     changed = {name for name in paths if not (parent/name).is_file() or not (runtime/name).is_file()
                or file_digest(parent/name) != file_digest(runtime/name)}
-    require(changed == set(q['changed_payloads']) and changed <= ALLOWED
+    allowed = ALLOWED | CLEANUP_PAYLOADS if q.get('renderer_cleanup') else ALLOWED
+    require(changed == set(q['changed_payloads']) and changed <= allowed
+            and (not q.get('renderer_cleanup') or CLEANUP_PAYLOADS <= changed)
             and all(file_digest(runtime/name) == sha for name,sha in q['changed_payloads'].items()),
             'unapproved native renderer payload change')
     cold = checked(root,q['cold_verification']); require(cold['status']=='native_cold_render_verified', 'cold renderer proof failed')
@@ -178,12 +217,14 @@ def run(root,request_path,output,preflight=False):
     require(Path(renderer.__file__).resolve().is_relative_to(runtime), 'loaded renderer outside candidate')
     directories=[str(Path(r['artifacts']['demo']['path']).parent) for r in records]
     wanted=[directories[index] for index in q['sequence']]
-    result={'schema':'isg-pool-native-render-reuse-observation-v1','request':ref(request_path),'physical_delta':DELTA,
+    result={'schema':'isg-pool-native-render-reuse-observation-v1','request':ref(request_path),'physical_delta':q['physical_delta'],
             'candidate_runtime':q['candidate_runtime'],'parent_runtime':q['parent_runtime'],'started_at':time.time(),
             'entries':[],'mutation_calls':[],'frame_counts':[], 'benchmark_credit':0,'production_released':False}
     selected=campaign.selected_records;environment=renderer.env_config;start=renderer.Slot.start;load=renderer.Slot.load
     frame_file=open(output/'frame_readback.jsonl','x');guard=None;identities=None;scene_identity=None
-    def select(manifest,demo_dirs):
+    def select(manifest,demo_dirs,**kwargs):
+        require(not kwargs or kwargs == {'sequential_augmentation':False,'slots':1},
+                'pool render cannot combine another scene compatibility contract')
         rows=[json.loads(line) for line in Path(manifest).read_text().splitlines()]
         require(rows==records,'derived renderer manifest changed')
         return selected_pool_records(rows,demo_dirs,wanted)
@@ -263,14 +304,17 @@ def run(root,request_path,output,preflight=False):
         listing=output/'demos.txt';listing.write_text(''.join(d+'\n' for d in wanted));native_results=output/'results.jsonl'
         with world_construction_counter(og) as world:
             result['world_construction']=world
+            extra = ['--diagnostic-episode-fault',q['renderer_cleanup']] if q.get('renderer_cleanup') else []
             code=renderer.main(['--demos','@'+str(listing),'--campaign-manifest',str(manifest),'--root',str(output/'rendered'),
                 '--task',records[0]['variant'],'--slots','1','--scene','recorded','--proprio','loaded',
-                '--results',str(native_results),'--repo-prefix','pool_reuse_aba'])
-        rows=[json.loads(line) for line in native_results.read_text().splitlines()];episodes=[r for r in rows if r.get('tag')=='REPLAY_DEMO']
-        require(code==0 and world=={'attempted':1,'completed':1} and len(episodes)==len(result['entries'])==3
-                and all(e['kept'] is True for e in episodes) and result['mutation_calls']==[], 'native reuse renderer incomplete')
+                '--results',str(native_results),'--repo-prefix','pool_reuse_aba'] + extra)
+        rows=[json.loads(line) for line in native_results.read_text().splitlines()]
+        episodes,aborted=checked_episode_results(rows,wanted,q.get('renderer_cleanup'))
+        require(code==0 and world=={'attempted':1,'completed':1} and len(result['entries'])==3
+                and result['mutation_calls']==[], 'native reuse renderer incomplete')
         inputs(root,request_path)
         result.update(status='native_reuse_render_passed',native_results=ref(native_results),episodes=episodes,
+                      aborted_episodes=aborted,
                       videos=[ref(p) for p in sorted((output/'rendered').rglob('*.mp4'))],finished_at=time.time())
     except BaseException as error:
         result.update(status='failed',error=repr(error),traceback=traceback.format_exc(),finished_at=time.time());raise

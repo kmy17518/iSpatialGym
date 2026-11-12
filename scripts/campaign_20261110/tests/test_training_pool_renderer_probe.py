@@ -4,7 +4,7 @@ import pytest
 from scripts.campaign_20261110.contracts import ContractError
 from scripts.campaign_20261110.training_pool_renderer_probe import (
     selected_pool_records, project_active_loaded, source_state_expected, prohibit_native_mutation, record_comparison,
-    capture_scene_input)
+    capture_scene_input, declared_delta, checked_episode_results, DELTA)
 from scripts.campaign_20261110.training_restoration import same_loaded_state
 
 
@@ -72,3 +72,37 @@ def test_native_in_place_tensor_conversion_cannot_change_or_break_reviewed_input
     saved,sha=capture_scene_input(private)
     private['state']['root']['position']=torch.tensor(private['state']['root']['position'])
     assert saved=={'state':{'root':{'position':[1.,2.,3.]}}} and digest(saved)==sha
+
+
+def cleanup_rows(fault='failure'):
+    return [{'tag':'REPLAY_EPISODE_ABORTED','demo':'A','kept':False,'cleanup':{
+        'exception_type':{'failure':'ControlledRenderFailure','interruption':'ControlledRenderInterrupt'}[fault],
+        'boundary':'after_native_writer_action','frames_observed':2,'native_writer_abort_called':True,
+        'trajectory_buffer_empty':True,'dataset_pending_frames':False,'writer_aborted':True,
+        'physics_steps_added':0,'render_ticks_added':0,'expected_controlled_failure':True}},
+        {'tag':'REPLAY_DEMO','demo':'B','kept':True},{'tag':'REPLAY_DEMO','demo':'A','kept':True}]
+
+
+@pytest.mark.parametrize('fault',['failure','interruption'])
+def test_cleanup_preserves_failed_prefix_and_requires_both_followthrough_members(fault):
+    completed,aborted=checked_episode_results(cleanup_rows(fault),['A','B','A'],fault)
+    assert [r['demo']for r in completed]==['B','A'] and len(aborted)==1
+    assert declared_delta({})==DELTA
+    assert declared_delta({'renderer_cleanup':fault})['native_writer_cleanup']['fault']==fault
+
+
+@pytest.mark.parametrize('mutation',['kept','pending','extra_render','wrong_exception','short_prefix','missing_recovery'])
+def test_cleanup_cannot_promote_abort_or_skip_native_buffer_and_recovery_checks(mutation):
+    rows=cleanup_rows();proof=rows[0]['cleanup']
+    if mutation=='kept':rows[0]['kept']=True
+    elif mutation=='pending':proof['dataset_pending_frames']=True
+    elif mutation=='extra_render':proof['render_ticks_added']=1
+    elif mutation=='wrong_exception':proof['exception_type']='ValueError'
+    elif mutation=='short_prefix':proof['frames_observed']=1
+    elif mutation=='missing_recovery':rows.pop()
+    with pytest.raises(ContractError):checked_episode_results(rows,['A','B','A'],'failure')
+
+
+def test_ordinary_control_rejects_an_undeclared_abort():
+    with pytest.raises(ContractError):checked_episode_results(cleanup_rows(),['A','B','A'],None)
+    with pytest.raises(ContractError):declared_delta({'renderer_cleanup':'pretend_success'})
