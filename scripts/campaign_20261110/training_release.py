@@ -18,6 +18,57 @@ def _reference(root, value):
     return path
 
 
+def verify_probe_execution(root, reference, execution_reference):
+    """A complete probe followed by a teardown crash is not a clean path run.
+
+    Keep the physical comparator independent. Production release additionally
+    binds the native observations to the submitted output and raw scheduler row.
+    """
+    probe = checked(root, reference)
+    execution = checked(root, execution_reference)
+    require(execution.get('schema') == 'isg-batch-execution-observation-v1' and
+            execution.get('request') == probe['request'], 'probe execution request differs')
+    request = checked(root, probe['request'])
+    require(request.get('schema') == 'isg-training-batch-probe-request-v1', 'unknown probe execution request')
+    kind = probe['kind']; job_ids = set()
+    for entry in probe['entries']:
+        report = checked(root, entry['report'])
+        restoration = (report['loader']['campaign_restoration'] if kind == 'physics_action_open_loop'
+                       else report['campaign_restoration'])
+        observation = (restoration['native_final_pre_action_observation']['observation']
+                       if kind == 'physics_action_open_loop' else restoration['native_observation'])
+        job_ids.add(str(observation['scheduler_job_id']))
+    require(len(job_ids) == 1 and next(iter(job_ids)).isdigit(), 'probe has no unique native allocation')
+    job_id = next(iter(job_ids))
+    jobs = [row for row in execution['jobs'] if str(row.get('job_id')) == job_id and row.get('kind') == kind]
+    require(len(jobs) == 1 and jobs[0].get('state') == 'COMPLETED' and jobs[0].get('exit_code') == '0:0',
+            'native probe process did not complete cleanly')
+    submission = checked(root, execution['submission'])
+    require(submission.get('request') == probe['request'], 'probe submission request differs')
+    submitted = [row for row in submission['jobs'] if str(row.get('job_id')) == job_id and row.get('kind') == kind]
+    require(len(submitted) == 1 and submitted[0].get('returncode') == 0 and
+            Path(submitted[0]['output']).resolve() == Path(reference['path']).resolve().parent,
+            'probe execution output or submitted allocation differs')
+    scheduler = execution['scheduler_evidence']; raw = _reference(root, scheduler).read_text()
+    command = scheduler.get('command', [])
+    fields = 'JobIDRaw,State,ExitCode,Start,End,ElapsedRaw,AllocTRES'
+    require(command and Path(command[0]).name == 'sacct' and '-X' in command and '-P' in command and
+            '-n' in command and '--format='+fields in command and '-j' in command and
+            job_id in command[command.index('-j')+1].split(','), 'exact raw scheduler query required')
+    rows = [line.split('|') for line in raw.splitlines() if line.strip()]
+    matches = [row for row in rows if row[0] == job_id]
+    require(len(matches) == 1 and len(matches[0]) == 7, 'native allocation raw scheduler row missing or ambiguous')
+    row = matches[0]
+    require(row[1:3] == ['COMPLETED', '0:0'] and row[3] not in ('', 'Unknown', 'None') and
+            row[4] not in ('', 'Unknown', 'None') and row[5].isdigit() and int(row[5]) > 0 and row[6],
+            'native raw scheduler result is not a clean completed execution')
+    require(jobs[0].get('start') == row[3] and jobs[0].get('end') == row[4] and
+            jobs[0].get('elapsed_seconds') == int(row[5]) and jobs[0].get('allocated_resources') == row[6],
+            'probe execution summary differs from raw scheduler evidence')
+    return {'probe': reference, 'execution': execution_reference, 'job_id': job_id,
+            'status': 'native_process_completed_cleanly'}
+
+
 def verify_render(root, reference, canary):
     """Reconcile actual native rendering again, including exact exported inputs."""
     from .training_pipeline_status import template_render_observations
@@ -413,6 +464,10 @@ def verify_configuration(root, config_path, reference):
             'actual nondefault scale execution missing')
     controls = verify_controls(root, shared['restoration_controls'], started)
     rendering = verify_batch(root, shared['batch_rendering'], started, 'kinematic_observation_rendering')
+    executions = {name: verify_probe_execution(root, ref, ref['execution'])
+                  for name, ref in shared['restoration_controls'].items()}
+    executions['batch_rendering'] = verify_probe_execution(
+        root, shared['batch_rendering'], shared['batch_rendering']['execution'])
     pool = verify_sampler_pool(root, shared['sampler_pool'], started)
     # Bind shared implementation identities explicitly. A task-local restoration
     # option cannot silently validate every other path or runtime.
@@ -457,6 +512,9 @@ def verify_configuration(root, config_path, reference):
     if options.get('pristine_mass_before_reset_v1') or options.get('serialized_mass_before_reset_v1'):
         require(shared.get('cold_reset_compatibility'), 'original cold-reset compatibility evidence missing')
         cold = verify_cold_reset_compatibility(root, shared['cold_reset_compatibility'], started, native, task)
+        cold_evidence = checked(root, shared['cold_reset_compatibility'])
+        executions['cold_candidate'] = verify_probe_execution(
+            root, cold_evidence['candidate'], cold_evidence['candidate_execution'])
     from .execution_dependencies import verify_execution_dependencies
     dependencies = verify_execution_dependencies(root, release['config_sha256'], 'native_generation')
     require(dependencies['status'] == 'exact_originals_checked' and dependencies['dependencies'],
@@ -469,6 +527,7 @@ def verify_configuration(root, config_path, reference):
             'task': task, 'class_id': config['template']['class_id'], 'controls': controls,
             'rendering': rendering, 'sampler_pool': pool, 'applicable_pool': applicable_pool, 'dependencies': dependencies,
             'cold_reset_compatibility': cold,
+            'native_process_executions': executions,
             'status': 'exact_evidence_verified', 'production_authorization': False}
 
 
