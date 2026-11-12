@@ -49,3 +49,18 @@ def test_vertical_retreat_policy_is_exact_and_default_off(monkeypatch):
     with pytest.raises(ContractError):CR.contact_recovery('lid_vertical_final_retreat')
     obj.default_scale=(.65,.65,.65);template.class_id='configuration_matching-attachment_02'
     with pytest.raises(ContractError):CR.contact_recovery('lid_vertical_final_retreat')
+
+
+def test_cap_vertical_retreat_policy_requires_exact_default_scale_model(monkeypatch):
+    monkeypatch.delenv('ISPATIALGYM_CAMPAIGN_CONFIG',raising=False)
+    assert not CR.contact_recovery('cap_vertical_final_retreat')
+    obj=NS(role='target',category='cap',model='xxqyrt',default_scale=(1.,1.,1.))
+    template=NS(class_id='configuration_matching-attachment_02',task='configuration_matching-attachment',split='eval_standard',
+                objects=[obj],scene_setup={'recovery_options':{'cap_vertical_final_retreat':True}})
+    monkeypatch.setenv('ISPATIALGYM_CAMPAIGN_CONFIG','bound.json')
+    monkeypatch.setattr(CR,'configuration',lambda:(None,template,None,None))
+    assert CR.contact_recovery('cap_vertical_final_retreat')
+    obj.default_scale=(.8,.8,.8)
+    with pytest.raises(ContractError):CR.contact_recovery('cap_vertical_final_retreat')
+    obj.default_scale=(1.,1.,1.);obj.model='other'
+    with pytest.raises(ContractError):CR.contact_recovery('cap_vertical_final_retreat')

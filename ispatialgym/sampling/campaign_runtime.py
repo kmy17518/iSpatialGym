@@ -116,6 +116,7 @@ def contact_recovery(option: str) -> bool:
         'cap_capture_margin': ('configuration_matching-attachment_02',
                                 'configuration_matching-attachment'),
         'axial_magazine_contact_height': ('alignment-axial_04', 'alignment-axial'),
+        'cap_vertical_final_retreat': ('configuration_matching-attachment_02', 'configuration_matching-attachment'),
         'lid_vertical_final_retreat': ('configuration_matching-attachment_04', 'configuration_matching-attachment'),
     }
     require(option in classes, 'unknown campaign contact recovery option')
@@ -132,7 +133,7 @@ def contact_recovery(option: str) -> bool:
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('hinged_jar', 'jnjtrl', (1.0, 1.0, 1.0))],
                     'held jar brace belongs to its exact ready default-scale category model')
-        if option == 'cap_capture_margin':
+        if option in ('cap_capture_margin', 'cap_vertical_final_retreat'):
             require(template.split == 'eval_standard' and
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('cap', 'xxqyrt', (1.0, 1.0, 1.0))],
