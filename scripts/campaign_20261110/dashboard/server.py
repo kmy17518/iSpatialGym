@@ -78,6 +78,9 @@ def snapshot(root, inventory):
     evidence, es = read_source(root / 'dashboard/dashboard_evidence.json')
     group_yield, ys = read_source(root / 'dashboard/goal_group_yield.json')
     heldout, hrs = read_source(root / 'dashboard/heldout_recovery.json')
+    deadline_checkpoint, dcs = read_source(root / 'dashboard/streaming_deadline_checkpoint.json')
+    if deadline_checkpoint and deadline_checkpoint.get('campaign_id') != 'campaign_20261110':
+        deadline_checkpoint = {}; dcs = {'available': False, 'error': 'Campaign identity mismatch'}
     capacity_recovery, crs = read_source(root / 'dashboard/capacity_recovery.json')
     recovery, rs = read_source(root / 'dashboard/standard_recovery.json')
     canonical, cvs = read_source(root / 'dashboard/canonical_validation.json')
@@ -186,6 +189,7 @@ def snapshot(root, inventory):
         'current_eligibility': {k:v for k,v in current_eligibility.items() if k not in ('records','groups','decisions')},
         'change_impact': {k:v for k,v in change_impact.items() if k not in ('decisions','inventory')},
         'heldout_recovery': heldout,
+        'deadline_checkpoint': deadline_checkpoint, 'deadline_checkpoint_source': dcs,
         'capacity_recovery': capacity_recovery,
         'standard_recovery': recovery,
         'canonical_validation': canonical,
@@ -230,7 +234,7 @@ class Handler(BaseHTTPRequestHandler):
                      'required_configurations_in_index':len(rows),'matching':len(matching),
                      'offset':offset,'limit':100,'rows':matching[offset:offset+100]}
             return self.send_body(200,json.dumps(sanitize(payload)).encode(),'application/json')
-        audits = {'/reports/execution-ledger':'execution_ledger.json', '/reports/preparation':'preparation_status.json', '/reports/capacity-recovery': 'capacity_recovery.json', '/reports/heldout-recovery': 'heldout_recovery.json', '/reports/reconciliation': 'reconciliation.json',
+        audits = {'/reports/deadline-checkpoint':'streaming_deadline_checkpoint.json', '/reports/execution-ledger':'execution_ledger.json', '/reports/preparation':'preparation_status.json', '/reports/capacity-recovery': 'capacity_recovery.json', '/reports/heldout-recovery': 'heldout_recovery.json', '/reports/reconciliation': 'reconciliation.json',
             '/reports/canonical-validation': 'canonical_validation.json',
             '/reports/training-eligibility': 'training_eligibility.json',
             '/reports/training-production-gate': 'training_production_gate.json',
@@ -252,7 +256,7 @@ class Handler(BaseHTTPRequestHandler):
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path in ('/reports/execution-ledger', '/reports/preparation', '/reports/pipeline-status', '/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
+            if path in ('/reports/deadline-checkpoint', '/reports/execution-ledger', '/reports/preparation', '/reports/pipeline-status', '/reports/ik-cache', '/reports/existing-native-reviews', '/reports/capacity-recovery', '/reports/heldout-recovery', '/reports/current-eligibility', '/reports/change-impact', '/reports/training-stream', '/reports/training-containment', '/reports/canonical-validation', '/reports/training-eligibility', '/reports/training-production-gate', '/reports/training-requirements', '/reports/standard-recovery', '/reports/goal-yield', '/reports/accepted-release', '/reports/fleet-gpu-time', '/reports/cluster-fleet-gpu-time', '/reports/replay-quality', '/reports/gpu-denominator-coverage') and status['available'] and (
                     not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,

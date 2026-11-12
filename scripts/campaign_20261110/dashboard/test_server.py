@@ -46,6 +46,19 @@ class ReadOnlyDashboardTests(unittest.TestCase):
     def hashes(self):
         return {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in self.root.rglob('*') if p.is_file()}
 
+    def test_deadline_checkpoint_is_read_only_scoped_and_sanitized(self):
+        value={'campaign_id':'campaign_20261110','observed_at':'2026-11-12T01:02:41Z',
+               'complete_by_deadline_supported':False,'forecasts':{'full_selected_preparation':
+               {'status':'incomplete_denominator_and_runtime_model'}},'api_key':'HIDDEN'}
+        self.write('dashboard/streaming_deadline_checkpoint.json',value)
+        before=self.hashes();data=json.loads(self.request('GET','/api/status')[1])
+        self.assertFalse(data['deadline_checkpoint']['complete_by_deadline_supported'])
+        code,raw=self.request('GET','/reports/deadline-checkpoint')
+        self.assertEqual(code,200);self.assertNotIn(b'HIDDEN',raw);self.assertEqual(before,self.hashes())
+        self.write('dashboard/streaming_deadline_checkpoint.json',{'campaign_id':'old'})
+        self.assertFalse(snapshot(self.root,self.root/'inventory')['deadline_checkpoint_source']['available'])
+        self.assertEqual(self.request('GET','/reports/deadline-checkpoint')[0],404)
+
     def test_capacity_ledger_is_read_only_and_campaign_scoped(self):
         value={'campaign_id':'campaign_20261110','observed_at':123,
                'unused_capacity_blockers':[{'owner':'root','missing_input':'exact native map','next_action':'audit'}]}
