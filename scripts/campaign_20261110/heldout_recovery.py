@@ -163,8 +163,10 @@ def snapshot(root):
     require(len({r['instance_id']for r in rows})==len(rows),'duplicate held identity')
     return rows,groups,proof
 
-def publish(root):
+def publish(root, *, output_dir=None):
     root=pathlib.Path(root).resolve();D=root/'infra/heldout_recovery';D.mkdir(parents=True,exist_ok=True);now=time.time();errors=[];sources=[];cache={}
+    output=pathlib.Path(output_dir).resolve() if output_dir is not None else D
+    require(output.is_relative_to(root) and output!=root,'held audit output must be inside campaign')
     def load(p,kind='input'):
         p=pathlib.Path(p).resolve();require(p.is_relative_to(root),'held audit source outside campaign')
         if str(p)not in cache:
@@ -336,8 +338,10 @@ def publish(root):
     value={'schema':'isg-heldout-recovery-ledger-v2','bucket_policy':BUCKET_POLICY,'campaign_id':'campaign_20261110','observed_at':iso(now),'owner':'/root','summary':summary,'rows':rows,
         'sources':sources+snapshot_sources,'current_eligibility_ledger':lref,'errors':errors,'training_generation_authorized':False,
         'semantics':'All99 model classes and23 category/room task scopes enumerated from frozen100-class inventory and exact owner quotas. Class/task total targets apply; buckets and measurements are descriptive metadata. Candidate preparation is separate from native/demo/replay/accepted proof. No collection action is performed by this audit.'}
-    write_json_atomic(D/'ledger.json',value);print(json.dumps({'path':str(D/'ledger.json'),'summary':summary,'errors':len(errors),'rows':len(rows)}));return value
+    write_json_atomic(output/'ledger.json',value);print(json.dumps({'path':str(output/'ledger.json'),'summary':summary,'errors':len(errors),'rows':len(rows)}));return value
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--root',type=pathlib.Path,required=True);a=p.parse_args();publish(a.root)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--root',type=pathlib.Path,required=True)
+    p.add_argument('--output-dir',type=pathlib.Path,help='Publish an additive report while preserving canonical observation inputs')
+    a=p.parse_args();publish(a.root,output_dir=a.output_dir)
 if __name__=='__main__':main()
