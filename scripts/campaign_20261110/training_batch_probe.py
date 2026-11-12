@@ -14,6 +14,9 @@ from scripts.campaign_20261110.contracts import file_digest,require,write_json_a
 def verify_runtime_compatibility(root, request, records, runtime):
     """Recheck the narrow observation-only runtime against native source bytes."""
     root=Path(root).resolve();runtime=Path(runtime).resolve()
+    if request.get('physical_candidate'):
+        from .training_pristine_probe import verify_candidate
+        return verify_candidate(root, request, records, runtime)
     ref=request.get('runtime_compatibility') or {}
     proof_path=Path(ref.get('path','')).resolve()
     require(proof_path.is_relative_to(root) and proof_path.is_file() and
@@ -269,6 +272,8 @@ def run(root,request,output,kind):
     runtime=Path(__file__).resolve().parents[2]/'.snapshot_commit'
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')
     compatibility=verify_runtime_compatibility(root,value,records,runtime.parent)
+    require(not value.get('physical_candidate') or kind=='physics_action_open_loop',
+            'pristine physical candidate is physics-only')
     os.environ['ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE']='1'
     if value.get('observe_native_dynamics') is True:
         os.environ['ISPATIALGYM_CAMPAIGN_RESTORATION_CONTEXT']='1'
@@ -286,6 +291,11 @@ def run(root,request,output,kind):
         # prebuild checks compare their content and recorded scene, not paths.
         os.environ['ISPATIALGYM_FAST_COLLECTOR_PREBUILD']='1'
         from ispatialgym.oracle import run_isg
+        if value.get('physical_candidate'):
+            from .training_pristine_probe import install_override
+            install_override(run_isg)
+            common.update(schema='isg-training-physical-diagnostic-v1', release_eligible=False,
+                          physical_candidate=value['physical_candidate'])
         from ispatialgym.fastflags import fast_on
         require(fast_on('COLLECTOR_PREBUILD'),'production template compatibility is disabled')
         pending_cleanups=[]
