@@ -599,6 +599,7 @@ def main(argv=None) -> int:
     ap.add_argument("--sequential-augmentation", action="store_true", help="explicit single-slot, fixed-inventory lighting/parking sequence")
     ap.add_argument("--diagnostic-episode-fault", choices=("failure", "interruption"), default=None,
                     help="explicit single-slot campaign test: abort first episode after one recorded action")
+    ap.add_argument("--diagnostic-fault-boundary", choices=("writer", "post_render"), default="writer")
     ap.add_argument("--poll-s", type=float, default=5.0)
     ap.add_argument("--root", required=True, help="LeRobot root dir: one dataset per slot, <root>/<repo prefix>_slot<k>")
     ap.add_argument("--task", required=True, help="task name written into the datasets (the variant)")
@@ -694,183 +695,198 @@ def main(argv=None) -> int:
     env = og.Environment(configs=config)
     load_s = time.time() - t_start
     robot_name = env.scenes[0].robots[0].name
-    with individual_render_products(env):
-        writers = [BL.ShardWriter(make_slot_view(env, k), args.root, f"{args.repo_prefix}_slot{k}", args.task, async_flush=args.async_flush)
-                   for k in range(n_slots)]
-    slots = [Slot(k, env.scenes[k], writers[k], robot_name, scene_mode=scene) for k in range(n_slots)]
-    slots[0].start(first)
-    n_objects_recorded_first = slots[0].n_objects_recorded  # REPLAY_SUMMARY (PARTIAL_SCENE): the first demo's recorded objects
-    n_demos = 1
+    from ispatialgym.multienv.campaign_render_cleanup import processing_cleanup
+    writers = []
+    with processing_cleanup(writers):
+        with individual_render_products(env):
+            for k in range(n_slots):
+                writers.append(BL.ShardWriter(make_slot_view(env, k), args.root, f"{args.repo_prefix}_slot{k}", args.task, async_flush=args.async_flush))
+        slots = [Slot(k, env.scenes[k], writers[k], robot_name, scene_mode=scene) for k in range(n_slots)]
+        slots[0].start(first)
+        n_objects_recorded_first = slots[0].n_objects_recorded  # REPLAY_SUMMARY (PARTIAL_SCENE): the first demo's recorded objects
+        n_demos = 1
 
-    def fill_idle(force: bool = False) -> None:
-        nonlocal n_demos
-        for s in slots:
-            if s.demo is None:
-                d = source.next(force)
-                if d is None:
-                    return
-                s.start(usable(d))
-                n_demos += 1
+        def fill_idle(force: bool = False) -> None:
+            nonlocal n_demos
+            for s in slots:
+                if s.demo is None:
+                    d = source.next(force)
+                    if d is None:
+                        return
+                    s.start(usable(d))
+                    n_demos += 1
 
-    fill_idle(force=True)
-    t_warm = time.time()
-    n_warm = 0
-    if args.warmup_s > 0:
-        for s in slots:
-            if s.demo is not None:
-                s.scene.load_state(s.demo.state_at(0), serialized=True)
-        while time.time() - t_warm < args.warmup_s:
-            og.sim.render()
-            n_warm += 1
-    warmup = {"s": round(time.time() - t_warm, 1), "renders": n_warm}
-    out = open(args.results, "a") if args.results else None
+        fill_idle(force=True)
+        t_warm = time.time()
+        n_warm = 0
+        if args.warmup_s > 0:
+            for s in slots:
+                if s.demo is not None:
+                    s.scene.load_state(s.demo.state_at(0), serialized=True)
+            while time.time() - t_warm < args.warmup_s:
+                og.sim.render()
+                n_warm += 1
+        warmup = {"s": round(time.time() - t_warm, 1), "renders": n_warm}
+        out = open(args.results, "a") if args.results else None
 
-    def emit(tag: str, rec: Dict[str, Any]) -> None:
-        line = f"{tag} {json.dumps(rec)}"
-        print(line, flush=True)
-        if out is not None:
-            out.write(json.dumps({"tag": tag, **rec}) + "\n")
-            out.flush()
+        def emit(tag: str, rec: Dict[str, Any]) -> None:
+            line = f"{tag} {json.dumps(rec)}"
+            print(line, flush=True)
+            if out is not None:
+                out.write(json.dumps({"tag": tag, **rec}) + "\n")
+                out.flush()
 
-    t_ticks = defaultdict(float)
-    n_occl = defaultdict(int)  # goal-occlusion verdicts: kept / dropped / not_screened
-    n_ticks = n_steps = 0
-    diagnostic_fault_pending = args.diagnostic_episode_fault
-    objs_in = objs_loaded = 0
-    idle_s = 0.0
-    r0, w0 = resource.getrusage(resource.RUSAGE_SELF), time.time()
-    gpu_peak = process_gpu_mib() or 0
-    prof_window = tuple(int(v) for v in args.profile_ticks.split(":")) if args.profile_ticks else None
-    prof = None
-    while True:
-        if prof_window is not None:
-            if n_ticks == prof_window[0]:
-                import cProfile
+        t_ticks = defaultdict(float)
+        n_occl = defaultdict(int)  # goal-occlusion verdicts: kept / dropped / not_screened
+        n_ticks = n_steps = 0
+        diagnostic_fault_pending = args.diagnostic_episode_fault
+        objs_in = objs_loaded = 0
+        idle_s = 0.0
+        r0, w0 = resource.getrusage(resource.RUSAGE_SELF), time.time()
+        gpu_peak = process_gpu_mib() or 0
+        prof_window = tuple(int(v) for v in args.profile_ticks.split(":")) if args.profile_ticks else None
+        prof = None
+        while True:
+            if prof_window is not None:
+                if n_ticks == prof_window[0]:
+                    import cProfile
 
-                prof = cProfile.Profile()
-                prof.enable()
-            elif prof is not None and n_ticks == prof_window[0] + prof_window[1]:
-                prof.disable()
-                import io
-                import pstats
+                    prof = cProfile.Profile()
+                    prof.enable()
+                elif prof is not None and n_ticks == prof_window[0] + prof_window[1]:
+                    prof.disable()
+                    import io
+                    import pstats
 
-                buf = io.StringIO()
-                pstats.Stats(prof, stream=buf).sort_stats("cumulative").print_stats(50)
-                pstats.Stats(prof, stream=buf).sort_stats("tottime").print_stats(30)
-                target = (args.results + ".prof.txt") if args.results else None
-                if target:
-                    with open(target, "w") as f:
-                        f.write(buf.getvalue())
-                else:
-                    print(buf.getvalue(), flush=True)
-                prof, prof_window = None, None
-        active = [s for s in slots if s.demo is not None]
-        if not active:
-            if source.finished():
-                break
-            t_idle = time.time()
-            time.sleep(args.poll_s)
-            fill_idle(force=True)
-            idle_s += time.time() - t_idle
-            continue
-        t1 = time.perf_counter()
-        with og.sim.batched_usd_edits() if args.batched_usd_edits else contextlib.nullcontext():
-            for s in active:
-                n_in, n_loaded = s.load(s.demo.state_at(s.i), args.delta_load)
-                objs_in += n_in
-                objs_loaded += n_loaded
-        t2 = time.perf_counter()
-        for _ in range(args.first_renders if any(s.i == 0 for s in active) else args.renders):
-            og.sim.render()
-        t3 = time.perf_counter()
-        obs_list, _ = env.get_obs()
-        t4 = time.perf_counter()
-        for s in active:
-            d, i = s.demo, s.i
-            # tiled camera buffers are persistent CUDA tensors (per-slot views), and the writer converts frames with .numpy()
-            obs = {key: ((v.detach().cpu() if v.is_cuda else v.clone()) if isinstance(v, th.Tensor) else v) for key, v in obs_list[s.k].items()}
-            if args.proprio == "recorded":
-                obs[s.proprio_key] = th.as_tensor(d.proprio[i], dtype=th.float32)
-            from ispatialgym.multienv.campaign_render_cleanup import write_frame
-            error, cleanup = write_frame(s.writer, d, i, obs, fault=diagnostic_fault_pending)
-            if error is not None:
-                emit("REPLAY_EPISODE_ABORTED", {"demo": d.dir, "slot": s.k, "kept": False,
+                    buf = io.StringIO()
+                    pstats.Stats(prof, stream=buf).sort_stats("cumulative").print_stats(50)
+                    pstats.Stats(prof, stream=buf).sort_stats("tottime").print_stats(30)
+                    target = (args.results + ".prof.txt") if args.results else None
+                    if target:
+                        with open(target, "w") as f:
+                            f.write(buf.getvalue())
+                    else:
+                        print(buf.getvalue(), flush=True)
+                    prof, prof_window = None, None
+            active = [s for s in slots if s.demo is not None]
+            if not active:
+                if source.finished():
+                    break
+                t_idle = time.time()
+                time.sleep(args.poll_s)
+                fill_idle(force=True)
+                idle_s += time.time() - t_idle
+                continue
+            t1 = time.perf_counter()
+            with og.sim.batched_usd_edits() if args.batched_usd_edits else contextlib.nullcontext():
+                for s in active:
+                    n_in, n_loaded = s.load(s.demo.state_at(s.i), args.delta_load)
+                    objs_in += n_in
+                    objs_loaded += n_loaded
+            t2 = time.perf_counter()
+            for _ in range(args.first_renders if any(s.i == 0 for s in active) else args.renders):
+                og.sim.render()
+            t3 = time.perf_counter()
+            if diagnostic_fault_pending and args.diagnostic_fault_boundary == "post_render" and any(s.i == 1 for s in active):
+                from ispatialgym.multienv.campaign_render_cleanup import abort_after_render
+                assert len(active) == 1
+                s = active[0]
+                error, cleanup = abort_after_render(s.writer, s.i, diagnostic_fault_pending)
+                emit("REPLAY_EPISODE_ABORTED", {"demo": s.demo.dir, "slot": s.k, "kept": False,
                     "campaign_restoration": s.campaign_restoration, "cleanup": cleanup,
                     "wall_s": round(time.time()-s.t0, 2)})
-                if not cleanup["expected_controlled_failure"]:
-                    raise error
                 diagnostic_fault_pending = None
                 s.demo, s.loaded, s.last_obs = None, None, None
+                fill_idle()
                 continue
-            s.i += 1
-            n_steps += 1
-            if s.i == d.T:
-                # the last action; the observation it led to is not a frame (the writer pairs it with no action)
-                s.writer.step(d.action[d.T - 1], obs, float(d.reward[d.T - 1]), bool(d.terminated[d.T - 1]), bool(d.truncated[d.T - 1]))
-                keep, occl = True, None
-                rec = instance_record(d)
-                screen, why = needs_occlusion_screen(args.goal_occlusion, rec)
-                if screen and tiled:
-                    screen, why = False, "not measured: tiled rendering"
-                if screen:
-                    t_o = time.perf_counter()
-                    try:
-                        occl = occlusion_screen(s.scene, og.sim.render, rec.get("subtask") or rec.get("variant"), rec.get("tracked"))
-                    except Exception as e:  # noqa: BLE001  (a failed screen keeps the demo and says why)
-                        occl = {"status": f"error: {e!r}", "occluded": False, "max_occluded": None}
-                    t_ticks["goal_occlusion"] += time.perf_counter() - t_o
-                    keep = not occl.get("occluded")
-                    n_occl[("dropped" if not keep else "kept")] += 1
-                else:
-                    n_occl["not_screened"] += 1
-                emit("REPLAY_OCCLUSION", {"demo": d.dir, "variant": rec.get("variant"), "screened": screen, "why": why, "kept": keep,
-                                          "max_occluded": (occl or {}).get("max_occluded"), "worst": (occl or {}).get("worst"),
-                                          "occluded": (occl or {}).get("occluded"), "status": (occl or {}).get("status"),
-                                          "objects": {k: {kk: v.get(kk) for kk in ("status", "occluded", "judged", "visible_px", "total_px") if kk in v}
-                                                      for k, v in ((occl or {}).get("objects") or {}).items()},
-                                          "sampler_predicted": ((rec.get("summary") or {}).get("goal_occlusion") or {}).get("max_occluded")})
-                index = s.writer.end(save=keep)
-                emit("REPLAY_DEMO", {"demo": d.dir, "slot": s.k, "frames": d.T, "episode_index": index, "wall_s": round(time.time() - s.t0, 2),
-                                     "dataset": os.path.join(args.root, f"{args.repo_prefix}_slot{s.k}"), "kept": keep,
-                                     "campaign_restoration": s.campaign_restoration,
-                                     "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
-                                                                                  "occluded": occl.get("occluded")}})
-                s.demo = None
-        fill_idle()
-        t5 = time.perf_counter()
-        t_ticks["load_states"] += t2 - t1
-        t_ticks["render"] += t3 - t2
-        t_ticks["get_obs"] += t4 - t3
-        t_ticks["writers"] += t5 - t4
-        n_ticks += 1
-        if n_ticks % 200 == 0:
-            gpu_peak = max(gpu_peak, process_gpu_mib() or 0)
-    if args.diagnostic_episode_fault and diagnostic_fault_pending is not None:
-        raise RuntimeError("requested renderer episode failure was not exercised")
-    t_flush = time.perf_counter()
-    for w in writers:
-        w.close()
-    close_s = time.perf_counter() - t_flush
-    w1, r1 = time.time(), resource.getrusage(resource.RUSAGE_SELF)
-    wall = w1 - w0
-    cpu = (r1.ru_utime - r0.ru_utime) + (r1.ru_stime - r0.ru_stime)
-    busy = wall - idle_s
-    emit("REPLAY_SUMMARY", {
-        "slots": n_slots, "tiled": tiled, "demos": n_demos, "env_steps": n_steps, "ticks": n_ticks, "load_s": round(load_s, 1), "warmup": warmup,
-        "replay_wall_s": round(wall, 2), "idle_s": round(idle_s, 2), "close_s": round(close_s, 2),
-        "env_steps_per_s": round(n_steps / max(wall, 1e-9), 2), "env_steps_per_busy_s": round(n_steps / max(busy, 1e-9), 2),
-        "ms_per_tick": {k: round(1000 * v / max(1, n_ticks), 2) for k, v in t_ticks.items()},
-        "cpu_cores_busy": round(cpu / max(wall, 1e-9), 2), "cpu_ms_per_env_step": round(1000 * cpu / max(1, n_steps), 1),
-        "gpu_mib_peak": max(gpu_peak, process_gpu_mib() or 0), "async_flush": bool(args.async_flush), "proprio": args.proprio,
-        "delta_load": bool(args.delta_load), "batched_usd_edits": bool(args.batched_usd_edits),
-        "objects_per_state": round(objs_in / max(1, n_steps), 1) if args.delta_load else None,
-        "objects_loaded_per_state": round(objs_loaded / max(1, n_steps), 1) if args.delta_load else None,
-        "renders": args.renders, "first_renders": args.first_renders, "omp_threads": os.environ.get("OMP_NUM_THREADS"),
-        "scene": scene, "goal_occlusion": {"mode": args.goal_occlusion, **n_occl}, "n_objects_scene": slots[0].n_objects_scene, "n_objects_recorded": n_objects_recorded_first,
-        "cpus_allowed": len(os.sched_getaffinity(0)), "host": os.uname().nodename, "pid": os.getpid()})
-    if out is not None:
-        out.close()
-    return 0
+            obs_list, _ = env.get_obs()
+            t4 = time.perf_counter()
+            for s in active:
+                d, i = s.demo, s.i
+                # tiled camera buffers are persistent CUDA tensors (per-slot views), and the writer converts frames with .numpy()
+                obs = {key: ((v.detach().cpu() if v.is_cuda else v.clone()) if isinstance(v, th.Tensor) else v) for key, v in obs_list[s.k].items()}
+                if args.proprio == "recorded":
+                    obs[s.proprio_key] = th.as_tensor(d.proprio[i], dtype=th.float32)
+                from ispatialgym.multienv.campaign_render_cleanup import write_frame
+                error, cleanup = write_frame(s.writer, d, i, obs, fault=diagnostic_fault_pending if args.diagnostic_fault_boundary == "writer" else None)
+                if error is not None:
+                    emit("REPLAY_EPISODE_ABORTED", {"demo": d.dir, "slot": s.k, "kept": False,
+                        "campaign_restoration": s.campaign_restoration, "cleanup": cleanup,
+                        "wall_s": round(time.time()-s.t0, 2)})
+                    if not cleanup["expected_controlled_failure"]:
+                        raise error
+                    diagnostic_fault_pending = None
+                    s.demo, s.loaded, s.last_obs = None, None, None
+                    continue
+                s.i += 1
+                n_steps += 1
+                if s.i == d.T:
+                    # the last action; the observation it led to is not a frame (the writer pairs it with no action)
+                    s.writer.step(d.action[d.T - 1], obs, float(d.reward[d.T - 1]), bool(d.terminated[d.T - 1]), bool(d.truncated[d.T - 1]))
+                    keep, occl = True, None
+                    rec = instance_record(d)
+                    screen, why = needs_occlusion_screen(args.goal_occlusion, rec)
+                    if screen and tiled:
+                        screen, why = False, "not measured: tiled rendering"
+                    if screen:
+                        t_o = time.perf_counter()
+                        try:
+                            occl = occlusion_screen(s.scene, og.sim.render, rec.get("subtask") or rec.get("variant"), rec.get("tracked"))
+                        except Exception as e:  # noqa: BLE001  (a failed screen keeps the demo and says why)
+                            occl = {"status": f"error: {e!r}", "occluded": False, "max_occluded": None}
+                        t_ticks["goal_occlusion"] += time.perf_counter() - t_o
+                        keep = not occl.get("occluded")
+                        n_occl[("dropped" if not keep else "kept")] += 1
+                    else:
+                        n_occl["not_screened"] += 1
+                    emit("REPLAY_OCCLUSION", {"demo": d.dir, "variant": rec.get("variant"), "screened": screen, "why": why, "kept": keep,
+                                              "max_occluded": (occl or {}).get("max_occluded"), "worst": (occl or {}).get("worst"),
+                                              "occluded": (occl or {}).get("occluded"), "status": (occl or {}).get("status"),
+                                              "objects": {k: {kk: v.get(kk) for kk in ("status", "occluded", "judged", "visible_px", "total_px") if kk in v}
+                                                          for k, v in ((occl or {}).get("objects") or {}).items()},
+                                              "sampler_predicted": ((rec.get("summary") or {}).get("goal_occlusion") or {}).get("max_occluded")})
+                    index = s.writer.end(save=keep)
+                    emit("REPLAY_DEMO", {"demo": d.dir, "slot": s.k, "frames": d.T, "episode_index": index, "wall_s": round(time.time() - s.t0, 2),
+                                         "dataset": os.path.join(args.root, f"{args.repo_prefix}_slot{s.k}"), "kept": keep,
+                                         "campaign_restoration": s.campaign_restoration,
+                                         "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
+                                                                                      "occluded": occl.get("occluded")}})
+                    s.demo = None
+            fill_idle()
+            t5 = time.perf_counter()
+            t_ticks["load_states"] += t2 - t1
+            t_ticks["render"] += t3 - t2
+            t_ticks["get_obs"] += t4 - t3
+            t_ticks["writers"] += t5 - t4
+            n_ticks += 1
+            if n_ticks % 200 == 0:
+                gpu_peak = max(gpu_peak, process_gpu_mib() or 0)
+        if args.diagnostic_episode_fault and diagnostic_fault_pending is not None:
+            raise RuntimeError("requested renderer episode failure was not exercised")
+        t_flush = time.perf_counter()
+        for w in writers:
+            w.close()
+        close_s = time.perf_counter() - t_flush
+        w1, r1 = time.time(), resource.getrusage(resource.RUSAGE_SELF)
+        wall = w1 - w0
+        cpu = (r1.ru_utime - r0.ru_utime) + (r1.ru_stime - r0.ru_stime)
+        busy = wall - idle_s
+        emit("REPLAY_SUMMARY", {
+            "slots": n_slots, "tiled": tiled, "demos": n_demos, "env_steps": n_steps, "ticks": n_ticks, "load_s": round(load_s, 1), "warmup": warmup,
+            "replay_wall_s": round(wall, 2), "idle_s": round(idle_s, 2), "close_s": round(close_s, 2),
+            "env_steps_per_s": round(n_steps / max(wall, 1e-9), 2), "env_steps_per_busy_s": round(n_steps / max(busy, 1e-9), 2),
+            "ms_per_tick": {k: round(1000 * v / max(1, n_ticks), 2) for k, v in t_ticks.items()},
+            "cpu_cores_busy": round(cpu / max(wall, 1e-9), 2), "cpu_ms_per_env_step": round(1000 * cpu / max(1, n_steps), 1),
+            "gpu_mib_peak": max(gpu_peak, process_gpu_mib() or 0), "async_flush": bool(args.async_flush), "proprio": args.proprio,
+            "delta_load": bool(args.delta_load), "batched_usd_edits": bool(args.batched_usd_edits),
+            "objects_per_state": round(objs_in / max(1, n_steps), 1) if args.delta_load else None,
+            "objects_loaded_per_state": round(objs_loaded / max(1, n_steps), 1) if args.delta_load else None,
+            "renders": args.renders, "first_renders": args.first_renders, "omp_threads": os.environ.get("OMP_NUM_THREADS"),
+            "scene": scene, "goal_occlusion": {"mode": args.goal_occlusion, **n_occl}, "n_objects_scene": slots[0].n_objects_scene, "n_objects_recorded": n_objects_recorded_first,
+            "cpus_allowed": len(os.sched_getaffinity(0)), "host": os.uname().nodename, "pid": os.getpid()})
+        if out is not None:
+            out.close()
+        return 0
 
 
 if __name__ == "__main__":

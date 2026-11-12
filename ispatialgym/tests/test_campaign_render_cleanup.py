@@ -39,3 +39,23 @@ def test_cleanup_failure_cannot_be_reported_successful():
     w=Writer();w.abort=lambda:None
     with pytest.raises(RuntimeError,match='did not clear'):
         write_frame(w,demo(),1,{},fault='interruption')
+
+
+def test_error_after_state_render_or_final_write_aborts_every_writer_and_propagates():
+    from ispatialgym.multienv.campaign_render_cleanup import processing_cleanup
+    for error in (ValueError('load state'),RuntimeError('render'),KeyboardInterrupt('get_obs'),RuntimeError('final writer end')):
+        writers=[Writer(),Writer()]
+        for w in writers:w.begin({});w.pending=True;w.closed=False;w.close=lambda w=w:setattr(w,'closed',True)
+        with pytest.raises(type(error))as captured:
+            with processing_cleanup(writers):raise error
+        assert captured.value is error
+        assert all(w.abort_calls==1 and not w.pending and w.closed for w in writers)
+
+
+def test_interruption_after_existing_render_clears_first_frame_without_extra_ticks():
+    from ispatialgym.multienv.campaign_render_cleanup import abort_after_render
+    w=Writer();w.begin({'frame':0})
+    error,proof=abort_after_render(w,1,'interruption')
+    assert type(error)is ControlledRenderInterrupt and proof['boundary']=='after_existing_render'
+    assert proof['frames_observed']==1 and proof['render_ticks_added']==proof['physics_steps_added']==0
+    assert not w.current_traj_history and not w.pending

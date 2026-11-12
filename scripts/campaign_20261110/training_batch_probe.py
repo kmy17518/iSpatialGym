@@ -452,7 +452,9 @@ def _run(root,request,output,kind,construction):
         results=output/'results.jsonl'
         extra=['--sequential-augmentation'] if value.get('sequential_augmentation') is True else []
         if value.get('render_cleanup_only'):
-            extra+=['--diagnostic-episode-fault', 'failure' if value['diagnostic_control']=='RENDER_FAILURE_A' else 'interruption']
+            require(value.get('render_fault_boundary','writer') in ('writer','post_render'),'unsupported render fault boundary')
+            extra+=['--diagnostic-episode-fault', 'failure' if value['diagnostic_control']=='RENDER_FAILURE_A' else 'interruption',
+                    '--diagnostic-fault-boundary',value.get('render_fault_boundary','writer')]
         code=replay.main(['--demos','@'+str(listing),'--campaign-manifest',str(manifest),
             '--root',str(output/'rendered'),'--task',records[0]['variant'],'--slots','1',
             '--scene','recorded','--results',str(results),'--repo-prefix','training_probe']+extra)
