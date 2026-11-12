@@ -173,7 +173,7 @@ def saved_world_scope(runner, records):
     comparison = compare_saved_scenes(*compared, parking_objects=contract['parking_objects'], task_objects=task_objects)
     members = {}
     for path, scene, doc, meta, row in zip(paths, scenes, docs, metas, records):
-        moved = meta.get('scene_variant', {}).get('moved_objects', {})
+        moved = (meta.get('scene_variant') or {}).get('moved_objects', {})
         names = row['perturbations']['removed_objects']
         # Actual native scene bytes, not an invented transform, supply every pose.
         states = doc['state']['registry']['object_registry']

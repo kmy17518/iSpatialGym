@@ -1,4 +1,5 @@
 from copy import deepcopy
+from pathlib import Path
 import json
 from types import SimpleNamespace
 
@@ -6,6 +7,7 @@ import pytest
 from scripts.campaign_20261110.contracts import ContractError,file_digest
 from ispatialgym.oracle.campaign_batch import record_scope,compare_saved_scenes,restore_parking,SCHEMA
 from ispatialgym.oracle.campaign_batch import checked_nested_parking_provenance
+from ispatialgym.oracle.campaign_batch import saved_world_scope
 
 
 def scene():
@@ -102,6 +104,29 @@ def test_native_parking_restore_is_hash_bound_and_adds_no_step(tmp_path):
     assert calls==[(state,False)] and calls[0][0] is not state
     tro.write_text('{"changed":true}')
     with pytest.raises(ContractError,match='input changed'):restore_parking(loader,contract)
+
+
+def test_saved_world_accepts_explicit_null_variant_only_with_exact_unparked_state(tmp_path):
+    rows=records(tmp_path);resolved={}
+    for index,row in enumerate(rows):
+        directory=tmp_path/str(index);definitions=directory/'activity_definitions/task';definitions.mkdir(parents=True)
+        (definitions/'problem0.bddl').write_text('same native definition')
+        meta={'scene':'scene','load_room_instances':['room'],'problem':'task','scene_crop':None,'scene_variant':None}
+        document=scene()
+        if index==0:
+            meta['scene_variant']={'removed_objects':['chair'],'moved_objects':{'chair':{'fixed_base':True,'pos':[0.,0.,0.],'moved_to':[-200.,0.,0.]}}}
+            document['state']['registry']['object_registry']['chair']['root_link']['pos']=[-200.,0.,0.]
+            document['metadata']['task']={'ispatialgym':deepcopy(meta['scene_variant'])}
+        scene_path=directory/'template.json';scene_path.write_text(json.dumps(document))
+        tro=directory/'tro.json';tro.write_text(json.dumps({'ispatialgym':{'object_bindings':{'target':{'scene_object_name':'target'}}}}))
+        row['artifacts']['tro']={'path':str(tro),'sha256':file_digest(tro)}
+        resolved[str(tro)]=(None,str(directory),meta,'task',0)
+    runner=SimpleNamespace(resolve_instance=lambda path:resolved[path],instance_signature=lambda path:json.dumps({'template':path,'task':'same'}),
+        _tro_object_names=lambda path:['target'],loaded_scene_path=lambda directory,meta:str(Path(directory)/'template.json'))
+    proof=saved_world_scope(runner,rows)
+    assert len(proof['members_by_tro'])==2
+    path=tmp_path/'1/template.json';wrong=json.loads(path.read_text());wrong['state']['registry']['object_registry']['chair']['root_link']['pos']=[-200.,0.,0.];path.write_text(json.dumps(wrong))
+    with pytest.raises(ContractError,match='saved parking/restored pose'):saved_world_scope(runner,rows)
 
 
 def test_multislot_different_lighting_still_rejected(tmp_path):
