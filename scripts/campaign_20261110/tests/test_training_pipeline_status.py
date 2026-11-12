@@ -417,3 +417,39 @@ def test_unknown_submission_history_does_not_hide_independent_terminal_native_fa
     assert got['status']=='native_failed' and got['native']['written']==0
     assert observed['errors'][0]['stage']=='native_submission'
     assert observed['benchmark_credit']==0
+
+
+def test_batch_combined_pointer_preserves_two_independent_exact_allocations(tmp_path):
+    folder=tmp_path/'training_pipeline_canaries/tray/batch_restoration_exact_r1'
+    request=folder/'request.json';write_json_atomic(request,{})
+    jobs=[{'kind':'physics_action_open_loop','job_id':'123','output':str(folder/'physics')},
+          {'kind':'kinematic_observation_rendering','job_id':'124','output':str(folder/'render')}]
+    receipts=[]
+    for index,job in enumerate(jobs):
+        path=folder/str(index)/'submission.json'
+        write_json_atomic(path,{'request':status.ref(request),'jobs':[job]});receipts.append(status.ref(path))
+    selected=folder/'submission_combined.json'
+    write_json_atomic(selected,{'request':status.ref(request),'jobs':jobs})
+    pointer=folder/'submission_current.json'
+    value={'campaign_id':'campaign_20261110','request':status.ref(request),
+           'current_submission':status.ref(selected),'source_receipts':receipts}
+    write_json_atomic(pointer,value)
+    assert status.batch_submission_pointer(request,pointer)[0]==selected
+    batch=status.observe(tmp_path)['batch_stages'][0]
+    assert batch['submission']==status.ref(selected)
+    assert [s['allocation']['job_id']for s in batch['stages']]==['123','124']
+    assert batch.get('error') is None
+    # A forged, incomplete merge cannot hide the original render allocation.
+    write_json_atomic(selected,{'request':status.ref(request),'jobs':jobs[:1]})
+    value['current_submission']=status.ref(selected);write_json_atomic(pointer,value)
+    with pytest.raises(ValueError,match='preserve exact'):
+        status.batch_submission_pointer(request,pointer)
+
+
+def test_batch_current_pointer_and_tampered_original_receipt(tmp_path):
+    request=tmp_path/'batch/request.json';write_json_atomic(request,{})
+    selected=request.parent/'submission_r2.json';write_json_atomic(selected,{'jobs':[]})
+    pointer=request.parent/'submission_current.json';write_json_atomic(pointer,{'current':status.ref(selected)})
+    assert status.batch_submission_pointer(request,pointer)[0]==selected
+    write_json_atomic(selected,{'jobs':['changed']})
+    with pytest.raises(ValueError,match='revision changed'):status.batch_submission_pointer(request,pointer)

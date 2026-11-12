@@ -74,6 +74,34 @@ def ref(path): return {'path': str(path), 'sha256': file_digest(path)}
 def timestamp(path): return datetime.fromtimestamp(Path(path).stat().st_mtime, timezone.utc).isoformat()
 
 
+def batch_submission_pointer(request, pointer_path):
+    """Resolve saved submission schemas without losing separately launched kinds."""
+    pointer=read(pointer_path)
+    names=[key for key in ('current','current_submission') if key in pointer]
+    require(len(names)==1, 'batch submission pointer is ambiguous or unsupported')
+    selected_ref=pointer[names[0]];selected=Path(selected_ref['path']).resolve()
+    require(selected.parent==request.parent.resolve() and file_digest(selected)==selected_ref['sha256'],
+            'submission revision changed')
+    if names[0]=='current_submission':
+        require(pointer.get('campaign_id')=='campaign_20261110' and pointer.get('request')==ref(request),
+                'combined submission pointer request differs')
+        combined=read(selected);require(combined.get('request')==ref(request), 'combined submission request differs')
+        sources=pointer.get('source_receipts');require(isinstance(sources,list) and sources,
+            'combined submission lacks original receipt bindings')
+        original_jobs=[]
+        for reference in sources:
+            path=Path(reference['path']).resolve()
+            require(path.is_relative_to(request.parent.resolve()) and file_digest(path)==reference['sha256'],
+                    'combined source receipt changed or escaped batch')
+            source=read(path);require(source.get('request')==ref(request), 'combined source request differs')
+            original_jobs.extend(source['jobs'])
+        keys=[(j['kind'],str(j['job_id']))for j in original_jobs]
+        require(len(keys)==len(set(keys)) and len({k for k,_ in keys})==len(keys)
+                and sorted(map(digest,original_jobs))==sorted(map(digest,combined['jobs'])),
+                'combined submission does not preserve exact independent source allocations')
+    return selected,pointer
+
+
 
 def reconciled_member_submission(root, batch, request, request_refs):
     """Join additive per-member receipts only through exact execution evidence."""
@@ -710,12 +738,9 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
         submission_pointer = request.parent/'submission_current.json'
         if submission_pointer.exists():
             try:
-                pointer = read(submission_pointer)
-                selected = Path(pointer['current']['path']).resolve()
-                require(selected.parent == request.parent.resolve() and
-                        file_digest(selected) == pointer['current']['sha256'], 'submission revision changed')
+                selected,pointer = batch_submission_pointer(request,submission_pointer)
                 submission_path = selected
-                batch['prior_attempts'] = pointer['prior_attempts']
+                batch['prior_attempts'] = pointer.get('prior_attempts',[])
                 batch['submission_pointer'] = ref(submission_pointer)
             except Exception as error:
                 batch.update(status='submission_observation_failed', error=f'{type(error).__name__}: {error}')
