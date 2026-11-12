@@ -24,8 +24,12 @@ def verify_runtime_compatibility(root, request, records, runtime):
             file_digest(proof_path)==ref.get('sha256'),'missing exact observational runtime proof')
     proof=json.loads(proof_path.read_text())
     if proof.get('schema') == 'isg-render-cleanup-runtime-compatibility-v1':
-        require(request.get('render_cleanup_only') is True and request.get('diagnostic_control') in
-                ('RENDER_FAILURE_A', 'RENDER_INTERRUPT_A'), 'render cleanup runtime is diagnostic-only')
+        cleanup = request.get('render_cleanup_only') is True and request.get('diagnostic_control') in ('RENDER_FAILURE_A', 'RENDER_INTERRUPT_A')
+        sequential = (request.get('sequential_render_only') is True and request.get('render_cleanup_only') is not True and
+                      request.get('sequential_augmentation') is True and request.get('diagnostic_control') in (None,'FRESH_A','FRESH_B') and
+                      request.get('production_released') is False and
+                      proof.get('permitted_execution_kinds') == ['kinematic_observation_rendering'])
+        require(cleanup or sequential, 'render cleanup runtime requires an exact render-only scope')
         base=Path(proof['native_runtime']['path']).resolve().parent
         require(base.is_relative_to(root/'code') and runtime.is_relative_to(root/'code') and
                 file_digest(base/'.snapshot_commit')==proof['native_runtime']['sha256'] and
@@ -314,6 +318,11 @@ def install_reset_boundary_probe(runner, *, final_pre_action=False, next_native_
 
 def episode_order(value, kind):
     """A repeated-A control is diagnostic only and cannot pass the A/B/A gate."""
+    if value.get('sequential_render_only'):
+        require(kind=='kinematic_observation_rendering' and value.get('sequential_augmentation') is True and
+                value.get('render_cleanup_only') is not True and value.get('production_released') is False and
+                value.get('diagnostic_control') in (None,'FRESH_A','FRESH_B'),
+                'sequential render scope cannot authorize physics or another control')
     control = value.get('diagnostic_control')
     if control is None:
         return [0, 1, 0]
@@ -357,7 +366,7 @@ def _run(root,request,output,kind,construction):
     root=Path(root).resolve();output=Path(output).resolve()
     require(output.is_relative_to(root) and not output.exists(),'probe output must be new and private')
     value,records=inputs(root,request);output.mkdir(parents=True)
-    require(not value.get('render_cleanup_only') or kind=='kinematic_observation_rendering',
+    require(not (value.get('render_cleanup_only') or value.get('sequential_render_only')) or kind=='kinematic_observation_rendering',
             'render cleanup helper cannot execute physics')
     runtime=Path(__file__).resolve().parents[2]/'.snapshot_commit'
     require(file_digest(runtime)==value['probe_runtime_sha256'],'probe runtime differs from approved observational snapshot')

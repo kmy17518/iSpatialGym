@@ -27,3 +27,13 @@ def test_render_compatibility_rejects_any_physics_change(tmp_path):
     (b/'ispatialgym/oracle/run_isg.py').write_text('changed loader')
     with pytest.raises(ContractError,match='native physics'):
         verify_runtime_compatibility(tmp_path,r,rows,b)
+
+
+@pytest.mark.parametrize('control,order',[(None,[0,1,0]),('FRESH_A',[0]),('FRESH_B',[1])])
+def test_cleanup_renderer_reference_scope_is_render_only(control,order):
+    value={'sequential_render_only':True,'sequential_augmentation':True,'diagnostic_control':control,
+           'diagnostic_only':True,'production_released':False}
+    assert episode_order(value,'kinematic_observation_rendering')==order
+    with pytest.raises(ContractError,match='cannot authorize physics'):
+        episode_order(value,'physics_action_open_loop')
+    with pytest.raises(ContractError):episode_order({**value,'production_released':True},'kinematic_observation_rendering')
