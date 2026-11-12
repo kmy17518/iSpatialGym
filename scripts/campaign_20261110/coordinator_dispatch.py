@@ -163,6 +163,13 @@ def collector_allowance(capacity, existing_jobs, account='minyeong', pending_lim
     return max(free,max(0,pending_limit-len(pending)))
 
 
+def preparation_capacity(capacity, account, reserved_slots=4):
+    """Keep physical headroom for the next recovery/pipeline control."""
+    if capacity.get('status')!='observed':return 0
+    return min(capacity.get('account_slots',{}).get(account,0),
+               max(0,capacity.get('compatible_available_slots',0)-reserved_slots))
+
+
 def dispatch_order(tickets):
     """Keep critical work first and distribute preparation across task classes."""
     priority={'pipeline':0,'canonical recovery':1,'heldout eval':2,'training preparation':3}
@@ -256,6 +263,7 @@ def cycle(root, account, capacity_probe=probe):
             errors.append({'source':reference['path'],'error':str(exc),'owner':'/root'})
     capacity=capacity_probe()
     allowance=min(capacity.get('compatible_available_slots',0),capacity.get('account_slots',{}).get(account,0)) if capacity.get('status')=='observed' else 0
+    preparation_allowance=preparation_capacity(capacity,account,int(policy.get('critical_reserved_physical_slots',4)))
     critical={'pipeline','canonical recovery'}
     pending=set(map(str,capacity.get('pending_job_ids',[])));known_pending=set()
     for ticket in tickets:
@@ -272,15 +280,20 @@ def cycle(root, account, capacity_probe=probe):
             if state=='ready' and ticket.get('workstream')=='training preparation':
                 ticket['preparation_authorization']=authorize_preparation(ticket,policy)
             slots=int(ticket.get('gpu_slots',1));is_critical=ticket.get('workstream') in critical
-            if state=='ready' and (allowance>=slots or is_critical and queue_allowance>=slots):
+            is_preparation=ticket.get('workstream')=='training preparation'
+            within_reserve=not is_preparation or preparation_allowance>=slots
+            if state=='ready' and within_reserve and (allowance>=slots or is_critical and queue_allowance>=slots):
                 result=submit(ticket,capacity)
                 if result:
                     allowance=max(0,allowance-slots);state=result['status']
+                    preparation_allowance=max(0,preparation_allowance-slots)
                     if is_critical:queue_allowance=max(0,queue_allowance-slots)
             rows.append({'id':ticket['id'],'workstream':ticket['workstream'],'owner':ticket['owner'],
                          'class_id':ticket.get('class_id'),'state':state,'ready_since':ticket.get('ready_since'),
                          'submission_path':ticket['submission_path'],'claim_path':ticket['claim_path'],
-                         'blocker':'No currently available account/physical slots' if state=='ready' and allowance<=0 else None})
+                         'blocker':('Physical headroom reserved for recovery/pipeline; eligible consumed data may use Vast'
+                                    if state=='ready' and is_preparation and not within_reserve else
+                                    'No currently available account/physical slots' if state=='ready' and allowance<=0 else None)})
         except (OSError,ValueError,KeyError,subprocess.SubprocessError) as exc:
             rows.append({'id':ticket['id'],'state':'needs_reconciliation','owner':ticket['owner'],'error':str(exc)})
     report={'schema':'isg-coordinator-dispatch-status-v1','campaign_id':root.name,'owner':'/root',

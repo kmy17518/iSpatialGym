@@ -168,3 +168,12 @@ def test_missing_scope_cannot_authorize_preparation(consumed_preparation):
     from scripts.campaign_20261110.coordinator_dispatch import authorize_preparation
     row,_=consumed_preparation
     with pytest.raises(ValueError,match='requires'):authorize_preparation(row,{})
+
+
+def test_preparation_reserves_physical_capacity_without_erasing_small_account_quota():
+    from scripts.campaign_20261110.coordinator_dispatch import preparation_capacity
+    cap={'status':'observed','compatible_available_slots':7,'account_slots':{'minyeong':10,'shiyuc':2}}
+    assert preparation_capacity(cap,'minyeong',4)==3
+    assert preparation_capacity(cap,'shiyuc',4)==2
+    assert preparation_capacity({**cap,'compatible_available_slots':4},'minyeong',4)==0
+    assert preparation_capacity({**cap,'status':'unavailable'},'minyeong',4)==0
