@@ -54,7 +54,7 @@ def immutable_write(path, value):
         native.write(path, value)
 
 
-def run(root, manifest, expected_sha, helper, *, leave_for_cluster, transport_name='vast_transport'):
+def run(root, manifest, expected_sha, helper, *, leave_for_cluster, transport_name='vast_transport', max_new_jobs=None):
     root, manifest, helper = map(lambda p:Path(p).resolve(), (root, manifest, helper))
     native.require(native.sha(manifest) == expected_sha, 'Source manifest changed')
     source = json.loads(manifest.read_text())
@@ -75,8 +75,15 @@ def run(root, manifest, expected_sha, helper, *, leave_for_cluster, transport_na
         name = ref['path']
         if name not in digest_cache:digest_cache[name] = native.sha(name)
         native.require(digest_cache[name] == ref['sha256'], 'Source input changed: '+name)
-    releases = {};submitted = [];skipped = [];errors = []
+    progress_path=transport/'progress.json'
+    previous=json.loads(progress_path.read_text()) if progress_path.exists() else {}
+    source_ref={'path':str(manifest),'sha256':expected_sha}
+    if previous.get('source'):
+        native.require(previous['source']==source_ref,'Transport source changed')
+    releases = {};submitted = list(previous.get('submitted',[]));skipped = [];errors = []
+    added=0
     for index, query in enumerate(queries):
+        if max_new_jobs is not None and added>=max_new_jobs:break
         physical = query['physical_dedup_key']
         claim = directory/'claims'/(physical+'.json');receipt = directory/'receipts'/(physical+'.json')
         if index < leave_for_cluster or claim.exists() or receipt.exists():
@@ -102,7 +109,12 @@ def run(root, manifest, expected_sha, helper, *, leave_for_cluster, transport_na
                         files[relative]=digest
                 native.require('anchors.json' in files and (camera or any(n.endswith('/library.json') for n in files)),
                                'Incomplete exact library release')
-                immutable_write(release/'release_manifest.json', {'files':files, 'source':query['request']})
+                release_manifest=release/'release_manifest.json'
+                if release_manifest.exists():
+                    prior=json.loads(release_manifest.read_text())
+                    native.require(prior['files']==files,'Existing library release changed')
+                    checked(prior['source'])
+                else:immutable_write(release_manifest, {'files':files, 'source':query['request']})
                 releases[str(original_release)] = release
             release = releases[str(original_release)]
             source_dir = transport/'queries'/query['id'];source_dir.mkdir(parents=True, exist_ok=True)
@@ -134,13 +146,14 @@ def run(root, manifest, expected_sha, helper, *, leave_for_cluster, transport_na
             jid=native.enqueue(job,root);native.bind_output(job,root)
             native.write(receipt,{**record,'status':'submitted','job_id':jid,'submitted_at':time.time()})
             submitted.append({'id':query['id'],'job_id':jid,'receipt':str(receipt),'job_dir':str(job)})
-            if len(submitted)%10==0:print(json.dumps({'prepared_queued':len(submitted),'source_index':index}),flush=True)
+            added+=1
+            if added%10==0:print(json.dumps({'prepared_queued':len(submitted),'newly_queued':added,'source_index':index}),flush=True)
         except Exception as exc:
             errors.append({'id':query['id'],'error':type(exc).__name__+': '+str(exc)})
-        native.write(transport/'progress.json',{'observed_at':time.time(),'submitted':submitted,'skipped':skipped,'errors':errors})
+        native.write(progress_path,{'observed_at':time.time(),'source':source_ref,'submitted':submitted,'skipped':skipped,'errors':errors})
     report={'observed_at':time.time(),'source':{'path':str(manifest),'sha256':expected_sha},
             'reservation':reservation.__dict__,'submitted':submitted,'skipped':skipped,'errors':errors,
-            'activation_required':True,'benchmark_credit':0,'production_released':False}
+            'newly_submitted':added,'activation_required':True,'benchmark_credit':0,'production_released':False}
     native.write(transport/'prepared.json',report)
     print(json.dumps({'submitted':len(submitted),'skipped':len(skipped),'errors':errors[:10]}),flush=True)
     return report
@@ -149,6 +162,8 @@ def run(root, manifest, expected_sha, helper, *, leave_for_cluster, transport_na
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--root',required=True);p.add_argument('--manifest',required=True)
     p.add_argument('--sha256',required=True);p.add_argument('--helper',required=True)
-    p.add_argument('--leave-for-cluster',type=int,required=True);p.add_argument('--transport-name',default='vast_transport');a=p.parse_args()
+    p.add_argument('--leave-for-cluster',type=int,required=True);p.add_argument('--transport-name',default='vast_transport')
+    p.add_argument('--max-new-jobs',type=int);a=p.parse_args()
     native.require(a.leave_for_cluster>=0,'Invalid cluster reservation')
-    run(a.root,a.manifest,a.sha256,a.helper,leave_for_cluster=a.leave_for_cluster,transport_name=a.transport_name)
+    native.require(a.max_new_jobs is None or a.max_new_jobs>0,'Invalid admission limit')
+    run(a.root,a.manifest,a.sha256,a.helper,leave_for_cluster=a.leave_for_cluster,transport_name=a.transport_name,max_new_jobs=a.max_new_jobs)
