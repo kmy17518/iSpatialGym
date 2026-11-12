@@ -65,10 +65,10 @@ def validate_row(row):
 def register(row_path):
     """Validate one immutable row and retain a pre-dispatch measurement receipt."""
     row_path = Path(row_path); row = json.loads(row_path.read_text()); validate_row(row)
-    require(row_path.parent.name == 'rows' and row_path.stem == row['class_id'], 'row locator differs')
-    directory = row_path.parent.parent / 'measurement_registrations'
-    directory.mkdir(exist_ok=True)
-    target = directory / row_path.name
+    from .runtime_suite_paths import base_for_row, paths
+    base=base_for_row(row_path);target=paths(base,row_path)['registration']
+    target.parent.mkdir(parents=True,exist_ok=True)
+    require(row_path.parent.name!='rows' or row_path.stem==row['class_id'],'row locator differs')
     value = {'schema': 'isg-runtime-validation-measurement-registration-v1', 'campaign_id': CAMPAIGN,
              'run_id': row['run_id'], 'class_id': row['class_id'], 'row': reference(row_path),
              'registered_at': time.time(), 'native_instrumentation': ['campaign_attempts.jsonl',
@@ -304,15 +304,48 @@ def strict_outcomes(result, row, row_ref, allocation_ref):
             'quota_ineligible': quota['quota_ineligible'], 'source': 'strict acceptance owner; exact linked evidence checked'}
 
 
+def rollup_attempts(records):
+    """Latest exact result with all historical allocation cost retained once."""
+    grouped={}
+    for record in records:grouped.setdefault(record['class_id'],[]).append(record)
+    result=[]
+    for rows in grouped.values():
+        if len(rows)==1:result.append(rows[0]);continue
+        latest=dict(rows[-1]);latest['attempt_history']=rows
+        jobs={}
+        for row in rows:
+            for job in row['jobs']:
+                key=(job['backend'],str(job['job_id']))
+                require(key not in jobs or jobs[key]==job,'attempts share conflicting allocation evidence')
+                jobs[key]=job
+        latest['jobs']=list(jobs.values());latest['cost']=accounting(latest['jobs'])
+        latest['current_attempt_native_attempts']=latest['native_attempts']
+        combined={}
+        for key in ('attempted_instance_slots','native_draws','native_finished_draws','censored_native_draws','native_process_seconds','failed_native_process_seconds'):
+            combined[key]=sum(row['native_attempts'].get(key,0) for row in rows)
+        combined['native_draw_elapsed_seconds']=[x for row in rows for x in row['native_attempts'].get('native_draw_elapsed_seconds',[])]
+        counts=Counter()
+        for row in rows:counts.update(row['native_attempts'].get('native_rejections',{}))
+        combined['native_rejections']=dict(counts);latest['native_attempts']=combined
+        latest['distinct_demo_instance_ids']=sorted({iid for row in rows for iid in row['distinct_demo_instance_ids']})
+        latest['errors']=[error for row in rows for error in row['errors']]
+        if latest['errors']:latest['cost']['cost_complete']=False
+        latest['rates']=rates(latest['cost'],{'attempted_instance_slots':combined['attempted_instance_slots'],'demo_successful_instances':len(latest['distinct_demo_instance_ids']),**(latest['strict_outcomes'] or {})})
+        latest['cost_scope']='All registered attempts, including failed, canceled and optional replay allocations; unique backend/job counted once.'
+        result.append(latest)
+    return result
+
+
 def observe(run_dir):
     """Only explicit suite rows and job directories; no global allocation scans."""
     run_dir = Path(run_dir); records, errors, ids = [], [], []
-    for row_path in sorted((run_dir / 'rows').glob('*.json')):
+    from .runtime_suite_paths import all_rows, paths
+    for row_path in all_rows(run_dir.parents[1],run_dir):
         try:
             row = json.loads(row_path.read_text()); validate_row(row)
-            registration = run_dir / 'measurement_registrations' / row_path.name
+            registration = paths(run_dir,row_path)['registration']
             require(registration.exists() and json.loads(registration.read_text())['row'] == reference(row_path), 'pre-dispatch measurement registration missing')
-            path = run_dir / 'allocations' / row_path.name
+            path = paths(run_dir,row_path)['allocation']
             allocation = json.loads(path.read_text()) if path.exists() else {'records': []}
             jobs = allocation.get('records', [])
             for job in jobs:
@@ -376,8 +409,8 @@ def observe(run_dir):
             result['cost']['cost_complete'] = False
         result['distinct_demo_instance_ids'] = sorted(demo_ids)
         result['native_elapsed_distribution'] = sample_distribution(result['native_attempts'].get('native_draw_elapsed_seconds', []))
-        acceptance = run_dir / 'acceptance' / row_path.name
-        if acceptance.exists():
+        acceptance = run_dir / 'acceptance' / (row['class_id']+'.json')
+        if acceptance.exists() and json.loads(acceptance.read_text()).get('row')==reference(row_path):
             result['acceptance_owner_record'] = reference(acceptance)
             try:
                 result['strict_outcomes'] = strict_outcomes(json.loads(acceptance.read_text()), row, reference(row_path), allocation_ref)
@@ -385,6 +418,7 @@ def observe(run_dir):
                 result['errors'].append({'error': 'strict_outcome_identity: ' + str(exc)})
         result['rates'] = rates(result['cost'], {'attempted_instance_slots': result['native_attempts'].get('attempted_instance_slots'), 'demo_successful_instances': len(demo_ids), **(result['strict_outcomes'] or {})})
         output.append(result)
+    output=rollup_attempts(output)
     value = {'schema': 'isg-runtime-validation-measurements-v1', 'campaign_id': CAMPAIGN, 'observed_at': time.time(),
              'run_dir': str(run_dir), 'classes': output, 'errors': errors, 'scheduler_evidence': scheduler_ref,
              'scope': 'Exact registered classes only; no acceptance mutations, no historical sample compatibility inference.'}

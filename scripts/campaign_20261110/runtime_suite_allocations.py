@@ -4,6 +4,7 @@ import argparse,csv,hashlib,json,time,threading
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from .runtime_validation_metrics import checked,reference,register,require,write,validate_row
 from .training_diversity import observe_ticket_jobs,_terminal_jobs
+from .runtime_suite_paths import all_rows, class_rows, paths
 
 
 def immutable(directory,value):
@@ -73,9 +74,11 @@ def observe(root,run_dir,*,row_paths=None,central=None,summary_path=None):
     root=Path(root).resolve();run_dir=Path(run_dir);start=time.time();rows=[];errors=[];all_jobs={}
     central_path=root/'validation/controller.json'
     if central is None:central=json.loads(central_path.read_text()).get('gates',{}) if central_path.exists() else {}
-    for p in (sorted((run_dir/'rows').glob('*.json')) if row_paths is None else row_paths):
+    initial_paths=sorted((run_dir/'rows').glob('*.json')) if row_paths is None else row_paths
+    selected_paths=[p for initial in initial_paths for p in (class_rows(root,run_dir,initial) if initial.parent.name=='rows' else [initial])]
+    for p in selected_paths:
         try:
-            row=json.loads(p.read_text());validate_row(row);register(p)
+            row=json.loads(p.read_text());validate_row(row);register(p);locations=paths(run_dir,p)
             rpath=root/'dispatch/receipts'/(row['dispatch_token']+'.json')
             if not rpath.exists():continue
             receipt=json.loads(rpath.read_text())
@@ -90,7 +93,7 @@ def observe(root,run_dir,*,row_paths=None,central=None,summary_path=None):
                 value['records'].append({'job_id':str(oa['jobid']),'job_dir':oa['job_dir'],'backend':'cluster','stage':'generation_collection','submission_ref':old_ref,'never_started':True})
             entries=[];c=central.get(jid)
             if c:entries.append(c)
-            member_path=run_dir/'member_replays'/p.name
+            member_path=locations['members']
             if member_path.exists():
                 state=json.loads(member_path.read_text());require(state['row']==reference(p),'member owner row differs');entries.extend(state.get('members',{}).values())
             gates={};pending=[]
@@ -116,7 +119,7 @@ def observe(root,run_dir,*,row_paths=None,central=None,summary_path=None):
             if 'gate' not in value and value['member_gates']:value['gate']=value['member_gates'][0]
             jobs=[{'job_id':j['job_id'],'backend':j['backend'],'stage':'collection' if j['stage']=='generation_collection' else 'replay'} for j in value['records']]
             for j in jobs:all_jobs[(j['backend'],j['job_id'],j['stage'])]=j
-            target=run_dir/'allocations'/p.name;prior=json.loads(target.read_text()) if target.exists() else {}
+            target=locations['allocation'];prior=json.loads(target.read_text()) if target.exists() else {}
             if prior.get('terminal_sealed') and all(prior.get(k)==value.get(k) for k in ('row','allocation','dispatch_receipt','records','member_gates','gate')):
                 rows.append((target,None,None));continue
             rows.append((target,value,jobs))
@@ -152,7 +155,7 @@ def observe(root,run_dir,*,row_paths=None,central=None,summary_path=None):
             all_terminal=set()
             # Gate failures remain terminal evidence but never pass member_gates.
             central_entry=central.get(str(value['allocation']['jobid']),{})
-            statepath=run_dir/'member_replays'/target.name
+            statepath=paths(run_dir,value['row']['path'])['members']
             entries=[central_entry]+(list(json.loads(statepath.read_text()).get('members',{}).values()) if statepath.exists() else [])
             for e in entries:
                 gp=Path(e.get('output','/nonexistent'))/'gate.json'

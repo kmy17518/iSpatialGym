@@ -9,6 +9,7 @@ from .runtime_validation_metrics import reference,require,write,validate_row
 from .runtime_suite_allocations import immutable,allocation,follow_receipt
 from .production_gate import check_job
 from .storage import atomic_directory_lock
+from .runtime_suite_paths import all_rows, paths
 
 
 def successful_members(source,row):
@@ -51,7 +52,7 @@ def cycle(root,run_dir,helper):
     errors=[];submitted=[];observed=None;resources=None
     central_path=root/'validation/controller.json'
     central=json.loads(central_path.read_text()).get('gates',{}) if central_path.exists() else {}
-    for rowpath in sorted((run_dir/'rows').glob('*.json')):
+    for rowpath in all_rows(root,run_dir):
         try:
             row=json.loads(rowpath.read_text());validate_row(row)
             if row['camera_exempt']:continue
@@ -63,7 +64,7 @@ def cycle(root,run_dir,helper):
             if not (source/'sampling.done').exists():continue
             first,members=successful_members(source,row)
             if not members:continue
-            target=run_dir/'member_replays'/rowpath.name;state=json.loads(target.read_text()) if target.exists() else {'row':reference(rowpath),'source_allocation':a,'members':{}}
+            target=paths(run_dir,rowpath)['members'];state=json.loads(target.read_text()) if target.exists() else {'row':reference(rowpath),'source_allocation':a,'members':{}}
             require(state['row']==reference(rowpath) and state['source_allocation']==a,'suite replay source ownership changed')
             state['canonical_first_member']=first
             for member in members:
