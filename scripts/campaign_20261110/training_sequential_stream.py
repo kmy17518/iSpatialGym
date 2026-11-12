@@ -277,15 +277,28 @@ def run_cycle(root,configuration,state):
         except Exception as error:state['matrix_error']=f'{type(error).__name__}: {error}'
     if state.get('matrix_request'):
         manifest=checked(root,state['matrix_request']);matrix={'schema':'isg-sequential-augmentation-verification-input-v1','physics':{},'rendering':{},'execution':{'physics':{},'rendering':{}}};progress=[]
-        for row in manifest['records']:
+        records=manifest['records'];verification_directory=batch/'sequential_verification_r1'
+        if configuration.get('physics_followup'):
+            followup=checked(root,configuration['physics_followup'])
+            require(followup['canaries']==manifest['canaries']and len(followup['records'])==len(PHYSICS)and
+                    {r['control']for r in followup['records']}==set(PHYSICS)and
+                    all(r['stage']=='physics'and checked(root,r['request']).get('sequential_anchor_rebase')is True
+                        for r in followup['records']),'prospective physics followup identity differs')
+            records=[r for r in records if r['stage']=='rendering']+followup['records']
+            verification_directory=Path(configuration['physics_followup']['path']).parent
+            matrix['prior_cold_references']={name:{'probe':ref(batch/'sequential_verification_r1/physics'/name/'output/probe.json'),
+                'execution':ref(batch/'sequential_verification_r1/physics'/name/'execution_observation.json')}
+                for name in('fresh_A','fresh_B')}
+            state['physics_followup']=configuration['physics_followup']
+        for row in records:
             directory=Path(row['request']['path']).parent;probe=Path(row['output'])/'probe.json';execution=directory/'execution_observation.json'
             progress.append({'control':row['control'],'stage':row['stage'],'probe':ref(probe)if probe.exists()else None,'execution':ref(execution)if execution.exists()else None})
             if probe.exists()and execution.exists():matrix[row['stage']][row['control']]=ref(probe);matrix['execution'][row['stage']][row['control']]=ref(execution)
         state['matrix_progress']=progress
         if len(matrix['physics'])==len(PHYSICS)and len(matrix['rendering'])==len(RENDER)and not state.get('verification'):
             try:
-                inp=immutable(batch/'sequential_verification_r1/verification_inputs.json',matrix)
-                state['verification']=immutable(batch/'sequential_verification_r1/verification.json',verify(root,inp,started))
+                inp=immutable(verification_directory/'verification_inputs.json',matrix)
+                state['verification']=immutable(verification_directory/'verification.json',verify(root,inp,started));state.pop('verification_error',None)
             except Exception as error:state['verification_error']=f'{type(error).__name__}: {error}'
     if state.get('renderer_cleanup_request') and not state.get('renderer_cleanup_verification'):
         try:

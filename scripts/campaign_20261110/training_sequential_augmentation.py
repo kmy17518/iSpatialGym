@@ -104,6 +104,37 @@ def observed_augmentation_change(root, records, first, second):
             'independent_reference_state_sha256':[digest(first),digest(second)]}
 
 
+
+def verify_original_cold(root, item, source_ref, current, started_at):
+    """A prospective warm repair must also preserve independently executed cold physics."""
+    probe=checked(root,item['probe']);verify_probe_execution(root,item['probe'],item['execution'])
+    checked(root,probe['request']);request,records=inputs(root,probe['request']['path'])
+    require(not request.get('sequential_anchor_rebase')and not request.get('physical_candidate')and
+            request.get('diagnostic_control')in('FRESH_A','FRESH_B')and len(probe['entries'])==1 and
+            probe['kind']=='physics_action_open_loop','original cold baseline is not independent unchanged physics')
+    runtime=probe['probe_runtime']
+    require(file_digest(runtime['path'])==runtime['sha256']==request['probe_runtime_sha256']and
+            verify_runtime_compatibility(root,request,records,Path(runtime['path']).parent)==probe['runtime_compatibility'],
+            'original cold runtime differs')
+    entry=probe['entries'][0];require(entry['canary_review']==source_ref and entry['returncode']==0,'cold source differs')
+    source=validated_canary(root,source_ref,started_at);report=checked(root,entry['report']);report_passed(report,'replay')
+    require(report['instance_id']==source['instance_id']and Path(report['replay']).resolve()==
+            Path(source['export_record']['artifacts']['demo']['path']).resolve()and
+            not report['loader'].get('reused_world'),'original cold input or build differs')
+    boundaries=[_observation(report,key)for key in('native_reset_boundary_observation',
+        'native_reset_step_completed_observation','native_final_pre_action_observation')]
+    step=report['loader']['campaign_restoration']['next_native_control_step_observation']
+    require(step['native_control_calls_observed']==1 and step['physics_steps_added']==0,'cold first action missing')
+    for end in('before','after'):
+        require(step[end]['loaded_state_sha256']==digest(step[end]['loaded_state']),'cold action state changed')
+    same_loaded_state(boundaries[-1]['loaded_state'],step['before']['loaded_state'])
+    process=one_world(probe,[boundaries[-1]])
+    require(process!=current['boundaries'][-1]['process_session'],'cold baseline reused current process')
+    compare_physics_reference({'boundaries':boundaries,'step':step},current)
+    return {'status':'original_cold_boundaries_and_first_action_preserved','probe':item['probe'],
+            'execution':item['execution'],'report':entry['report']}
+
+
 def verify(root, reference, started_at):
     return _verify_stages(root,reference,started_at,(('physics',PHYSICS),('rendering',RENDER)))
 
@@ -123,15 +154,16 @@ def _verify_stages(root, reference, started_at, stages):
                 for stage,specs in stages),
             'complete independent-reference/success/failure/interruption matrix required')
     sources = {}; source_refs = None; runtimes = {}; artifacts = set(); results = {}; all_processes = set()
-    augmentation_changes = {}
+    augmentation_changes = {}; cold_compatibility={}
     for stage, specifications in stages:
-        cases = {}; stage_results = {}
+        cases = {}; stage_results = {}; prospective_anchor=False
         expected_kind = 'physics_action_open_loop' if stage == 'physics' else 'kinematic_observation_rendering'
         for name, (control, order) in specifications.items():
             probe_ref = document[stage][name]; probe = checked(root, probe_ref)
             execution=verify_probe_execution(root,probe_ref,document['execution'][stage][name])
             request_ref = probe['request']; checked(root, request_ref)
             request, records = inputs(root, request_ref['path'])
+            prospective_anchor=prospective_anchor or request.get('sequential_anchor_rebase')is True
             require(request.get('sequential_augmentation') is True and not request.get('physical_candidate') and
                     request.get('diagnostic_control') == control and probe['kind'] == expected_kind and
                     len(probe['entries']) == len(order), 'sequential reference/control identity differs')
@@ -214,10 +246,17 @@ def _verify_stages(root, reference, started_at, stages):
             return (entry['boundaries'][-1] if stage == 'physics' else entry['observation'])['loaded_state']
         augmentation_changes[stage]=observed_augmentation_change(root,
             [sources[digest(ref)]['export_record'] for ref in source_refs],loaded('fresh_A'),loaded('fresh_B'))
+        if prospective_anchor:
+            require(stage=='physics'and set(document.get('prior_cold_references',{}))=={'fresh_A','fresh_B'},
+                    'prospective warm repair requires original cold A and B evidence')
+            for name,member in(('fresh_A',0),('fresh_B',1)):
+                cold_compatibility[name]=verify_original_cold(root,document['prior_cold_references'][name],
+                    source_refs[member],cases[name][0],started_at)
         results[stage] = stage_results
     return {'schema': 'isg-sequential-augmentation-verification-v1'if full else'isg-sequential-rendering-verification-v1', 'input': reference,
             'status': 'verified', 'runtimes': runtimes, 'sources': source_refs, 'stages': results,
             'verified_stages':[stage for stage,_ in stages],'full_matrix_verified':full,
+            'original_cold_compatibility':cold_compatibility,
             'independent_processes': len(all_processes), 'observed_augmentation_changes':augmentation_changes,
             'checks': ['changed lighting and fixed-actor parking',
                 'one actual Environment construction per process', 'exact native task/model/scale/room/assets',

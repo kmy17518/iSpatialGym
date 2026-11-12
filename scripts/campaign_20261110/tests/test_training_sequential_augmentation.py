@@ -214,3 +214,37 @@ def test_rendering_stage_does_not_certify_missing_physics_or_cleanup(tmp_path,mo
 def test_rendering_stage_retains_exact_state_and_episode_checks(tmp_path,monkeypatch,fault):
     m,reference=rendering_stage_fixture(tmp_path,monkeypatch,fault)
     with pytest.raises(ContractError):m.verify_rendering(tmp_path,reference,0)
+
+@pytest.mark.parametrize('fault',[None,'changed_mass','same_process','changed_source','candidate_baseline'])
+def test_prospective_anchor_preserves_original_cold_boundaries(tmp_path,monkeypatch,fault):
+    import json
+    from scripts.campaign_20261110 import training_sequential_augmentation as m
+    from scripts.campaign_20261110.contracts import file_digest
+    def put(name,value):
+        p=tmp_path/name;p.write_text(json.dumps(value));return {'path':str(p),'sha256':file_digest(p)}
+    stamp=tmp_path/'.snapshot_commit';stamp.write_text('original')
+    review=put('review.json',{});source={'instance_id':'A','export_record':{'artifacts':{'demo':{'path':str(tmp_path/'demo')}}}}
+    request={'diagnostic_control':'FRESH_A','probe_runtime_sha256':file_digest(stamp)}
+    if fault=='candidate_baseline':request['sequential_anchor_rebase']=True
+    bounds=[observed(i)for i in range(3)]
+    for item in bounds:item.update(scheduler_job_id='123',simulator_module='omnigibson.sim')
+    step={'before':deepcopy(bounds[-1]),'after':observed(4),'native_control_calls_observed':1,'physics_steps_added':0}
+    current={'boundaries':deepcopy(bounds),'step':deepcopy(step)}
+    for value in current['boundaries']:value['process_session']='new_process'
+    if fault=='same_process':current['boundaries'][-1]['process_session']='native:1'
+    if fault=='changed_mass':
+        current['boundaries'][0]['native_dynamics_context']['dynamic_roots']['target']['mass']=3.
+        current['boundaries'][0]['native_dynamics_context_sha256']=digest(current['boundaries'][0]['native_dynamics_context'])
+    restoration={name:{'observation':value}for name,value in zip(('native_reset_boundary_observation','native_reset_step_completed_observation','native_final_pre_action_observation'),bounds)}
+    restoration['next_native_control_step_observation']=step
+    report={'instance_id':'A','replay':str(tmp_path/'demo'),'loader':{'reused_world':False,'campaign_restoration':restoration}}
+    probe={'request':put('request.json',request),'kind':'physics_action_open_loop','probe_runtime':{'path':str(stamp),'sha256':file_digest(stamp)},'runtime_compatibility':{},
+      'world_construction':{'attempted':1,'completed':1,'method':'omnigibson.Environment'},
+      'entries':[{'canary_review':review if fault!='changed_source'else{'wrong':True},'returncode':0,'report':put('report.json',report)}]}
+    monkeypatch.setattr(m,'inputs',lambda *a:(request,[]));monkeypatch.setattr(m,'verify_runtime_compatibility',lambda *a:{})
+    monkeypatch.setattr(m,'verify_probe_execution',lambda *a:{});monkeypatch.setattr(m,'validated_canary',lambda *a:source)
+    monkeypatch.setattr(m,'report_passed',lambda *a:None)
+    item={'probe':put('probe.json',probe),'execution':put('execution.json',{})}
+    if fault:
+        with pytest.raises(ContractError):m.verify_original_cold(tmp_path,item,review,current,0)
+    else:assert m.verify_original_cold(tmp_path,item,review,current,0)['status']=='original_cold_boundaries_and_first_action_preserved'
