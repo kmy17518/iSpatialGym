@@ -2,6 +2,7 @@ import pytest
 from scripts.campaign_20261110 import training_pipeline_status as status
 from scripts.campaign_20261110.contracts import write_json_atomic
 import copy
+from pathlib import Path
 
 
 def request(root, name, start):
@@ -325,3 +326,59 @@ def test_physical_control_retains_observed_success_without_release(tmp_path):
     assert value['release_eligible'] is False and value['benchmark_credit']==0
     report.write_text('{}')
     with pytest.raises(ValueError,match='report changed'):status.diagnostic_control_observation(tmp_path,request)
+
+
+def test_historical_policy_resolves_original_content_addressed_bytes(tmp_path):
+    import hashlib
+    payload=b'{"mode":"historical_canary","unusual_whitespace": true}\n'
+    sha=hashlib.sha256(payload).hexdigest()
+    path=tmp_path/'infra/training_production_gate/policy_snapshots'/(sha+'.json')
+    path.parent.mkdir(parents=True);path.write_bytes(payload)
+    write_json_atomic(tmp_path/'controllers/training_production_gate.json',{'mode':'different_current_policy'})
+    reference,policy=status.policy_snapshot(tmp_path,sha)
+    assert reference=={'path':str(path),'sha256':sha}
+    assert policy['mode']=='historical_canary'
+    path.write_text('{}')
+    with pytest.raises(ValueError,match='exact historical gate policy bytes unavailable'):
+        status.policy_snapshot(tmp_path,sha)
+
+
+def reconciled_member_fixture(tmp_path):
+    folder,row=request(tmp_path,'member',100)
+    command={**row,'slurm_job_id':'321','request_sha256':status.ref(folder/'requests.json')['sha256']}
+    write_json_atomic(folder/'native/command.json',command)
+    dispatch=folder/'native_dispatch_r2'
+    for name in ('original','scheduler','preflight'):write_json_atomic(dispatch/(name+'.json'),{'preserved':name})
+    current={**row,'request':status.ref(folder/'requests.json'),'returncode':0,'job_id':'321',
+        'status':'submitted_reconciled','original_receipt':status.ref(dispatch/'original.json'),
+        'scheduler_proof':status.ref(dispatch/'scheduler.json'),'preflight':status.ref(dispatch/'preflight.json'),
+        'native_execution_proof':status.ref(folder/'native/command.json')}
+    path=dispatch/'submission_current_0.json';write_json_atomic(path,current)
+    return folder,row,path,current
+
+
+def test_reconciled_member_receipt_keeps_actual_execution_and_no_success_inference(tmp_path):
+    folder,row,path,current=reconciled_member_fixture(tmp_path)
+    value=status.observe(tmp_path)
+    assert not value['errors']
+    got=value['records'][0]
+    assert got['native_submission']['job_id']=='321' and got['status']=='native_submitted'
+    assert got['native'] is None and got['native_submission']['scheduler_state']=='unavailable'
+    assert got['native_submission_reconciliation']==status.ref(path)
+    assert status.read(folder/'native_dispatch_r2/original.json')=={'preserved':'original'}
+
+
+@pytest.mark.parametrize('field,value',[('job_id','different'),('start',101),('config_sha256','changed')])
+def test_reconciled_receipt_cannot_relabel_output_identity(tmp_path,field,value):
+    folder,row,path,current=reconciled_member_fixture(tmp_path)
+    current[field]=value;write_json_atomic(path,current)
+    got=status.observe(tmp_path)
+    assert got['errors'] and got['records'][0]['status']=='evidence_identity_failed'
+
+
+def test_reconciled_receipt_requires_all_original_proofs_and_exclusive_member(tmp_path):
+    folder,row,path,current=reconciled_member_fixture(tmp_path)
+    second=folder/'native_dispatch_r3/submission_current_0.json';write_json_atomic(second,current)
+    assert 'ambiguous reconciled' in status.observe(tmp_path)['errors'][0]['error']
+    second.unlink();Path(current['scheduler_proof']['path']).write_text('{}')
+    assert 'evidence changed' in status.observe(tmp_path)['errors'][0]['error']

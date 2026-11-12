@@ -54,6 +54,36 @@ def ref(path): return {'path': str(path), 'sha256': file_digest(path)}
 def timestamp(path): return datetime.fromtimestamp(Path(path).stat().st_mtime, timezone.utc).isoformat()
 
 
+
+def reconciled_member_submission(root, batch, request, request_refs):
+    """Join additive per-member receipts only through exact execution evidence."""
+    root=Path(root).resolve();matches=[]
+    for path in sorted(Path(batch).glob('native_dispatch*/submission_current_*.json')):
+        value=read(path)
+        if value.get('candidate_id')!=request['candidate_id']:continue
+        require(value.get('request') in request_refs and
+                all(value.get(k)==request[k] for k in ('start','count','config_sha256','native_runtime')) and
+                value.get('returncode')==0 and value.get('status')=='submitted_reconciled',
+                'reconciled native member identity differs')
+        checked={}
+        for name in ('original_receipt','native_execution_proof','scheduler_proof','preflight'):
+            reference=value[name];artifact=Path(reference['path']).resolve()
+            require(artifact.is_relative_to(root) and artifact.is_file() and
+                    file_digest(artifact)==reference['sha256'], 'reconciled native evidence changed: '+name)
+            checked[name]=artifact
+        require(checked['native_execution_proof']==Path(request['output']).resolve()/'command.json',
+                'reconciled native output identity differs')
+        command=read(checked['native_execution_proof'])
+        require(str(command.get('slurm_job_id'))==str(value['job_id']) and
+                command.get('candidate_id')==request['candidate_id'] and
+                command.get('config_sha256')==request['config_sha256'] and
+                command.get('request_sha256')==value['request']['sha256'],
+                'reconciled native execution job differs')
+        matches.append(path)
+    require(len(matches)<=1,'ambiguous reconciled native member submissions')
+    return matches[0] if matches else None
+
+
 def sequence_stage_references(root, sequence_path, stage):
     """Check immutable stage identities, including explicit append-journal repair.
 
@@ -178,7 +208,11 @@ def policy_snapshot(root, expected):
         value=read(cached['path'])
         require(_stamp(cached['path'])==cached['stamp'],'cached policy changed during identity check')
         return cached['reference'],value
-    paths=[root/'controllers/training_production_gate.json']
+    # The content-addressed store contains original bytes from authorization
+    # changes as well as observation-only evaluations. Exact digest checks apply
+    # to both stores; this lookup never grants current authorization.
+    paths=[root/'infra/training_production_gate/policy_snapshots'/(expected+'.json'),
+           root/'controllers/training_production_gate.json']
     paths.extend(sorted((root/'infra/training_production_gate/current_evaluations_r1').glob('*_previous_policy.json')))
     for path in paths:
         if not path.is_file():continue
@@ -511,6 +545,11 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
                         row['native_submission_pointer'] = ref(submitted_pointer)
                         if submitted_path.exists(): row['original_native_submission'] = ref(submitted_path)
                         submitted_path = selected
+                    reconciled = reconciled_member_submission(root,path.parent,request,(current_request,original_request))
+                    if reconciled is not None:
+                        if submitted_path.exists(): row['original_native_submission'] = ref(submitted_path)
+                        submitted_path = reconciled
+                        row['native_submission_reconciliation'] = ref(reconciled)
                     if submitted_path.exists():
                         submitted = read(submitted_path)
                         if 'jobs' in submitted:
