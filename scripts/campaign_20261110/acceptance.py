@@ -80,7 +80,7 @@ def replay_report_path(gate, gate_path, instance_id, *, root, started_at):
     return checked(gate_path.parent/'replay'/instance_id/'meta.json')
 
 
-def audit_job(job, gate_path, *, root, started_at, group_closed=False, group_id=None):
+def audit_job(job, gate_path, *, root, started_at, group_closed=False, group_id=None, member_ids=None):
     root, job = Path(root).resolve(), Path(job).resolve()
     require(job.is_relative_to(root / "out"), "job outside campaign output")
     gate_path = artifact(gate_path, root, started_at)
@@ -169,6 +169,11 @@ def audit_job(job, gate_path, *, root, started_at, group_closed=False, group_id=
                                    perturbations, block["created_at"], True))
         artifacts.append(record)
     require(members, "no successfully demonstrated goal-group members")
+    if member_ids is not None:
+        require(isinstance(member_ids,list) and member_ids and len(member_ids)==len(set(member_ids)) and
+                set(member_ids) <= {m.instance_id for m in members}, 'selected members are not distinct demonstrated members')
+        members=[m for m in members if m.instance_id in member_ids]
+        artifacts=[m for m in artifacts if m['instance_id'] in member_ids]
     allocation = None
     if group_closed:
         if campaign["split"] in ("train", "eval_standard"):
@@ -187,6 +192,8 @@ def audit_job(job, gate_path, *, root, started_at, group_closed=False, group_id=
             "pending": "quota claim and final dataset export" if allocation else "group completion"}
     if duplicates:
         result["excluded_duplicate_members"] = duplicates
+    if member_ids is not None:
+        result['selected_member_ids']=sorted(member_ids)
     return result
 
 

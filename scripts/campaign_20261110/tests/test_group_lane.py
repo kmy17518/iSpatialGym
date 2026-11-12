@@ -45,6 +45,37 @@ def claim(root, f, review, reserved=None, plan=None):
                             training_room_plan=room_plan() if plan is None else plan)
 
 
+def regression(root, f, review):
+    reserved=reservations()
+    hashes={'schema':'campaign-reserved-asset-hashes-v1','reserved_model_keys':[],
+            'ready_assets':{},'reserved_asset_hashes':[],'pending_unready_model_keys':[]}
+    return lane.claim_group(review,f.template,reserved,reservation_hashes=hashes,root=root,
+        started_at=f.since,state_path=root/'dataset/quotas.sqlite3',training_room_plan=room_plan(),validation_only=True)
+
+
+def test_full_strict_regression_never_creates_or_changes_quota_database(tmp_path):
+    f,review=candidate(tmp_path,0)
+    result=regression(tmp_path,f,review)
+    assert result['validation_passed'] and result['quota_consumed']==0 and result['accepted']=={}
+    assert not (tmp_path/'dataset').exists()
+    claim(tmp_path,f,review)
+    path=tmp_path/'dataset/quotas.sqlite3';before=path.read_bytes()
+    f2,review2=candidate(tmp_path,1)
+    assert regression(tmp_path,f2,review2)['validation_passed']
+    assert path.read_bytes()==before
+    Path(review2['members'][0]['demo']).write_bytes(b'changed')
+    with pytest.raises(c.ContractError,match='demo content'):
+        regression(tmp_path,f2,review2)
+    assert path.read_bytes()==before
+
+
+def test_regression_rejects_singleton_and_invalid_bucket(tmp_path):
+    f=fixture(tmp_path,starts=(1,))
+    with pytest.raises(c.ContractError):regression(tmp_path,f,audit(f))
+    f2,review=candidate(tmp_path,1,magnitude=.31)
+    with pytest.raises(c.ContractError,match='outside task buckets'):regression(tmp_path,f2,review)
+
+
 def test_strict_eval_bucket_caps_with_train_siblings_and_idempotent_export(tmp_path):
     for index in range(4):
         f, review = candidate(tmp_path, index)

@@ -235,14 +235,15 @@ def _allocate(rows, *, split, q, eval_counts, train_count, train_capacity=None):
     return result
 
 
-def claim_group(review, template, reservations, *, reservation_hashes, root, started_at, state_path, training_room_plan=None):
+def claim_group(review, template, reservations, *, reservation_hashes, root, started_at, state_path, training_room_plan=None,
+                validation_only=False):
     root, state_path = Path(root).resolve(), Path(state_path).resolve()
     require(state_path.is_relative_to(root), "quota database outside campaign")
     require(review.get("group_closed") is True, "cannot allocate an open goal group")
     # Re-read the actual reports, source hashes and gate rather than trusting a
     # previously generated review file or a controller's claimed success.
     fresh = audit_job(review["source_job"], review["gate"]["path"], root=root, started_at=started_at,
-                      group_closed=True, group_id=review["group_id"])
+                      group_closed=True, group_id=review["group_id"],member_ids=review.get('selected_member_ids'))
     require(digest(fresh) == digest(review), "release evidence changed after review")
     require(review["validation_key"]["template_sha256"] == template.fingerprint, "release contract differs from validated template")
     from scripts.campaign_20261110.current_eligibility import pending_instance_blockers
@@ -280,6 +281,41 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                              "perturbations": canonical_pool_perturbations(template, perturb) if pool else asdict(perturb)}))
         rows.append({**member, "bucket": bucket, "sampling_split": template.split})
     require(len(set(goals)) == 1, "goal group changes goal/base/template/perturbations")
+    if validation_only:
+        require(template.split == 'eval_standard' and 2 <= len(rows) <= 3 and
+                list(review['proposed_allocation'].values()).count('eval_standard') == 1 and
+                list(review['proposed_allocation'].values()).count('train') >= 1,
+                'regression validation requires a complete standard group and sibling')
+        require_active_policy(root, reservations)
+        # Read the same canonical template and cross-split asset constraints as
+        # the claim path, without creating or replacing any dataset database.
+        if state_path.exists():
+            import shutil
+            import tempfile
+            from scripts.campaign_20261110.current_eligibility import install_quota_view
+            with atomic_directory_lock(state_path.with_suffix('.lockdir')):
+                with tempfile.TemporaryDirectory(prefix='isg-suite-history-', dir='/tmp') as directory:
+                    local = Path(directory)/'history.sqlite'
+                    shutil.copyfile(state_path, local)
+                    with sqlite3.connect(f'file:{local}?mode=ro', uri=True) as db:
+                        install_quota_view(root, db)
+                        pins = {v[0] for v in db.execute('SELECT DISTINCT template FROM current_members WHERE split=? AND task=? AND class_id=?',
+                            (template.split,template.task,template.class_id))}
+                        require(not pins or pins == {conceptual}, 'evaluation class changed its pinned conceptual template')
+                        for obj in audit_objects(template,root=root):
+                            if obj.semantic_kind in ('wall','floor'): continue
+                            for split,model,sha,category,kind in db.execute('SELECT split,model,sha,category,kind FROM assets WHERE model=? OR sha=? OR category=?',
+                                    (obj.model_key,obj.asset_sha256,obj.category)):
+                                if split in ('train','eval_standard'): continue
+                                require(model != obj.model_key and sha != obj.asset_sha256, 'asset model/hash leaked across held-out splits')
+                                if split == 'eval_category':
+                                    require(category != obj.category or obj.semantic_kind in ('tray','board') or kind in ('tray','board'),
+                                            'asset category leaked across held-out splits')
+        return {'schema': 'isg-group-regression-audit-v1', 'accepted': {},
+                'validation_passed': True, 'quota_consumed': 0,
+                'members': rows, 'canonical_goal_sha256': goals[0],
+                'conceptual_template_sha256': conceptual, 'physical_template_sha256': physical_template(template),
+                'scope': 'Full fresh evidence, distinct members, shared goal, strict bucket, ready reservations and room policy; no quota transaction.'}
     production = None
     if template.split == 'train':
         from scripts.campaign_20261110.training_release import acceptance_proof

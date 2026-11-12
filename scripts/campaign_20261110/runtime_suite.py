@@ -90,7 +90,7 @@ def current_training_ready(root):
         for entry in manifest['classes']:
             path = base/'acceptance'/(entry['class_id']+'.json')
             result = verify_result(root, {'path':str(path), 'sha256':file_digest(path)})
-            require(result['run_id'] == release['run_id'] and result['validation_passed'] is True,
+            require(result['run_id'] == release['run_id'] and result['class_id'] == entry['class_id'] and result['validation_passed'] is True,
                     'current-runtime class not validated')
         return True
     except (OSError, ValueError, KeyError, TypeError, ImportError):

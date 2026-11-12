@@ -67,6 +67,15 @@ def test_release_requires_verified_evidence_and_distinct_fresh_sibling(tmp_path)
     assert audit(f, closed=False)["proposed_allocation"] is None
 
 
+def test_explicit_distinct_member_subset_preserves_strict_review(tmp_path):
+    f=fixture(tmp_path,starts=(1,2,3))
+    value=a.audit_job(f.job,f.gate,root=f.root,started_at=f.since,group_closed=True,member_ids=['fresh_0','fresh_2'])
+    assert value['selected_member_ids']==['fresh_0','fresh_2']
+    assert value['proposed_allocation']=={'fresh_0':'eval_standard','fresh_2':'train'}
+    with pytest.raises(c.ContractError,match='not distinct'):
+        a.audit_job(f.job,f.gate,root=f.root,started_at=f.since,group_closed=True,member_ids=['fresh_0','missing'])
+
+
 @pytest.mark.parametrize("split,expected", [("eval_standard", "train"), ("eval_model", "eval_model"), ("eval_category", "eval_category")])
 def test_singletons_do_not_leak_heldout_assets_into_train(tmp_path, split, expected):
     f = fixture(tmp_path, split=split, starts=(1,))
