@@ -610,6 +610,7 @@ def observe(root, *, now=None, publish=None, previous_batches=(), batch_verifier
             result['errors'].append({'path': str(path), 'error': f'{type(error).__name__}: {error}'})
     controls=set(base.glob('*/restoration_control*/request.json'))
     controls.update(base.glob('*/batch_restoration*/control_aa/request.json'))
+    controls.update(base.glob('*/restoration_pristine*/request.json'))
     controls.update(base.glob('*/restoration_pristine*/*/request.json'))
     for request in sorted(controls):
         try:
