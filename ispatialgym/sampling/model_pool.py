@@ -9,11 +9,13 @@ import copy
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import time
 
 ENV = 'ISPATIALGYM_CAMPAIGN_MODEL_POOL_MANIFEST'
 SCHEMA = 'isg-native-model-pool-v1'
+SELECTED_MODE = 'selected_training_configuration'
 
 
 def require(condition, message):
@@ -51,11 +53,108 @@ def check_policy(value):
                 or row.get('semantic_kind') in ('tray', 'board'), 'held-out category in pool')
 
 
-def read_manifest(path, *, scene, rooms, fixed_bindings):
+def file_reference(path):
+    path = Path(path).resolve()
+    return {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def native_runtime_reference():
+    return file_reference(Path(__file__).resolve().parents[2]/'.snapshot_commit')
+
+
+def authorize_execution(path, *, environment, start, count):
+    """Check the current gate once at native entry, never during structural audits.
+
+    The selected manifest cannot grant production authority. Its exact bytes
+    are bound either by a bounded canary authorization or by the fully checked
+    applicable-pool release and diversity ticket returned by the current gate.
+    """
+    path = Path(path).resolve(); value = json.loads(path.read_text())
+    if value.get('mode') != SELECTED_MODE:
+        return None
+    require(type(start) is int and start > 0 and type(count) is int and count > 0,
+            'selected execution needs an explicit native index range')
+    root = Path(value['campaign_root']).resolve()
+    require(path.is_relative_to(root), 'selected manifest outside campaign')
+    config_path = Path(environment.get('ISPATIALGYM_CAMPAIGN_CONFIG', '')).resolve()
+    require(config_path.is_relative_to(root) and config_path.is_file(), 'selected configuration is unavailable')
+    config = json.loads(config_path.read_text()); config_ref = file_reference(config_path)
+    require(config.get('campaign_id') == value.get('campaign_id') == 'campaign_20261110'
+            and config.get('purpose') == 'training_production', 'selected execution needs the exact production configuration')
+    runtime = native_runtime_reference()
+    require(config['validation_key']['code_sha256'] == runtime['sha256'], 'selected native runtime differs')
+    from scripts.campaign_20261110.production_gate import check_environment
+    decision = check_environment(root, environment, kind='collection', start=start, count=count)
+    require(decision.get('allowed') is True and decision.get('config_sha256') == config_ref['sha256'],
+            'current selected execution gate denied or configuration differs')
+    reference = file_reference(path)
+    if decision.get('category') == 'validation_canary':
+        registered = decision['authorization']
+        authorization_path = Path(registered['authorization_path']).resolve()
+        require(authorization_path.is_relative_to(root) and
+                file_reference(authorization_path)['sha256'] == registered['authorization_sha256'],
+                'selected canary authorization changed')
+        authorization = json.loads(authorization_path.read_text())
+        from scripts.campaign_20261110.training_canary_scope import validate_scope
+        validate_scope(config, authorization)
+        require(authorization.get('config_sha256') == config_ref['sha256']
+                and authorization.get('native_runtime_sha256') == runtime['sha256']
+                and (authorization.get('start'), authorization.get('count')) == (start, count)
+                and authorization.get('pool_manifest') == reference,
+                'selected canary pool, runtime, configuration or range differs')
+    elif decision.get('category') == 'released_training':
+        release = decision['production_release']
+        require(release.get('production_authorization') is True and
+                release.get('applicable_pool', {}).get('pool_manifest') == reference,
+                'selected production pool differs from current exact release')
+    else:
+        raise ValueError('model pool: selected execution has no bounded canary or scoped production authority')
+    return {'schema': 'isg-model-pool-execution-context-v1', 'campaign_id': value['campaign_id'],
+            'manifest': reference, 'configuration': config_ref, 'native_runtime': runtime,
+            'start': start, 'count': count, 'observed_at': time.time(), 'gate': decision}
+
+
+def execution_from_args(path, args, environment):
+    """Bind one actual native CLI range, without guessing default batch sizes."""
+    if not path or json.loads(Path(path).read_text()).get('mode') != SELECTED_MODE:
+        return None
+    require(len(args.variant) == 1 and args.scene and type(args.templates) is int and args.templates == 1
+            and type(args.instances_per_template) is int and args.instances_per_template > 0,
+            'selected execution needs one explicit variant, scene, template and instance bound')
+    return authorize_execution(path, environment=environment, start=args.start_index,
+                               count=args.instances_per_template)
+
+
+def validate_execution_context(value, reference, context):
+    if value.get('mode') != SELECTED_MODE:
+        return
+    require(context and context.get('schema') == 'isg-model-pool-execution-context-v1'
+            and context.get('campaign_id') == value['campaign_id'] and context.get('manifest') == reference,
+            'selected activation needs its exact checked execution context')
+    require(reference == file_reference(reference['path']) and
+            value == json.loads(Path(reference['path']).read_text()), 'selected manifest changed before activation')
+    require(context['configuration'] == file_reference(os.environ.get('ISPATIALGYM_CAMPAIGN_CONFIG', ''))
+            and context['native_runtime'] == native_runtime_reference(), 'selected execution context changed')
+    decision = context['gate']
+    require(decision.get('allowed') is True and decision.get('category') in ('validation_canary', 'released_training')
+            and decision.get('config_sha256') == context['configuration']['sha256'],
+            'selected execution context has no current gate decision')
+    require(type(context.get('start')) is int and context['start'] > 0
+            and type(context.get('count')) is int and context['count'] > 0,
+            'selected execution context range is missing')
+    if decision['category'] == 'validation_canary':
+        registered = decision['authorization']
+        require((registered.get('start'), registered.get('count')) == (context['start'], context['count']),
+                'selected execution context range differs from the gate')
+
+
+def read_manifest(path, *, scene, rooms, fixed_bindings, execution_context=None):
     path = Path(path).resolve(); value = json.loads(path.read_text())
     require(value.get('schema') == SCHEMA and value.get('campaign_id') == 'campaign_20261110', 'wrong schema/campaign')
     require(value.get('benchmark_credit') == 0 and value.get('production_released') is False
-            and value.get('mode') == 'bounded_validation', 'only zero-credit bounded validation is enabled')
+            and (value.get('mode') == 'bounded_validation' or
+                 (value.get('mode') == SELECTED_MODE and value.get('production_authorization') is False)),
+            'pool manifests cannot grant production or benchmark authority')
     require(value.get('scene') == scene and sorted(value.get('rooms', [])) == sorted(rooms or []), 'world scope mismatch')
     require(value.get('fixed_bindings') == fixed_bindings, 'fixed support/partner scope mismatch')
     require(value.get('selected_scope') and value.get('batch_id') and value.get('selection_proof'),
@@ -89,7 +188,10 @@ def read_manifest(path, *, scene, rooms, fixed_bindings):
         count += row['copies']
     require(count <= value['max_objects'], 'selected batch exceeds explicit bound; do not silently truncate')
     check_policy(value)
-    return value, {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    reference = file_reference(path)
+    if execution_context is not None:
+        validate_execution_context(value, reference, execution_context)
+    return value, reference
 
 
 def active_scene(scene, loaded_names, active_names):
@@ -171,8 +273,10 @@ subsequently loaded TRO's per-instance state.
 
 class ModelPool:
     """Exact object leases; the backend performs real physical state changes."""
-    def __init__(self, world, manifest, reference, output):
+    def __init__(self, world, manifest, reference, output, *, execution_context=None):
+        validate_execution_context(manifest, reference, execution_context)
         self.world, self.manifest, self.reference = world, manifest, reference
+        self.execution_context = execution_context
         self.output = Path(output); self.members = {}; self.active = {}; self.events = []
         self.request_names = set(); self.switches = 0
         specs = []
@@ -228,9 +332,13 @@ class ModelPool:
         self.events.append({'event': event, 'observed_at_unix': time.time(), 'loaded': sorted(self.members),
                             'active': dict(self.active), 'parked': sorted(set(self.members) - set(self.active)),
                             'template_switches': self.switches, 'native_observation': observation})
+        if self.execution_context is not None:
+            self.events[-1]['execution_context'] = self.execution_context
         value = {'schema': 'isg-model-pool-execution-v1', 'campaign_id': 'campaign_20261110',
                  'manifest': self.reference, 'benchmark_credit': 0, 'production_released': False,
                  'events': self.events, 'physical_validation_passed': False,
                  'boundary': 'Execution evidence only; native demo, independent replay, rendering and family-path checks remain separate.'}
+        if self.execution_context is not None:
+            value['execution_context'] = self.execution_context
         self.output.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.output.with_suffix('.tmp'); temporary.write_text(json.dumps(value, indent=2)+'\n'); temporary.replace(self.output)

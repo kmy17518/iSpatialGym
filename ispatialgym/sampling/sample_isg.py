@@ -303,6 +303,7 @@ class WorldPool:
         self.n_loads = 0
         self.load_time_s = 0.0
         self.model_pool_key = None
+        self.model_pool_execution_context = None
         self.require_compatible_reuse = False
 
     def get(self, problem: GroundedProblem, scene: str):
@@ -316,12 +317,14 @@ class WorldPool:
         key = world_key(problem, scene, stable)
         removed = list(key[2])
         rooms = list(key[1])
-        from ispatialgym.sampling.model_pool import ENV as POOL_ENV, ModelPool, read_manifest
+        from ispatialgym.sampling.model_pool import ENV as POOL_ENV, ModelPool, read_manifest, validate_execution_context
         pool_path = os.environ.get(POOL_ENV)
         pool_manifest = pool_reference = None
         if pool_path:
             pool_manifest, pool_reference = read_manifest(pool_path, scene=scene, rooms=rooms,
-                                                         fixed_bindings=problem.bindings(scene))
+                                                         fixed_bindings=problem.bindings(scene),
+                                                         execution_context=self.model_pool_execution_context)
+            validate_execution_context(pool_manifest, pool_reference, self.model_pool_execution_context)
         pool_key = pool_reference['sha256'] if pool_reference else None
         cameras = world_cameras_required(getattr(problem, "subtask", None))
         from ispatialgym.sampling import scene_crop as SCROP
@@ -329,6 +332,8 @@ class WorldPool:
         crop_mode, crop_bindings, crop_radius = scene_crop_request(problem, scene)
         wanted_crop = SCROP.request_key(crop_mode, crop_bindings, crop_radius)
         if self.key == key and self.model_pool_key == pool_key and self.world is not None and (getattr(self.world, "cameras", True) or not cameras) and SCROP.covers(self.crop_key, wanted_crop):
+            if self.world.model_pool is not None:
+                self.world.model_pool.execution_context = self.model_pool_execution_context
             self.last_action = "reused"
             log.info("world reused for %s: %s%s (SCENE_CROP of the live world: %s)", problem.variant, world_key_str(key),
                      "" if getattr(self.world, "cameras", True) else " (camera-free)", (self.crop_key or ("full",))[0])
@@ -365,7 +370,8 @@ class WorldPool:
         self.world = SimWorld(scene, rooms, scene_variant=scene_variant, cameras=cameras, usd_camera_model=not cameras, scene_crop=crop)
         if pool_manifest:
             self.world.model_pool = ModelPool(self.world, pool_manifest, pool_reference,
-                os.path.join(self.out_root, 'model_pool', pool_manifest['batch_id']+'.json'))
+                os.path.join(self.out_root, 'model_pool', pool_manifest['batch_id']+'.json'),
+                execution_context=self.model_pool_execution_context)
         self.model_pool_key = pool_key
         self.crop_key = plan.key()
         if not cameras:
@@ -572,6 +578,8 @@ def main(argv=None, shutdown: bool = True, *, existing_pool: Optional[WorldPool]
     configure_logging(args.log_level)
     if args.world_key:
         return print_world_keys(args)
+    from ispatialgym.sampling.model_pool import ENV as POOL_ENV, execution_from_args
+    model_pool_execution_context = execution_from_args(os.environ.get(POOL_ENV), args, os.environ)
     os.makedirs(args.out, exist_ok=True)
     customs_copy = os.path.join(args.out, "task_custom_lists.json")
     if not args.v1_spec and os.path.exists(args.customs):
@@ -582,6 +590,8 @@ def main(argv=None, shutdown: bool = True, *, existing_pool: Optional[WorldPool]
     report = new_run_summary(SAMPLER_VERSION, None if args.v1_spec else args.customs, args.out, vars(args))
     report["variants"] = {}  # per variant: wall time, world action, n_written, error
     pool = existing_pool if existing_pool is not None else WorldPool(args.out)
+    previous_execution_context = pool.model_pool_execution_context
+    pool.model_pool_execution_context = model_pool_execution_context
     previous_reuse_policy = pool.require_compatible_reuse
     pool.require_compatible_reuse = existing_pool is not None
     t_start = time.time()
@@ -605,6 +615,7 @@ def main(argv=None, shutdown: bool = True, *, existing_pool: Optional[WorldPool]
         log.error("traceback", exc_info=True)
         raise
     finally:
+        pool.model_pool_execution_context = previous_execution_context
         pool.require_compatible_reuse = previous_reuse_policy
         report["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         report["wall_time_s"] = round(time.time() - t_start, 2)

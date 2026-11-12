@@ -44,7 +44,7 @@ def parser_preflight(prepared):
     from ispatialgym.sampling.v2.problem import GroundedProblem
     from ispatialgym.sampling.sample_isg import variant_split, world_key, stable_scene_json
     from ispatialgym.sampling import campaign_runtime
-    from ispatialgym.sampling.model_pool import read_manifest
+    from ispatialgym.sampling.model_pool import read_manifest, authorize_execution
     keys = []
     for row, job, env, decision, argv, output in prepared:
         os.environ.update(env)
@@ -53,8 +53,11 @@ def parser_preflight(prepared):
             seed_split=None, scene=job['scene'], room=None, scene_from_split=False), gp)
         require(gp.rooms(job['scene']) == [job['room']], 'native room binding differs')
         campaign_runtime.configuration()
+        execution = authorize_execution(env['ISPATIALGYM_CAMPAIGN_MODEL_POOL_MANIFEST'],
+            environment=env, start=row['start'], count=row['count'])
         manifest, reference = read_manifest(env['ISPATIALGYM_CAMPAIGN_MODEL_POOL_MANIFEST'],
-            scene=job['scene'], rooms=gp.rooms(job['scene']), fixed_bindings=gp.bindings(job['scene']))
+            scene=job['scene'], rooms=gp.rooms(job['scene']), fixed_bindings=gp.bindings(job['scene']),
+            execution_context=execution)
         keys.append({'world_key':world_key(gp, job['scene'], stable_scene_json(job['scene'])),
                      'pool_manifest':reference})
     require(keys[0] == keys[1] == keys[2], 'native world/pool compatibility differs')
