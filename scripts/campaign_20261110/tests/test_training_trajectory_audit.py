@@ -48,3 +48,21 @@ def test_missing_fields_and_nonfinite_measurements_fail_closed():
     with pytest.raises(ContractError,match='inventory'):compare_arrays(a,b)
     b=copy.deepcopy(a);b['joint_velocities'][4,0]=np.nan
     with pytest.raises(ContractError,match='finite'):compare_arrays(a,b)
+
+
+def test_camera_compares_actual_camera_and_robot_motion_without_fabricated_object_pose():
+    a=traces();a['head_camera_pose']=a.pop('object_pose/target');b=copy.deepcopy(a)
+    with pytest.raises(ContractError,match='missing'):compare_arrays(a,b)
+    assert compare_arrays(a,b,camera_task=True)['status']=='matched'
+    b['head_camera_pose'][3,0]+=.003
+    result=compare_arrays(a,b,camera_task=True)
+    assert result['status']=='mismatch'
+    assert result['metrics']['head_camera_pose/position_m']['first_frame_exceeding']==3
+
+
+def test_camera_cannot_omit_head_pose_or_use_looser_robot_thresholds():
+    a=traces()
+    with pytest.raises(ContractError,match='missing'):compare_arrays(a,a,camera_task=True)
+    a['head_camera_pose']=a.pop('object_pose/target');b=copy.deepcopy(a)
+    b['joint_positions'][2,0]=2e-5
+    assert compare_arrays(a,b,camera_task=True)['status']=='mismatch'

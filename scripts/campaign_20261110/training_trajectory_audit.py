@@ -16,7 +16,7 @@ def _metric(delta, tolerance):
             'passed': len(failed) == 0}
 
 
-def compare_arrays(reference, actual, *, prefix=False):
+def compare_arrays(reference, actual, *, prefix=False, camera_task=False):
     """Use existing reset bounds across every recorded frame, without alignment.
 
     A controlled abort may compare its explicitly requested prefix. Ordinary
@@ -26,7 +26,9 @@ def compare_arrays(reference, actual, *, prefix=False):
     require(reference.keys() == actual.keys(), 'trajectory field inventory differs')
     required = {'action', 'joint_positions', 'joint_velocities', 'base_pose',
                 'eef_pose_left', 'eef_pose_right'}
-    require(required <= reference.keys() and any(k.startswith('object_pose/') for k in reference),
+    physical_subject = ('head_camera_pose' in reference if camera_task else
+                        any(k.startswith('object_pose/') for k in reference))
+    require(required <= reference.keys() and physical_subject,
             'required recorded dynamics are missing')
     frames = len(actual['action']); cold_frames = len(reference['action'])
     require(frames > 0 and (frames <= cold_frames if prefix else frames == cold_frames),
@@ -58,6 +60,7 @@ def compare_arrays(reference, actual, *, prefix=False):
     return {'status':'matched' if all(m['passed'] for m in metrics.values()) else 'mismatch',
             'frames_compared':frames, 'reference_frames':cold_frames,
             'controlled_abort_prefix':prefix,'requested_actions_exact':True,'metrics':metrics,
+            'camera_task':camera_task,
             'scope':'Recorded robot joints/velocities and robot/task-object poses at every frame. '
                     'Unrecorded object velocities and untracked scene actors are not inferred.',
             'production_released':False,'benchmark_credit':0}
@@ -77,8 +80,12 @@ def _trajectory(root, report_ref):
         arrays={'action':group['action'][:]}
         for key in ('joint_positions','joint_velocities','base_pose','eef_pose_left','eef_pose_right','head_camera_pose'):
             if key in observations:arrays[key]=observations[key][:]
-        for key in observations['object_pose']:
-            arrays['object_pose/'+key]=observations['object_pose'][key][:]
+        if 'object_pose' in observations:
+            for key in observations['object_pose']:
+                arrays['object_pose/'+key]=observations['object_pose'][key][:]
+        else:
+            require(report.get('task_family') == 'camera_relocalization'
+                    and 'head_camera_pose' in arrays, 'task-object observations missing')
     require(file_digest(path)==reference['sha256'],'trajectory changed during observation')
     return report,identity,arrays,reference
 
@@ -89,6 +96,7 @@ def audit(root, reference_report, reused_report, *, controlled_abort_prefix=Fals
     require(ai==bi,'recorded robot/controller identity differs')
     require(a['instance_id']==b['instance_id'] and a['replay']==b['replay'],
             'replay input differs between cold and reused controls')
+    require(a.get('task_family') == b.get('task_family'), 'trajectory task family differs')
     source=Path(a['replay']).resolve()
     require(source.is_relative_to(Path(root).resolve()),'source action file escapes campaign')
     if controlled_abort_prefix:
@@ -96,7 +104,8 @@ def audit(root, reference_report, reused_report, *, controlled_abort_prefix=Fals
         require(abort.get('injected') is True and abort.get('native_control_calls_completed')==1
                 and abort.get('exception_type') in ('ControlledEpisodeFailure','ControlledEpisodeInterrupt'),
                 'prefix comparison requires the recorded one-step controlled abort')
-    comparison=compare_arrays(aa,ba,prefix=controlled_abort_prefix)
+    comparison=compare_arrays(aa,ba,prefix=controlled_abort_prefix,
+                              camera_task=a.get('task_family') == 'camera_relocalization')
     return {'schema':'isg-cold-reused-recorded-trajectory-audit-v1',
             'reference_report':reference_report,'reused_report':reused_report,
             'reference_trajectory':ar,'reused_trajectory':br,
