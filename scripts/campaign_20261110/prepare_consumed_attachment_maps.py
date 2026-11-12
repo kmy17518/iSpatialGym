@@ -28,7 +28,7 @@ def prepare(root, runtime, graph_path, audit_path, output, *, family='attachment
     ref = lambda p: {'path': str(p), 'sha256': sha(p)}
     read = lambda p: json.loads(Path(p).read_text())
     graph = read(graph_path); audit = read(audit_path)
-    assert family in {'attachment', 'tabletop'}
+    assert family in {'attachment', 'tabletop', 'inside'}
     assert audit['schema'] == ('isg-consumed-attachment-native-reader-v1' if family == 'attachment' else 'isg-consumed-tabletop-native-reader-v1') and not output.exists()
     positives = {}
     for row in audit['rows']:
@@ -52,6 +52,7 @@ def prepare(root, runtime, graph_path, audit_path, output, *, family='attachment
         if family == 'attachment' and not any(c.startswith('configuration_matching-attachment_') for c in classes): continue
         if family == 'tabletop' and not all(c.startswith('inter_object_relation_satisfaction-') and 'large_scale' not in c and
                                           not c.startswith('inter_object_relation_satisfaction-inside_') for c in classes): continue
+        if family == 'inside' and not all(c.startswith('inter_object_relation_satisfaction-inside_') and 'large_scale' not in c for c in classes): continue
         if family == 'attachment' and dep['inputs']['arm'] != 'right':
             missing['retired_no_left_tabletop_consumer'] += 1
             continue
@@ -59,6 +60,12 @@ def prepare(root, runtime, graph_path, audit_path, output, *, family='attachment
         if not scale: missing['target_scale_missing'] += 1; continue
         source = positives.get((target['category'], target['model'], tuple(S.canonical_scale(scale))))
         if not source: missing['positive_' + family + '_library_missing'] += 1; continue
+        if family == 'inside':
+            binding = source.get('consumer_binding') or {}
+            assert binding.get('required_constraint') in {'tabletop_insert', 'flower_stem_top'}
+            assert source['entry']['constraint'] == binding['required_constraint']
+            if source['entry'].get('rest_hint_wxyz'):
+                missing['designated_rest_reader_extension_pending'] += 1; continue
         support = dep['inputs']['support']; measured = supports.get((support['support_profile'], support['height_slot']))
         if measured is None: missing['support_height_missing'] += 1; continue
         proof, value = measured
@@ -68,7 +75,7 @@ def prepare(root, runtime, graph_path, audit_path, output, *, family='attachment
                 'selected': support, 'measured': {k: value.get(k) for k in ('absolute_scale', 'object', 'scene', 'actual_height_key')}, 'proof': proof}
             continue
         height = value['actual_height_key']; group_key = (source['native_identity_key'], source['library']['sha256'], height)
-        if family == 'tabletop': group_key += (dep['inputs']['arm'],)
+        if family != 'attachment': group_key += (dep['inputs']['arm'],)
         unit = grouped.setdefault(group_key, {'source': source, 'height': height, 'arms': set(), 'proofs': {}, 'configuration_ids': set(), 'dependency_ids': set(), 'class_ids': set()})
         unit['arms'].add(dep['inputs']['arm']); unit['proofs'][proof['path']] = proof
         unit['configuration_ids'].update(dep['consumer_scopes']['required']); unit['dependency_ids'].add(dep['id']); unit['class_ids'].update(dep['required_by_classes'])
@@ -113,12 +120,13 @@ v.update(finished_at=time.time(),map_files=[{'path':str(x),'sha256':sha(x)}for x
     compile(runner, 'run.py', 'exec'); tickets = []; units = []
     for _, unit in sorted(grouped.items()):
         row = unit['source']; entry = row['entry']; arms = sorted(unit['arms']); assert arms and set(arms) <= {'left', 'right'}
-        if family == 'tabletop':
+        if family != 'attachment':
             arm = arms[0]; assert len(arms) == 1
             if (row['native_identity_key'], unit['height'], arm) in owned_keys:
                 retained_owned.append({'entry_id': entry['id'], 'height': unit['height'], 'arm': arm,
                                        'dependency_ids': sorted(unit['dependency_ids']), 'configuration_ids': sorted(unit['configuration_ids'])}); continue
-            lib = S.load_model(entry['category'], entry['model'], entry['scale'], str(Path(row['library']['path']).parents[2]), constraint=entry['constraint'])
+            lib = S.load_model(entry['category'], entry['model'], entry['scale'], str(Path(row['library']['path']).parents[2]), constraint=entry['constraint'],
+                               rest_hint_wxyz=entry.get('rest_hint_wxyz'))
             assert lib is not None and lib.identity_key() == row['native_identity_key']
             hits = {}
             directories = [r / entry['id'] for r in cache_roots] + list(cache_dirs.get(entry['id'], set()))
@@ -180,7 +188,7 @@ v.update(finished_at=time.time(),map_files=[{'path':str(x),'sha256':sha(x)}for x
             'benchmark_credit': 0, 'production_authorized': False})
         units.append({'id': ident, 'physical_dedup_key': key, 'entry_id': entry['id'], 'height': unit['height'], 'arms': arms,
                       'logical_requirements': len(unit['dependency_ids']), 'configuration_ids': sorted(unit['configuration_ids'])})
-        if family == 'tabletop' and len(tickets) % chunk_size == 0:
+        if family != 'attachment' and len(tickets) % chunk_size == 0:
             chunk = output / ('tickets_%03d.json' % (len(tickets) // chunk_size - 1))
             chunk.write_text(json.dumps({'schema': 'isg-preparation-dispatch-tickets-v1', 'campaign_id': root.name, 'account': 'minyeong',
                 'source_account': 'minyeong', 'claim_namespace': str(namespace / 'claims'), 'receipt_namespace': str(namespace / 'receipts'),
@@ -188,7 +196,8 @@ v.update(finished_at=time.time(),map_files=[{'path':str(x),'sha256':sha(x)}for x
                 'benchmark_credit': 0, 'production_authorized': False}, indent=2) + '\n')
             print(json.dumps({'ready_chunk': ref(chunk), 'jobs': chunk_size}), flush=True)
     p = output / 'tickets.json'; p.write_text(json.dumps({'schema': 'isg-preparation-dispatch-tickets-v1', 'campaign_id': root.name,
-        'account': 'minyeong', 'owner': '/root/templates_assets', 'dispatch_owner': '/root', 'observed_at': time.time(), 'jobs': tickets,
+        'account': 'minyeong', 'source_account': 'minyeong', 'claim_namespace': str(namespace / 'claims'),
+        'receipt_namespace': str(namespace / 'receipts'), 'owner': '/root/templates_assets', 'dispatch_owner': '/root', 'observed_at': time.time(), 'jobs': tickets,
         'source_graph': ref(graph_path), 'source_library_audit': ref(audit_path), 'missing_logical_requirements': dict(missing),
         'retained_existing_ownership': retained_owned, 'retained_native_cache_hits': retained_cache,
         'unresolved_support_identities': list(unresolved_supports.values()),
