@@ -16,10 +16,9 @@ def class_rows(root,base,initial):
     require(initial.parent==base/'rows','initial row outside suite')
     pointer_path=root/'runtime_validation/current.json'
     if not pointer_path.exists():return [initial]
-    pointer=json.loads(pointer_path.read_text())
-    if not pointer.get('attempt_registry'):return [initial]
     from .runtime_suite import active, registered_rows
-    pointer,_,_,_,current=active(root)
+    pointer,_,_,_,current=active(root,run_dir=base)
+    if not pointer.get('attempt_registry'):return [initial]
     require(current==base,'retry registry belongs to another suite')
     refs=registered_rows(root,pointer,base,initial.stem)
     return [Path(ref['path']).resolve() for ref in refs]

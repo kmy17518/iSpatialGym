@@ -209,7 +209,7 @@ def quota_snapshot(root, template, members):
             'bucket_limits':limits,'eligible':available,'canonical_members':same}, eligible, groups
 
 
-def _claim_camera(root, template, review, since, policy):
+def _claim_camera(root, template, review, since, policy, *, run_id=None):
     from .camera_lane import claim_camera, room_caps
     from .camera_classes import claim_camera_classes
     from .runtime_suite import active
@@ -218,7 +218,7 @@ def _claim_camera(root, template, review, since, policy):
     caps=room_caps(plan,total=quota.train_instances,task=template.task)
     if template.task=='camera_relocalization-standard':
         return claim_camera(review,root/'dataset/camera_quota.json',root=root,started_at=since,training_room_caps=caps)
-    manifest=active(root)[2]
+    manifest=active(root,run_id=run_id)[2]
     classes=[r['class_id'] for r in manifest['classes'] if r['class_id'].startswith(template.task+'-')]
     return claim_camera_classes(review,root/'dataset/camera_obstructed_quota.json',root=root,started_at=since,
         standard_classes=classes,training_room_caps=caps,reservations=policy[1],reservation_hashes=policy[2])
@@ -228,8 +228,8 @@ def reconcile(root, row_ref, allocation_ref, gate_ref, *, claim=True):
     from .group_lane import claim_group
     from .reservation_policy import active_policy
     from .runtime_suite import active
-    base=active(root)[4]
     row_identity=checked(root,row_ref)
+    base=active(root,run_id=row_identity['run_id'])[4]
     target=base/'acceptance'/(row_identity['class_id']+'.json')
     if target.exists():
         prior=checked(root,reference(target))
@@ -244,7 +244,7 @@ def reconcile(root, row_ref, allocation_ref, gate_ref, *, claim=True):
     allocation_result={'accepted':{}}
     if quota['eligible'] and claim:
         policy=active_policy(root)
-        allocation_result=(_claim_camera(root,template,review,timestamp(row['run_started_at']),policy) if row['camera_exempt'] else
+        allocation_result=(_claim_camera(root,template,review,timestamp(row['run_started_at']),policy,run_id=row['run_id']) if row['camera_exempt'] else
             claim_group(review,template,policy[1],reservation_hashes=policy[2],root=root,
                 started_at=timestamp(row['run_started_at']),state_path=Path(root)/'dataset/allocations.sqlite',
                 suite_context={'row':row_ref,'allocation':allocation_ref,'gate':gate_ref}))

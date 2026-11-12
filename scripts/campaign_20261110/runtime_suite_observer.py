@@ -51,8 +51,8 @@ def source_stage(root,row,wrapper):
 
 def observe(root, run_dir):
     root=Path(root).resolve();base=Path(run_dir).resolve()
-    pointer,release,manifest,_,current=active(root)
-    require(base==current,'acceptance observer is not the active immutable suite')
+    pointer,release,manifest,_,current=active(root,run_dir=base)
+    require(base==current,'acceptance observer is not the registered immutable suite')
     state_path=base/'acceptance_observer.json'
     state=json.loads(state_path.read_text()) if state_path.exists() else {'schema':'isg-runtime-suite-acceptance-observer-v1','classes':{}}
     with atomic_directory_lock(base/'acceptance_observer.lockdir'):
