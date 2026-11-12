@@ -50,3 +50,28 @@ def test_more_useful_concurrency_reduces_only_known_compute_window():
     assert forecast(100,[120,240],100,1000)[1] < forecast(100,[120,240],10,1000)[1]
     assert forecast(100,[],100,1000) is None
     assert forecast(100,[120],0,1000) is None
+
+
+def test_other_required_work_counts_but_does_not_inflate_map_rate(tmp_path):
+    spec,flow=setup(tmp_path)
+    flow['items'].append({'physical_dedup_key':'library','backend':'cluster','execution_state':'RUNNING'})
+    spec['desired_preparation_gpus']=2
+    put(tmp_path/'infra/coordination/joint_schedule_inputs.json',spec)
+    value=project(tmp_path,flow,1000)
+    assert value['capacity']['current_executing_preparation_jobs']==2
+    assert value['capacity']['current_executing_wave_jobs']==1
+    assert value['capacity']['desired_known_wave_gpus_after_other_work']==1
+    assert value['capacity']['additional_useful_gpus_needed']==0
+
+
+def test_incremental_manifest_and_stale_vast_are_explicit(tmp_path):
+    spec,flow=setup(tmp_path)
+    extra=put(tmp_path/'extra.json',{'jobs':[{'physical_dedup_key':'c'}]})
+    spec['preparation_waves'].append({'manifest':extra,'reader_directory':str(tmp_path/'extra_readers')})
+    put(tmp_path/'infra/coordination/joint_schedule_inputs.json',spec)
+    flow['items'].append({'physical_dedup_key':'c','backend':'vast','job_id':'10','execution_state':'RUNNING'})
+    value=project(tmp_path,flow,1500)
+    assert value['known_wave']['physical_jobs']==3
+    assert value['capacity']['vast_observation_current'] is False
+    assert value['capacity']['vast_provider_gpus'] is None
+    assert value['capacity']['current_executing_preparation_jobs']==1

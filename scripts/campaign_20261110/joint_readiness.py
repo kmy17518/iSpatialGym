@@ -35,9 +35,10 @@ def project(root, flow, now):
                 'preparation_extra_delay_seconds': None}
     spec = read(path); errors = []; samples = []; keys = set()
     for wave in spec['preparation_waves']:
-        for chunk in checked(wave['index'])['chunks']:
+        chunks = checked(wave['index'])['chunks'] if 'index' in wave else [{'manifest': wave['manifest']}]
+        for chunk in chunks:
             keys.update(t['physical_dedup_key'] for t in checked(chunk['manifest'])['jobs'])
-        for status in Path(wave['reader_directory']).glob('*/status.json'):
+        for status in Path(wave['reader_directory']).glob(wave.get('reader_glob', '*/status.json')):
             for row in read(status).get('rows', []):
                 elapsed = row.get('builder_elapsed_seconds')
                 if row.get('status') in ('verified_positive', 'verified_zero') and isinstance(elapsed, (int, float)) and elapsed > 0:
@@ -51,14 +52,23 @@ def project(root, flow, now):
     failed = sum(r.get('verification_status') == 'failed' for r in items.values())
     metrics = read(root/'vast/metrics.json')
     fresh = 0 <= now-metrics.get('observed_at_unix', 0) <= 180
-    ids = {r.get('job_id') for r in items.values()}
+    all_items = {r['physical_dedup_key']: r for r in flow.get('items', [])}
+    ids = {str(r.get('job_id')) for r in items.values()}
+    all_ids = {str(r.get('job_id')) for r in all_items.values()}
+    heartbeat_jobs = {str(j) for w in metrics.get('instances', []) if fresh and w.get('worker_observation_current')
+                      for j in w.get('heartbeat_running_jobs', [])}
     vast_running = {str(j) for w in metrics.get('instances', []) if fresh and w.get('worker_observation_current')
                     for j in w.get('heartbeat_running_jobs', []) if str(j) in ids}
     cluster_running = sum(r.get('backend') != 'vast' and r.get('execution_state') == 'RUNNING' for r in items.values())
     current = cluster_running+len(vast_running)
-    desired = min(int(spec['desired_preparation_gpus']), len(remaining))
+    all_cluster_running = sum(r.get('backend') != 'vast' and r.get('execution_state') == 'RUNNING'
+                              for r in all_items.values())
+    all_current = all_cluster_running+len(heartbeat_jobs & all_ids)
+    other_current = max(0, all_current-current)
+    desired = int(spec['desired_preparation_gpus'])
+    desired_maps = min(max(0, desired-other_current), len(remaining))
     conditional = [{'useful_gpus': c, 'known_wave_finish_range': forecast(len(remaining), samples, c, now)}
-                   for c in sorted({c for c in (current, 100, desired) if c > 0})]
+                   for c in sorted({c for c in (current, min(100, len(remaining)), desired_maps) if c > 0})]
     streams = spec['streams']
     ranges = [r.get('finish_range') for r in streams]
     complete = len(ranges) == 3 and all(r and len(r) == 2 for r in ranges)
@@ -88,8 +98,14 @@ def project(root, flow, now):
                            'assumption': 'Measured native p50-p90 planning scenarios plus10-20minutes for startup/transfer/verification. Not a confidence interval or full preparation ETA; failed items require repair.'},
             'capacity': {'desired_preparation_gpus': desired, 'cluster_running_wave_jobs': cluster_running,
                          'vast_heartbeat_running_wave_jobs': len(vast_running), 'current_executing_wave_jobs': current,
+                         'current_executing_preparation_jobs': all_current,
+                         'cluster_running_preparation_jobs': all_cluster_running,
+                         'vast_heartbeat_running_preparation_jobs': len(heartbeat_jobs & all_ids),
+                         'other_required_preparation_executing': other_current,
+                         'desired_known_wave_gpus_after_other_work': desired_maps,
                          'vast_provider_gpus': metrics.get('running_gpus') if fresh else None,
-                         'additional_useful_gpus_needed': max(0, desired-current), 'gpu_utilization': 'unmeasured'},
+                         'additional_useful_gpus_needed': max(0, desired-all_current), 'gpu_utilization': 'unmeasured',
+                         'vast_observation_current': fresh, 'inventory_complete': False},
             'budget': {'total_cap_usd': 3000, 'observed_exposure_usd': exposure, 'remaining_after_commitments_usd': 3000-exposure},
             'resource_actions': spec['resource_actions'], 'exceptions': errors, 'production_released': False}
 
