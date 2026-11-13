@@ -790,7 +790,11 @@ class InstanceLoader:
 
         reset_options = ({'reset_context': lambda: reconstruction_reset_scope(self, og.sim)}
                          if needs_reconstruction(self) else {})
+        if self.pool_world is not None:
+            self.pool_world.observe_reset('before_task_restore', og.sim)
         task.load_tro_instance(env, tro=self.tro, settle_steps=0, **reset_options)
+        if self.pool_world is not None:
+            self.pool_world.observe_reset('after_task_restore', og.sim)
         self.physical = {k: v for k, v in task.object_scope.items() if v is not None and not isinstance(v, GroupEntity)}
         if self.tro.meta.raw.get("campaign"):
             from ispatialgym.sampling.campaign_runtime import verify_loaded
@@ -815,12 +819,16 @@ class InstanceLoader:
         recorded = (self.tro.meta.robot_state or {}).get("controller_targets") or {}
         self.report["controller_targets_restored"] = apply_recorded_targets(self.hold, robot, recorded) if recorded else []
         robot.apply_action(self.hold.action())
+        if self.pool_world is not None:
+            self.pool_world.observe_reset('before_native_settle', og.sim)
         for _ in range(settle_physics_steps):
             og.sim.step_physics()
             self._hold_entities()
         for _ in range(2):  # full steps refresh the per-step caches (AABBs, contacts, kinematic 'changed' flags)
             og.sim.step()
             self._hold_entities()
+        if self.pool_world is not None:
+            self.pool_world.observe_reset('after_native_settle_before_reset', og.sim)
         env.scene.update_initial_file()
         task._reset_tracking()
         if PO.trim():
@@ -847,6 +855,8 @@ class InstanceLoader:
                                                       self.tro.object_states, execution=self._restoration_execution)
             if restored is not None:
                 self.report["campaign_restoration"]["serialized_root_motion"] = restored
+        if self.pool_world is not None:
+            self.pool_world.observe_reset('after_native_reset', og.sim)
         return obs, info
 
     def _tro_pose_pairs(self) -> Dict[str, Tuple[Any, Any]]:

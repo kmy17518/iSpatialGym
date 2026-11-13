@@ -11,6 +11,7 @@ DELTA = {
     'planner': 'per_episode_native_obstacle_filter_and_enable_mask',
     'recording': 'native_Executor_and_Recorder_active_actor_consumers',
     'episode_evidence': 'per_loader_lists_not_inherited_from_first_build',
+    'reset_observations': 'read_only_native_boundaries_v1_no_steps_or_setters',
     'queue': 'existing_exclusive_claims_with_exact_request_episode_order',
     'driver': 'original_own_argv_apply_driver_env_and_saved_report_check',
     'source_authorization': 'original_gate_rechecked_before_each_episode',
