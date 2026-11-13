@@ -950,6 +950,9 @@ class ArticulationLarge(SamplerV2):
         """The joint (``roles.target.joint``), its handle (§5.3 rules incl. the icl rows; ``generation.handle_row`` names
         the row, ``generation.pinch_width_min_m`` the width floor: :func:`pick_handle_row`) and the joint info in the
         instance frame; ``Reject("missing_handle")`` when the joint has no admissible pinch."""
+        from ispatialgym.sampling.prepared_articulation import verify_inputs, verify_selected
+
+        prepared_handle = verify_inputs(self, obj, handles_csv=HANDLES_CSV)
         key = self.role_option("handle_key") or f"{obj.category}__{obj.model}"
         joint_name = self.role_option("joint")
         data, path, frame = self._handle_record(obj)
@@ -982,6 +985,10 @@ class ArticulationLarge(SamplerV2):
         row, ranked = pick_handle_row(rows, named, width_range, where=f"{obj.name}/{joint_name}",
                                       sources=f"{path and os.path.relpath(path, REPO_ROOT)} or {HANDLES_CSV}")
         handle = row.as_handle()
+        if prepared_handle is not None:
+            self.template_facts["prepared_handle_lookup"] = verify_selected(
+                prepared_handle, handle=handle, source=row.source, path=path, frame=frame,
+                joint_name=joint_name, width_range=width_range)
         width = handle.get("width")
         # bar length (instance frame) for the grasp slide along the bar (§5.3 bars: any point along the bar is a pinch)
         for hrec in (jinfo.get("handles") or []):
