@@ -65,13 +65,17 @@ class PoolWorld:
 
     def cold_stopped(self, sim):
         from scripts.campaign_20261110.training_pool_probe import _incoming_spawn
+        from scripts.campaign_20261110.training_pool_source_anchor_probe import apply_cold_anchor
         require(sim.is_stopped() and self.loader.robot.is_holonomic_base,
                 'pool cold anchor requires the existing stopped holonomic-base lifecycle')
         incoming = _incoming_spawn(self.loader, self.loader.robot)
-        self.loader.robot.set_position_orientation(
-            position=incoming['position'], orientation=incoming['orientation'])
+        # The original scene loader already authored this native root. A second
+        # setter round-trips its quaternion through the fixed joint and changes
+        # the original cold trajectory. Check our own loaded anchor without
+        # rewriting it; warm source transitions remain separately measured.
+        anchor = apply_cold_anchor(self.loader.robot, incoming, preserve=True)
         self.events.append({'phase':'cold_existing_mass_stop','source_spawn':copy.deepcopy(incoming),
-                            'extra_physics_steps':0})
+                            'extra_physics_steps':0, **anchor})
 
     def initialized(self):
         from ispatialgym.sampling.model_pool import restore_export

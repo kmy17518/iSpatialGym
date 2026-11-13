@@ -231,6 +231,10 @@ class PoolConsumers:
         objects = {name: scene.object_registry('name', name) for name in self.initialized}
         self.planner = planner_observation(backend, objects, self.active)
         self.loader.report['model_pool_planner'] = copy.deepcopy(self.planner)
+        # Keep the same append-only list through native recording. This binds
+        # the persisted float32 stream to each native reader observation in
+        # the final report without changing any simulator or recorder call.
+        self.loader.report['model_pool_serialized_states'] = self.observations
         return self.planner
 
     def dump_recording(self, executor, *, initial):

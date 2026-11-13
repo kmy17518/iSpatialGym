@@ -4,6 +4,8 @@ from .contracts import require
 DELTA = {
     'route': 'native_run_isg_explicit_pool_request_v1',
     'loader': 'per_instance_PoolWorld_at_named_build_and_incoming_boundaries',
+    'cold_robot_anchor': 'preserve_own_loaded_native_anchor_check_exact_incoming_spawn_without_pose_write',
+    'warm_robot_anchor': 'existing_separately_measured_source_transition_unchanged',
     'planner': 'per_episode_native_obstacle_filter_and_enable_mask',
     'recording': 'native_Executor_and_Recorder_active_actor_consumers',
     'queue': 'existing_exclusive_claims_with_exact_request_episode_order',
