@@ -57,13 +57,20 @@ def restoration_execution(meta, tro_path, native_runtime, *, environment=None):
         require(request_path.is_relative_to(root) and request_path.is_file() and
                 file_digest(request_path) == environment.get('ISPATIALGYM_TRAINING_OBSERVATION_REQUEST_SHA256'),
                 'production restoration native runtime differs without exact observation proof')
-        request, records = inputs(root, request_path)
+        raw_request = json.loads(request_path.read_text())
+        if raw_request.get('multi_active_replay_v1') is True:
+            from .training_multi_active_replay import inputs as multi_active_inputs
+            request, records, _, _ = multi_active_inputs(root, request_path, runtime)
+            runtime_compatibility = request['runtime_compatibility']
+        else:
+            request, records = inputs(root, request_path)
         require(not request.get('physical_candidate') and
                 request['probe_runtime_sha256'] == file_digest(runtime/'.snapshot_commit') and
                 any(row['instance_id'] == raw['instance_id'] and
                     row['artifacts']['tro']['sha256'] == file_digest(tro) for row in records),
                 'production observation runtime or exact input differs')
-        runtime_compatibility = verify_runtime_compatibility(root, request, records, runtime)
+        if runtime_compatibility is None:
+            runtime_compatibility = verify_runtime_compatibility(root, request, records, runtime)
     start, count = int(job_env['START']), int(job_env['N'])
     index = int(raw['instance_id'].rsplit('__', 1)[-1])
     require(count > 0 and start <= index < start+count, 'production restoration instance outside authorized job range')

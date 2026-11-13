@@ -31,7 +31,8 @@ def boundary(previous, current, compatible=False):
 
 def inputs(request_path):
     value = json.loads(Path(request_path).read_text())
-    assert value['schema'] == 'isg-selected-pool-episode-probe-v1'
+    from .training_multi_active_sources import SCHEMA as MULTI_ACTIVE_SCHEMA
+    assert value['schema'] in ('isg-selected-pool-episode-probe-v1', MULTI_ACTIVE_SCHEMA)
     assert value['benchmark_credit'] == 0 and value['production_released'] is False
     assert value['sequence'] == ['A', 'B', 'A'] and len(value['episodes']) == 3
     root = Path(value['campaign_root']).resolve()
@@ -56,17 +57,22 @@ def inputs(request_path):
         scene = checked(record['artifacts']['recorded_scene'])
         assert scene['init_info']['args']['scene_model'] == cfg['template']['scene']
         records.append(record)
-    assert value['episodes'][0]['expected']['target']['model'] == value['episodes'][2]['expected']['target']['model']
-    assert value['episodes'][0]['expected']['target']['model'] != value['episodes'][1]['expected']['target']['model']
+    if value['schema'] == MULTI_ACTIVE_SCHEMA:
+        from .training_multi_active_sources import source_contract
+        source_contract(value, records)
+    else:
+        assert value['episodes'][0]['expected']['target']['model'] == value['episodes'][2]['expected']['target']['model']
+        assert value['episodes'][0]['expected']['target']['model'] != value['episodes'][1]['expected']['target']['model']
     return value, records
 
 
 def live_identity(scene, expected):
     objects = {obj.name: obj for obj in scene.objects}
     result = {'objects': {}, 'pool_object_names': sorted(n for n in objects if n.startswith('campaign_pool_'))}
-    assert result['pool_object_names'] == [expected['target']['native_name']], 'stale or missing pool object'
-    for role in ('target', 'support'):
-        spec = expected[role]; obj = objects[spec['native_name']]
+    roles = expected.get('active_roles') or {'target': expected['target']}
+    assert result['pool_object_names'] == sorted(row['native_name'] for row in roles.values()), 'stale or missing pool object'
+    for role, spec in {**roles, 'support': expected['support']}.items():
+        obj = objects[spec['native_name']]
         scale = [float(x) for x in obj.scale]
         assert obj.category == spec['category'] and obj.model == spec['model'], 'live role identity differs'
         assert scale == spec['scale'], 'live exact float32 scale differs'

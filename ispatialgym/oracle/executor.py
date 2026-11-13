@@ -749,7 +749,7 @@ class Executor:
     def __init__(self, env, task, sidecar, recorder: Optional[Recorder] = None, motions: Optional[Motions] = None,
                  monitors: Optional[Monitors] = None, cfg: Optional[ExecutorConfig] = None, sim=None, state: Optional[SimState] = None,
                  tracked_objects: Optional[Dict[str, Any]] = None, cam_key: Optional[str] = None,
-                 task_variant: Optional[str] = None):
+                 task_variant: Optional[str] = None, pool_consumers=None):
         self.env, self.task, self.sidecar = env, task, sidecar
         # Action replay intentionally has no oracle sidecar. Keep the loaded
         # task identity for QA rules, including the existing inside-container
@@ -759,6 +759,11 @@ class Executor:
         self.robot = env.scene.robots[0]
         self.cam_key = cam_key or (state.cam_key if state is not None else None)
         self.recorder = recorder
+        self.pool_consumers = pool_consumers
+        if pool_consumers is not None:
+            from ispatialgym.oracle.pool_consumers import PoolConsumers
+            if type(pool_consumers) is not PoolConsumers or pool_consumers.loader.env is not env:
+                raise ValueError("executor pool consumers do not belong to this loaded world")
         self.motions = motions
         self.monitors = monitors
         self._sim = sim
@@ -876,7 +881,15 @@ class Executor:
         (``ExecutorConfig.per_scene_state``) or the simulator."""
         return self.env.scene if self.cfg.per_scene_state else self.sim
 
+    def initial_recording_state(self) -> th.Tensor:
+        """Record active pool actors and all background; checkpoints stay full."""
+        if self.pool_consumers is not None:
+            return self.pool_consumers.dump_recording(self, initial=True)
+        return self._dump_state(full=True)
+
     def _dump_state(self, full: bool) -> th.Tensor:
+        if not full and self.pool_consumers is not None:
+            return self.pool_consumers.dump_recording(self, initial=False)
         owner = self.state_owner
         registry = getattr(getattr(self.env, "scene", None), "object_registry", None)
         if full and getattr(self, "_recording_filter", False) and registry is not None and hasattr(registry, "set_dump_filter"):

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from .contracts import require, file_digest, write_json_atomic
+from .training_pool_world import active_actor_names, private_member_filename
 
 SCHEMA = 'isg-pool-active-recording-runtime-v1'
 PARENT_COMMIT = '53b0cc9274b94e29b44ce2cadbc9269a2f7d1339'
@@ -84,7 +85,7 @@ def serialized_object_names(state):
 def verify_serialized(owner, flat, initialized, active, all_scene_names, initial):
     state, consumed = owner.deserialize(flat)
     require(int(consumed) == int(flat.numel()), 'native serialized state has unread trailing data')
-    names = serialized_object_names(state); inactive = set(initialized)-{active}
+    names = serialized_object_names(state); inactive = set(initialized)-set(active_actor_names(active))
     require(not names.intersection(inactive) and names <= set(all_scene_names),
             'recorded state contains inactive or unknown actors')
     if initial:
@@ -98,10 +99,9 @@ def active_document(document, source, source_metadata, initialized, active, prop
                     initial_scene_path, exported_scene_path):
     from ispatialgym.sampling.model_pool import active_scene
     result = copy.deepcopy(document)
-    # This native Scene.save wraps its whole loaded metadata in metadata.task,
-    # then overlays the current binding and robot poses. Verify that exact
-    # known wrapper before replacing it with the incoming source's metadata.
-    # Unknown fields or references must never be silently discarded.
+    # The initialized pool's native snapshot inherits the complete known
+    # source metadata under task, then overlays current physical bindings and
+    # robot poses. Preserve its full lineage and reject every unknown field.
     require(set(result['metadata']) == {'task'}, 'unknown native metadata wrapper')
     native = result['metadata']['task']
     inherited = {k: v for k, v in native.items() if k not in ('inst_to_name', 'robot_poses')}
@@ -112,21 +112,23 @@ def active_document(document, source, source_metadata, initialized, active, prop
     result['metadata']['task'].update(inst_to_name=copy.deepcopy(bindings), robot_poses=copy.deepcopy(robot_poses))
     target = result['metadata']['ispatialgym']['model_pool']
     expected = source['metadata']['ispatialgym']['model_pool']
+    names = active_actor_names(active)
+    measured = {active: properties} if isinstance(active, str) else properties
     require(set(target) == set(expected) == {'manifest_sha256', 'batch_id', 'active_names',
                                            'inactive_omitted', 'active_properties'}
             and all(target[k] == expected[k] for k in ('manifest_sha256', 'batch_id'))
-            and expected['active_names'] == [active]
-            and set(expected['active_properties']) == {active}
-            and properties == expected['active_properties'][active]
-            and active in bindings.values()
+            and active_actor_names(expected['active_names']) == names
+            and set(expected['active_properties']) == set(names)
+            and measured == expected['active_properties']
+            and set(names) <= set(bindings.values())
             and result['metadata']['task']['inst_to_name'] == bindings,
             'native scene metadata or current task binding differs')
-    target.update(active_names=[active], inactive_omitted=len(initialized)-1,
-                  active_properties={active: copy.deepcopy(properties)})
+    target.update(active_names=list(names), inactive_omitted=len(initialized)-len(names),
+                  active_properties=copy.deepcopy(measured))
     require(result['init_info']['args']['scene_file'] == str(initial_scene_path),
             'native initialization scene differs from recorded environment')
     result['init_info']['args']['scene_file'] = str(exported_scene_path)
-    return active_scene(result, initialized, {active})
+    return active_scene(result, initialized, set(names))
 
 
 def recorded_config(config, scene_path, tro_path, nominal_image_size, native_defaults=None):
@@ -182,7 +184,7 @@ def install(runner, contract, current, output, native_build):
 
     def record_state(executor, *, initial):
         scene = executor.env.scene
-        with recorded_registry_scope(scene, initialized, {current['active']}, initial_state=initial):
+        with recorded_registry_scope(scene, initialized, active_actor_names(current['active']), initial_state=initial):
             # Direct owner dump for the explicit initial record. Full internal
             # snapshots always use the untouched native _dump_state path.
             flat = executor.state_owner.dump_state(serialized=True) if initial else native_dump(executor, False)
@@ -211,20 +213,30 @@ def install(runner, contract, current, output, native_build):
             document = json.loads(document) if document.lstrip().startswith('{') else json.loads(Path(document).read_text())
         member = source_member(contract, current['loader'].tro_path)
         source = json.loads(Path(member['scene']['path']).read_text())
-        bindings = {k: v.name for k, v in current['loader'].task.object_scope.items() if hasattr(v, 'name')}
-        scene = recorder.env.scene; actor = scene.object_registry('name', current['active'])
+        # Match IsSpatialGymTask.update_bddl_scope_metadata exactly. Virtual
+        # GroupEntity values have names but are not scene object bindings.
+        bindings = {k: v.name for k, v in current['loader'].task.physical_object_scope.items()
+                    if v is not None}
+        scene = recorder.env.scene
+        names = active_actor_names(current['active'])
+        measured = {name: native_properties(scene.object_registry('name', name)) for name in names}
+        if isinstance(current['active'], str): measured = measured[current['active']]
         initial_scene = Path(recorder.env_config['scene']['scene_file']).resolve()
         require(initial_scene.parent == output and initial_scene.name in {
-            'private_union_'+name+'.json' for name in initialized}, 'native union source is outside this diagnostic')
+            private_member_filename(row['active']) for row in contract['members']},
+            'native union source is outside this diagnostic')
         destination = output/('recorded_active_scene_'+str(current['ordinal'])+'.json')
+        write_json_atomic(output/('native_metadata_' + str(current['ordinal']) + '.json'),
+                          {'metadata': document['metadata'], 'source': member['scene'],
+                           'bindings': bindings, 'robot_poses': current['loader'].tro.robot_poses})
         projected = active_document(document, source, known_metadata, initialized, current['active'],
-                                    native_properties(actor), bindings, current['loader'].tro.robot_poses,
+                                    measured, bindings, current['loader'].tro.robot_poses,
                                     initial_scene, destination)
         require(not destination.exists(), 'preserve prior active recording scene')
         write_json_atomic(destination, projected)
         config = recorded_config(current['recording_config'], destination, member['tro']['path'],
                                  recorder.nominal_image_size, recorder.env_config)
-        require(not any(name in json.dumps(config) for name in initialized-{current['active']}),
+        require(not any(name in json.dumps(config) for name in initialized-set(names)),
                 'inactive actor referenced by recorded configuration')
         recorder.scene_file = projected; recorder.env_config = config
         current['active_recording_scene'] = {'path': str(destination), 'sha256': file_digest(destination)}

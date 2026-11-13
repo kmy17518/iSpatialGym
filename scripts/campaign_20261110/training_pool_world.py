@@ -13,6 +13,21 @@ from ispatialgym.oracle.campaign_batch import compare_saved_scenes
 SCHEMA='isg-model-pool-world-contract-v1'
 
 
+def active_actor_names(value):
+    values = [value] if isinstance(value, str) else value
+    require(isinstance(values, (list, tuple, set, frozenset)) and values
+            and all(isinstance(name, str) and name for name in values)
+            and len(values) == len(set(values)), 'explicit unique active actor set required')
+    return tuple(sorted(values))
+
+
+def private_member_filename(value):
+    names = active_actor_names(value)
+    key = names[0] if len(names) == 1 else 'actors_' + digest(list(names))
+    require('/' not in key and '\\' not in key, 'pool actor name cannot be a path')
+    return 'private_union_' + key + '.json'
+
+
 def isolated_member_scene(contract, document, active):
     """Build one explicit union initialization without changing a source scene.
 
@@ -21,14 +36,15 @@ def isolated_member_scene(contract, document, active):
     cells. Native collision/gravity/visibility isolation is a separate required
     operation before any episode restore; a parked JSON pose does not prove it.
     """
-    require(contract.get('schema') == SCHEMA and active in contract['initialized_actors'],
+    active = set(active_actor_names(active))
+    require(contract.get('schema') == SCHEMA and active <= set(contract['initialized_actors']),
             'unknown active pool member')
     names = set(contract['initialized_actors'])
     initial = document['objects_info']['init_info']
     states = document['state']['registry']['object_registry']
-    require({n for n in initial if n.startswith('campaign_pool_')} == {active}
+    require({n for n in initial if n.startswith('campaign_pool_')} == active
             and set(initial) == set(states)
-            and initial[active] == contract['initialized_actors'][active],
+            and all(initial[name] == contract['initialized_actors'][name] for name in active),
             'member scene identity differs from checked pool contract')
     result = copy.deepcopy(document)
     # Keep construction order identical in independent A/B worlds. Starting
@@ -40,7 +56,7 @@ def isolated_member_scene(contract, document, active):
     isolation = {}
     for ordinal, name in enumerate(sorted(names)):
         flags = copy.deepcopy(contract['active_properties'][name])
-        if name != active:
+        if name not in active:
             state = copy.deepcopy(contract['source_actor_states'][name])
             root = state.get('root_link', {})
             require(all(k in root for k in ('pos', 'ori', 'lin_vel', 'ang_vel')),
@@ -52,7 +68,7 @@ def isolated_member_scene(contract, document, active):
                 if link['gravity_disabled'] is not None:
                     link['gravity_disabled'] = True
                 link['collisions'] = {shape: False for shape in link['collisions']}
-        isolation[name] = {'active': name == active, 'properties': flags,
+        isolation[name] = {'active': name in active, 'properties': flags,
                            'state': copy.deepcopy(destinations[name])}
     require(set(destinations) == set(result['objects_info']['init_info']),
             'union scene object/state inventory differs')
@@ -65,7 +81,7 @@ def verify_pool_isolation(expected, observed, *, task_bindings, planner_names):
     """Require native properties and actual planner exclusion for every actor."""
     require(expected and expected.keys() == observed.keys(), 'native pool inventory differs')
     active = {name for name, row in expected.items() if row['active']}
-    require(len(active) == 1 and active <= set(task_bindings.values()),
+    require(active and active <= set(task_bindings.values()),
             'selected actor lacks its exact task binding')
     inactive = expected.keys() - active
     require(not inactive.intersection(task_bindings.values()), 'inactive actor is task-bound')
@@ -109,57 +125,135 @@ def cold_anchor_transform(first_spawn, first_anchor, incoming_spawn):
     return {'position':position.tolist(),'orientation':orientation.tolist()}
 
 
-def scene_contract(documents, active_names, pool_reference):
+def normalize_active_role_bindings(document, active, roles):
+    """Compare semantic roles without discarding any other source task metadata."""
+    require(isinstance(roles, dict) and len(roles) == len(active)
+            and all(isinstance(role, str) and role for role in roles),
+            'explicit role for every active actor required')
+    names = [row.get('native_name') for row in roles.values()]
+    instances = [row.get('instance') for row in roles.values()]
+    require(set(names) == set(active) and len(set(names)) == len(names)
+            and all(isinstance(instance, str) and instance for instance in instances)
+            and len(set(instances)) == len(instances), 'active role identities are not bijective')
+    result = copy.deepcopy(document)
+    bindings = result['metadata']['task']['inst_to_name']
+    require({key for key, name in bindings.items() if name in active} == set(instances),
+            'source active task binding is missing, duplicated or undeclared')
+    normalized = {}
+    for role, row in roles.items():
+        instance, name = row['instance'], row['native_name']
+        token = '<selected_pool_role:' + role + '>'
+        require(bindings.get(instance) == name and token not in bindings,
+                'source role binding differs or normalization collides')
+        normalized[token] = token
+        del bindings[instance]
+    bindings.update(normalized)
+    return result
+
+
+def scene_contract(documents, active_names, pool_reference, *, role_maps=None,
+                   source_pool_references=None, fixed_support_roles=None):
     """Verify shared static geometry, allowing only explicitly selected actors.
 
     Source scenes remain immutable. The returned union is a new, declared
     experimental initialization artifact, never substituted for source exports.
     """
     require(len(documents)==len(active_names)>=2,'pool contract needs distinct member scenes')
-    names=set(active_names)
-    require(len(names)>=2 and all(n.startswith('campaign_pool_') for n in names),
+    active_sets = [active_actor_names(value) for value in active_names]
+    if role_maps is not None:
+        require(len(role_maps) == len(documents) and all(isinstance(roles, dict) for roles in role_maps)
+                and all(set(roles) == set(role_maps[0]) for roles in role_maps),
+                'source semantic role inventories differ')
+    references = source_pool_references or [pool_reference] * len(documents)
+    require(len(references) == len(documents)
+            and (source_pool_references is None or role_maps is not None),
+            'different source manifests require explicit multi-active roles')
+    if fixed_support_roles is not None:
+        require(role_maps is not None and len(fixed_support_roles) == len(documents)
+                and all(isinstance(role, dict) for role in fixed_support_roles)
+                and len({(role['native_name'], role['initialized_sha256'])
+                         for role in fixed_support_roles}) == 1,
+                'fixed support must keep one exact initialized physical actor')
+    names = set().union(*map(set, active_sets))
+    require(len(set(active_sets)) >= 2 and all(n.startswith('campaign_pool_') for n in names),
             'explicit distinct native pool identities required')
     common=None;initial={};states={};properties={};normalized=[]
-    for document,active in zip(documents,active_names):
+    for ordinal,(document,active_values) in enumerate(zip(documents,active_sets)):
+        active = set(active_values)
         init=document['objects_info']['init_info'];state=document['state']['registry']['object_registry']
         require(set(init)==set(state),'pool scene initialization/state inventory differs')
         pool=document.get('metadata',{}).get('ispatialgym',{}).get('model_pool',{})
-        require(pool.get('manifest_sha256')==pool_reference['sha256']
-                and pool.get('active_names')==[active]
-                and set(pool.get('active_properties',{}))=={active}
-                and {n for n in init if n.startswith('campaign_pool_')}=={active},
+        require(pool.get('manifest_sha256')==references[ordinal]['sha256']
+                and active_actor_names(pool.get('active_names')) == active_values
+                and set(pool.get('active_properties',{})) == active
+                and {n for n in init if n.startswith('campaign_pool_')} == active,
                 'source scene active/inactive pool inventory differs')
-        fixed={n:v for n,v in init.items() if n!=active}
+        fixed={n:v for n,v in init.items() if n not in active}
         if common is None:common=copy.deepcopy(fixed)
         require(common==fixed,'pool switch changes shared initialized geometry or robot')
-        if active in initial:
-            require(initial[active]==init[active] and properties[active]==pool['active_properties'][active],
-                    'same physical pool identity has different initialized properties')
-        initial[active]=copy.deepcopy(init[active]);states.setdefault(active,copy.deepcopy(state[active]))
-        properties[active]=copy.deepcopy(pool['active_properties'][active])
-        args=init[active]['args'];flags=properties[active]
-        require(args['category']==flags['category'] and args['model']==flags['model'] and
-                len(flags['scale'])==3 and all(float(x)>0 for x in flags['scale'])
-                and flags['visible'] is True and bool(flags['links']),
-                'source active actor physical identity differs')
-        doc=copy.deepcopy(document)
+        for name in active_values:
+            if name in initial:
+                require(initial[name] == init[name] and properties[name] == pool['active_properties'][name],
+                        'same physical pool identity has different initialized properties')
+            initial[name] = copy.deepcopy(init[name]); states.setdefault(name, copy.deepcopy(state[name]))
+            properties[name] = copy.deepcopy(pool['active_properties'][name])
+            args = init[name]['args']; flags = properties[name]
+            require(args['category'] == flags['category'] and args['model'] == flags['model'] and
+                    len(flags['scale']) == 3 and all(float(x)>0 for x in flags['scale'])
+                    and flags['visible'] is True and bool(flags['links']),
+                    'source active actor physical identity differs')
+        doc=(normalize_active_role_bindings(document, active, role_maps[ordinal])
+             if role_maps is not None else copy.deepcopy(document))
+        if fixed_support_roles is not None:
+            from .training_pool_source_compatibility import normalize_fixed_support
+            doc = normalize_fixed_support(doc, active, fixed_support_roles[ordinal])
         doc['metadata']['ispatialgym'].pop('model_pool')
         # Every changed task binding must point to this explicitly selected actor.
         bindings=doc['metadata'].get('task',{}).get('inst_to_name',{})
-        require(active in bindings.values(),'active actor lacks a native task binding')
-        for key,value in list(bindings.items()):
-            if value==active:bindings[key]='<selected_pool_actor>'
+        if role_maps is None:
+            require(active <= set(bindings.values()), 'active actor lacks a native task binding')
+            for key,value in list(bindings.items()):
+                if value in active: bindings[key] = '<selected_pool_actor:'+key+'>'
         normalized.append(doc)
     checks=[compare_saved_scenes(normalized[0],doc,parking_objects=[],task_objects=names)
             for doc in normalized[1:]]
     union=copy.deepcopy(documents[0]);union['objects_info']['init_info'].update(initial)
     union['state']['registry']['object_registry'].update(states)
-    return {'schema':SCHEMA,'pool_manifest':pool_reference,'initialized_actors':initial,
+    result = {'schema':SCHEMA,'pool_manifest':pool_reference,'initialized_actors':initial,
             'source_actor_states':states,'active_properties':properties,
-            'source_active_sequence':list(active_names),'static_scene_checks':checks,
+            'source_active_sequence':copy.deepcopy(list(active_names)),
+            'static_scene_checks':checks,
             'union_scene':union,'production_released':False,'benchmark_credit':0,
             'scope':'Same scene/rooms and unchanged shared geometry; initialized model/scale actors only. '
                     'Room or support geometry changes require a separately verified contract.'}
+    # Preserve the exact immutable v1 representation for old single-actor
+    # source sequences. Explicit active sets use the additive field.
+    if role_maps is not None or not all(isinstance(value, str) for value in active_names):
+        result['source_active_sets'] = [list(values) for values in active_sets]
+    if role_maps is not None:
+        result['source_role_maps'] = copy.deepcopy(role_maps)
+        result['original_task_metadata_sha256'] = [digest(doc['metadata']['task']) for doc in documents]
+    if source_pool_references is not None:
+        result['source_pool_manifests'] = copy.deepcopy(references)
+    if fixed_support_roles is not None:
+        result['source_fixed_support_roles'] = copy.deepcopy(fixed_support_roles)
+    return result
+
+
+def verify_selected_world(entry, record, document, manifest):
+    """Compare campaign-qualified room IDs with native room-instance names."""
+    expected = entry['expected']; scene = expected['scene']; room = expected['room']
+    require(scene == manifest['scene'] and record['room'] == room,
+            'selected world scene or recorded room differs')
+    prefix = scene + '/'
+    native_room = room[len(prefix):] if room.startswith(prefix) else room
+    require('/' not in native_room and native_room in manifest['rooms'],
+            'selected world room differs from exact native pool scope')
+    args = document['init_info']['args']
+    support = document['objects_info']['init_info'][expected['support']['native_name']]['args']
+    require(args['scene_model'] == scene and native_room in args['load_room_instances']
+            and native_room in support['in_rooms'],
+            'selected native room or fixed support membership differs')
 
 
 def prepare(root, request):
@@ -169,31 +263,49 @@ def prepare(root, request):
     value,records=inputs(request)
     root=Path(root).resolve();require(root==Path(value['campaign_root']).resolve(),'campaign root differs')
     references=[r['template']['scene_setup']['native_model_pool'] for r in records]
-    require(all(x==references[0] for x in references),'sequence pool manifests differ')
-    manifest=checked(root,references[0])
-    read_manifest(references[0]['path'],scene=manifest['scene'],rooms=manifest['rooms'],
+    from .training_multi_active_sources import SCHEMA as MULTI_ACTIVE_SCHEMA, source_contract
+    tasks = source_contract(value, records) if value['schema'] == MULTI_ACTIVE_SCHEMA else None
+    pool_reference = references[0]; compatibility = None
+    if not all(x == pool_reference for x in references):
+        require(tasks is not None, 'sequence pool manifests differ')
+        from .training_pool_source_compatibility import additive_manifest_union
+        proof = checked(root, value['active_role_contract'])
+        pool_reference, compatibility = additive_manifest_union(root, proof, references)
+    manifest=checked(root,pool_reference)
+    read_manifest(pool_reference['path'],scene=manifest['scene'],rooms=manifest['rooms'],
                   fixed_bindings=manifest['fixed_bindings'])
-    require(all(r['task']==records[0]['task'] and r['variant']==records[0]['variant']
-                and r['room']==records[0]['room'] and r['class_id']==records[0]['class_id']
+    require(all(r['task']==records[0]['task'] and
+                (tasks is not None or (r['variant']==records[0]['variant'] and r['class_id']==records[0]['class_id']))
+                and r['room']==records[0]['room']
                 and r['perturbations']['lighting']==records[0]['perturbations']['lighting']
                 and r['perturbations']['removed_objects']==records[0]['perturbations']['removed_objects']
                 for r in records),'pool experiment changes undeclared task, room or augmentation')
-    names=[e['expected']['target']['native_name'] for e in value['episodes']]
+    role_maps = [task['role_map'] for task in tasks] if tasks is not None else None
+    names=([list(active_actor_names([v['native_name'] for v in roles.values()])) for roles in role_maps]
+           if role_maps is not None else [e['expected']['target']['native_name'] for e in value['episodes']])
     docs=[checked(root,r['artifacts']['recorded_scene']) for r in records]
-    contract=scene_contract(docs,names,references[0]);members=[]
-    for entry,record,doc,active in zip(value['episodes'],records,docs,names):
+    support_roles = [task.get('fixed_support_role') for task in tasks] if tasks else None
+    if support_roles is not None and not any(support_roles): support_roles = None
+    contract=scene_contract(docs,names,pool_reference,role_maps=role_maps,
+        source_pool_references=references if compatibility else None,
+        fixed_support_roles=support_roles);members=[]
+    if compatibility: contract['pool_manifest_compatibility'] = compatibility
+    for ordinal,(entry,record,doc,active) in enumerate(zip(value['episodes'],records,docs,names)):
         tro=checked(root,record['artifacts']['tro'])['ispatialgym']
-        target=entry['expected']['target'];binding=tro['object_bindings'][target['instance']]
-        require(binding['scene_object_name']==active and binding['category']==target['category']
-                and binding['model']==target['model'],'selected TRO binding differs')
-        require(entry['expected']['scene']==manifest['scene'] and
-                entry['expected']['room'] in manifest['rooms'],'selected world scope differs')
-        flags=contract['active_properties'][active]
-        require(flags['scale']==target['scale'],'initialized actor scale differs from selected measured scale')
+        roles = role_maps[ordinal] if role_maps is not None else {'target':entry['expected']['target']}
+        for target in roles.values():
+            binding=tro['object_bindings'][target['instance']]
+            require(binding['scene_object_name']==target['native_name'] and binding['category']==target['category']
+                    and binding['model']==target['model'],'selected TRO binding differs')
+            flags=contract['active_properties'][target['native_name']]
+            require(flags['scale']==target['scale'],'initialized actor scale differs from selected measured scale')
+        verify_selected_world(entry, record, doc, manifest)
         members.append({'tro':record['artifacts']['tro'],'scene':record['artifacts']['recorded_scene'],
                         'active':active,'bindings':tro['object_bindings'],
                         'robot_poses':doc['metadata']['task']['robot_poses'],
                         'review':entry['review'],'configuration':entry['configuration']})
+        if tasks is not None:
+            members[-1]['task_definition'] = tasks[ordinal]
     contract.update(source_request={'path':str(Path(request).resolve()),'sha256':file_digest(request)},
                     native_runtime=value['native_runtime'],members=members,
                     selected_inputs_sha256=digest([r['validation_key'] for r in records]))

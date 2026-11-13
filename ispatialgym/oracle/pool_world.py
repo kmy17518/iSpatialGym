@@ -1,0 +1,159 @@
+"""Explicit per-loader lifecycle for a source-checked fixed actor union.
+
+This is an opt-in native consumer of the campaign's exact pool contract. It
+performs the existing measured pool operations at named loader boundaries;
+it grants no execution/release authority and never changes source artifacts.
+"""
+import copy
+import json
+from pathlib import Path
+
+from ispatialgym.sampling.model_pool import require, digest
+from .pool_consumers import PoolConsumers
+
+
+class PoolWorld:
+    def __init__(self, contract, tro_path, output):
+        self.contract = copy.deepcopy(contract)
+        self.contract_sha256 = digest(contract)
+        self.consumers = PoolConsumers(contract, tro_path)
+        self.member = self.consumers.member
+        self.output = Path(output).resolve()
+        require(self.output.is_dir(), 'native pool output must already be private and prepared')
+        self.loader = None
+        self.cold_anchor = None
+        self.expected_scene = None
+        self.isolation = None
+        self._incoming_state = None
+        self.events = []
+
+    @classmethod
+    def from_source_sequence(cls, root, source_reference, tro_path, output):
+        # This CPU contract rechecks current source reviews, exact fixed-world
+        # identity, role mappings and additive pool compatibility. The ordinary
+        # loader still independently checks execution authorization.
+        from scripts.campaign_20261110.training_pool_world import checked, prepare
+        root = Path(root).resolve()
+        checked(root, source_reference)
+        require(Path(output).resolve().is_relative_to(root), 'native pool output escaped campaign')
+        return cls(prepare(root, source_reference['path']), tro_path, output)
+
+    def bind_loader(self, loader):
+        require(self.loader is None and loader.tro_path == self.member['tro']['path'],
+                'native pool lifecycle belongs to one incoming source')
+        require(getattr(loader, '_sequential_augmentation', None) is None,
+                'pool plus sequential augmentation requires a combined reviewed contract')
+        self.loader = loader
+        self.consumers.bind_loader(loader)
+        from scripts.campaign_20261110.training_pool_world import isolated_member_scene
+        source = json.loads(Path(self.member['scene']['path']).read_text())
+        self.expected_scene, self.isolation = isolated_member_scene(
+            self.contract, source, self.member['active'])
+
+    def configuration(self, config):
+        from scripts.campaign_20261110.training_pool_world import private_member_filename
+        require(self.loader is not None and self.expected_scene is not None,
+                'pool configuration has no incoming source')
+        path = self.output/private_member_filename(self.member['active'])
+        require(not path.exists(), 'preserve existing pool initialization artifact')
+        with path.open('x') as stream:
+            json.dump(self.expected_scene, stream, indent=2)
+            stream.write('\n')
+        result = copy.deepcopy(config)
+        result['scene']['scene_file'] = str(path)
+        return result
+
+    def cold_stopped(self, sim):
+        from scripts.campaign_20261110.training_pool_probe import _incoming_spawn
+        require(sim.is_stopped() and self.loader.robot.is_holonomic_base,
+                'pool cold anchor requires the existing stopped holonomic-base lifecycle')
+        incoming = _incoming_spawn(self.loader, self.loader.robot)
+        self.loader.robot.set_position_orientation(
+            position=incoming['position'], orientation=incoming['orientation'])
+        self.events.append({'phase':'cold_existing_mass_stop','source_spawn':copy.deepcopy(incoming),
+                            'extra_physics_steps':0})
+
+    def initialized(self):
+        from ispatialgym.sampling.model_pool import restore_export
+        from scripts.campaign_20261110.training_pool_adapter import pool_restore_document
+        from ispatialgym.oracle.campaign_batch import capture_robot_anchor
+        import omnigibson as og
+        loader = self.loader
+        require(len(self.events)==1, 'pool cold anchor did not join one existing mass lifecycle')
+        restore_export(loader.env.scene, og.sim, pool_restore_document(self.expected_scene, self.isolation))
+        loader._scene_state0 = copy.deepcopy(loader.env.scene.dump_state(serialized=False))
+        self.cold_anchor = capture_robot_anchor(loader)
+        self._observe_task(rebind=False)
+        self.observe('world_initialized_before_first_restore')
+
+    def share(self, shared):
+        require(self.cold_anchor is not None, 'pool has no initialized native anchor')
+        shared['model_pool_world'] = {'contract_sha256':self.contract_sha256,
+                                    'cold_anchor':copy.deepcopy(self.cold_anchor)}
+
+    def compatible(self, shared):
+        current = shared.get('model_pool_world')
+        require(isinstance(current, dict) and current.get('contract_sha256')==self.contract_sha256,
+                'incoming pool does not match this initialized world contract')
+        return True
+
+    def prepare_incoming(self, shared):
+        from scripts.campaign_20261110.training_pool_adapter import merge_member_state
+        from scripts.campaign_20261110.training_pool_source_anchor_probe import source_anchor
+        from scripts.campaign_20261110.training_pool_probe import _incoming_spawn
+        from omnigibson.utils.python_utils import recursively_convert_to_torch
+        import torch
+        self.compatible(shared)
+        self.cold_anchor = copy.deepcopy(shared['model_pool_world']['cold_anchor'])
+        anchor = source_anchor(self.cold_anchor, _incoming_spawn(self.loader, shared['robot']))
+        scene = shared['env'].scene
+        def local(position, orientation):
+            return scene.convert_world_pose_to_scene_relative(
+                torch.tensor(position,dtype=torch.float32),torch.tensor(orientation,dtype=torch.float32))
+        state = merge_member_state(shared['scene_state0'],self.expected_scene,shared['robot'].name,anchor,local)
+        self._incoming_state = {'anchor':anchor,'loaded':False}
+        return recursively_convert_to_torch(state)
+
+    def load_incoming(self, state, sim):
+        from scripts.campaign_20261110.training_pool_adapter import restart_without_steps, pool_restore_document
+        from scripts.campaign_20261110.training_pool_native_anchor_probe import anchored_scene_state
+        from ispatialgym.sampling.model_pool import restore_export
+        import torch
+        loader = self.loader; incoming = self._incoming_state
+        require(incoming is not None and incoming['loaded'] is False,
+                'incoming pool state must load exactly once after native cleanup')
+        anchor = incoming['anchor']; incoming['loaded'] = True
+        transition = restart_without_steps(sim,lambda:loader.robot.set_position_orientation(
+            position=anchor['position'],orientation=anchor['orientation']))
+        pose = tuple(v.clone() for v in loader.robot.root_link.get_position_orientation())
+        prepared = anchored_scene_state(state,loader.robot.name,pose,loader.env.scene.get_position_orientation())
+        result = loader.env.scene.load_state(prepared,serialized=False)
+        actual = loader.robot.root_link.get_position_orientation()
+        require(all(torch.equal(a,b)for a,b in zip(pose,actual)), 'incoming restore changed its own native anchor')
+        restore_export(loader.env.scene,sim,pool_restore_document(self.expected_scene,self.isolation))
+        self.events.append({'phase':'incoming_after_native_cleanup','anchor':copy.deepcopy(anchor),
+                            'transition':transition,'native_anchor_bit_identical':True})
+        return result
+
+    def attached(self):
+        require(self._incoming_state is not None and self._incoming_state['loaded'] is True,
+                'incoming pool restoration boundary was omitted')
+        self._observe_task(rebind=True)
+        self.observe('incoming_scene_loaded_before_task_restore')
+
+    def _observe_task(self, *, rebind):
+        from scripts.campaign_20261110.training_pool_task import observe_task, rebind_task
+        loader = self.loader
+        require(self.member.get('task_definition') is not None,
+                'native pool needs an explicit exact role/task contract')
+        loader.report['pool_exact_task_binding'] = (rebind_task if rebind else observe_task)(loader,self.member)
+
+    def observe(self, phase):
+        from scripts.campaign_20261110.training_pool_adapter import native_isolation
+        loader = self.loader
+        bindings = {k:v.name for k,v in loader.task.physical_object_scope.items() if v is not None}
+        observed = native_isolation(loader.env.scene,loader.robot,self.isolation,bindings,None)
+        loader.report.setdefault('model_pool_world',[]).append({
+            'phase':phase,'contract_sha256':self.contract_sha256,'source_tro':self.member['tro'],
+            'active_names':list(self.consumers.active),'isolation':observed,
+            'lifecycle_events':copy.deepcopy(self.events),'production_authorization':False})
