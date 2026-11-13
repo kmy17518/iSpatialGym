@@ -92,6 +92,15 @@ class PoolWorld:
 
     def share(self, shared):
         require(self.cold_anchor is not None, 'pool has no initialized native anchor')
+        if 'build_report' in shared:
+            # InstanceLoader shares build measurements before the first restore
+            # and recording. Its shallow report copy otherwise retains the first
+            # episode's mutable lifecycle and serialized-state lists. Incoming
+            # loaders must publish their own task, isolation and reader evidence.
+            shared['build_report'] = {
+                key: copy.deepcopy(value) for key, value in shared['build_report'].items()
+                if not key.startswith('model_pool_') and key != 'pool_exact_task_binding'
+            }
         shared['model_pool_world'] = {'contract_sha256':self.contract_sha256,
                                     'cold_anchor':copy.deepcopy(self.cold_anchor)}
 

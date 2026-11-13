@@ -10,6 +10,7 @@ DELTA = {
     'warm_reference_state_copied': False,
     'planner': 'per_episode_native_obstacle_filter_and_enable_mask',
     'recording': 'native_Executor_and_Recorder_active_actor_consumers',
+    'episode_evidence': 'per_loader_lists_not_inherited_from_first_build',
     'queue': 'existing_exclusive_claims_with_exact_request_episode_order',
     'driver': 'original_own_argv_apply_driver_env_and_saved_report_check',
     'source_authorization': 'original_gate_rechecked_before_each_episode',
@@ -27,6 +28,11 @@ PAYLOADS = {
     'ispatialgym/oracle/restoration_policy.py',
     'ispatialgym/oracle/restoration_policy_inputs.py',
     'scripts/campaign_20261110/training_native_pool_contract.py',
+    # The b4fa snapshot includes these regressions. payloads() inventories all
+    # Python files, including tests; omitting them rejects the prepared native
+    # candidate before any physics executes. Keep the exception finite.
+    'scripts/campaign_20261110/tests/test_native_pool_world.py',
+    'scripts/campaign_20261110/tests/test_pool_robot_anchor.py',
 }
 
 

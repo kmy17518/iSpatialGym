@@ -43,6 +43,32 @@ def test_shared_pool_requires_exact_complete_contract_and_one_loader(tmp_path):
     with pytest.raises(ValueError,match='one incoming'):world.bind_loader(loader)
 
 
+def test_shared_build_report_cannot_overwrite_incoming_reader_or_lifecycle_evidence(tmp_path):
+    world, loader, _ = bound(tmp_path)
+    world.cold_anchor = {'own': 'anchor'}
+    first_states = [{'initial': True, 'object_names': ['campaign_pool_A']}]
+    first_events = [{'phase': 'world_initialized_before_first_restore', 'source': 'A'}]
+    build = {'base_link_mass_kg': {'value': 10},
+             'model_pool_serialized_states': first_states,
+             'model_pool_world': first_events,
+             'pool_exact_task_binding': {'source': 'A'}}
+    shared = {'build_report': dict(build)}
+    world.share(shared)
+    # Match InstanceLoader.attach: it updates an incoming per-loader report
+    # from the first build after PoolConsumers has bound its own reader list.
+    incoming_states = [{'initial': True, 'object_names': ['campaign_pool_B']}]
+    incoming = {'model_pool_serialized_states': incoming_states}
+    incoming.update(shared['build_report'])
+    first_states.append({'initial': False, 'source': 'A'})
+    first_events.append({'phase': 'after_complete_native_loader', 'source': 'A'})
+    build['base_link_mass_kg']['value'] = 11
+    assert incoming['model_pool_serialized_states'] is incoming_states
+    assert len(incoming_states) == 1
+    assert incoming['base_link_mass_kg'] == {'value': 10}
+    assert 'model_pool_world' not in incoming and 'pool_exact_task_binding' not in incoming
+    assert shared['model_pool_world']['cold_anchor'] == world.cold_anchor
+
+
 def test_cold_anchor_joins_existing_stop_without_starting_another_lifecycle(tmp_path):
     world,loader,_=bound(tmp_path);calls=[]
     pose={'position':[1,2,3],'orientation':[0,0,0,1]};loader.tro=N(robot_poses={'robot':[pose]})
