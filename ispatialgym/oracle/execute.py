@@ -868,6 +868,25 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
         return
     n = escape_direction(state, pre, supports)
     if n is None:
+        from .campaign_support_transit import required as keep_far_support
+        if keep_far_support(getattr(motions, '_protect', None) or {}):
+            # touching01: its pre-grasp is 185 mm above the table, outside the
+            # escape-direction 150 mm neighborhood. That endpoint distance does
+            # not clear the transit: the prior ignored-table path pressed a
+            # finger into the table for 30 steps and triggered hard wobble QA.
+            rec = {'required': True, 'supports': [getattr(o, 'name', str(o)) for o in supports],
+                   'status': 'planning', 'emitted_steps': 0, 'ignored_support_fallback': False}
+            ctx['far_pregrasp_support_present'] = rec
+            moved = [0]
+            try:
+                yield from _counted(motions.arm_to(arm, pose=pre, q_hint=q_hint,
+                    ignore_objects=list(through), ignore_links=list(ignore_links),
+                    accept_other_branch=accept_other_branch), moved)
+            except SkillError as exc:
+                rec.update(status='failed', reason=exc.reason, emitted_steps=moved[0])
+                raise
+            rec.update(status='completed', emitted_steps=moved[0])
+            return
         yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(supports) + list(through), ignore_links=list(ignore_links), accept_other_branch=accept_other_branch)
         if getattr(motions, "last_relaxed_links", None):
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
@@ -1857,7 +1876,7 @@ def _grasp_transit(action: Grasp, motions: Motions, state, targets, ctx, arm: st
                         ctx["transit_dip"] = dict(dip)
             ctx["pre_grasp_transit"] = "supports present"
         except SkillError as e:
-            if e.details.get("stage") == "protected":
+            if e.details.get("stage") == "protected" or ctx.get('far_pregrasp_support_present', {}).get('required'):
                 raise
             if (yield from cartesian_before_ignoring(motions, arm, targets["pre_grasp"], _witness(ctx, "pre_grasp"), targets.get("approach") or (), ctx, e.message)):
                 return
