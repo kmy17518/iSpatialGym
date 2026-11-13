@@ -1,0 +1,96 @@
+import copy
+import json
+from types import SimpleNamespace as N
+import pytest
+import torch
+from ispatialgym.oracle.pool_world import PoolWorld
+from ispatialgym.sampling.model_pool import file_reference
+from scripts.campaign_20261110.training_pool_world import scene_contract
+from scripts.campaign_20261110.tests.test_training_pool_world import scenes
+from scripts.campaign_20261110.tests.test_training_pool_native_anchor_probe import state_and_pose
+
+
+def bound(tmp_path):
+    documents=scenes();contract=scene_contract(documents,['campaign_pool_A','campaign_pool_B','campaign_pool_A'],{'sha256':'pool'})
+    rows=[]
+    for i,doc in enumerate(documents[:2]):
+        scene=tmp_path/('scene'+str(i)+'.json');scene.write_text(json.dumps(doc))
+        tro=tmp_path/('tro'+str(i)+'.json');tro.write_text('{}')
+        rows.append({'tro':file_reference(tro),'scene':file_reference(scene),'active':('campaign_pool_A','campaign_pool_B')[i]})
+    contract['members']=[rows[0],rows[1],copy.deepcopy(rows[0])]
+    world=PoolWorld(contract,rows[0]['tro']['path'],tmp_path)
+    loader=N(tro_path=rows[0]['tro']['path']);world.bind_loader(loader)
+    return world,loader,documents
+
+
+def test_native_union_configuration_is_private_and_does_not_overwrite_source(tmp_path):
+    world,loader,documents=bound(tmp_path)
+    original={'scene':{'scene_file':'original'},'task':{'tro_path':loader.tro_path}}
+    out=world.configuration(original)
+    assert original['scene']['scene_file']=='original'
+    doc=json.loads(open(out['scene']['scene_file']).read())
+    assert set(doc['objects_info']['init_info'])=={'support','campaign_pool_A','campaign_pool_B'}
+    assert json.loads(open(world.member['scene']['path']).read())==documents[0]
+    with pytest.raises(ValueError,match='preserve'):world.configuration(original)
+
+
+def test_shared_pool_requires_exact_complete_contract_and_one_loader(tmp_path):
+    world,loader,_=bound(tmp_path)
+    world.cold_anchor={'own':'anchor'};shared={};world.share(shared)
+    assert world.compatible(shared)
+    shared['model_pool_world']['contract_sha256']='different support or pool'
+    with pytest.raises(ValueError,match='initialized world'):world.compatible(shared)
+    with pytest.raises(ValueError,match='one incoming'):world.bind_loader(loader)
+
+
+def test_cold_anchor_joins_existing_stop_without_starting_another_lifecycle(tmp_path):
+    world,loader,_=bound(tmp_path);calls=[]
+    pose={'position':[1,2,3],'orientation':[0,0,0,1]};loader.tro=N(robot_poses={'robot':[pose]})
+    native=(torch.tensor(pose['position']),torch.tensor(pose['orientation']))
+    loader.robot=N(is_holonomic_base=True,model='r1',set_position_orientation=lambda **kw:calls.append(kw),
+                   root_link=N(get_position_orientation=lambda:native))
+    with pytest.raises(ValueError,match='existing stopped'):world.cold_stopped(N(is_stopped=lambda:False))
+    world.cold_stopped(N(is_stopped=lambda:True))
+    assert calls==[] and world.events[0]['extra_physics_steps']==0
+    assert world.events[0]['extra_native_pose_writes']==0
+    assert world.events[0]['native_anchor_before_existing_mass_play']==[v.tolist()for v in native]
+    native[0][0]+=1
+    with pytest.raises(ValueError,match='declared incoming'):world.cold_stopped(N(is_stopped=lambda:True))
+    assert calls==[] and len(world.events)==1
+
+
+def test_incoming_native_load_is_once_and_preserves_own_anchor_without_copying_reference(tmp_path,monkeypatch):
+    from scripts.campaign_20261110 import training_pool_adapter as adapter
+    from ispatialgym.sampling import model_pool
+    from ispatialgym.oracle import pool_robot_anchor
+    world,loader,_=bound(tmp_path);state,pose,frame=state_and_pose();calls=[]
+    scene=N(get_position_orientation=lambda:frame)
+    def load(value,serialized=False):
+        calls.append(('load',copy.deepcopy(value)));assert serialized is False
+        root=value['registry']['object_registry']['robot']['root_link']
+        pose[0].copy_(root['pos']);pose[1].copy_(root['ori'])
+        return 'loaded'
+    scene.load_state=load;loader.env=N(scene=scene)
+    loader.robot=N(name='robot',root_link=N(get_position_orientation=lambda:pose),
+                   set_position_orientation=lambda **kw:calls.append(('anchor',kw)))
+    def restart(sim,callback):calls.append(('stop',));callback();calls.append(('play',));return {'observed_physics_step_calls':[]}
+    monkeypatch.setattr(adapter,'restart_without_steps',restart)
+    monkeypatch.setattr(pool_robot_anchor,'author_native_root_joint',lambda robot,sim,anchor:
+                        (calls.append(('anchor',anchor)) or {'mode':'own_stopped_native_root_joint_v1'}))
+    monkeypatch.setattr(model_pool,'restore_export',lambda *args:calls.append(('pool_properties',)))
+    world._incoming_state={'anchor':{'position':[1,2,3],'orientation':[0,0,0,1]},'loaded':False}
+    before=copy.deepcopy(state)
+    assert world.load_incoming(state,N())=='loaded'
+    assert [c[0]for c in calls]==['stop','anchor','play','load','pool_properties']
+    actual=calls[3][1]['registry']['object_registry']['robot']
+    assert torch.equal(actual['root_link']['ori'],pose[1])
+    assert actual['joint_pos']==before['registry']['object_registry']['robot']['joint_pos']
+    assert torch.equal(state['registry']['object_registry']['robot']['root_link']['ori'],before['registry']['object_registry']['robot']['root_link']['ori'])
+    with pytest.raises(ValueError,match='exactly once'):world.load_incoming(state,N())
+    assert len(calls)==5
+
+
+def test_unbound_combined_augmentation_is_rejected_before_physics(tmp_path):
+    world,loader,_=bound(tmp_path)
+    other=PoolWorld(world.contract,world.member['tro']['path'],tmp_path)
+    with pytest.raises(ValueError,match='combined reviewed'):other.bind_loader(N(tro_path=loader.tro_path,_sequential_augmentation={'other':True}))

@@ -122,13 +122,16 @@ class PoolWorld:
         from scripts.campaign_20261110.training_pool_adapter import restart_without_steps, pool_restore_document
         from scripts.campaign_20261110.training_pool_native_anchor_probe import anchored_scene_state
         from ispatialgym.sampling.model_pool import restore_export
+        from .pool_robot_anchor import author_native_root_joint
         import torch
         loader = self.loader; incoming = self._incoming_state
         require(incoming is not None and incoming['loaded'] is False,
                 'incoming pool state must load exactly once after native cleanup')
         anchor = incoming['anchor']; incoming['loaded'] = True
-        transition = restart_without_steps(sim,lambda:loader.robot.set_position_orientation(
-            position=anchor['position'],orientation=anchor['orientation']))
+        joint_event = {}
+        def stopped_anchor():
+            joint_event.update(author_native_root_joint(loader.robot, sim, anchor))
+        transition = restart_without_steps(sim, stopped_anchor)
         pose = tuple(v.clone() for v in loader.robot.root_link.get_position_orientation())
         prepared = anchored_scene_state(state,loader.robot.name,pose,loader.env.scene.get_position_orientation())
         result = loader.env.scene.load_state(prepared,serialized=False)
@@ -136,7 +139,8 @@ class PoolWorld:
         require(all(torch.equal(a,b)for a,b in zip(pose,actual)), 'incoming restore changed its own native anchor')
         restore_export(loader.env.scene,sim,pool_restore_document(self.expected_scene,self.isolation))
         self.events.append({'phase':'incoming_after_native_cleanup','anchor':copy.deepcopy(anchor),
-                            'transition':transition,'native_anchor_bit_identical':True})
+                            'transition':transition,'joint_anchor':joint_event,
+                            'native_anchor_bit_identical':True})
         return result
 
     def attached(self):
