@@ -2014,11 +2014,15 @@ class Disembedding(SamplerV2):
             self.campaign_verify_goal(draft)
             draft.summary["campaign_goal_group"]["phase"] = "settled_goal_verified"
         path = super().write_instance(draft, index, seed)
-        if getattr(self, "_campaign_tray_active", None) is not None:
-            self._campaign_group_written = getattr(self, "_campaign_group_written", 0) + 1
         if draft.extras.get("fixed_layout"):
             self.template_meta.setdefault("fixed_layout", {}).setdefault("per_instance", {})[self.instance_id(index)] = dict(draft.extras["fixed_layout"])
         return path
+
+    def check_goal_occlusion(self, draft: Draft, tro_path: str) -> None:
+        super().check_goal_occlusion(draft, tro_path)
+        # A staged native write rejected by a post-write screen is not a member.
+        if getattr(self, "_campaign_tray_active", None) is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0) + 1
 
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
         g = self.sidecar.grasp_of(self.tname)
