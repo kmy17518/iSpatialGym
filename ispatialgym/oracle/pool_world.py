@@ -180,7 +180,12 @@ class PoolWorld:
                 'native pool needs an explicit exact role/task contract')
         loader.report['pool_exact_task_binding'] = (rebind_task if rebind else observe_task)(loader,self.member)
 
-    def observe_reset(self, phase, sim):
+    def trace_reset(self, sim):
+        from .pool_reset_trace import reset_targets, trace_calls
+        return trace_calls(reset_targets(self.loader, sim),
+                           lambda event: self.observe_reset('native_reset_internal', sim, internal=event))
+
+    def observe_reset(self, phase, sim, *, internal=None):
         """Read native boundary state without setters, steps or reference-state imports.
 
         Stopped observations intentionally avoid articulation/velocity handles.
@@ -237,10 +242,21 @@ class PoolWorld:
                'sim_time': before[0], 'sim_step': before[1], 'stopped': stopped,
                'robot': native, 'active_states': active,
                'state_writes': 0, 'physics_steps_requested': 0}
+        if internal is not None:
+            from omnigibson.utils.usd_utils import RigidContactAPI
+            from .pool_reset_trace import contact_snapshot
+            objects = [robot] + [loader.env.scene.object_registry('name', name)
+                                 for name in self.consumers.active]
+            paths = {link.prim_path for obj in objects for link in obj.links.values()}
+            row['call'] = internal
+            row['native_contacts'] = contact_snapshot(
+                RigidContactAPI, loader.env.scene.idx, paths, float(sim.get_physics_dt()))
+            require(clock() == before, 'internal reset observation advanced the native simulation clock')
         # Detach every mutable value and reject nonfinite/unserializable native
         # evidence now, instead of corrupting the eventual episode report.
         row = json.loads(json.dumps(row, allow_nan=False))
-        loader.report.setdefault('model_pool_reset_observations', []).append(row)
+        key = 'model_pool_reset_internal_observations' if internal is not None else 'model_pool_reset_observations'
+        loader.report.setdefault(key, []).append(row)
 
     def observe(self, phase):
         from scripts.campaign_20261110.training_pool_adapter import native_isolation

@@ -13,6 +13,7 @@ DELTA = {
     'recording': 'native_Executor_and_Recorder_active_actor_consumers',
     'episode_evidence': 'per_loader_lists_not_inherited_from_first_build',
     'reset_observations': 'read_only_native_boundaries_v1_no_steps_or_setters',
+    'reset_internal_observations': 'exact_instance_python_calls_v1_native_contacts_no_refresh',
     'queue': 'existing_exclusive_claims_with_exact_request_episode_order',
     'driver': 'original_own_argv_apply_driver_env_and_saved_report_check',
     'source_authorization': 'original_gate_rechecked_before_each_episode',
@@ -27,6 +28,7 @@ PAYLOADS = {
     'ispatialgym/oracle/recorder.py', 'ispatialgym/oracle/pool_consumers.py',
     'ispatialgym/oracle/pool_world.py', 'ispatialgym/oracle/pool_inputs.py',
     'ispatialgym/oracle/pool_robot_anchor.py',
+    'ispatialgym/oracle/pool_reset_trace.py',
     'ispatialgym/oracle/restoration_policy.py',
     'ispatialgym/oracle/restoration_policy_inputs.py',
     'scripts/campaign_20261110/training_native_pool_contract.py',
@@ -35,6 +37,7 @@ PAYLOADS = {
     # candidate before any physics executes. Keep the exception finite.
     'scripts/campaign_20261110/tests/test_native_pool_world.py',
     'scripts/campaign_20261110/tests/test_pool_robot_anchor.py',
+    'scripts/campaign_20261110/tests/test_pool_reset_trace.py',
 }
 
 

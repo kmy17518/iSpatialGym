@@ -829,34 +829,39 @@ class InstanceLoader:
             self._hold_entities()
         if self.pool_world is not None:
             self.pool_world.observe_reset('after_native_settle_before_reset', og.sim)
-        env.scene.update_initial_file()
-        task._reset_tracking()
-        if PO.trim():
-            # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): Environment.reset renders 3 frames before it reads the observation (no
-            # config key for the count in OmniGibson 3.9); a physics-only run keeps no frame - the same reset and step, the
-            # observation read without the renders (its images are stale, nothing reads them)
-            env.reset(get_obs=False)
-            og.sim.step()
-            obs, obs_info = SE.get_obs(env)
-            info = {"obs_info": obs_info}
-            log.info("train-fast PHYSICS_ONLY_TRIM: reset without the 3 observation renders")
-        else:
-            obs, info = SE.reset(env)  # returns to the snapshot, activates pose_settled tracking, renders
-        self.report["after_reset"] = self.restore_after_reset()
-        # i7-attachfix: every TRO object starts where the TRO puts it (the plan, its grasps and its IK witnesses assume it); a world
-        # reused after a joined episode left the pair off its TRO pose and nothing compared them (meta.start_state was only recorded)
-        self.report["tro_pose_check"] = self._check_tro_poses()
-        if self.report["controller_targets_restored"]:
-            robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action
-        if self.tro.meta.raw.get("campaign"):
-            from ispatialgym.oracle.campaign_restore import restore_serialized_root_motion
+        from contextlib import nullcontext
 
-            restored = restore_serialized_root_motion(self.tro.meta.raw["campaign"], self.physical,
-                                                      self.tro.object_states, execution=self._restoration_execution)
-            if restored is not None:
-                self.report["campaign_restoration"]["serialized_root_motion"] = restored
+        with self.pool_world.trace_reset(og.sim) if self.pool_world is not None else nullcontext() as reset_trace:
+            env.scene.update_initial_file()
+            task._reset_tracking()
+            if PO.trim():
+                # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): Environment.reset renders 3 frames before it reads the observation (no
+                # config key for the count in OmniGibson 3.9); a physics-only run keeps no frame - the same reset and step, the
+                # observation read without the renders (its images are stale, nothing reads them)
+                env.reset(get_obs=False)
+                og.sim.step()
+                obs, obs_info = SE.get_obs(env)
+                info = {"obs_info": obs_info}
+                log.info("train-fast PHYSICS_ONLY_TRIM: reset without the 3 observation renders")
+            else:
+                obs, info = SE.reset(env)  # returns to the snapshot, activates pose_settled tracking, renders
+            self.report["after_reset"] = self.restore_after_reset()
+            # i7-attachfix: every TRO object starts where the TRO puts it (the plan, its grasps and its IK witnesses assume it); a world
+            # reused after a joined episode left the pair off its TRO pose and nothing compared them (meta.start_state was only recorded)
+            self.report["tro_pose_check"] = self._check_tro_poses()
+            if self.report["controller_targets_restored"]:
+                robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action
+            if self.tro.meta.raw.get("campaign"):
+                from ispatialgym.oracle.campaign_restore import restore_serialized_root_motion
+
+                restored = restore_serialized_root_motion(self.tro.meta.raw["campaign"], self.physical,
+                                                          self.tro.object_states, execution=self._restoration_execution)
+                if restored is not None:
+                    self.report["campaign_restoration"]["serialized_root_motion"] = restored
+            if self.pool_world is not None:
+                self.pool_world.observe_reset('after_native_reset', og.sim)
         if self.pool_world is not None:
-            self.pool_world.observe_reset('after_native_reset', og.sim)
+            self.report["model_pool_reset_internal_trace"] = reset_trace
         return obs, info
 
     def _tro_pose_pairs(self) -> Dict[str, Tuple[Any, Any]]:
