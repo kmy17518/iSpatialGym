@@ -134,17 +134,23 @@ class PoolWorld:
         from scripts.campaign_20261110.training_pool_adapter import restart_without_steps, pool_restore_document
         from scripts.campaign_20261110.training_pool_native_anchor_probe import anchored_scene_state
         from ispatialgym.sampling.model_pool import restore_export
-        from .pool_robot_anchor import author_native_root_joint
+        from .pool_robot_anchor import restore_source_cold_spawn
         import torch
         loader = self.loader; incoming = self._incoming_state
         require(incoming is not None and incoming['loaded'] is False,
                 'incoming pool state must load exactly once after native cleanup')
         anchor = incoming['anchor']; incoming['loaded'] = True
+        robot_configs = loader.cfg['robots']
+        require(len(robot_configs) == 1, 'native pool needs one cold robot configuration')
+        # Environment._load_robots uses this frame (scene by default). Retain
+        # the construction contract when restoring a compatible incoming spawn.
+        pose_frame = robot_configs[0].get('pose_frame', 'scene')
+        require(pose_frame in ('scene', 'world'), 'unsupported cold robot spawn frame')
         joint_event = {}
         self.observe_reset('incoming_before_stop', sim)
         def stopped_anchor():
             self.observe_reset('incoming_stopped_before_anchor', sim)
-            joint_event.update(author_native_root_joint(loader.robot, sim, anchor))
+            joint_event.update(restore_source_cold_spawn(loader.robot, sim, anchor, pose_frame=pose_frame))
             self.observe_reset('incoming_stopped_after_anchor', sim)
         transition = restart_without_steps(sim, stopped_anchor)
         self.observe_reset('incoming_after_play', sim)

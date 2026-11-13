@@ -86,7 +86,8 @@ def test_cold_anchor_joins_existing_stop_without_starting_another_lifecycle(tmp_
     assert calls==[] and len(world.events)==1
 
 
-def test_incoming_native_load_is_once_and_preserves_own_anchor_without_copying_reference(tmp_path,monkeypatch):
+@pytest.mark.parametrize('robot_config, expected_frame', [({}, 'scene'), ({'pose_frame': 'world'}, 'world')])
+def test_incoming_native_load_is_once_and_preserves_own_anchor_without_copying_reference(tmp_path,monkeypatch,robot_config,expected_frame):
     from scripts.campaign_20261110 import training_pool_adapter as adapter
     from ispatialgym.sampling import model_pool
     from ispatialgym.oracle import pool_robot_anchor
@@ -99,12 +100,16 @@ def test_incoming_native_load_is_once_and_preserves_own_anchor_without_copying_r
         pose[0].copy_(root['pos']);pose[1].copy_(root['ori'])
         return 'loaded'
     scene.load_state=load;loader.env=N(scene=scene)
+    loader.cfg = {'robots': [robot_config]}
     loader.robot=N(name='robot',root_link=N(get_position_orientation=lambda:pose),
                    set_position_orientation=lambda **kw:calls.append(('anchor',kw)))
     def restart(sim,callback):calls.append(('stop',));callback();calls.append(('play',));return {'observed_physics_step_calls':[]}
     monkeypatch.setattr(adapter,'restart_without_steps',restart)
-    monkeypatch.setattr(pool_robot_anchor,'author_native_root_joint',lambda robot,sim,anchor:
-                        (calls.append(('anchor',anchor)) or {'mode':'own_stopped_native_root_joint_v1'}))
+    def restore_spawn(robot, sim, anchor, *, pose_frame):
+        assert pose_frame == expected_frame
+        calls.append(('anchor', anchor))
+        return {'mode': 'source_cold_stopped_spawn_v1'}
+    monkeypatch.setattr(pool_robot_anchor, 'restore_source_cold_spawn', restore_spawn)
     monkeypatch.setattr(model_pool,'restore_export',lambda *args:calls.append(('pool_properties',)))
     world._incoming_state={'anchor':{'position':[1,2,3],'orientation':[0,0,0,1]},'loaded':False}
     before=copy.deepcopy(state)
