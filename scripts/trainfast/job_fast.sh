@@ -50,6 +50,13 @@ isgf_grasps_record $JOBDIR   # of-v2maps: ISGF_GRASPS legacy | v2 (fast_env.sh),
 # the campaign-wide sampling cache (start-draw cells, exact IK witnesses) instead of the job-private one
 export ISPATIALGYM_SAMPLING_CACHE=${ISGF_SAMPLING_CACHE:-$F/cache/sampling}
 mkdir -p $ISPATIALGYM_SAMPLING_CACHE
+# Release-owned attempt policy for explicitly routed classes. This is resolved
+# from the same config/profile as sampling; failure must stop before native work.
+if [ -n "${ISPATIALGYM_CAMPAIGN_CONFIG:-}" ]; then
+  ROUTED_MAX_ATTEMPTS=$(python -m ispatialgym.sampling.campaign_class_routes \
+    --config "$ISPATIALGYM_CAMPAIGN_CONFIG" --output "$JOBDIR/class_route_policy.json") || exit 2
+  [ -z "$ROUTED_MAX_ATTEMPTS" ] || MAX_ATTEMPTS=$ROUTED_MAX_ATTEMPTS
+fi
 # i7-plateqtf 2026-11-07: the expanding reach map's corrections (v2/map_tilt.py) - this job's own overlay shards (one file per process,
 # never the frozen maps; merged offline by `python -m ispatialgym.sampling.v2.map_tilt merge`)
 export ISPATIALGYM_MAP_OVERLAY_SHARDS=${ISPATIALGYM_MAP_OVERLAY_SHARDS:-$JOBDIR/map_overlay}

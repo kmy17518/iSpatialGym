@@ -1,0 +1,436 @@
+{
+  "config": {
+    "campaign_id": "campaign_20261110",
+    "perturbations": {
+      "lighting": {},
+      "removed_objects": [],
+      "scales": {
+        "cork.n.04_1": {
+          "applied": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "mode": "fixed"
+        },
+        "desk.n.01_1": {
+          "applied": [
+            0.9999847412109375,
+            1.0000094175338745,
+            0.9999880790710449
+          ],
+          "default": [
+            0.9999847412109375,
+            1.0000094175338745,
+            0.9999880790710449
+          ],
+          "mode": "fixed"
+        },
+        "floor.n.01_1": {
+          "applied": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "mode": "fixed"
+        },
+        "wine_bottle.n.01_1": {
+          "applied": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "mode": "fixed"
+        }
+      }
+    },
+    "purpose": "validation",
+    "split": "eval_standard",
+    "template": {
+      "class_id": "configuration_matching-attachment_03",
+      "definition_sha256": "06e9b6ccc9e4c13485ce8454c68d0360344f4bcbf56b2d08470be9655c75d584",
+      "objects": [
+        {
+          "asset_sha256": "5d34829723c7bada8ccb5ccf9e5bbee9669e5880606322e733c947729a95c13c",
+          "category": "floors",
+          "default_scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "instance": "floor.n.01_1",
+          "joint": null,
+          "model": "wyitdg",
+          "readiness_source": "{\"files_sha256\":{\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/complaints.json\":\"c1e2500bf9c9384d7b5a4bf5a6de84a38435042a9d9598e2be4d73f0b63bf69d\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/deletion_queue.csv\":\"6fe45858ff6a9b48963c6b53c5fc7ecc1040250ef748e934d9e8e489614a0c20\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/object_inventory.json\":\"bbab63508e33e4634646f8f2027bc00df728b0b1ff1e2e3e952d36d9201089db\"},\"rule\":\"ispatialgym.sampling.knowledge.is_ready + provider presence\"}",
+          "ready": true,
+          "role": "support",
+          "semantic_kind": "floor"
+        },
+        {
+          "asset_sha256": "aa68cf4b93c1f156368e40e2b041c6f4538aa34acf401f4dfdc4e6a3b7e4b7be",
+          "category": "desk",
+          "default_scale": [
+            0.9999847412109375,
+            1.0000094175338745,
+            0.9999880790710449
+          ],
+          "instance": "desk.n.01_1",
+          "joint": null,
+          "model": "mdhelw",
+          "readiness_source": "{\"files_sha256\":{\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/complaints.json\":\"c1e2500bf9c9384d7b5a4bf5a6de84a38435042a9d9598e2be4d73f0b63bf69d\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/deletion_queue.csv\":\"6fe45858ff6a9b48963c6b53c5fc7ecc1040250ef748e934d9e8e489614a0c20\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/object_inventory.json\":\"bbab63508e33e4634646f8f2027bc00df728b0b1ff1e2e3e952d36d9201089db\"},\"rule\":\"ispatialgym.sampling.knowledge.is_ready + provider presence\"}",
+          "ready": true,
+          "role": "support",
+          "semantic_kind": "object"
+        },
+        {
+          "asset_sha256": "51c833e864ce4a044898f78a496c44c99570fa6bde76eee2ddafb30ac5c2ad7f",
+          "category": "cork",
+          "default_scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "instance": "cork.n.04_1",
+          "joint": null,
+          "model": "ncxgpe",
+          "readiness_source": "{\"files_sha256\":{\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/complaints.json\":\"c1e2500bf9c9384d7b5a4bf5a6de84a38435042a9d9598e2be4d73f0b63bf69d\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/deletion_queue.csv\":\"6fe45858ff6a9b48963c6b53c5fc7ecc1040250ef748e934d9e8e489614a0c20\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/object_inventory.json\":\"bbab63508e33e4634646f8f2027bc00df728b0b1ff1e2e3e952d36d9201089db\"},\"rule\":\"ispatialgym.sampling.knowledge.is_ready + provider presence\"}",
+          "ready": true,
+          "role": "target",
+          "semantic_kind": "object"
+        },
+        {
+          "asset_sha256": "f3282c9acdd25c0b4512eef31f6ba22d6803880f7289c5fcb658f766ec53a09f",
+          "category": "wine_bottle",
+          "default_scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "instance": "wine_bottle.n.01_1",
+          "joint": null,
+          "model": "inkqch",
+          "readiness_source": "{\"files_sha256\":{\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/complaints.json\":\"c1e2500bf9c9384d7b5a4bf5a6de84a38435042a9d9598e2be4d73f0b63bf69d\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/deletion_queue.csv\":\"6fe45858ff6a9b48963c6b53c5fc7ecc1040250ef748e934d9e8e489614a0c20\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/object_inventory.json\":\"bbab63508e33e4634646f8f2027bc00df728b0b1ff1e2e3e952d36d9201089db\"},\"rule\":\"ispatialgym.sampling.knowledge.is_ready + provider presence\"}",
+          "ready": true,
+          "role": "partner",
+          "semantic_kind": "object"
+        }
+      ],
+      "room": "private_office_2",
+      "scene": "office_cubicles_right",
+      "scene_setup": {
+        "awaiting_owner_update": false,
+        "campaign_adaptation": "pending",
+        "fresh_validation": "not_started",
+        "inst_to_name": {
+          "agent.n.01_1": "robot_r1",
+          "cork.n.04_1": "target_cork_ncxgpe_0",
+          "desk.n.01_1": "desk_mdhelw_1",
+          "floor.n.01_1": "floors_wyitdg_0",
+          "wine_bottle.n.01_1": "partner_wine_bottle_inkqch_0"
+        },
+        "runtime_bddl_equivalence": {
+          "comparison": "parsed activity/domain/variant/objects/groups/init/goal/measure; goal and measure remain separate",
+          "migration": null,
+          "runtime": {
+            "has_explicit_measure": true,
+            "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/code/trunk_7941e07f8c0d/ispatialgym/assets/bddl/activity_definitions/configuration_matching/problem82.bddl",
+            "sha256": "a696b59f7d9dbcd6e3d39b534056f46d1522b0814a029cb2cf60a7a53e4402ca"
+          },
+          "runtime_semantic_sha256": "50ccc59c3c60dac839cf923d27902dbd9436b9bc39996750b71d1c4a2c219bb8",
+          "semantic_equivalence": true,
+          "semantic_sha256": "50ccc59c3c60dac839cf923d27902dbd9436b9bc39996750b71d1c4a2c219bb8",
+          "source": {
+            "has_explicit_measure": true,
+            "path": "/vision/u/minyeong/projects/isg_home/eval85/runs/s3_55tasks/configuration_matching-attachment_03/c10_k0/inst/configuration_matching-attachment-cork-wine_bottle-desk/activity_definitions/configuration_matching/problem82.bddl",
+            "sha256": "e33447e62fe0a9d8d774148802993f280f7fd6953241ced9e4196fbd941ddbe6"
+          }
+        },
+        "runtime_bddl_sha256": "a696b59f7d9dbcd6e3d39b534056f46d1522b0814a029cb2cf60a7a53e4402ca",
+        "runtime_template_id": "office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe",
+        "scene_variant": {
+          "freed_footprints": {
+            "block": [
+              [
+                [
+                  14.794865608215332,
+                  -7.977816581726074
+                ],
+                [
+                  17.5761661529541,
+                  -7.9778008460998535
+                ],
+                [
+                  17.576171875,
+                  -8.877800941467285
+                ],
+                [
+                  14.794870376586914,
+                  -8.877817153930664
+                ]
+              ]
+            ],
+            "free": [
+              [
+                [
+                  16.293466567993164,
+                  -9.251572608947754
+                ],
+                [
+                  16.965744018554688,
+                  -8.964003562927246
+                ],
+                [
+                  17.248788833618164,
+                  -9.62570858001709
+                ],
+                [
+                  16.57651138305664,
+                  -9.913277626037598
+                ]
+              ],
+              [
+                [
+                  15.382627487182617,
+                  -9.160414695739746
+                ],
+                [
+                  16.06134796142578,
+                  -9.432428359985352
+                ],
+                [
+                  15.79361343383789,
+                  -10.10047435760498
+                ],
+                [
+                  15.11489200592041,
+                  -9.828460693359375
+                ]
+              ],
+              [
+                [
+                  16.77355194091797,
+                  -7.6373419761657715
+                ],
+                [
+                  16.14042854309082,
+                  -8.080658912658691
+                ],
+                [
+                  15.656731605529785,
+                  -7.389868259429932
+                ],
+                [
+                  16.289854049682617,
+                  -6.9465508460998535
+                ]
+              ]
+            ]
+          },
+          "moved_objects": {
+            "swivel_chair_gfixyb_2": {
+              "fixed_base": false,
+              "moved_to": [
+                -104.84157943725586,
+                -117.40103912353516,
+                -100.15001033246517
+              ],
+              "ori": [
+                -0.00030713676824234426,
+                -0.00013151652819942683,
+                0.8346505761146545,
+                0.5507796406745911
+              ],
+              "pos": [
+                16.753826141357422,
+                -9.407360076904297,
+                0.4937431812286377
+              ]
+            },
+            "swivel_chair_gfixyb_3": {
+              "fixed_base": false,
+              "moved_to": [
+                -109.84157943725586,
+                -117.40103912353516,
+                -100.15001033246517
+              ],
+              "ori": [
+                -0.0003330982581246644,
+                -3.895731879310915e-06,
+                0.5603525638580322,
+                0.8282541036605835
+              ],
+              "pos": [
+                15.598005294799805,
+                -9.596092224121094,
+                0.49374306201934814
+              ]
+            },
+            "swivel_chair_lhkkri_3": {
+              "fixed_base": false,
+              "moved_to": [
+                -114.84157943725586,
+                -117.40103912353516,
+                -100.15001033246517
+              ],
+              "ori": [
+                8.810142304582769e-08,
+                5.197804409107221e-09,
+                -0.4617484509944916,
+                0.8870109915733337
+              ],
+              "pos": [
+                16.22474479675293,
+                -7.526325225830078,
+                0.45582693815231323
+              ]
+            }
+          },
+          "removed_objects": [
+            "swivel_chair_gfixyb_2",
+            "swivel_chair_gfixyb_3",
+            "swivel_chair_lhkkri_3"
+          ],
+          "scene_file": "../../scene_variants/office_cubicles_right__ce38327497.json"
+        },
+        "source_alias": "configuration_matching-attachment-cork-wine_bottle-desk",
+        "source_bddl_sha256": "e33447e62fe0a9d8d774148802993f280f7fd6953241ced9e4196fbd941ddbe6",
+        "source_template": "/vision/u/minyeong/projects/isg_home/eval85/runs/s3_55tasks/configuration_matching-attachment_03/c10_k0/inst/configuration_matching-attachment-cork-wine_bottle-desk/office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe",
+        "source_template_sha256": "5ea975d7987441739dc110f76b3a0b70a656c95867d4b07457188bc072ae9cf4",
+        "task_rooms": [
+          "private_office_2"
+        ]
+      },
+      "split": "eval_standard",
+      "task": "configuration_matching-attachment",
+      "template_id": "standard__configuration_matching-attachment_03"
+    },
+    "validation_key": {
+      "code_sha256": "6535b958e843ce9206cbd8df70287b3d283644bd8799417c1a56f42b621a5367",
+      "data_sha256": "759a02240d5175b78036137e5e74ff92c59a6ac858b5535d24105839ab7219a9",
+      "physics_sha256": "74f1aba526a6a9080301a3a45df9be47011dcc3da5404196b04d0fbd550ef1a9",
+      "scale_sha256": "9b41364f7f868e8dc08102685fd964c1b2461eebcb33ae6d0c82ab04164b153e",
+      "template_sha256": "40c59c6a6af0fc4c2f4e535f9ed0d45e9dcdb4f1243a74685c05e02f58e14a1a"
+    }
+  },
+  "plan": {
+    "anchor_base_pose2d": [
+      15.946370124816895,
+      -9.287872314453125,
+      1.5708020925520199
+    ],
+    "anchor_manipulation_stance": {
+      "base_pose2d": [
+        15.946370124816895,
+        -9.187872886657715,
+        1.5708020925520199
+      ],
+      "focus": [
+        16.026365280151367,
+        -8.357872009277344,
+        0.8025195002555847
+      ],
+      "source_summary_sha256": "44ae964a510d3ae05baf9be63cd1828726d848f5762150a507c5e9fcc77c851b",
+      "tilt": -0.532533327738444,
+      "translate": 0.25
+    },
+    "anchor_sources": {
+      "demo": {
+        "mtime": 1794383645.375936,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/configuration_matching-attachment_03/g50253200-50253202/demo/configuration_matching-attachment-cork-wine_bottle-desk__office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe__50253200/demo.hdf5",
+        "sha256": "120d32803bda5bdef9db1a2e044914df68919e506b737f6937b4517f11b7cc56"
+      },
+      "demo_meta": {
+        "mtime": 1794383645.379936,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/configuration_matching-attachment_03/g50253200-50253202/demo/configuration_matching-attachment-cork-wine_bottle-desk__office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe__50253200/meta.json",
+        "sha256": "d267b3f3e2f797bb1d4bf125e0997c1e85750a25462db5f45cb7367fa984c1aa"
+      },
+      "job_env": {
+        "mtime": 1794383053.617922,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/configuration_matching-attachment_03/g50253200-50253202/job.env",
+        "sha256": "b012ff08583f859f3eac7f4d562425d9311b17d2dd6d1135791f493d1d55fbd5"
+      },
+      "sidecar": {
+        "mtime": 1794383384.301159,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/configuration_matching-attachment_03/g50253200-50253202/inst/configuration_matching-attachment-cork-wine_bottle-desk/office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe/instances/configuration_matching-attachment-cork-wine_bottle-desk__office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe__50253200.oracle.json",
+        "sha256": "3bae6059ca49dbf981e207d83e4971f746dd61f11c27bcb7760715a892a0ee65"
+      },
+      "summary": {
+        "mtime": 1794383384.3071587,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/configuration_matching-attachment_03/g50253200-50253202/inst/configuration_matching-attachment-cork-wine_bottle-desk/office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe/instances/configuration_matching-attachment-cork-wine_bottle-desk__office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe__50253200.summary.json",
+        "sha256": "44ae964a510d3ae05baf9be63cd1828726d848f5762150a507c5e9fcc77c851b"
+      },
+      "tro": {
+        "mtime": 1794383384.298159,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/configuration_matching-attachment_03/g50253200-50253202/inst/configuration_matching-attachment-cork-wine_bottle-desk/office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe/instances/configuration_matching-attachment-cork-wine_bottle-desk__office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe__50253200-tro_state.json",
+        "sha256": "0600676e02be01b631d9a5d5be6bd9f795eb49a260418eb522d01c58e0d93ae5"
+      }
+    },
+    "bucket_policy": {
+      "authority": "NEW_SESSION_PROMPT_20261112.md#2",
+      "bucket_labels": "descriptive",
+      "bucket_quotas_enforced": false,
+      "bucket_ranges_enforced": false,
+      "campaign_id": "campaign_20261110",
+      "physical_constraints_unchanged": true,
+      "schema": "isg-bucket-policy-v2",
+      "version": 2
+    },
+    "budget_seconds": 1800,
+    "campaign_id": "campaign_20261110",
+    "contract_template_sha256": "40c59c6a6af0fc4c2f4e535f9ed0d45e9dcdb4f1243a74685c05e02f58e14a1a",
+    "created_at": 1794560739.0680952,
+    "goal_pose": {
+      "orientation": [
+        0.0004787147045135498,
+        0.00014698505401611328,
+        0.39209261536598206,
+        -0.9199256896972656
+      ],
+      "position": [
+        15.976388931274414,
+        -8.277633666992188,
+        1.0068196058273315
+      ]
+    },
+    "group_id": "eval100_8dca_r2_7cd0b76f39ce2aef8aa1",
+    "max_members": 3,
+    "partner_name": "wine_bottle.n.01_1",
+    "partner_pose": {
+      "orientation": [
+        -0.00050492980517447,
+        -0.000228797915042378,
+        -0.44599464535713196,
+        0.8950355052947998
+      ],
+      "position": [
+        15.976306915283203,
+        -8.27777099609375,
+        0.8764276504516602
+      ]
+    },
+    "room": "private_office_2",
+    "scene": "office_cubicles_right",
+    "schema": "isg-attachment-goal-plan-v1",
+    "source_instance_id": "configuration_matching-attachment-cork-wine_bottle-desk__office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe__50253200",
+    "source_instance_is_member": false,
+    "split": "eval_standard",
+    "target_name": "cork.n.04_1",
+    "task": "configuration_matching-attachment",
+    "template_id": "office_cubicles_right__support-desk_mdhelw_1-T10__partner-wine_bottle-inkqch__target-cork-ncxgpe"
+  }
+}

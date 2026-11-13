@@ -1172,8 +1172,12 @@ class Attachment(SamplerV2):
         plan = getattr(self, '_campaign_attachment_active', None)
         if plan is not None and plan.anchor_manipulation_stance is not None:
             from ispatialgym.sampling import campaign_runtime
-            order = CAG.order_source_stances(plan, campaign_runtime.configuration()[1].class_id,
-                                            order, self.manip_candidates)
+            from ispatialgym.sampling.campaign_class_routes import rank
+            trace = self.__dict__.setdefault('_campaign_class_route_trace', [])
+            config = campaign_runtime.configuration()[0]
+            routed = rank(config, plan, order, self.manip_candidates, trace=trace)
+            order = routed if routed is not None else CAG.order_source_stances(
+                plan, config['template']['class_id'], order, self.manip_candidates)
         self._early_rest_last = None
         for k in order[:6]:
             if time.time() > self._deadline:

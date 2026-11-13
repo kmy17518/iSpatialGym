@@ -2819,7 +2819,11 @@ class IORSSmall(SamplerV2):
             written = getattr(self, "_campaign_written_inside_stances", {}).get(plan.sha256, [])
             source_stance = getattr(plan, 'anchor_manipulation_stance', None)
             hints = written or ([source_stance] if source_stance is not None else [])
-            order = prioritize_written_stances(order, cands, hints)
+            from ispatialgym.sampling.campaign_class_routes import rank
+            trace = self.__dict__.setdefault('_campaign_class_route_trace', [])
+            routed = rank(campaign_runtime.configuration()[0], plan, order, cands,
+                          written=written, trace=trace)
+            order = routed if routed is not None else prioritize_written_stances(order, cands, hints)
             if source_stance is not None and not written:
                 TT._count(self, 'campaign_' + self.relation + '.source_stance_ranked')
             if campaign_runtime.contact_recovery('inside_goal_stance_proposal'):

@@ -1,0 +1,564 @@
+{
+  "config": {
+    "campaign_id": "campaign_20261110",
+    "perturbations": {
+      "lighting": {},
+      "removed_objects": [],
+      "scales": {
+        "breakfast_table.n.01_1": {
+          "applied": [
+            0.9999933242797852,
+            0.9999943971633911,
+            0.9999465942382812
+          ],
+          "default": [
+            0.9999933242797852,
+            0.9999943971633911,
+            0.9999465942382812
+          ],
+          "mode": "fixed"
+        },
+        "floor.n.01_1": {
+          "applied": [
+            1.0000057220458984,
+            1.000015377998352,
+            0.9998500943183899
+          ],
+          "default": [
+            1.0000057220458984,
+            1.000015377998352,
+            0.9998500943183899
+          ],
+          "mode": "fixed"
+        },
+        "place_mat.n.01_1": {
+          "applied": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "mode": "fixed"
+        },
+        "plate.n.04_1": {
+          "applied": [
+            1.0,
+            1.0,
+            3.0
+          ],
+          "default": [
+            1.0,
+            1.0,
+            3.0
+          ],
+          "mode": "fixed"
+        }
+      }
+    },
+    "purpose": "validation",
+    "split": "eval_standard",
+    "template": {
+      "class_id": "inter_object_relation_satisfaction-under_small_scale_03",
+      "definition_sha256": "b0d15dbb5f33de200c70e6c9f8eeafd9c6abdf75d48d470b9fcfff8fe37f0624",
+      "objects": [
+        {
+          "asset_sha256": "05eeda9711bf988dc02299ab2fb771328dd118d37c4c696fc8096679c7dfcf16",
+          "category": "floors",
+          "default_scale": [
+            1.0000057220458984,
+            1.000015377998352,
+            0.9998500943183899
+          ],
+          "instance": "floor.n.01_1",
+          "joint": null,
+          "model": "qgmjvd",
+          "readiness_source": "{\"files_sha256\":{\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/complaints.json\":\"c1e2500bf9c9384d7b5a4bf5a6de84a38435042a9d9598e2be4d73f0b63bf69d\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/deletion_queue.csv\":\"6fe45858ff6a9b48963c6b53c5fc7ecc1040250ef748e934d9e8e489614a0c20\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/object_inventory.json\":\"bbab63508e33e4634646f8f2027bc00df728b0b1ff1e2e3e952d36d9201089db\"},\"rule\":\"ispatialgym.sampling.knowledge.is_ready + provider presence\"}",
+          "ready": true,
+          "role": "support",
+          "semantic_kind": "floor"
+        },
+        {
+          "asset_sha256": "674f8663599c62a96402950907d4023728457f685c580209cbee5f27400f0670",
+          "category": "breakfast_table",
+          "default_scale": [
+            0.9999933242797852,
+            0.9999943971633911,
+            0.9999465942382812
+          ],
+          "instance": "breakfast_table.n.01_1",
+          "joint": null,
+          "model": "rhjoby",
+          "readiness_source": "{\"files_sha256\":{\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/complaints.json\":\"c1e2500bf9c9384d7b5a4bf5a6de84a38435042a9d9598e2be4d73f0b63bf69d\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/deletion_queue.csv\":\"6fe45858ff6a9b48963c6b53c5fc7ecc1040250ef748e934d9e8e489614a0c20\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/object_inventory.json\":\"bbab63508e33e4634646f8f2027bc00df728b0b1ff1e2e3e952d36d9201089db\"},\"rule\":\"ispatialgym.sampling.knowledge.is_ready + provider presence\"}",
+          "ready": true,
+          "role": "support",
+          "semantic_kind": "object"
+        },
+        {
+          "asset_sha256": "15acb2f9571f92717e2d70bd7265524fd846a092be74accbdc56c16f0f103c13",
+          "category": "plate",
+          "default_scale": [
+            1.0,
+            1.0,
+            3.0
+          ],
+          "instance": "plate.n.04_1",
+          "joint": null,
+          "model": "qtfzeq",
+          "readiness_source": "{\"files_sha256\":{\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/complaints.json\":\"c1e2500bf9c9384d7b5a4bf5a6de84a38435042a9d9598e2be4d73f0b63bf69d\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/deletion_queue.csv\":\"6fe45858ff6a9b48963c6b53c5fc7ecc1040250ef748e934d9e8e489614a0c20\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/object_inventory.json\":\"bbab63508e33e4634646f8f2027bc00df728b0b1ff1e2e3e952d36d9201089db\"},\"rule\":\"ispatialgym.sampling.knowledge.is_ready + provider presence\"}",
+          "ready": true,
+          "role": "target",
+          "semantic_kind": "object"
+        },
+        {
+          "asset_sha256": "a36856a4db9e665ae7e8bedf4f329e643cb6f7946192ffedcaf6024a549a7e03",
+          "category": "place_mat",
+          "default_scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "instance": "place_mat.n.01_1",
+          "joint": null,
+          "model": "ujaolf",
+          "readiness_source": "{\"files_sha256\":{\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/complaints.json\":\"c1e2500bf9c9384d7b5a4bf5a6de84a38435042a9d9598e2be4d73f0b63bf69d\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/deletion_queue.csv\":\"6fe45858ff6a9b48963c6b53c5fc7ecc1040250ef748e934d9e8e489614a0c20\",\"/home/minyeongk/Desktop/projects/Behavior-1K-grasp-bands-6a6194600/bddl3/bddl/generated_data/object_inventory.json\":\"bbab63508e33e4634646f8f2027bc00df728b0b1ff1e2e3e952d36d9201089db\"},\"rule\":\"ispatialgym.sampling.knowledge.is_ready + provider presence\"}",
+          "ready": true,
+          "role": "partner",
+          "semantic_kind": "object"
+        }
+      ],
+      "room": "dining_room_0",
+      "scene": "house_single_floor",
+      "scene_setup": {
+        "awaiting_owner_update": false,
+        "campaign_adaptation": "pending",
+        "fresh_validation": "not_started",
+        "inst_to_name": {
+          "agent.n.01_1": "robot_r1",
+          "breakfast_table.n.01_1": "breakfast_table_rhjoby_0",
+          "floor.n.01_1": "floors_qgmjvd_0",
+          "place_mat.n.01_1": "partner_place_mat_ujaolf_0",
+          "plate.n.04_1": "target_plate_qtfzeq_0"
+        },
+        "runtime_bddl_equivalence": {
+          "comparison": "parsed activity/domain/variant/objects/groups/init/goal/measure; goal and measure remain separate",
+          "migration": null,
+          "runtime": {
+            "has_explicit_measure": true,
+            "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/code/trunk_8dd0f5a96876/ispatialgym/assets/bddl/activity_definitions/inter_object_relation_satisfaction/problem44.bddl",
+            "sha256": "373d8e511713f2548023562574506f140a417e2d495ca271d445c6a82092ef68"
+          },
+          "runtime_semantic_sha256": "74534275ee1786e98389080dd881d27fa46c758a9f59e9708947df0b3060c4cb",
+          "semantic_equivalence": true,
+          "semantic_sha256": "74534275ee1786e98389080dd881d27fa46c758a9f59e9708947df0b3060c4cb",
+          "source": {
+            "has_explicit_measure": true,
+            "path": "/vision/u/minyeong/projects/isg_home/eval85/runs/s3_55tasks/inter_object_relation_satisfaction-under_small_scale_03/c1_k0/inst/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table/activity_definitions/inter_object_relation_satisfaction/problem44.bddl",
+            "sha256": "2fe1176ca533b6c02d1d7754703e5c9068838b047800078010c005bdfc8496c9"
+          }
+        },
+        "runtime_bddl_sha256": "373d8e511713f2548023562574506f140a417e2d495ca271d445c6a82092ef68",
+        "runtime_template_id": "house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3",
+        "scene_variant": {
+          "freed_footprints": {
+            "block": [
+              [
+                [
+                  5.848289966583252,
+                  4.084524154663086
+                ],
+                [
+                  8.743980407714844,
+                  4.077131748199463
+                ],
+                [
+                  8.741019248962402,
+                  2.9172356128692627
+                ],
+                [
+                  5.845329284667969,
+                  2.9246277809143066
+                ]
+              ]
+            ],
+            "free": [
+              [
+                [
+                  7.993353843688965,
+                  3.1143271923065186
+                ],
+                [
+                  8.363746643066406,
+                  3.248072862625122
+                ],
+                [
+                  8.546874046325684,
+                  2.7409231662750244
+                ],
+                [
+                  8.176481246948242,
+                  2.607177495956421
+                ]
+              ],
+              [
+                [
+                  8.428321838378906,
+                  3.81669282913208
+                ],
+                [
+                  8.04768180847168,
+                  3.715738296508789
+                ],
+                [
+                  7.909452438354492,
+                  4.236918926239014
+                ],
+                [
+                  8.290092468261719,
+                  4.337873458862305
+                ]
+              ],
+              [
+                [
+                  7.475783348083496,
+                  3.7558629512786865
+                ],
+                [
+                  7.083395957946777,
+                  3.722538948059082
+                ],
+                [
+                  7.037768363952637,
+                  4.259805202484131
+                ],
+                [
+                  7.4301557540893555,
+                  4.293128967285156
+                ]
+              ],
+              [
+                [
+                  6.607521057128906,
+                  3.804436206817627
+                ],
+                [
+                  6.21530818939209,
+                  3.8397560119628906
+                ],
+                [
+                  6.263669013977051,
+                  4.3767828941345215
+                ],
+                [
+                  6.655881881713867,
+                  4.341463088989258
+                ]
+              ],
+              [
+                [
+                  6.289393901824951,
+                  3.2292425632476807
+                ],
+                [
+                  6.669515132904053,
+                  3.1263527870178223
+                ],
+                [
+                  6.528636455535889,
+                  2.605881929397583
+                ],
+                [
+                  6.148515224456787,
+                  2.7087717056274414
+                ]
+              ],
+              [
+                [
+                  7.140786647796631,
+                  3.0244858264923096
+                ],
+                [
+                  7.520907878875732,
+                  2.921595573425293
+                ],
+                [
+                  7.380028247833252,
+                  2.401125192642212
+                ],
+                [
+                  6.99990701675415,
+                  2.5040154457092285
+                ]
+              ]
+            ]
+          },
+          "moved_objects": {
+            "straight_chair_jgoolz_0": {
+              "fixed_base": false,
+              "moved_to": [
+                -124.84286308288574,
+                -115.73151111602783,
+                -100.9590277671814
+              ],
+              "ori": [
+                1.6197562217712402e-05,
+                -1.215015072375536e-05,
+                0.8184217810630798,
+                0.5746181011199951
+              ],
+              "pos": [
+                8.276880264282227,
+                2.908885955810547,
+                0.32601872086524963
+              ]
+            },
+            "straight_chair_jgoolz_1": {
+              "fixed_base": false,
+              "moved_to": [
+                -129.84286308288574,
+                -115.73151111602783,
+                -100.9590277671814
+              ],
+              "ori": [
+                -1.2665987014770508e-05,
+                -1.56183959916234e-05,
+                -0.6097702980041504,
+                0.7925782799720764
+              ],
+              "pos": [
+                8.163780212402344,
+                4.046063423156738,
+                0.32601845264434814
+              ]
+            },
+            "straight_chair_jgoolz_2": {
+              "fixed_base": false,
+              "moved_to": [
+                -134.84286308288574,
+                -115.73151111602783,
+                -100.9590277671814
+              ],
+              "ori": [
+                -6.452202796936035e-06,
+                -7.124384865164757e-06,
+                -0.6765273213386536,
+                0.7364175915718079
+              ],
+              "pos": [
+                7.255090236663818,
+                4.027685642242432,
+                0.32602065801620483
+              ]
+            },
+            "straight_chair_jgoolz_3": {
+              "fixed_base": false,
+              "moved_to": [
+                -139.84286308288574,
+                -115.73151111602783,
+                -100.9590277671814
+              ],
+              "ori": [
+                -1.7136335372924805e-05,
+                -1.3347831554710865e-05,
+                -0.7381362915039062,
+                0.6746516227722168
+              ],
+              "pos": [
+                6.437382221221924,
+                4.110452651977539,
+                0.32601872086524963
+              ]
+            },
+            "straight_chair_jgoolz_4": {
+              "fixed_base": false,
+              "moved_to": [
+                -144.84286308288574,
+                -115.73151111602783,
+                -100.9590277671814
+              ],
+              "ori": [
+                1.1816620826721191e-05,
+                -1.826148945838213e-05,
+                0.6077523231506348,
+                0.7941267490386963
+              ],
+              "pos": [
+                6.403809547424316,
+                2.8983311653137207,
+                0.3260188698768616
+              ]
+            },
+            "straight_chair_jgoolz_5": {
+              "fixed_base": false,
+              "moved_to": [
+                -149.84286308288574,
+                -115.73151111602783,
+                -100.9590277671814
+              ],
+              "ori": [
+                1.1801719665527344e-05,
+                -1.615926157683134e-05,
+                0.6077519059181213,
+                0.7941270470619202
+              ],
+              "pos": [
+                7.255201816558838,
+                2.6935744285583496,
+                0.3260185718536377
+              ]
+            }
+          },
+          "removed_objects": [
+            "straight_chair_jgoolz_0",
+            "straight_chair_jgoolz_1",
+            "straight_chair_jgoolz_2",
+            "straight_chair_jgoolz_3",
+            "straight_chair_jgoolz_4",
+            "straight_chair_jgoolz_5"
+          ],
+          "scene_file": "../../scene_variants/house_single_floor__cc5e0dab4b.json"
+        },
+        "source_alias": "inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table",
+        "source_bddl_sha256": "2fe1176ca533b6c02d1d7754703e5c9068838b047800078010c005bdfc8496c9",
+        "source_template": "/vision/u/minyeong/projects/isg_home/eval85/runs/s3_55tasks/inter_object_relation_satisfaction-under_small_scale_03/c1_k0/inst/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table/house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3",
+        "source_template_sha256": "ef804dd634c334cda48a3f32c9dde224bca06c590e45b16eb1b6ee905119cffb",
+        "task_rooms": [
+          "dining_room_0"
+        ]
+      },
+      "split": "eval_standard",
+      "task": "inter_object_relation_satisfaction-under_small_scale",
+      "template_id": "standard__inter_object_relation_satisfaction-under_small_scale_03"
+    },
+    "validation_key": {
+      "code_sha256": "6535b958e843ce9206cbd8df70287b3d283644bd8799417c1a56f42b621a5367",
+      "data_sha256": "759a02240d5175b78036137e5e74ff92c59a6ac858b5535d24105839ab7219a9",
+      "physics_sha256": "74f1aba526a6a9080301a3a45df9be47011dcc3da5404196b04d0fbd550ef1a9",
+      "scale_sha256": "6be4910af7cd0cf1fcf319fb3a99e55f88ec4d7ff2c4113f8efc33bc0a55d5d8",
+      "template_sha256": "68b7fa5314a82859ef4b0f7e934295b56f06ee6fc120fc10d0dc279357580b80"
+    }
+  },
+  "plan": {
+    "anchor_base_pose2d": [
+      5.389183044433594,
+      3.4972102642059326,
+      -0.00255163110387004
+    ],
+    "anchor_manipulation_stance": {
+      "base_pose2d": [
+        5.489692687988281,
+        3.6969544887542725,
+        -0.00255163110387004
+      ],
+      "focus": [
+        6.399689674377441,
+        3.6946325302124023,
+        0.835037112236023
+      ],
+      "source_summary_sha256": "d4e31ab87b251e8e724b99dfe5ea0b00a7f53ee83808707cb15996aeebffb2cf",
+      "tilt": -0.6108666658401489,
+      "translate": 0.0
+    },
+    "anchor_sources": {
+      "demo": {
+        "mtime": 1794379364.3240957,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/inter_object_relation_satisfaction-under_small_scale_03/g50239500-50239502/demo/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table__house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3__50239500/demo.hdf5",
+        "sha256": "3b8f98d2e05782918ed44a63ba9e6559c8484d2248ffd612bf4b5c8513d5879e"
+      },
+      "demo_meta": {
+        "mtime": 1794379364.3270957,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/inter_object_relation_satisfaction-under_small_scale_03/g50239500-50239502/demo/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table__house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3__50239500/meta.json",
+        "sha256": "7edc9bf30a2cd081c315eb05d96410307f1e85f50648e819dbf9975182c7ccd2"
+      },
+      "job_env": {
+        "mtime": 1794378874.9374607,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/inter_object_relation_satisfaction-under_small_scale_03/g50239500-50239502/job.env",
+        "sha256": "e0c2440c23d237ca16f10d2be2c3dc4e9c25499815a4562e25e7af04bb83a290"
+      },
+      "sidecar": {
+        "mtime": 1794379224.0209768,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/inter_object_relation_satisfaction-under_small_scale_03/g50239500-50239502/inst/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table/house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3/instances/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table__house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3__50239500.oracle.json",
+        "sha256": "5d4580174926a0b73c0d57eee5e901a8eb2c516de497cd43fce0d61d345965e1"
+      },
+      "summary": {
+        "mtime": 1794379224.025977,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/inter_object_relation_satisfaction-under_small_scale_03/g50239500-50239502/inst/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table/house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3/instances/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table__house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3__50239500.summary.json",
+        "sha256": "d4e31ab87b251e8e724b99dfe5ea0b00a7f53ee83808707cb15996aeebffb2cf"
+      },
+      "tro": {
+        "mtime": 1794379224.0179768,
+        "path": "/vision/u/minyeong/projects/isg_home/campaign_20261110/out/goal_groups/inter_object_relation_satisfaction-under_small_scale_03/g50239500-50239502/inst/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table/house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3/instances/inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table__house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3__50239500-tro_state.json",
+        "sha256": "917975043d63ba047c2eed59108f5be11d818365cfc7fea2b32b14b9ceaf40da"
+      }
+    },
+    "bucket_policy": {
+      "authority": "NEW_SESSION_PROMPT_20261112.md#2",
+      "bucket_labels": "descriptive",
+      "bucket_quotas_enforced": false,
+      "bucket_ranges_enforced": false,
+      "campaign_id": "campaign_20261110",
+      "physical_constraints_unchanged": true,
+      "schema": "isg-bucket-policy-v2",
+      "version": 2
+    },
+    "budget_seconds": 1800,
+    "campaign_id": "campaign_20261110",
+    "contract_template_sha256": "68b7fa5314a82859ef4b0f7e934295b56f06ee6fc120fc10d0dc279357580b80",
+    "created_at": 1794560739.0680952,
+    "goal_pose": {
+      "orientation": [
+        0.0001463366934331134,
+        5.111528298584744e-05,
+        0.4482967257499695,
+        -0.8938847780227661
+      ],
+      "position": [
+        6.360597610473633,
+        3.254457473754883,
+        0.8354449272155762
+      ]
+    },
+    "goal_selection": "fresh_anchor",
+    "group_id": "eval100_8dca_r2_d0458fd30b8d6c26325d",
+    "max_members": 3,
+    "partner_name": "place_mat.n.01_1",
+    "partner_pose": {
+      "orientation": [
+        -0.00012569998216349632,
+        0.00014073603961151093,
+        0.7053221464157104,
+        0.708886981010437
+      ],
+      "position": [
+        6.360597133636475,
+        3.2544667720794678,
+        0.8141397833824158
+      ]
+    },
+    "release_pose": {
+      "orientation": [
+        0.00028258038219064474,
+        0.0001153848206740804,
+        0.448295921087265,
+        -0.8938851356506348
+      ],
+      "position": [
+        6.360598087310791,
+        3.254465341567993,
+        0.8385071754455566
+      ]
+    },
+    "room": "dining_room_0",
+    "scene": "house_single_floor",
+    "schema": "isg-pair-goal-plan-v1",
+    "source_instance_id": "inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table__house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3__50239500",
+    "source_instance_is_member": false,
+    "split": "eval_standard",
+    "target_name": "plate.n.04_1",
+    "task": "inter_object_relation_satisfaction-under_small_scale",
+    "template_id": "house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-place_mat-ujaolf__target-plate-qtfzeq-s1x1x3"
+  }
+}

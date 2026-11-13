@@ -1734,6 +1734,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         result.update({"instance": iid, **names, "activity": loader.activity, "variant": meta["variant"], "out": out_dir})
 
         # ---------------------------------------------------------------- sidecar + program (before the sim: cheap failures first)
+        from ispatialgym.sampling.campaign_class_routes import verify_recorded
+        class_route = verify_recorded(loader.tro.meta.raw.get('campaign') or {},
+                                      phase='oracle' if args.mode == 'oracle' else 'replay')
+        if class_route is not None:
+            meta['class_route'] = class_route
         actions = None
         program_error = None
         if args.mode == "oracle":

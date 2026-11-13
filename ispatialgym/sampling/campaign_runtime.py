@@ -48,6 +48,8 @@ def _load(path: str):
             "campaign configuration split mismatch")
     perturbations.validate(config["split"], (obj.instance for obj in template.objects))
     _require_supported(perturbations)
+    from ispatialgym.sampling.campaign_class_routes import resolve
+    resolve(config)  # Release registry selects required profiles; no shell flag.
     return config, template, perturbations, key
 
 
@@ -344,6 +346,12 @@ def annotate(sampler, tro, draft, seed):
                      "scene": "scene_variant_parking" if perturbations.removed_objects else "none",
                      "lighting": "usd_lights_v1" if perturbations.lighting else "none"},
     }
+    from ispatialgym.sampling.campaign_class_routes import record
+    route = record(config, getattr(sampler, '_campaign_attachment_active', None) or
+                   getattr(sampler, '_campaign_pair_active', None),
+                   getattr(sampler, '_campaign_class_route_trace', []))
+    if route is not None:
+        result["ispatialgym"]["campaign"]["runtime"]["class_route"] = route
     if context_objects:
         result["ispatialgym"]["campaign"]["runtime"]["camera_context"] = {
             "scene": template.scene, "room": template.room,
@@ -389,6 +397,10 @@ def verify_loaded(meta, physical, *, scene=None, sim=None):
     result = {"observed_scales": verify_scales(physical, perturbations.scales), "scale_verified": True,
             "camera_context": context_observed,
             "scene_augmentation": bool(perturbations.removed_objects), "lighting_augmentation": bool(perturbations.lighting)}
+    from ispatialgym.sampling.campaign_class_routes import verify_recorded
+    route = verify_recorded(meta, physical=physical)
+    if route is not None:
+        result['class_route'] = route
     if os.environ.get('ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE') == '1':
         result['native_observation'] = restoration_observation(meta, scene, sim)
     return result
