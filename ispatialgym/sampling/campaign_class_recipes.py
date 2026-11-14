@@ -55,18 +55,44 @@ PROFILES = {
 }
 
 
+#: train 2026-11-14 (train_r4): a train sub-template of a recipe class that is not the reviewed canonical selection (another
+#: scene / room / model / scale) keeps the recipe - its physics and data fingerprints, its goal plans and the native checks are
+#: unchanged - and binds the profile by class + task + recipe applicability instead of the eval template/scale fingerprints.
+TRAIN_VARIANT_BINDING = "train_class_recipe_v1"
+
+
+def _binding(config, class_id, task, template_sha256, scale_sha256):
+    """``"exact"`` (the reviewed canonical selection, eval or train), ``TRAIN_VARIANT_BINDING`` (a train sub-template of the
+    class with the recipe's data/physics fingerprints) or None (incompatible)."""
+    template = config.get("template", {})
+    key = config.get("validation_key", {})
+    if (config.get("split") not in ("eval_standard", "train") or template.get("class_id") != class_id
+            or template.get("task") != task or key.get("data_sha256") != DATA_SHA or key.get("physics_sha256") != PHYSICS_SHA):
+        return None
+    if key.get("template_sha256") == template_sha256 and key.get("scale_sha256") == scale_sha256:
+        return "exact"
+    if config.get("split") == "train" and template.get("split") in ("train", "eval_standard") and all(
+            isinstance(key.get(k), str) and len(key[k]) == 64 for k in ("template_sha256", "scale_sha256")):
+        return TRAIN_VARIANT_BINDING
+    return None
+
+
 def profile_for_config(config):
-    """Resolve selected canonical profiles without importing a simulator."""
+    """Resolve selected canonical profiles without importing a simulator. A train sub-template other than the canonical
+    selection gets the same recipe with its binding recorded (``train_variant``); eval binds the exact fingerprints only."""
     profile = PROFILES.get(config.get("template", {}).get("class_id"))
     if profile is None:
         return None
-    key = config.get("validation_key", {})
-    if (config.get("split") not in ("eval_standard", "train")
-            or config.get("template", {}).get("task") != profile["task"]
-            or any(key.get(k) != profile["applicability"][k] for k in
-                   ("template_sha256", "scale_sha256", "data_sha256", "physics_sha256"))):
+    binding = _binding(config, profile["class_id"], profile["task"], profile["template_sha256"], profile["scale_sha256"])
+    if binding is None:
         raise ValueError("selected class has no compatible retained recipe profile")
-    return json.loads(json.dumps(profile))
+    result = json.loads(json.dumps(profile))
+    if binding == TRAIN_VARIANT_BINDING:
+        key = config["validation_key"]
+        result["train_variant"] = {"binding": TRAIN_VARIANT_BINDING, "template_sha256": key["template_sha256"],
+                                   "scale_sha256": key["scale_sha256"], "split": "train",
+                                   "rule": "class + task + recipe data/physics fingerprints; goal plan bound to this template"}
+    return result
 
 
 def _value(obj, key, default=None):
@@ -94,15 +120,11 @@ def validate_recipe_inputs(route_id, config, plan, *, phase, trace):
     if trace is None or not callable(getattr(trace, "append", None)):
         raise ValueError("retained recipe requires a persistent execution trace sink")
     profile = _ROUTES[route_id]
-    template = config.get("template", {})
     key = config.get("validation_key", {})
-    if (config.get("split") not in ("eval_standard", "train")
-            or template.get("class_id") != profile["class_id"]
-            or template.get("task") != profile["task"]
-            or any(key.get(k) != profile[k] for k in ("template_sha256", "scale_sha256"))
-            or key.get("data_sha256") != DATA_SHA
-            or key.get("physics_sha256") != PHYSICS_SHA
-            or _value(plan, "contract_template_sha256") != profile["template_sha256"]):
+    binding = _binding(config, profile["class_id"], profile["task"], profile["template_sha256"], profile["scale_sha256"])
+    # the goal plan belongs to the configuration's own template (the reviewed one, or the train sub-template's)
+    plan_template = profile["template_sha256"] if binding == "exact" else key.get("template_sha256")
+    if binding is None or _value(plan, "contract_template_sha256") != plan_template:
         raise ValueError("retained recipe does not match exact reviewed configuration")
     event = {"schema": "isg-retained-class-recipe-trace-v1", "route_id": route_id,
              "phase": phase, "class_id": profile["class_id"],
@@ -111,6 +133,7 @@ def validate_recipe_inputs(route_id, config, plan, *, phase, trace):
              "plan_sha256": _value(plan, "sha256") or _digest(plan),
              "source_revision": profile["source_revision"], "source_group": profile["source_group"],
              "native_checks_unchanged": True,
+             **({"train_variant_binding": binding} if binding != "exact" else {}),
              "action": "binding_verified" if phase == "sampling" else ("oracle_native_unchanged" if phase == "oracle" else "replay_recorded_route_verified")}
     trace.append(event)
     return event
