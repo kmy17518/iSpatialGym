@@ -26,6 +26,18 @@ CONFIG_ENV = 'ISPATIALGYM_CAMPAIGN_CONFIG'
 FIXED_CLOSING_CLASSES = frozenset(
     'configuration_matching-articulation_close_large_scale_' + suffix
     for suffix in ('01', '02', '03'))
+#: Owner 2026-11-14: the world-vertical alignment classes may repeat a native
+#: goal like the fixed closing classes (native goal definition unchanged,
+#: distinct saved starts still required, quota units still counted per group).
+#: Authorized under their own quota-policy key, so registries running frozen
+#: releases (which require fixed_goal_exceptions <= FIXED_CLOSING_CLASSES on
+#: every claim) keep reading the same quota_policy.json unchanged.
+REPEATED_GOAL_CLASSES = frozenset(
+    'alignment-world_vertical_' + suffix for suffix in ('01', '02', '03', '04', '05'))
+REPEATED_GOAL_POLICY_KEY = 'repeated_goal_exceptions'
+#: Every class a quota policy may exempt from the distinct-goal requirement
+#: (read by admission from the admitting release).
+GOAL_QUOTA_EXCEPTION_CLASSES = FIXED_CLOSING_CLASSES | REPEATED_GOAL_CLASSES
 
 
 def read(path):
@@ -91,7 +103,10 @@ class GoalRegistry:
                     'invalid goal quota authorization')
             exceptions = set(policy.get('fixed_goal_exceptions', []))
             require(exceptions <= FIXED_CLOSING_CLASSES, 'unauthorized goal quota exception')
-            if cid in exceptions: exception = ref(policy_path)
+            repeated = set(policy.get(REPEATED_GOAL_POLICY_KEY, []))
+            require(repeated <= REPEATED_GOAL_CLASSES, 'unauthorized goal quota exception')
+            if cid in exceptions or cid in repeated: exception = ref(policy_path)
+        kind = {'quota_exception_kind': 'repeated_goal'} if exception is not None and cid in REPEATED_GOAL_CLASSES else {}
         directory = self.root / cid
         directory.mkdir(exist_ok=True)
         lock = directory / '.lock'
@@ -114,9 +129,9 @@ class GoalRegistry:
                     return {'claimed': False, 'duplicate_of': ref(path)}
             path = directory / (digest(owner) + '.json')
             write_json_atomic(path, {'owner': owner, 'record': record, 'claimed_at': time.time(),
-                                    'fixed_goal_quota_exception': exception})
+                                    'fixed_goal_quota_exception': exception, **kind})
             return {'claimed': True, 'receipt': ref(path), 'resumed': False,
-                    'fixed_goal_quota_exception': exception}
+                    'fixed_goal_quota_exception': exception, **kind}
         finally:
             (lock / 'owner.json').unlink(missing_ok=True)
             lock.rmdir()

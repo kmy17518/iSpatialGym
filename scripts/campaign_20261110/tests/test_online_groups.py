@@ -122,3 +122,41 @@ def test_user_fixed_goal_exception_is_narrow_and_does_not_change_identity(tmp_pa
     (tmp_path/'quota_policy.json').write_text(json.dumps(policy))
     with pytest.raises(ValueError, match='unauthorized'):
         registry.claim(goal(.3), 'invalid', time.time()+10)
+
+
+def test_world_vertical_repeated_goal_exception_is_narrow_and_keeps_identity(tmp_path):
+    from ispatialgym.sampling import online_groups as OG
+    assert OG.REPEATED_GOAL_CLASSES == {'alignment-world_vertical_0%d' % i for i in range(1, 6)}
+    assert OG.GOAL_QUOTA_EXCEPTION_CLASSES == OG.FIXED_CLOSING_CLASSES | OG.REPEATED_GOAL_CLASSES
+    registry = GoalRegistry(tmp_path)
+    cid = 'alignment-world_vertical_03'
+    record = {'class_id': cid, 'requested_goal': {'target': goal()['requested_goal']['target']}, 'goal_group': {}}
+    assert registry.claim(record, 'w/first', time.time() + 10)['claimed']
+    assert not registry.claim(record, 'w/second', time.time() + 10)['claimed']   # no policy: duplicate rejected
+    base = {'schema': 'isg-goal-quota-policy-v1', 'authorized_by': 'user', 'native_goal_definition_unchanged': True,
+            'fixed_goal_exceptions': sorted(OG.FIXED_CLOSING_CLASSES)}
+    (tmp_path / 'quota_policy.json').write_text(json.dumps(base))
+    assert not registry.claim(record, 'w/second', time.time() + 10)['claimed']   # closing-class policy alone: unchanged
+    (tmp_path / 'quota_policy.json').write_text(json.dumps({**base, OG.REPEATED_GOAL_POLICY_KEY: [cid]}))
+    claim = registry.claim(record, 'w/second', time.time() + 10)
+    assert claim['claimed'] and claim['fixed_goal_quota_exception']['sha256'] and claim['quota_exception_kind'] == 'repeated_goal'
+    receipt = json.loads((tmp_path / cid).joinpath(claim['receipt']['path'].rsplit('/', 1)[1]).read_text())
+    assert receipt['quota_exception_kind'] == 'repeated_goal' and identity.equivalent_goal(receipt['record'], record)
+    # another world-vertical class not listed, and every other class, keep distinct goals
+    other = {**record, 'class_id': 'alignment-world_vertical_01'}
+    assert registry.claim(other, 'o/first', time.time() + 10)['claimed']
+    assert not registry.claim(other, 'o/second', time.time() + 10)['claimed']
+    assert registry.claim(goal(), 'u/first', time.time() + 10)['claimed']
+    assert not registry.claim(goal(), 'u/second', time.time() + 10)['claimed']
+    # closing classes keep their claim shape (no kind field)
+    close = {'class_id': 'configuration_matching-articulation_close_large_scale_01',
+             'requested_goal': {'pose': [[0, 0, 0], [0, 0, 0, 1]], 'joints': {'door': 0}}, 'goal_group': {}}
+    assert registry.claim(close, 'c/first', time.time() + 10)['claimed']
+    c2 = registry.claim(close, 'c/second', time.time() + 10)
+    assert c2['claimed'] and 'quota_exception_kind' not in c2
+    # a non-world-vertical class under the new key, or world-vertical under the closing key, is refused
+    for bad in ({**base, OG.REPEATED_GOAL_POLICY_KEY: [cid, goal()['class_id']]},
+                {**base, 'fixed_goal_exceptions': base['fixed_goal_exceptions'] + [cid]}):
+        (tmp_path / 'quota_policy.json').write_text(json.dumps(bad))
+        with pytest.raises(ValueError, match='unauthorized'):
+            registry.claim(goal(.3), 'invalid', time.time() + 10)
