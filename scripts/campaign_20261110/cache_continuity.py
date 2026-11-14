@@ -182,10 +182,16 @@ def reconcile(store_root,durable):
                     rel=overlay/'releases'/('r'+str(overlay_release)+'.json');overlay_files[str(rel.relative_to(overlay))]=put(store,rel)
                     for mk,v in M.load_release(str(overlay),overlay_release).items():
                         p=overlay/mk/('v'+str(v)+'.json');overlay_files[str(p.relative_to(overlay))]=put(store,p)
-                seed=merged/'seed.json';packed=ik.pack_delta(durable/'exact',manifest,seed,max_entries=4096,max_bytes=128*1024*1024,deadline_seconds=120,source='durable_cluster_merge')
-                if not packed['scan_complete']or packed['failures']:raise ValueError('published seed incomplete')
-                version={'schema':SCHEMA,'compatibility_id':cid,'ik_bundles':[put(store,seed)]if packed['entry_count']else[],
-                         'overlay_files':overlay_files,'overlay_release':overlay_release,'entries':packed['entry_count'],'at':time.time()}
+                seed=merged/'seed.json';bundles=[];seed_cursor={};entries=0
+                while True:
+                    packed=ik.pack_delta(durable/'exact',manifest,seed,cursor=seed_cursor,max_entries=4096,max_bytes=128*1024*1024,deadline_seconds=120,source='durable_cluster_merge')
+                    if packed['failures']:raise ValueError('published seed contains invalid entries')
+                    if packed['entry_count']:bundles.append(put(store,seed));entries+=packed['entry_count']
+                    if packed['scan_complete']:break
+                    if packed['cursor']==seed_cursor:raise ValueError('published seed pagination stalled')
+                    seed_cursor=packed['cursor']
+                version={'schema':SCHEMA,'compatibility_id':cid,'ik_bundles':bundles,
+                         'overlay_files':overlay_files,'overlay_release':overlay_release,'entries':entries,'at':time.time()}
                 version['version']=hashlib.sha256(canonical(version)).hexdigest();vp=merged/'versions'/(version['version']+'.json');write(vp,version)
                 store.put_verified(vp,'published/'+cid+'/'+version['version']+'.json')
                 store.put_verified(vp,'published/'+cid+'/latest.json',immutable=False)
