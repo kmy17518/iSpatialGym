@@ -9,6 +9,8 @@ import argparse
 import json
 import os
 import subprocess
+import shutil
+from concurrent.futures import ThreadPoolExecutor
 import time
 from pathlib import Path
 from scripts.campaign_20261110.contracts import digest, require, write_json_atomic
@@ -22,9 +24,11 @@ class Mailbox:
         self.remote = self.location.startswith('s3://')
         if self.remote:
             require((self.location + '/').startswith(PREFIX), 'registry is outside production R2 prefix')
+            self.s5 = shutil.which('s5cmd')
             self.aws = ['aws']
-            endpoint = os.environ.get('AWS_ENDPOINT_URL') or os.environ.get('R2_ENDPOINT_URL')
+            endpoint = os.environ.get('AWS_ENDPOINT_URL') or os.environ.get('R2_ENDPOINT_URL') or os.environ.get('S3_ENDPOINT_URL')
             if endpoint: self.aws += ['--endpoint-url', endpoint]
+            self.s5cmd = [self.s5, '--endpoint-url', endpoint] if self.s5 and endpoint else None
         else:
             Path(self.location).mkdir(parents=True, exist_ok=True)
 
@@ -32,25 +36,31 @@ class Mailbox:
         if not self.remote:
             p = Path(self.location) / key
             return json.loads(p.read_text()) if p.exists() else None
-        result = subprocess.run(self.aws + ['s3', 'cp', self.location + '/' + key, '-'], capture_output=True, timeout=20)
+        command = self.s5cmd + ['cat', self.location + '/' + key] if self.s5cmd else self.aws + ['s3', 'cp', self.location + '/' + key, '-']
+        result = subprocess.run(command, capture_output=True, timeout=20)
         if result.returncode:
-            if b'404' in result.stderr or b'NoSuchKey' in result.stderr: return None
+            if any(x in result.stderr.lower() for x in (b'404', b'nosuchkey', b'no object found')): return None
             raise RuntimeError('registry object read failed; credentials/network must be checked')
         return json.loads(result.stdout)
 
     def put(self, key, value):
         if not self.remote:
             write_json_atomic(Path(self.location) / key, value); return
-        result = subprocess.run(self.aws + ['s3', 'cp', '-', self.location + '/' + key, '--only-show-errors'],
+        command = self.s5cmd + ['pipe', self.location + '/' + key] if self.s5cmd else self.aws + ['s3', 'cp', '-', self.location + '/' + key, '--only-show-errors']
+        result = subprocess.run(command,
                                 input=json.dumps(value).encode(), capture_output=True, timeout=20)
         require(result.returncode == 0, 'registry object write failed')
 
-    def requests(self):
+    def keys(self, prefix):
         if not self.remote:
-            return [str(p.relative_to(self.location)) for p in (Path(self.location) / 'requests').glob('*.json')]
-        result = subprocess.run(self.aws + ['s3', 'ls', self.location + '/requests/'], capture_output=True, timeout=20)
+            return [str(p.relative_to(self.location)) for p in (Path(self.location) / prefix).glob('*.json')]
+        command = self.s5cmd + ['ls', self.location + '/' + prefix + '/*'] if self.s5cmd else self.aws + ['s3', 'ls', self.location + '/' + prefix + '/']
+        result = subprocess.run(command, capture_output=True, timeout=20)
+        if result.returncode and any(x in result.stderr.lower() for x in (b'404', b'nosuchkey', b'no object found')):return []
         require(result.returncode == 0, 'registry listing failed')
-        return ['requests/' + line.split()[-1] for line in result.stdout.decode().splitlines() if line.split()[-1].endswith('.json')]
+        return [prefix + '/' + line.split()[-1].rsplit('/',1)[-1] for line in result.stdout.decode().splitlines() if line.split() and line.split()[-1].endswith('.json')]
+
+    def requests(self):return self.keys('requests')
 
 
 def mailbox_claim(location, record, owner, deadline):
@@ -68,12 +78,17 @@ def mailbox_claim(location, record, owner, deadline):
     raise TimeoutError('online goal claim deadline')
 
 
+_SERVE_SEEN = {}
+
+
 def serve_once(location, registry_root):
     from ispatialgym.sampling.online_groups import GoalRegistry
     box = Mailbox(location); registry = GoalRegistry(registry_root)
-    for key in box.requests():
+    if location not in _SERVE_SEEN:
+        _SERVE_SEEN[location] = {k.replace('responses/','requests/',1)for k in box.keys('responses')}
+    seen = _SERVE_SEEN[location]
+    def handle(key):
         target = key.replace('requests/', 'responses/', 1)
-        if box.get(target) is not None: continue
         request = box.get(key)
         reply = {'request_sha256': digest(request)}
         try:
@@ -83,6 +98,11 @@ def serve_once(location, registry_root):
         except (ValueError, TimeoutError) as exc:
             reply['error'] = str(exc)
         box.put(target, reply)
+        return key
+    pending = [key for key in box.requests() if key not in seen]
+    if pending:
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            for key in pool.map(handle,pending):seen.add(key)
 
 
 if __name__ == '__main__':
