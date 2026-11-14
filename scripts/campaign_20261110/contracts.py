@@ -533,7 +533,10 @@ def restoration_plan(tro: Mapping[str, Any]) -> dict[str, Any]:
 def write_json_atomic(path: str | Path, data: Any) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", dir=target.parent, prefix=target.name + ".", delete=False) as stream:
+    # Bounded temporary name in the same directory: target basenames can be at
+    # NAME_MAX already (TRO instance ids), so the target name is not a prefix.
+    prefix = "." + hashlib.sha256(target.name.encode()).hexdigest()[:16] + "."
+    with tempfile.NamedTemporaryFile("w", dir=target.parent, prefix=prefix, suffix=".tmp", delete=False) as stream:
         temp = stream.name
         try:
             stream.write(canonical_json(data) + "\n")
