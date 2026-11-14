@@ -34,6 +34,13 @@ if [ -n "${ISPATIALGYM_CACHE_CONTINUITY:-}" ]; then
   source "$JOBDIR/cache_continuity/warm/environment.sh"
 fi
 source $S/env_fast.sh
+# variant authoring r1 (2026-11-14): pin the environment's cffi in every Python process of this job (sitecustomize). In the fresh
+# sample_isg flow the first numba compile (holonomic_base_joint_controller, after Kit put omni.kit.pip_archive/pip_prebundle on
+# sys.path) imported Kit's prebundled cffi 1.17.1 against the env's _cffi_backend 2.1.1 -> "Version mismatch" (va_83..86 samplers,
+# va_82 collectors). Import order only; no simulator, sampler or oracle code changes.
+mkdir -p $JOBDIR/pyhooks
+printf 'import cffi  # isgtrain variant job: pin the env cffi (matches _cffi_backend) before Kit pip_prebundle can shadow it\n' > $JOBDIR/pyhooks/sitecustomize.py
+export PYTHONPATH=$JOBDIR/pyhooks:$PYTHONPATH
 if [ -n "${ISPATIALGYM_CACHE_CONTINUITY:-}" ]; then
   # Baseline stores are read-only; the new lifecycle owns every publication.
   _kit_tex_save() { :; }

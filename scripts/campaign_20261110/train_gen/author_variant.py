@@ -329,7 +329,7 @@ def allocate(k):
     return k
 
 
-def author(cid, k, groups, kcollect, dry=False):
+def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=()):
     gate = gate_module()
     manifest, row = validity_row(gate, cid)
     cls = row['class_id']
@@ -404,13 +404,19 @@ def author(cid, k, groups, kcollect, dry=False):
                                  asset_sha256=r['asset_sha256'], default_scale=default, joint=r.get('joint'),
                                  semantic_kind=c['semantic_kind'], ready=True, readiness_source=st['readiness_source']))
         roles_customs[r['role']] = (r, c, applied, mode)
-    perturbations = Perturbations(scales, (), {})
+    # scene/light augmentation (another component chooses them): removed_objects are parked by sample_isg at the fresh template's
+    # world build (campaign_runtime.scene_removals -> scene variant), lighting is applied by campaign_runtime.prepare before screens
+    from ispatialgym.sampling import campaign_augmentation as AUG
+    removed = tuple(AUG.checked_removals(read(stable), list(removed_objects or ()), inst_to_name.values())) if removed_objects else ()
+    lighting = dict(lighting or {})
+    AUG.validate_lighting(lighting)
+    perturbations = Perturbations(scales, removed, lighting)
     perturbations.validate('train', [o.instance for o in objects])
 
     # ---- output dir
     k = k if dry else allocate(k)
     key = f'va_{k}'
-    job = VA / 'sources' / key
+    job = VA / ('dryrun/' + key + '_' + str(int(time.time())) if dry else 'sources/' + key)   # dry: no slot, never dispatched
     require(not job.exists(), 'source exists: ' + str(job))
     job.mkdir(parents=True)
     used = build_dependency_overlay(job, row, reg, arts, can['env'])
@@ -688,11 +694,16 @@ def main():
     a.add_argument('--k', type=int, required=True)
     a.add_argument('--groups', type=int, default=2)
     a.add_argument('--kcollect', type=int, default=2)
+    a.add_argument('--dry-run', action='store_true', help='author under dryrun/ without allocating the slot (never dispatch it)')
+    a.add_argument('--lighting-json', default=None, help='campaign lighting dict (default {})')
+    a.add_argument('--removed-objects', default='', help='comma-separated scene object names to park (default none)')
     r = sub.add_parser('report')
     r.add_argument('job')
     args = ap.parse_args()
     if args.cmd == 'author':
-        s = author(args.configuration_id, args.k, args.groups, args.kcollect)
+        s = author(args.configuration_id, args.k, args.groups, args.kcollect, dry=args.dry_run,
+                   lighting=json.loads(args.lighting_json) if args.lighting_json else None,
+                   removed_objects=[x for x in args.removed_objects.split(',') if x])
         print(json.dumps({x: s[x] for x in ('key', 'class_id', 'configuration_id', 'job_dir', 'seconds', 'start')}))
     else:
         print(json.dumps(report(args.job), indent=1))
