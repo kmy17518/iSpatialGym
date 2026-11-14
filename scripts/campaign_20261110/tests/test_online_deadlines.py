@@ -33,3 +33,11 @@ def test_policy_is_pinned_and_missing_class_fails_closed(tmp_path):
     with pytest.raises(ValueError,match='missing class'):resolve(ref,'b','eval_standard')
     path.write_text('{}')
     with pytest.raises(ValueError,match='changed'):resolve(ref,'a','eval_standard')
+
+
+def test_train_grace_lets_an_overrunning_attempt_finish(tmp_path):
+    now=time.time()
+    state={'current':{'id':'g','deadline':now-60},'sampling_operation':{'pid':1,'start_ticks':1,'parent':0,'active':True,'member_deadline':now-60}}
+    assert expired(state,now) is not None                      # eval default: 2 s grace
+    assert expired(state,now,grace_s=1200.) is None            # train: in-process rejection, watch only for hangs
+    assert expired(state,now+1200,grace_s=1200.) is not None

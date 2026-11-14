@@ -29,16 +29,19 @@ def descendant(pid, ancestor):
     return False
 
 
-def expired(state, now):
+def expired(state, now, grace_s=2.):
     group = state.get('current')
     operation = state.get('sampling_operation')
     if not group or not operation or not operation.get('active'): return None
     deadline = min(float(group['deadline']), float(operation['member_deadline']))
-    return {**operation, 'group_id': group['id'], 'deadline': deadline} if now > deadline + 2 else None
+    return {**operation, 'group_id': group['id'], 'deadline': deadline, 'grace_s': grace_s} if now > deadline + grace_s else None
 
 
 def watch(settings_path, ancestor, poll_s=1., term_grace_s=5.):
     settings = json.loads(Path(settings_path).read_text());root = Path(settings['state_dir'])
+    # Train (2026-11-14): a sampling attempt that overruns its member budget is rejected in-process at publication
+    # (online_member_deadline); the watch then only backstops a hung native call. Eval keeps the 2 s default.
+    grace_s = float(settings.get('hard_deadline_grace_s', 2.))
     known = process(ancestor)
     while True:
         try:
@@ -46,7 +49,7 @@ def watch(settings_path, ancestor, poll_s=1., term_grace_s=5.):
         except OSError: return
         try: state = json.loads((root / 'state.json').read_text())
         except (OSError, ValueError): time.sleep(poll_s); continue
-        late = expired(state, time.time())
+        late = expired(state, time.time(), grace_s)
         if late:
             pid = int(late['pid'])
             try: actual = process(pid)

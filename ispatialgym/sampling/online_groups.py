@@ -488,8 +488,14 @@ class OnlineGroups:
                     if committed() >= self.options['groups']:
                         time.sleep(poll_s); continue  # a parked group may still finalize short
                     now = time.time()
+                    # Train (2026-11-14): a fresh-template worker builds its native template inside its first group;
+                    # first_group_extra_s (settings, train only) extends only that group's sampling budget.
+                    extra = (float(self.options.get('first_group_extra_s', 0)) if self.ungated and not self.state['groups']
+                             and not self.state['open'] and not self.state.get('first_group_extended') else 0.)
+                    if extra:
+                        self.state['first_group_extended'] = extra
                     self.state['current'] = {'id': 'online-' + uuid.uuid4().hex, 'started_at': now,
-                                             'deadline': min(now + self.options['group_limit_s'], original_deadline or math.inf),
+                                             'deadline': min(now + self.options['group_limit_s'] + extra, original_deadline or math.inf),
                                              'members': []}
                     self.reset_goal(); self.save(); self.event('group_started', group_id=self.state['current']['id'])
                 elif original_deadline and time.time() >= original_deadline: break

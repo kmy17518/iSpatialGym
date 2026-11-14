@@ -140,3 +140,11 @@ def test_verify_result_train_rule(tmp_path):
     eval_cand = {k: v for k, v in cand.items() if k != 'demo_deadline'}
     with pytest.raises(ValueError, match='member deadline exceeded'):
         verify_result(eval_cand, {**base, 'finished_at_unix': now + 50}, [])
+
+
+def test_first_group_extra_extends_only_the_first_group(tmp_path, monkeypatch):
+    worker, _, _ = make_worker(tmp_path, monkeypatch, groups=2, delays={str(i): .05 for i in range(100, 200)}, end=200)
+    worker.options['first_group_extra_s'] = .5
+    worker.run(3)
+    g1, g2 = worker.state['groups'][:2]
+    assert abs((g1['deadline'] - g1['started_at']) - .9) < .05 and abs((g2['deadline'] - g2['started_at']) - .4) < .05
