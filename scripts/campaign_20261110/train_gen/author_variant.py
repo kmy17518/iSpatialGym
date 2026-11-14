@@ -18,10 +18,16 @@ the augmentation component), customs.json + bddl/, deps/{glib,maps,anchors.json[
 prepared artifacts plus the base v2 release), preparation_binding.json, gate_author.txt (gate `check` must exit 0),
 settings.json, job.env, run.sh, job_variant.sh, source.json.
 
-Covered: floor-only held-object classes (object_scaling-*, mental_rotation-*) and tabletop classes whose roles keep the
-canonical categories (IORS small, alignment-axial) with a scaled native support when a height probe scene is found.
-Refused (explicit error): category changes (needs an IDDL re-render), multi-room / null-room rows, dict joints, roles other
-than target/partner/support, fixture replacements, scaled supports without a probe scene, x/y-scaled "height" supports.
+Covered: floor-only held-object classes (object_scaling-*, mental_rotation-*) and tabletop classes (IORS small, alignment-axial)
+with a scaled native support when a height probe scene is found. A role whose category differs from the canonical template
+(nextto_01 on a desk instead of the breakfast table, ...) gets its BDDL re-rendered from the class IDDL (render_variant: the
+canonical categories must re-render the canonical BDDL and alias first); every generation setting of the canonical customs
+entry is kept, model-keyed values move to the new model, alias-bound switches are dropped (recorded). An unscaled support
+outside the canonical scene takes the height of its prepared reach maps as top_z; a room with several floors binds the first
+in scene order (native floor_of_room). Generic reach maps join the overlay without a library identity.
+Refused (explicit error): multi-room / null-room rows (gate identity), dict joints, roles other than target/partner/support,
+fixture replacements, scaled supports without a probe scene, x/y-scaled "height" supports. Census of what passes:
+train_gen/coverage_census.py.
 """
 from __future__ import annotations
 
@@ -57,6 +63,8 @@ PROPOSAL = R / 'training_generation/handoff_20261114/train_class_wallclock_propo
 OBSERVER = R / 'tools/eval_runtime_observer_5da2a8fc.py'
 VA = R / 'training_generation/variant_authoring_r1'
 GIVEUPS = VA / 'subtemplate_giveups.jsonl'
+#: where --dry-run sources go (coverage_census.py points it at VA/dryrun_cov/<run>)
+DRY_ROOT = {'path': VA / 'dryrun'}
 #: production mode (--production): sources in the train root, ordinals shared with author_canonical (t2611_<ordinal>)
 T = R / 'training_generation/train_online_r1'
 PRODUCTION = {'on': False}
@@ -227,6 +235,8 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env):
     # maps decide the library identity of their model (a map is only found with the library it was built against)
     chosen_libs = {}
     for a in map_arts:
+        if not a.get('library'):   # generic (model-free) reach maps carry no library identity
+            continue
         lib = Path(a['library']['path'])
         model_key = '/'.join(lib.parent.name.split('__')[:2])
         chosen_libs.setdefault(model_key, (lib, a['lookup']['identity_key']))
@@ -284,7 +294,8 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env):
             if f.exists():
                 link(maps / p.parent.name / f.name, f)
         used['maps'].append({'map': ref(p), 'arm': a.get('arm'), 'height': (a.get('height') or {}).get('key'),
-                             'identity_key': a['lookup']['identity_key']})
+                             'height_source': (a.get('height') or {}).get('source'),
+                             'identity_key': a['lookup'].get('identity_key'), 'kind': a['lookup'].get('kind')})
         if (a.get('height') or {}).get('anchors'):
             anchors.add(a['height']['anchors']['path'])
     # base release (the canonical's roots) under every name the prepared artifacts do not take
@@ -311,19 +322,83 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env):
     for extra in (base_glib / 'profiles',):
         if extra.is_dir():
             os.symlink(extra, deps / 'glib/profiles')
-    require(len(anchors) <= 1, 'maps of one configuration name different anchor files')
     if anchors:
-        a = Path(anchors.pop())
-        prepared = read(a)['anchors']
+        # model maps and generic maps of one configuration can name different anchor files: merge them by key (a key named twice
+        # must name the same height), then the base anchors of other keys
+        prepared, files = {}, []
+        for a in sorted(Path(x) for x in anchors):
+            files.append(ref(a))
+            for x in read(a)['anchors']:
+                prev = prepared.setdefault(x['key'], x)
+                require(abs(float(prev['height']) - float(x['height'])) <= 1e-9, f'anchor key {x["key"]} names two heights')
         base = read(canonical_env.get('ISPATIALGYM_REACH_MAP_ANCHORS', BASE_V2 / 'anchors.json'))
-        keys = {x['key'] for x in prepared}
-        merged = dict(base, anchors=prepared + [x for x in base.get('anchors', []) if x['key'] not in keys])
+        merged = dict(base, anchors=list(prepared.values()) + [x for x in base.get('anchors', []) if x['key'] not in prepared])
         write_json_atomic(deps / 'anchors.json', merged)
-        used['anchors'] = {'prepared': ref(a), 'base': ref(canonical_env.get('ISPATIALGYM_REACH_MAP_ANCHORS', BASE_V2 / 'anchors.json')),
+        used['anchors'] = {'prepared': files[0] if len(files) == 1 else files,
+                           'base': ref(canonical_env.get('ISPATIALGYM_REACH_MAP_ANCHORS', BASE_V2 / 'anchors.json')),
                            'merged': ref(deps / 'anchors.json'), 'rule': 'prepared anchors first, base anchors of other keys kept'}
     else:
         used['anchors'] = {'base': ref(canonical_env.get('ISPATIALGYM_REACH_MAP_ANCHORS', BASE_V2 / 'anchors.json'))}
     return used
+
+
+# ------------------------------------------------------------------------------------------------ category changes
+
+def _bddl_body(text):
+    """BDDL text without comments, blank lines and the problem / variant header (what the IDDL decides)."""
+    out = []
+    for line in text.splitlines():
+        t = line.split(';', 1)[0].strip()
+        if t and not t.startswith(('(define (problem', '(:variant')):
+            out.append(' '.join(t.split()))
+    return out
+
+
+def render_variant(can, categories):
+    """The class IDDL rendered with the row's role categories (materialize_model_table_tasks pattern).
+
+    The canonical categories must re-render the canonical BDDL (comments and header aside) and the canonical alias, with or
+    without the `ontop -> inside` init rewrite (ground_isg's starts_inside); the same rewrite is then applied to the row's
+    categories. Returns (alias, rendered, canonical rendered, init_predicates, iddl path)."""
+    from ispatialgym.sampling.bddl_from_iddl import RoleGrounding, render
+    from ispatialgym.sampling.iddl import parse_file
+    from ispatialgym.sampling.knowledge import synset_of_category
+    entry = can['entry']
+    ipath = SNAP / 'ispatialgym/assets/iddl' / entry['iddl']
+    iddl = parse_file(str(ipath))
+    canon_cats = {role: (entry['roles'].get(role) or {}).get('category') for role in iddl.roles}
+    require(not iddl.groups, 'IDDL render: composite groups are not supported')
+
+    def groundings(cats):
+        out = {}
+        for role in iddl.roles:
+            if role == 'floor':
+                out[role] = RoleGrounding(role, 'scene', same_as='floor')
+                continue
+            spec = entry['roles'].get(role) or {}
+            require(cats.get(role), f'IDDL render: role {role} has no category')
+            out[role] = RoleGrounding(role, 'sampleable' if spec.get('sampleable') else 'scene', category=cats[role],
+                                      synset=synset_of_category(cats[role]))
+        return out
+
+    def alias(cats):
+        return iddl.variant_template.format(**{slot: cats[slot] for slot in iddl.variant_slots})
+
+    did, activity = int(entry['definition_id']), can['bddl_rel'].parts[0]
+    require(alias(canon_cats) == can['meta']['variant'], f'IDDL render: canonical alias {alias(canon_cats)} != {can["meta"]["variant"]}')
+    want = _bddl_body(can['bddl'].read_text())
+    supports = [r for r in iddl.roles if not (entry['roles'].get(r) or {}).get('sampleable') and r != 'floor']
+    for init_predicates in (None, {('ontop', r): 'inside' for r in supports}):
+        canon = render(iddl, groundings(canon_cats), did, alias(canon_cats), activity, init_predicates=init_predicates or None)
+        if _bddl_body(canon.text) == want:
+            break
+    else:
+        raise SystemExit('IDDL render failed: the canonical categories do not re-render the canonical BDDL')
+    cats = dict(canon_cats, **categories)
+    new = render(iddl, groundings(cats), did, alias(cats), activity,
+                 comment=f'train variant (author_variant): {alias(cats)} rendered from {entry["iddl"]} with the row categories',
+                 init_predicates=init_predicates or None)
+    return alias(cats), new, canon, init_predicates, ipath
 
 
 # ------------------------------------------------------------------------------------------------ authoring
@@ -381,23 +456,46 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
             stable = Path(probe[2])
     init = read(stable)['objects_info']['init_info']
     floors = [n for n, v in init.items() if v['args'].get('category') == 'floors' and room in (v['args'].get('in_rooms') or [])]
-    require(len(floors) == 1, f'floor of {scene}/{room} not unique: {floors}')
+    require(floors, f'no floor in {scene}/{room}')
+    # a room with several floor objects (house_single_floor garden_0): the sampler binds the first in scene order
+    # (sim_utils.floor_of_room; the BDDL `ontop agent floor` is judged on the floor under the robot, floor_object_under)
+    floor_note = None if len(floors) == 1 else {'candidates': floors, 'bound': floors[0], 'rule': 'first in scene order (sim_utils.floor_of_room)'}
 
-    # ---- role -> canonical instance (categories must match: the canonical BDDL bytes are reused unchanged)
+    # ---- role -> canonical object; a role whose category differs re-renders the BDDL from the class IDDL (render_variant)
     objects, scales, inst_to_name, roles_customs = [], {}, {}, {}
     cobj = {(o['role'], o['category']): o for o in ctemplate['objects'] if o['semantic_kind'] != 'floor'}
+    by_role = {}
+    for o in ctemplate['objects']:
+        if o['semantic_kind'] != 'floor':
+            by_role.setdefault(o['role'], []).append(o)
+    changed = {}
+    for r in row['identity_roles']:
+        if (r['role'], r['category']) not in cobj:
+            cands = by_role.get(r['role'], [])
+            require(len(cands) == 1, f'unsupported: {r["role"]} category change with {len(cands)} canonical {r["role"]} objects')
+            changed[r['role']] = (cands[0]['category'], r['category'])
+    variant = can['meta']['variant']
+    rendered = None
+    new_inst = {}   # canonical instance -> rendered instance
+    if changed:
+        variant, rendered, canon_r, init_predicates, ipath = render_variant(can, {role: c2 for role, (c1, c2) in changed.items()})
+        for role, inst in canon_r.instances.items():
+            if isinstance(inst, str) and role in rendered.instances:
+                new_inst[inst] = rendered.instances[role]
     floor_c = next(o for o in ctemplate['objects'] if o['semantic_kind'] == 'floor')
     fa = init[floors[0]]['args']
     st = catalog.status(fa['category'], fa['model'])
     require(st['ready'], 'floor not ready')
-    objects.append(ObjectRef(instance=floor_c['instance'], role='support', category=fa['category'], model=fa['model'],
+    floor_i = new_inst.get(floor_c['instance'], floor_c['instance'])
+    objects.append(ObjectRef(instance=floor_i, role='support', category=fa['category'], model=fa['model'],
                              asset_sha256=sha(asset_path(fa['category'], fa['model'])), default_scale=tuple(fa['scale']),
                              semantic_kind='floor', ready=True, readiness_source=st['readiness_source']))
-    scales[floor_c['instance']] = ScaleState(tuple(fa['scale']), tuple(fa['scale']), 'fixed')
-    inst_to_name[floor_c['instance']] = floors[0]
+    scales[floor_i] = ScaleState(tuple(fa['scale']), tuple(fa['scale']), 'fixed')
+    inst_to_name[floor_i] = floors[0]
     for r in row['identity_roles']:
-        c = cobj.get((r['role'], r['category']))
-        require(c is not None, f'unsupported: {r["role"]} category {r["category"]} differs from the canonical template (needs IDDL render)')
+        c = cobj.get((r['role'], r['category'])) or by_role[r['role']][0]
+        inst = new_inst.get(c['instance'], c['instance'])
+        require(not changed or inst in rendered.instances.values(), f'{r["role"]}: canonical instance {c["instance"]} not rendered')
         mk = r['category'] + '/' + r['model']
         path = asset_path(r['category'], r['model'])
         require(path.is_file() and sha(path) == r['asset_sha256'], f'asset bytes of {mk} differ from the selection row')
@@ -410,16 +508,18 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
             mode = 'fixed' if same_scale(default, applied) else 'height'
             if mode == 'height':
                 require(applied[0] == default[0] and applied[1] == default[1], 'unsupported: height scale changes x/y (world-up axis fix §3a)')
-            inst_to_name[c['instance']] = support_name
+            inst_to_name[inst] = support_name
         else:
             md = defaults.get(mk)
             default = tuple(md['default_scale']) if md else tuple(c['default_scale'])
             require(md is not None or r['model'] == c['model'], 'no ready default scale for ' + mk)
             mode = 'fixed' if same_scale(default, applied) else 'uniform'
             cname = can['meta']['inst_to_name'][c['instance']]
-            inst_to_name[c['instance']] = cname.replace('_' + c['model'] + '_', '_' + r['model'] + '_')
-        scales[c['instance']] = ScaleState(default, applied, mode)
-        objects.append(ObjectRef(instance=c['instance'], role=c['role'], category=r['category'], model=r['model'],
+            old_tok, new_tok = f'_{c["category"]}_{c["model"]}_', f'_{r["category"]}_{r["model"]}_'
+            require(old_tok in cname or (c['category'], c['model']) == (r['category'], r['model']), f'scene name {cname} has no {old_tok}')
+            inst_to_name[inst] = cname.replace(old_tok, new_tok)
+        scales[inst] = ScaleState(default, applied, mode)
+        objects.append(ObjectRef(instance=inst, role=c['role'], category=r['category'], model=r['model'],
                                  asset_sha256=r['asset_sha256'], default_scale=default, joint=r.get('joint'),
                                  semantic_kind=c['semantic_kind'], ready=True, readiness_source=st['readiness_source']))
         roles_customs[r['role']] = (r, c, applied, mode)
@@ -451,19 +551,24 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
     else:
         k = k if dry else allocate(k)
         key = f'va_{k}'
-        job = VA / ('dryrun/' + key + '_' + str(int(time.time())) if dry else 'sources/' + key)   # dry: no slot, never dispatched
+        # dry: no slot, never dispatched; pid + ns keep parallel dry runs (coverage census) apart
+        job = (DRY_ROOT['path'] / f'{key}_{int(time.time())}_{os.getpid()}_{time.time_ns() % 10**9}') if dry else VA / 'sources' / key
     require(not job.exists(), 'source exists: ' + str(job))
     job.mkdir(parents=True)
     used = build_dependency_overlay(job, row, reg, arts, can['env'])
     if probe:
         above = probe[1].get('measured_height_above_floor')
         heights = {float(m['height']) for m in used['maps'] if m.get('height') is not None}
-        require(above is not None and heights and all(abs(h - above) <= 5e-5 for h in heights),
+        arms = {m.get('arm') for m in used['maps'] if m.get('height') is not None}
+        # every arm needs a prepared map at the probe height; maps of other (older native) heights may ride along unused
+        hit = {m.get('arm') for m in used['maps'] if m.get('height') is not None and above is not None and abs(float(m['height']) - above) <= 5e-5}
+        require(above is not None and heights and hit == arms,
                 f'probe height {above} differs from the prepared map heights {sorted(heights)} (placement mismatch)')
 
-    # ---- customs entry + BDDL (canonical bytes; same categories)
-    variant = can['meta']['variant']
+    # ---- customs entry + BDDL (canonical bytes, or the IDDL render when a role category changes)
     entry = copy.deepcopy(can['entry'])
+    for role, (c1, c2) in changed.items():
+        entry['roles'][role]['category'] = c2
     for role, (r, c, applied, mode) in roles_customs.items():
         if role == 'support':
             continue
@@ -501,15 +606,31 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
                 for k2, v in d.items():
                     walk(v, path + (k2,))
         walk(gen, ('generation',))
+    dropped_generation = []
+    # alias/model-bound switches of the canonical source: they reject any other variant or model pair (iors_small)
+    if gen.get('crayon_raised_release_gap_fallback') and (variant != can['meta']['variant'] or any(
+            (r['category'], r['model']) != (c['category'], c['model']) for role, (r, c, a, m) in roles_customs.items() if role != 'support')):
+        gen.pop('crayon_raised_release_gap_fallback')
+        dropped_generation.append('crayon_raised_release_gap_fallback (bound to the canonical crayon/ruler source)')
     block = {'rooms': [room], 'bindings': {'floor': {'room': room}}, 'blacklist': {},
              'whitelist': {role: {r['category']: [r['model']]} for role, (r, c, a, m) in roles_customs.items() if role != 'support'}}
+    top = top_source = None
     if supports:
         top = probe[1].get('measured_height_world', probe[1].get('support_top_z_world')) if probe else None
+        top_source = 'height_probe' if top is not None else None
         if top is None:
             cblock = can['meta']['choice']['bindings']
             surf = [s for s in cblock.get('support_surfaces', []) if s['name'] == support_name]
-            require(scene == ctemplate['scene'] and surf, 'unscaled support outside the canonical scene: top height unknown')
-            top = surf[0]['top_z']
+            if scene == ctemplate['scene'] and surf:
+                top, top_source = surf[0]['top_z'], 'canonical_surface'
+            else:
+                # unscaled native support elsewhere: the height (m above the floor) its prepared reach maps were measured at;
+                # the sampler keeps the support top when it is within SURFACE_MISMATCH_M of it (tabletop.support_surface)
+                ms = [m for m in used['maps'] if m.get('height') is not None]
+                measured = [m for m in ms if m.get('height_source') == 'measured_configuration_height']
+                heights = sorted({round(float(m['height']), 4) for m in (measured or ms)})
+                require(len(heights) == 1, f'unscaled support outside the canonical scene: top height unknown (prepared map heights {heights})')
+                top, top_source = heights[0], 'prepared_map_height'
         block['bindings']['support'] = [support_name]
         block['bindings']['support_surfaces'] = [{'name': support_name, 'init': 'ontop', 'top_z': float(top), 'row': 'train_variant_' + key}]
     entry['scenes'] = {scene: block}
@@ -518,13 +639,18 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
         if name.startswith('fallback') or name == 'superseded_by':
             entry.pop(name)
     entry['campaign_provenance'] = {'status': 'train_variant_route_b', 'configuration_id': cid,
-                                    'canonical_customs': ref(can['customs']), 'canonical_variant': variant,
-                                    'inherited_model_keyed_generation': inherited, 'production_released': False}
+                                    'canonical_customs': ref(can['customs']), 'canonical_variant': can['meta']['variant'],
+                                    'category_changes': {r: list(v) for r, v in changed.items()},
+                                    'inherited_model_keyed_generation': inherited, 'dropped_generation': dropped_generation,
+                                    'production_released': False}
     write_json_atomic(job / 'customs.json', {variant: entry})
     bddl = job / 'bddl' / can['bddl_rel']
     bddl.parent.mkdir(parents=True)
-    shutil.copyfile(can['bddl'], bddl)
-    require(sha(bddl) == can['meta']['bddl_sha256'], 'BDDL copy differs')
+    if rendered is None:
+        shutil.copyfile(can['bddl'], bddl)
+        require(sha(bddl) == can['meta']['bddl_sha256'], 'BDDL copy differs')
+    else:
+        bddl.write_text(rendered.text)
     # the native problem must ground the exact models in this scene (no simulator)
     from ispatialgym.sampling.v2.problem import GroundedProblem, iter_template_choices
     import numpy as np
@@ -543,7 +669,7 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
         require(same_scale(live['scale'], supports[0]['scale'], 1e-9), 'probe scene support scale differs from the row')
 
     # ---- campaign template + config
-    setup = {'task_rooms': [room], 'inst_to_name': inst_to_name, 'runtime_bddl_sha256': can['meta']['bddl_sha256'],
+    setup = {'task_rooms': [room], 'inst_to_name': inst_to_name, 'runtime_bddl_sha256': sha(bddl),
              'preparation_configuration_id': cid, 'preparation_variant_id': row.get('variant_id'),
              'preparation_template_key': row.get('template_key'),
              'validity_manifest': {'path': manifest['_pointer']['path'], 'sha256': manifest['_pointer']['sha256'],
@@ -552,6 +678,15 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
                                   'template_dir': str(can['template_dir'])},
              'authored_customs': ref(job / 'customs.json'), 'authored_bddl': ref(bddl),
              'prepared_dependencies': used, 'route': 'B_fresh_native_online_worker', 'production_released': False}
+    if supports:
+        setup['support_top'] = {'top_z': float(top), 'source': top_source}
+    if floor_note:
+        setup['floor_binding'] = floor_note
+    if rendered is not None:
+        setup['iddl_render'] = {'iddl': ref(ipath), 'variant': variant, 'canonical_variant': can['meta']['variant'],
+                                'category_changes': {r: list(v) for r, v in changed.items()},
+                                'init_predicates': sorted(f'{a}:{b}->{c}' for (a, b), c in (init_predicates or {}).items()),
+                                'pattern': 'materialize_model_table_tasks (RoleGrounding + iter_template_choices)'}
     if probe:
         setup['private_scene'] = {'schema': 'isg-native-private-scene-v1', 'path': str(job / 'deps/stable_scene' / (scene + '_stable.json')),
                                   'sha256': sha(job / 'deps/stable_scene' / (scene + '_stable.json')),
@@ -683,7 +818,8 @@ exec {PY} {OBSERVER} --output {job}/runtime.json --snapshot {SNAP} --expected-sd
               'proposal': ref(PROPOSAL), 'limits': {'group_limit_s': L, 'member_limit_s': Lm, 'demo_safety_cap_s': cap,
                                                     'subtemplate_giveup_s': int(prop['subtemplate_giveup_s'])},
               'scales': {n: asdict(s) for n, s in scales.items()}, 'inherited_model_keyed_generation': inherited,
-              'dropped_recovery_options': dropped, 'prepared_dependencies': used, 'kcollect': kcollect, 'authored_at': time.time()}
+              'dropped_recovery_options': dropped, 'prepared_dependencies': used, 'variant': variant,
+              'category_changes': {r: list(v) for r, v in changed.items()}, 'dropped_generation': dropped_generation, 'kcollect': kcollect, 'authored_at': time.time()}
     write_json_atomic(job / 'source.json', source)
     return source
 
