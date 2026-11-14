@@ -46,7 +46,9 @@ from types import SimpleNamespace
 R = Path(os.environ.get('ISG_TRAIN_ADMISSION_R', '/vision/u/minyeong/projects/isg_home/campaign_20261110'))
 TG = R / 'training_generation'
 SOURCES = TG / 'train_online_r1' / 'sources'
-RELEASE = TG / 'releases' / 'release_train_r1.json'
+RELEASE = TG / 'releases' / 'release_train_r2.json'   # newest: its snapshot provides the native checks
+#: every frozen train release a source may be authored against (each source is checked against ITS release)
+RELEASES = (TG / 'releases' / 'release_train_r1.json', TG / 'releases' / 'release_train_r2.json')
 OUT = Path(os.environ.get('ISG_TRAIN_ADMISSION_OUT', str(TG / 'admission_r1')))
 EVAL_TREE = R / 'vast'                                   # read-only: parent eval release + proof; never written
 SCHEMA = 'isg-train-admission-v1'
@@ -258,7 +260,7 @@ def check_worker(job, rel):
         need(s.get('key') == job.name and Path(s['job_dir']).resolve() == job.resolve(), 'source key/job_dir differs')
         need(s.get('workstream') == 'train', 'workstream not train: %r' % s.get('workstream'))
         need(Path(s['release']['path']).resolve() == Path(rel['release']['path']).resolve()
-             and s['release']['sha256'] == rel['release']['sha256'], 'source release ref is not release_train_r1')
+             and s['release']['sha256'] == rel['release']['sha256'], 'source release ref is not its admitting train release')
         need(s.get('native_commit') == rel['candidate_commit'], 'source native commit differs from release')
         need(Path(s.get('snapshot', '')).resolve() == Path(rel['snapshot']), 'source snapshot differs from release')
         bad = []
@@ -778,7 +780,8 @@ def scan_sources(only):
 
 def admit(a):
     t0 = time.time()
-    rel = release_identity(); load_native(rel['snapshot'])
+    newest = release_identity(); load_native(newest['snapshot'])
+    releases = {str(Path(p).resolve()): release_identity(p) for p in RELEASES}
     tool_ref = ref(Path(__file__))
     scan = {'only': sorted(a.only) if a.only else None, 'sources': {}, 'rejected_groups': []}
     bodies, records = [], []
@@ -788,6 +791,10 @@ def admit(a):
         running = worker_running(job)
         if running:
             scan['sources'][job.name] = {'status': 'pending_worker_not_finished', 'why': running}; continue
+        try:
+            rel = releases[str(Path(read(job / 'source.json')['release']['path']).resolve())]
+        except (KeyError, OSError, ValueError):
+            scan['sources'][job.name] = {'status': 'rejected_unknown_release'}; continue
         wck, info = check_worker(job, rel)
         st = info.get('_state') or {}
         groups = st.get('groups', [])
@@ -805,7 +812,7 @@ def admit(a):
                                                 'category': category, 'reasons': reasons[:6]})
         scan['sources'][job.name] = srow
     scan['rejected_groups'].sort(key=lambda x: (x['class_id'], x['group_id']))
-    result = {'mode': 'apply' if a.apply else 'dry_run', 'release': rel['name'],
+    result = {'mode': 'apply' if a.apply else 'dry_run', 'release': newest['name'], 'releases': sorted(r['name'] for r in releases.values()),
               'admitted_this_scan': len(bodies), 'rejected_this_scan': len(scan['rejected_groups']),
               'members_admitted_this_scan': sum(len(b['allocation']) for b in bodies),
               'members_excluded_this_scan': sum(len(b['excluded_members']) for b in bodies),
@@ -821,7 +828,7 @@ def admit(a):
         res = apply_receipts(bodies)
         result['receipts'] = res
         result['conflicts'] = [x for x in res if x['status'] == 'conflict']
-        result.update(write_ledger(build_ledger(receipts_on_disk(), scan, rel, tool_ref)))
+        result.update(write_ledger(build_ledger(receipts_on_disk(), scan, newest, tool_ref)))
     result['seconds'] = round(time.time() - t0, 1)
     if a.report:
         Path(a.report).write_text(json.dumps({'result': result, 'records': records}, indent=1, sort_keys=True, default=str) + '\n')

@@ -43,8 +43,9 @@ from dataclasses import asdict
 from pathlib import Path
 
 R = Path('/vision/u/minyeong/projects/isg_home/campaign_20261110')
-SNAP = Path(os.environ.get('ISG_TRAIN_SNAPSHOT', str(R / 'code/train_e45f4cfd634b')))
-CODE_SHA256 = '3416dbb9cabd8e43da1a5f9bc259e6d9094eb7ab90c6a6aab7f69ab37980b6ca'
+SNAP = Path(os.environ.get('ISG_TRAIN_SNAPSHOT', str(R / 'code/train_699ba262b46e')))
+CODE_SHA256 = '70c32df8ef5cdd132ddc37366aed6ebee1bb458ca4588569bea409ba55a3bfe0'
+RELEASE_RECORD = R / 'training_generation/releases/release_train_r2.json'
 RP = R / 'training_preparation/preparation_vast_20261114T034355Z'
 GATE = RP / 'validity/code/train_validity_gate.py'
 REGISTRY = RP / 'registry/revisions/rev_20261114T161444Z_7d5cc515cc7e'
@@ -672,6 +673,7 @@ exec {PY} {OBSERVER} --output {job}/runtime.json --snapshot {SNAP} --expected-sd
     source = {'owner': 'train_gen_20261114/variant_authoring_r1', 'workstream': 'train', 'key': key, 'slot_k': k, 'class_id': cls,
               'configuration_id': cid, 'route': 'B', 'augment_seed': augment_seed, 'groups': groups, 'job_dir': str(job), 'seconds': seconds, 'start': start,
               'index_count': 100000, 'snapshot': str(SNAP), 'code_sha256': CODE_SHA256,
+              'release': ref(RELEASE_RECORD), 'native_commit': read(RELEASE_RECORD)['candidate_commit'],
               'author': ref(Path(__file__).resolve()), 'wrapper_job': ref(job / 'job_variant.sh'),
               'settings': ref(job / 'settings.json'), 'campaign_config': ref(job / 'campaign_config.json'),
               'job_env': ref(job / 'job.env'), 'wrapper': ref(job / 'run.sh'), 'customs': ref(job / 'customs.json'),
