@@ -56,6 +56,11 @@ PROPOSAL = R / 'training_generation/handoff_20261114/train_class_wallclock_propo
 OBSERVER = R / 'tools/eval_runtime_observer_5da2a8fc.py'
 VA = R / 'training_generation/variant_authoring_r1'
 GIVEUPS = VA / 'subtemplate_giveups.jsonl'
+#: production mode (--production): sources in the train root, ordinals shared with author_canonical (t2611_<ordinal>)
+T = R / 'training_generation/train_online_r1'
+PRODUCTION = {'on': False}
+#: ordinals whose index ranges the test slots k=80..99 (INDEX_BASE + k*1e5) already use; never allocated
+RESERVED_ORDINALS = range(10080, 10100)
 BASE_V2 = Path('/vision/u/minyeong/projects/isg_home/oracle_fix/v2maps_int2')
 PY = '/vision/u/minyeong/miniconda3/envs/ispatialgym-vectorized-envs/bin/python'
 INDEX_BASE = 2000600000000
@@ -322,6 +327,19 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env):
 
 # ------------------------------------------------------------------------------------------------ authoring
 
+def allocate_production():
+    (T / 'ordinals').mkdir(parents=True, exist_ok=True)
+    existing = [int(p.name) for p in (T / 'ordinals').iterdir() if p.name.isdigit()]
+    o = max(existing + [9999]) + 1
+    while True:
+        if o in RESERVED_ORDINALS:
+            o += 1; continue
+        try:
+            (T / 'ordinals' / str(o)).mkdir(); return o
+        except FileExistsError:
+            o += 1
+
+
 def allocate(k):
     require(80 <= k <= 89, 'test slots are k = 80..89')
     (VA / 'ordinals').mkdir(parents=True, exist_ok=True)
@@ -329,7 +347,7 @@ def allocate(k):
     return k
 
 
-def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=()):
+def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(), augment_seed=None, force_augment=False):
     gate = gate_module()
     manifest, row = validity_row(gate, cid)
     cls = row['class_id']
@@ -407,6 +425,19 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
     # scene/light augmentation (another component chooses them): removed_objects are parked by sample_isg at the fresh template's
     # world build (campaign_runtime.scene_removals -> scene variant), lighting is applied by campaign_runtime.prepare before screens
     from ispatialgym.sampling import campaign_augmentation as AUG
+    if augment_seed is not None:
+        # D5 (2026-11-14): per-source draws, each with p = 0.5 (campaign_augmentation helpers); identical for every group of the
+        # worker. force_augment (tests only) advances the seed until both draws are non-empty.
+        seed = int(augment_seed)
+        while True:
+            lit = AUG.lighting_draw(seed) if lighting is None else lighting
+            rem = (AUG.removal_candidates(read(stable), rooms=[room], protected=list(inst_to_name.values()), seed=seed + 7919)
+                   if not removed_objects else list(removed_objects))
+            if not force_augment or (lit and rem):
+                break
+            seed += 1
+        lighting, removed_objects = lit, rem
+        augment_seed = seed
     removed = tuple(AUG.checked_removals(read(stable), list(removed_objects or ()), inst_to_name.values())) if removed_objects else ()
     lighting = dict(lighting or {})
     AUG.validate_lighting(lighting)
@@ -414,9 +445,12 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
     perturbations.validate('train', [o.instance for o in objects])
 
     # ---- output dir
-    k = k if dry else allocate(k)
-    key = f'va_{k}'
-    job = VA / ('dryrun/' + key + '_' + str(int(time.time())) if dry else 'sources/' + key)   # dry: no slot, never dispatched
+    if PRODUCTION['on'] and not dry:
+        ordinal = allocate_production(); key = f't2611_{ordinal}'; job = T / 'sources' / key; k = ordinal - 10000
+    else:
+        k = k if dry else allocate(k)
+        key = f'va_{k}'
+        job = VA / ('dryrun/' + key + '_' + str(int(time.time())) if dry else 'sources/' + key)   # dry: no slot, never dispatched
     require(not job.exists(), 'source exists: ' + str(job))
     job.mkdir(parents=True)
     used = build_dependency_overlay(job, row, reg, arts, can['env'])
@@ -587,7 +621,8 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
                  'ISGF_WALLCLOCK_POLICY', 'TAG'):
         env.pop(name, None)
     env.update(ISGE_CODE=str(SNAP), ISGF_SCRIPTS=str(SNAP / 'scripts/trainfast'), ISGF_ROOT=str(R),
-               ISGF_JB_NFS=str(VA / 'jobs'), ISGF_PREDEMO_ROOT=str(VA), ISGF_SAMPLING_CACHE=str(job / 'sampling_cache'),
+               ISGF_JB_NFS=str((T if PRODUCTION['on'] else VA) / 'jobs'), ISGF_PREDEMO_ROOT=str(T if PRODUCTION['on'] else VA),
+               ISGF_SAMPLING_CACHE=str(job / 'sampling_cache'),
                ISPATIALGYM_CAMPAIGN_CONFIG=str(job / 'campaign_config.json'), ISPATIALGYM_ONLINE_GROUPS=str(job / 'settings.json'),
                ISPATIALGYM_MAP_OVERLAY_SHARDS=str(job / 'map_overlay'),
                ISPATIALGYM_GRASP_LIBRARY_V2=str(job / 'deps/glib'), ISPATIALGYM_REACH_MAPS=str(job / 'deps/maps'),
@@ -635,7 +670,7 @@ exec {PY} {OBSERVER} --output {job}/runtime.json --snapshot {SNAP} --expected-sd
     os.chmod(job / 'run.sh', 0o775)
     latest = read(RP / 'validity/LATEST.json')
     source = {'owner': 'train_gen_20261114/variant_authoring_r1', 'workstream': 'train', 'key': key, 'slot_k': k, 'class_id': cls,
-              'configuration_id': cid, 'route': 'B', 'groups': groups, 'job_dir': str(job), 'seconds': seconds, 'start': start,
+              'configuration_id': cid, 'route': 'B', 'augment_seed': augment_seed, 'groups': groups, 'job_dir': str(job), 'seconds': seconds, 'start': start,
               'index_count': 100000, 'snapshot': str(SNAP), 'code_sha256': CODE_SHA256,
               'author': ref(Path(__file__).resolve()), 'wrapper_job': ref(job / 'job_variant.sh'),
               'settings': ref(job / 'settings.json'), 'campaign_config': ref(job / 'campaign_config.json'),
@@ -691,19 +726,27 @@ def main():
     sub = ap.add_subparsers(dest='cmd', required=True)
     a = sub.add_parser('author')
     a.add_argument('--configuration-id', required=True)
-    a.add_argument('--k', type=int, required=True)
+    a.add_argument('--k', type=int, default=0, help='test slot 80..89 (ignored with --production)')
+    a.add_argument('--production', action='store_true', help='train root + shared ordinal (t2611_<n>); giveups in the train root')
     a.add_argument('--groups', type=int, default=2)
     a.add_argument('--kcollect', type=int, default=2)
     a.add_argument('--dry-run', action='store_true', help='author under dryrun/ without allocating the slot (never dispatch it)')
     a.add_argument('--lighting-json', default=None, help='campaign lighting dict (default {})')
     a.add_argument('--removed-objects', default='', help='comma-separated scene object names to park (default none)')
+    a.add_argument('--augment-seed', type=int, default=None, help='draw lighting + scene removals (p=0.5 each) from this seed')
+    a.add_argument('--force-augment', action='store_true', help='tests only: advance the seed until both draws are non-empty')
     r = sub.add_parser('report')
     r.add_argument('job')
     args = ap.parse_args()
     if args.cmd == 'author':
+        if args.production:
+            PRODUCTION['on'] = True
+            global GIVEUPS
+            GIVEUPS = T / 'subtemplate_giveups.jsonl'
         s = author(args.configuration_id, args.k, args.groups, args.kcollect, dry=args.dry_run,
                    lighting=json.loads(args.lighting_json) if args.lighting_json else None,
-                   removed_objects=[x for x in args.removed_objects.split(',') if x])
+                   removed_objects=[x for x in args.removed_objects.split(',') if x],
+                   augment_seed=args.augment_seed, force_augment=args.force_augment)
         print(json.dumps({x: s[x] for x in ('key', 'class_id', 'configuration_id', 'job_dir', 'seconds', 'start')}))
     else:
         print(json.dumps(report(args.job), indent=1))

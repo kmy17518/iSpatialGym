@@ -95,6 +95,8 @@ def allocate():
     existing = [int(p.name) for p in (T / 'ordinals').iterdir() if p.name.isdigit()]
     o = max(existing + [9999]) + 1
     while True:
+        if 10080 <= o < 10100:   # index ranges of the test slots k=80..99
+            o += 1; continue
         try:
             (T / 'ordinals' / str(o)).mkdir(); return o
         except FileExistsError:
