@@ -595,7 +595,9 @@ def author(cid, k, groups, kcollect, dry=False):
     if probe:
         env['ISPATIALGYM_STABLE_SCENE_DIR'] = str(job / 'deps/stable_scene')
     # OmniGibson copies its .kit into EXP_PATH on every launch: a private copy of the campaign overlay per source (eval jobs did the same)
-    shutil.copytree(R / 'isaacsim_overlay/apps', job / 'isaacsim_overlay/apps')
+    # keep the symlinks: the overlay's .kit files link into the env's isaacsim/apps and Kit resolves extension folders relative to
+    # the link target - dereferenced copies broke that (Kit's prebundled cffi 1.17.1 vs the env's _cffi_backend 2.1.1, va_82..84)
+    shutil.copytree(R / 'isaacsim_overlay/apps', job / 'isaacsim_overlay/apps', symlinks=True)
     env['EXP_PATH'] = env['ISGF_EXP_PATH'] = str(job / 'isaacsim_overlay/apps')
     extra = re.sub(r'--wallclock \d+(\.\d+)?', f'--wallclock {cap}', env.get('ISGF_COLLECT_EXTRA', ''))
     if '--wallclock' not in extra:
