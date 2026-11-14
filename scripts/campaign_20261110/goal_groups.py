@@ -321,6 +321,32 @@ def bind_scaled_runtime_identity(anchor, template, perturbations):
             if model.get("grasp_key") != actual.get("grasp_key"):
                 routes.append(verify_scaled_grasp_route(anchor, model, actual, state))
                 model["grasp_key"] = actual["grasp_key"]
+        elif model.get("scale") is None and actual.get("scale") is not None:
+            # A natively re-sampled training template records unperturbed scales explicitly; null means the
+            # native default, so only the exact default may stand in for it.
+            require([float(x) for x in actual["scale"]] == list(state.default), "unperturbed native choice changes its scale")
+            model["scale"] = actual["scale"]
+    # A verified height perturbation of a scene-object support moves its measured top: the support binding of the
+    # re-sampled template (top_z, support row, support tag) follows it. Every other binding must stay identical.
+    names = template.scene_setup.get("inst_to_name", {})
+    height = {names.get(obj.instance) for obj in template.objects
+              if obj.instance in perturbations.scales and perturbations.scales[obj.instance].mode == "height"
+              and perturbations.scales[obj.instance].default != perturbations.scales[obj.instance].applied}
+    support = []
+    old_rows = expected.get("bindings", {}).get("support_surfaces") or []
+    new_rows = current.get("bindings", {}).get("support_surfaces") or []
+    if height and old_rows != new_rows:
+        require(len(old_rows) == len(new_rows), "scaled support changes the number of support surfaces")
+        for before, after in zip(old_rows, new_rows):
+            if before == after:
+                continue
+            require(before.get("name") == after.get("name") and before.get("name") in height
+                    and before.get("init") == after.get("init"),
+                    "support binding changes beyond a verified height-scaled support")
+            support.append({"name": before["name"], "source": before, "runtime": after})
+        expected["bindings"]["support_surfaces"] = copy.deepcopy(new_rows)
+        if "support_tag" in expected and "support_tag" not in current:
+            support.append({"support_tag_dropped": expected.pop("support_tag")})
     require(expected == current, "runtime choices differ beyond verified training scales")
     proof = {"source_runtime_template_id": declared, "source_metadata": str(source_path),
              "source_choice_sha256": digest(original), "runtime_choice_sha256": digest(current),
@@ -328,6 +354,8 @@ def bind_scaled_runtime_identity(anchor, template, perturbations):
              "comparison": "native template choices unchanged except live-verified training scales"}
     if routes:
         proof["grasp_routes"] = routes
+    if support:
+        proof["height_scaled_supports"] = support
     return replace(template, scene_setup={**template.scene_setup, "runtime_template_id": runtime_id,
                                          "scaled_runtime_identity": proof})
 

@@ -31,6 +31,10 @@ def selected_records(manifest, demo_dirs, *, sequential_augmentation=False, slot
     else:
         require(len({row["render_compatibility_sha256"] for row in selected.values()}) == 1,
                 "campaign rendering batch mixes scene, scale, light or validation configuration")
+        # Defense in depth: the skybox is global to the simulator, so a batch must share one lighting record even
+        # when an exporter computed equal compatibility hashes (render_compatibility_sha256 is the only guard today).
+        from ispatialgym.sampling.campaign_augmentation import require_shared_skybox
+        require_shared_skybox([{"perturbations": row.get("perturbations") or {}} for row in selected.values()])
     return selected
 
 

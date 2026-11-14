@@ -486,11 +486,39 @@ def spread_order(rng: np.random.Generator, names: Sequence[str], uses: Dict[str,
 def floating_key(category: str, model: str, preferred: Optional[str]) -> str:
     """The grasp-library key of the floating pipeline (``resolve_key`` with the floating kinds only; a preferred key of
     another pipeline is not accepted — §2.2 "no fallback to another pipeline")."""
+    if preferred and preferred.startswith("campaign_selected__"):
+        # Train 2026-11-14: preparation binds per-configuration (scaled) floating libraries under a selected key with no legacy
+        # stem. Accept it only when its v2 entry IS a floating entry of exactly this category/model (inspect the entry, not the key).
+        lib = GL.v2_entry(preferred)
+        if lib is None:
+            raise FileNotFoundError(f"selected floating key {preferred!r} has no v2 entry")
+        if (lib.data.get("category"), lib.data.get("model")) != (category, model) or (lib.data.get("constraint") or "tabletop") != PIPELINE:
+            raise FileNotFoundError(f"selected key {preferred!r} is not a floating entry of {category}/{model}")
+        return preferred
     key = GL.resolve_key(category, model, preferred, [PIPELINE])
     stem = f"{category}__{model}"
     if not key.startswith(stem) or key[len(stem):] not in FLOATING_SUFFIXES:
         raise FileNotFoundError(f"{key!r} is not a floating-pipeline key of {category}/{model}")
     return key
+
+
+def _train_scaled_model(key: str) -> bool:
+    """True when the active campaign config is a train config that scales (applied != default) an object whose model the key
+    names (``<category>__<model>...``)."""
+    try:
+        from ispatialgym.sampling import campaign_runtime as CR
+        if not CR.active():
+            return False
+        config, template, perturbations, _ = CR.configuration()
+    except Exception:  # noqa: BLE001 - no campaign context: legacy behaviour
+        return False
+    if config.get("split") != "train":
+        return False
+    for obj in template.objects:
+        state = perturbations.scales.get(obj.instance)
+        if state is not None and tuple(state.applied) != tuple(state.default) and key.startswith(f"{obj.category}__{obj.model}"):
+            return True
+    return False
 
 
 class V2ScaleMismatch(Exception):
@@ -505,6 +533,10 @@ def check_v2_floating(key: str, spawn_scale=None) -> None:
     to check - the legacy path is unchanged."""
     lib = GL.v2_entry(key)
     if lib is None:
+        # Train 2026-11-14: a training scale perturbation of this model must be served by a v2 entry built at that scale; the
+        # legacy (scale-1) library silently serving a rescaled object is refused. Eval / unperturbed configs are unchanged.
+        if spawn_scale is not None and _train_scaled_model(key):
+            raise V2ScaleMismatch(f"{key}: training-scaled object (spawn {spawn_scale}) has no v2 entry at its scale")
         return
     cons = lib.data.get("constraint") or "tabletop"
     if cons != PIPELINE:
