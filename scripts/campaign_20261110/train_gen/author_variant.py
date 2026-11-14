@@ -267,6 +267,9 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env, wants=None):
     maps.mkdir(parents=True)
     used = {'grasp_libraries': [], 'maps': [], 'anchors': None, 'grasp_keys': {}, 'skipped_maps': []}
     map_arts = [a for a in arts.values() if a.get('native_kind') == 'reach_map' and (a.get('lookup') or {}).get('lookup_ok')]
+    # contact maps (touch_push / touch_brace / push_blade / axial_brace) sit in the maps root beside the grasp maps
+    # (tabletop.contact_map: <maps>/<entry>/cmap__*); without them the touching brace gate / axial placement miss (t2611_10009)
+    cmap_arts = [a for a in arts.values() if a.get('native_kind') == 'contact_map' and (a.get('lookup') or {}).get('lookup_ok', True)]
     lib_arts = [a for a in arts.values() if a.get('native_kind') == 'grasp_library' and (a.get('lookup') or {}).get('lookup_ok')]
     copies = {}   # identity -> library paths
     for a in lib_arts:
@@ -363,6 +366,23 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env, wants=None):
                 declared.setdefault(k, {'key': k, 'height': v, 'precision': prec, 'range': [v - prec / 2, v + prec / 2],
                                         'status': ['map_declared'], 'surfaces': list(hd.get('anchor_surfaces') or []),
                                         'declared_by': str(p)})
+    for a in cmap_arts:
+        p = Path(a['path'])
+        if p.name in seen or not p.name.startswith('cmap__'):
+            continue
+        seen.add(p.name)
+        for f in [p, p.with_suffix('.npz')]:
+            if f.exists():
+                link(maps / p.parent.name / f.name, f)
+        used.setdefault('contact_maps', []).append({'map': ref(p), 'entry': p.parent.name})
+        hd = read(p).get('height')
+        if isinstance(hd, dict) and hd.get('anchors'):
+            anchors.add(hd['anchors']['path'] if isinstance(hd['anchors'], dict) else hd['anchors'])
+        elif isinstance(hd, dict) and hd.get('anchor_key') and hd.get('value') is not None:
+            v, k = float(hd['value']), str(hd['anchor_key']).lstrip('h')   # contact maps write 'h0.8947'
+            prec = 10.0 ** -len(k.split('.')[1]) if '.' in k else 1.0
+            declared.setdefault(k, {'key': k, 'height': v, 'precision': prec, 'range': [v - prec / 2, v + prec / 2],
+                                    'status': ['map_declared'], 'surfaces': list(hd.get('anchor_surfaces') or []), 'declared_by': str(p)})
     # base release (the canonical's roots) under every name the prepared artifacts do not take
     base_glib = Path(canonical_env.get('ISPATIALGYM_GRASP_LIBRARY_V2', BASE_V2 / 'glib'))
     base_maps = Path(canonical_env.get('ISPATIALGYM_REACH_MAPS', BASE_V2 / 'maps'))
