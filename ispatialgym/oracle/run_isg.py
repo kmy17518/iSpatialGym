@@ -2498,11 +2498,14 @@ def run_queue(args) -> int:
         previous_wallclock = args.wallclock
         previous_online_deadline = getattr(args, "online_member_deadline", None)
         executed = False
-        if online and t0 >= float(online["member_deadline"]):
+        # Train (ungated demos, handoff 2026-11-14 section 3a): a published member's demo is bounded only by its
+        # demo_deadline (publication + per-class safety cap); eval keeps the member deadline.
+        online_deadline = float(online.get("demo_deadline", online["member_deadline"])) if online else None
+        if online and t0 >= online_deadline:
             code, result = 0, {"status": "expired", "success": False, "reason": "online_member_deadline_before_load"}
         else:
             if online:
-                args.online_member_deadline = float(online["member_deadline"])
+                args.online_member_deadline = online_deadline
                 remaining = args.online_member_deadline - t0
                 args.wallclock = min(previous_wallclock, remaining) if previous_wallclock else remaining
             try:

@@ -152,12 +152,28 @@ def saved_member(tro_path):
                                           'initial_waypoint': art.get('waypoints', {}).get('0.0')} if art else None)}
 
 
+def result_deadline(candidate):
+    """When a member's oracle result stops counting.
+
+    Eval (and any candidate without ``demo_deadline``): the member deadline,
+    which bounds sampling and the demo together. Train with ungated demos
+    (handoff 2026-11-14 section 3a): ``deadline`` bounds sampling/publication
+    only; the demo counts until ``demo_deadline`` = publication +
+    ``demo_safety_cap_s`` (a hung-simulator backstop, not a gate).
+    """
+    return float(candidate.get('demo_deadline', candidate['deadline']))
+
+
 def verify_result(candidate, result, accepted):
     """Online admission; downstream immutable dataset allocation stays separate."""
     require(result.get('success') is True and result.get('status') == 'success' and result.get('rc') == 0,
             'oracle did not pass')
     require(result.get('provisional') is False and result.get('hdf5_ok') is True, 'demo provisional or HDF5 invalid')
-    require(result.get('finished_at_unix', math.inf) <= candidate['deadline'], 'member deadline exceeded')
+    if 'demo_deadline' in candidate:
+        require(candidate['published_at'] <= candidate['deadline'], 'member published after its sampling deadline')
+        require(result.get('finished_at_unix', math.inf) <= candidate['demo_deadline'], 'demo safety cap exceeded')
+    else:
+        require(result.get('finished_at_unix', math.inf) <= candidate['deadline'], 'member deadline exceeded')
     require(Path(result['tro']).resolve() == Path(candidate['tro']['path']).resolve(), 'result TRO differs')
     require(file_digest(candidate['tro']['path']) == candidate['tro']['sha256'], 'published TRO changed')
     require(file_digest(candidate['sidecar']['path']) == candidate['sidecar']['sha256'], 'published sidecar changed')
@@ -181,6 +197,9 @@ def verify_result(candidate, result, accepted):
 
 
 class OnlineGroups:
+    #: Train split only (set in __init__): deadlines gate sampling; demos are bounded by demo_safety_cap_s.
+    ungated = False
+
     def __init__(self, sampler, settings_path, start_index):
         from ispatialgym.sampling.v2.core import publish_after_screens
         from ispatialgym.sampling.campaign_runtime import configuration
@@ -204,6 +223,13 @@ class OnlineGroups:
         require(self.config['split'] != 'eval_standard' or self.minimum >= 2, 'standard eval needs siblings')
         for field in ('group_limit_s', 'member_limit_s'):
             require(math.isfinite(self.options[field]) and self.options[field] > 0, 'invalid ' + field)
+        # Train only: deadlines gate sampling; published members' demos are
+        # bounded by the per-class hung-simulator cap, not by the group.
+        self.ungated = self.config['split'] == 'train'
+        if self.ungated:
+            cap = self.options.get('demo_safety_cap_s')
+            require(isinstance(cap, (int, float)) and math.isfinite(cap) and cap > 0,
+                    'train (ungated demos) requires a finite demo_safety_cap_s')
         require(self.options['groups'] > 0 and self.options['index_count'] > 0, 'empty online allocation')
         self.root = Path(self.options['state_dir']); self.root.mkdir(parents=True, exist_ok=True)
         self.state_path = self.root / 'state.json'
@@ -229,7 +255,7 @@ class OnlineGroups:
         if resumed:
             from ispatialgym.sampling.v2.core import publish_instance
             for member in (m for g in resumed for m in g['members']):
-                if member['status'] == 'pending' and time.time() < member['deadline']:
+                if member['status'] == 'pending' and time.time() < result_deadline(member):
                     require(file_digest(member['tro']['path']) == member['tro']['sha256'], 'resume TRO changed')
                     require(file_digest(member['sidecar']['path']) == member['sidecar']['sha256'], 'resume sidecar changed')
                     publish_instance(member['tro']['path'])
@@ -351,9 +377,14 @@ class OnlineGroups:
             native = draft.summary.get('campaign_goal_group') or {}
             record = {'class_id': self.template.class_id, 'requested_goal': native.get('requested_goal'), 'goal_group': native}
             require(identity.equivalent_goal(group['goal'], record), 'member changed its group native goal')
+        published_at = time.time()
         draft.summary['online_group'] = {'worker': self.state['owner'], 'group_id': group['id'],
                                          'member_deadline': self.member_deadline, 'group_deadline': group['deadline'],
                                          'sampler_pid': os.getpid(), 'world_id': id(self.sampler.world)}
+        if self.ungated:
+            draft.summary['online_group'].update(
+                demo_deadline=published_at + float(self.options['demo_safety_cap_s']),
+                demo_gate='ungated_train_safety_cap')
         tro = annotate(self.sampler, tro, draft, seed)
         tro['ispatialgym']['campaign']['runtime']['online_group'] = draft.summary['online_group']
         write_json_atomic(path, tro)
@@ -362,7 +393,9 @@ class OnlineGroups:
         summary.update(campaign_goal_group=draft.summary['campaign_goal_group'], online_group=draft.summary['online_group'])
         write_json_atomic(summary_path, summary)
         candidate = {'instance_id': iid, 'tro': ref(path), 'sidecar': ref(side_path), 'group_id': group['id'],
-                     'deadline': self.member_deadline, 'status': 'pending', 'published_at': time.time()}
+                     'deadline': self.member_deadline, 'status': 'pending', 'published_at': published_at}
+        if self.ungated:
+            candidate['demo_deadline'] = draft.summary['online_group']['demo_deadline']
         group['members'].append(candidate)
         self.save()
 
@@ -390,8 +423,9 @@ class OnlineGroups:
                     member['status'] = 'accepted'; accepted.append(member)
                 except (ValueError, OSError, KeyError) as exc:
                     member.update(status='rejected', reason=str(exc))
-            elif time.time() >= member['deadline']:
-                member.update(status='expired', reason='member_deadline_without_success')
+            elif time.time() >= result_deadline(member):
+                member.update(status='expired', reason=('demo_safety_cap_without_result' if 'demo_deadline' in member
+                                                        else 'member_deadline_without_success'))
             else:
                 continue
             self.event('member_' + member['status'], group_id=group['id'], instance_id=member['instance_id'],
@@ -423,7 +457,8 @@ class OnlineGroups:
         rows = self.results()
         for group in list(self.state['open']):
             accepted, pending = self.collect_group(group, rows)
-            if pending and time.time() < group['deadline']: continue
+            # Ungated: wait for in-flight demos (each bounded by its own cap).
+            if pending and (self.ungated or time.time() < group['deadline']): continue
             group['parked_resolution'] = 'members_resolved' if not pending else 'group_deadline'
             self.state['open'].remove(group)
             self.finalize(group, accepted)
@@ -491,10 +526,20 @@ class OnlineGroups:
                     self.event('group_parked', group_id=group['id'], accepted=accepted, pending=pending)
                     continue
                 accepted, pending = self.collect()
+                if self.ungated and pending:
+                    # Sampling deadline reached with demos in flight: park; the
+                    # group finalizes when they resolve, not at the deadline.
+                    group['parked_at'] = time.time(); group['parked_after_sampling_deadline'] = True
+                    self.state['open'].append(group); self.state['current'] = None
+                    self.reset_goal(); self.save()
+                    self.event('group_parked', group_id=group['id'], accepted=accepted, pending=pending,
+                               reason='sampling_deadline_demos_in_flight')
+                    continue
                 self.finalize(group, accepted)
                 self.state['current'] = None; self.save()
             # Parked members resolve in the collectors; each group is bounded by
-            # its own deadline, so this wait is bounded.
+            # its own deadline (train: each member by its demo safety cap), so
+            # this wait is bounded.
             while self.state['open']:
                 self.poll_open()
                 if self.state['open']: time.sleep(poll_s)

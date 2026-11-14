@@ -52,7 +52,9 @@ def main():
             state = json.load(open(os.path.join(job, "online", "state.json")))
             for group in state.get("groups", []) + state.get("open", []) + ([state["current"]] if state.get("current") else []):
                 for member in group["members"]:
-                    member_deadlines[member["instance_id"]] = min(member["deadline"], group["deadline"])
+                    # train ungated demos: only the member's demo safety cap bounds a published demo
+                    member_deadlines[member["instance_id"]] = (member["demo_deadline"] if "demo_deadline" in member
+                                                               else min(member["deadline"], group["deadline"]))
         except (OSError, ValueError, KeyError):
             pass
         for c in glob.glob(os.path.join(claims, "*")):
