@@ -30,6 +30,8 @@ sys.path.insert(0, str(HERE))
 import author_variant as AV  # noqa: E402
 
 REASONS = [  # (reason class, message fragment) - first match wins
+    ('library_identity', 'different library identities'),
+    ('same_model_pair', 'share one model'),
     ('category_change', 'needs IDDL render'),
     ('category_change', 'category change'),
     ('family_unsupported', 'unsupported family'),
@@ -57,6 +59,7 @@ REASONS = [  # (reason class, message fragment) - first match wins
     ('model_keyed_transfer', 'cannot be transferred'),
     ('render', 'IDDL render failed'),
     ('floor_not_unique', 'not unique'),
+    ('wall_support', 'wall support'),
 ]
 
 

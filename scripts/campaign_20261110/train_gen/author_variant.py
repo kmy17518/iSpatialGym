@@ -195,8 +195,10 @@ def support_instance(row, name_hint=None):
     return names.pop(), sel
 
 
-def find_probe(scene, name, scale):
-    """The height-probe scene of (scene, support, applied scale): its private stable scene (scaled support, chairs moved)."""
+def find_probe(scene, name, scale, map_heights=()):
+    """The height-probe scene of (scene, support, applied scale): its private stable scene (scaled support, chairs moved).
+    Several probes can match (a rejected v1 slot without a height, re-measured v2 slots): a probe with a measured height that
+    every arm's prepared map shares (map_heights: (arm, height) pairs) wins, then any probe with a measured height."""
     hits = []
     for pattern in PROBE_GLOBS:
         for p in glob.glob(pattern):
@@ -210,7 +212,14 @@ def find_probe(scene, name, scale):
                 if scene_path and Path(scene_path).is_file():
                     hits.append((p, d, scene_path))
     require(hits, f'no height probe scene for {scene}/{name} at {scale} (scaled native support placement unresolved)')
-    return hits[0]
+    arms = {a for a, h in map_heights}
+
+    def rank(hit):
+        above = hit[1].get('measured_height_above_floor')
+        if above is None:
+            return 2
+        return 0 if arms and {a for a, h in map_heights if abs(h - float(above)) <= 5e-5} == arms else 1
+    return min(hits, key=rank)
 
 
 # ------------------------------------------------------------------------------------------------ prepared artifacts
@@ -223,24 +232,64 @@ def link(dst, src):
     os.symlink(src, dst)
 
 
-def build_dependency_overlay(job, row, cfg, arts, canonical_env):
-    """glib/maps roots = the base v2 release + the configuration's prepared artifacts (one consistent library identity per model)."""
+SPECIALIZED = {'insert': {'tabletop_insert', 'flower_stem_top'}, 'i': {'tabletop_insert', 'flower_stem_top'},
+               'fl': {'tabletop_insert', 'flower_stem_top'}, 'tabletop_insert': {'tabletop_insert'}, 'flower_stem_top': {'flower_stem_top'}}
+
+
+def _lib_rank(path):
+    """Copies of one library identity: a campaign key first, then any key, keyless copies last (never resolvable by key)."""
+    try:
+        d = read(path)
+    except (OSError, ValueError):
+        return 3
+    keys = [k for k in [d.get('legacy_key'), *(d.get('legacy_keys') or [])] if k]
+    return 0 if any(k.startswith('campaign_selected__') for k in keys) else 1 if keys else 2
+
+
+def _fits(constraint, allowed):
+    """grasp_library.resolve_key: an insert consumer only accepts insert / stem constraints; others take the rest."""
+    c = constraint or 'tabletop'
+    every = set().union(*SPECIALIZED.values())
+    return c in allowed if allowed else c not in every
+
+
+def build_dependency_overlay(job, row, cfg, arts, canonical_env, wants=None):
+    """glib/maps roots = the base v2 release + the configuration's prepared artifacts (one consistent library identity per model).
+
+    wants: model key -> the constraint set its role's `require.grasps` accepts (None = non-specialized). When a model's maps
+    were built against several library identities (inside: insert and tabletop libraries), the one the role can resolve is
+    kept and the other identity's maps stay out of the overlay (recorded). Among byte-identical copies of an identity, a keyed
+    copy is served (a keyless copy is never found by key)."""
+    wants = wants or {}
     deps = job / 'deps'
     glib, maps = deps / 'glib/models', deps / 'maps'
     glib.mkdir(parents=True)
     maps.mkdir(parents=True)
-    used = {'grasp_libraries': [], 'maps': [], 'anchors': None, 'grasp_keys': {}}
+    used = {'grasp_libraries': [], 'maps': [], 'anchors': None, 'grasp_keys': {}, 'skipped_maps': []}
     map_arts = [a for a in arts.values() if a.get('native_kind') == 'reach_map' and (a.get('lookup') or {}).get('lookup_ok')]
     lib_arts = [a for a in arts.values() if a.get('native_kind') == 'grasp_library' and (a.get('lookup') or {}).get('lookup_ok')]
+    copies = {}   # identity -> library paths
+    for a in lib_arts:
+        copies.setdefault(a['lookup']['identity_key'], set()).add(a['path'])
     # maps decide the library identity of their model (a map is only found with the library it was built against)
-    chosen_libs = {}
+    idents = {}   # model -> {identity: constraint}
     for a in map_arts:
         if not a.get('library'):   # generic (model-free) reach maps carry no library identity
             continue
         lib = Path(a['library']['path'])
         model_key = '/'.join(lib.parent.name.split('__')[:2])
-        chosen_libs.setdefault(model_key, (lib, a['lookup']['identity_key']))
-        require(chosen_libs[model_key][1] == a['lookup']['identity_key'], 'maps of one model need different library identities')
+        ident = a['lookup']['identity_key']
+        copies.setdefault(ident, set()).add(str(lib))
+        idents.setdefault(model_key, {})[ident] = read(lib).get('constraint')
+    chosen_libs, chosen_ident = {}, {}
+    for mk, cands in idents.items():
+        fit = sorted(i for i, c in cands.items() if _fits(c, wants.get(mk)))
+        if len(cands) > 1:
+            require(len(fit) == 1, f'maps of one model need different library identities ({mk}: {cands}, role accepts {wants.get(mk)})')
+        ident = fit[0] if fit else sorted(cands)[0]
+        chosen_ident[mk] = ident
+        best = min(sorted(copies[ident]), key=_lib_rank)
+        chosen_libs[mk] = (Path(best), ident)
     for a in lib_arts:
         mk = a['lookup']['model']
         if mk in chosen_libs:
@@ -285,10 +334,16 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env):
         used['grasp_keys'][mk] = key
     seen = set()
     anchors = set()
+    declared = {}
     for a in map_arts:
         p = Path(a['path'])
         if p.name in seen:
             continue
+        if a.get('library'):
+            mk = '/'.join(Path(a['library']['path']).parent.name.split('__')[:2])
+            if chosen_ident.get(mk) not in (None, a['lookup']['identity_key']):
+                used['skipped_maps'].append({'map': str(p), 'identity_key': a['lookup']['identity_key'], 'why': 'library identity not chosen'})
+                continue
         seen.add(p.name)
         for f in [p, p.with_suffix('.npz')]:
             if f.exists():
@@ -298,6 +353,16 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env):
                              'identity_key': a['lookup'].get('identity_key'), 'kind': a['lookup'].get('kind')})
         if (a.get('height') or {}).get('anchors'):
             anchors.add(a['height']['anchors']['path'])
+        else:
+            # a map without an anchors file still declares the anchor it was built at (height.anchor_key): without it the
+            # lookup snaps h to the nearest base anchor within 1 cm (0.8060 -> 0.8126) and misses the map (va t2611_10010)
+            hd = read(p).get('height')
+            if isinstance(hd, dict) and hd.get('anchor_key') and hd.get('value') is not None:
+                v, k = float(hd['value']), str(hd['anchor_key'])
+                prec = 10.0 ** -len(k.split('.')[1]) if '.' in k else 1.0
+                declared.setdefault(k, {'key': k, 'height': v, 'precision': prec, 'range': [v - prec / 2, v + prec / 2],
+                                        'status': ['map_declared'], 'surfaces': list(hd.get('anchor_surfaces') or []),
+                                        'declared_by': str(p)})
     # base release (the canonical's roots) under every name the prepared artifacts do not take
     base_glib = Path(canonical_env.get('ISPATIALGYM_GRASP_LIBRARY_V2', BASE_V2 / 'glib'))
     base_maps = Path(canonical_env.get('ISPATIALGYM_REACH_MAPS', BASE_V2 / 'maps'))
@@ -322,7 +387,7 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env):
     for extra in (base_glib / 'profiles',):
         if extra.is_dir():
             os.symlink(extra, deps / 'glib/profiles')
-    if anchors:
+    if anchors or declared:
         # model maps and generic maps of one configuration can name different anchor files: merge them by key (a key named twice
         # must name the same height), then the base anchors of other keys
         prepared, files = {}, []
@@ -331,10 +396,14 @@ def build_dependency_overlay(job, row, cfg, arts, canonical_env):
             for x in read(a)['anchors']:
                 prev = prepared.setdefault(x['key'], x)
                 require(abs(float(prev['height']) - float(x['height'])) <= 1e-9, f'anchor key {x["key"]} names two heights')
+        for k, x in declared.items():   # declared anchors only where no anchors file names the key
+            if k not in prepared:
+                prepared[k] = x
+                used.setdefault('declared_anchors', []).append(k)
         base = read(canonical_env.get('ISPATIALGYM_REACH_MAP_ANCHORS', BASE_V2 / 'anchors.json'))
         merged = dict(base, anchors=list(prepared.values()) + [x for x in base.get('anchors', []) if x['key'] not in prepared])
         write_json_atomic(deps / 'anchors.json', merged)
-        used['anchors'] = {'prepared': files[0] if len(files) == 1 else files,
+        used['anchors'] = {'prepared': files[0] if len(files) == 1 else files, 'declared': sorted(declared),
                            'base': ref(canonical_env.get('ISPATIALGYM_REACH_MAP_ANCHORS', BASE_V2 / 'anchors.json')),
                            'merged': ref(deps / 'anchors.json'), 'rule': 'prepared anchors first, base anchors of other keys kept'}
     else:
@@ -354,7 +423,7 @@ def _bddl_body(text):
     return out
 
 
-def render_variant(can, categories):
+def render_variant(can, categories, models=None):
     """The class IDDL rendered with the row's role categories (materialize_model_table_tasks pattern).
 
     The canonical categories must re-render the canonical BDDL (comments and header aside) and the canonical alias, with or
@@ -364,6 +433,7 @@ def render_variant(can, categories):
     from ispatialgym.sampling.iddl import parse_file
     from ispatialgym.sampling.knowledge import synset_of_category
     entry = can['entry']
+    models = models or {}
     ipath = SNAP / 'ispatialgym/assets/iddl' / entry['iddl']
     iddl = parse_file(str(ipath))
     canon_cats = {role: (entry['roles'].get(role) or {}).get('category') for role in iddl.roles}
@@ -381,15 +451,34 @@ def render_variant(can, categories):
                                       synset=synset_of_category(cats[role]))
         return out
 
+    # slot values of the canonical alias: a slot may pin a model (ontop_small_03: bar_soap_utgixp); a changed role takes its
+    # new category, an unchanged role keeps the canonical value (model token swapped when the row's model differs)
+    pieces = re.split(r'\{(\w+)\}', iddl.variant_template)
+    rx = ''.join(re.escape(x) if i % 2 == 0 else '([^-]+)' for i, x in enumerate(pieces))
+    m = re.fullmatch(rx, can['meta']['variant'])
+    require(m is not None, f'IDDL render: canonical alias {can["meta"]["variant"]} does not match {iddl.variant_template}')
+    canon_slots = dict(zip(pieces[1::2], m.groups()))
+    for slot, val in canon_slots.items():
+        require(val == canon_cats[slot] or val.startswith(canon_cats[slot] + '_'), f'IDDL render: alias slot {slot}={val} is not its category')
+
     def alias(cats):
-        return iddl.variant_template.format(**{slot: cats[slot] for slot in iddl.variant_slots})
+        vals = {}
+        for slot in iddl.variant_slots:
+            if cats[slot] != canon_cats[slot]:
+                vals[slot] = cats[slot]
+            else:
+                vals[slot] = canon_slots[slot]
+                pinned = canon_slots[slot][len(canon_cats[slot]) + 1:]
+                if pinned and models.get(slot) and pinned != models[slot]:
+                    vals[slot] = canon_cats[slot] + '_' + models[slot]
+        return iddl.variant_template.format(**vals)
 
     did, activity = int(entry['definition_id']), can['bddl_rel'].parts[0]
-    require(alias(canon_cats) == can['meta']['variant'], f'IDDL render: canonical alias {alias(canon_cats)} != {can["meta"]["variant"]}')
+    require(iddl.variant_template.format(**canon_slots) == can['meta']['variant'], 'IDDL render: canonical alias')
     want = _bddl_body(can['bddl'].read_text())
     supports = [r for r in iddl.roles if not (entry['roles'].get(r) or {}).get('sampleable') and r != 'floor']
     for init_predicates in (None, {('ontop', r): 'inside' for r in supports}):
-        canon = render(iddl, groundings(canon_cats), did, alias(canon_cats), activity, init_predicates=init_predicates or None)
+        canon = render(iddl, groundings(canon_cats), did, can['meta']['variant'], activity, init_predicates=init_predicates or None)
         if _bddl_body(canon.text) == want:
             break
     else:
@@ -446,13 +535,16 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
     stable = SNAP / 'Behavior-1K/datasets/2026-challenge-task-instances/scenes' / scene / 'json' / (scene + '_stable.json')
     support_name = None
     if supports:
-        canon_support = next(o for o in ctemplate['objects'] if o['role'] == 'support' and o['semantic_kind'] == 'object')
+        canon_support = next((o for o in ctemplate['objects'] if o['role'] == 'support' and o['semantic_kind'] == 'object'), None)
+        require(canon_support is not None, 'unsupported: wall support (world_vertical hang regions: support_regions per wall)')
         hint = can['meta']['inst_to_name'].get(canon_support['instance']) if (scene == ctemplate['scene']) else None
         support_name, _ = support_instance(row, hint)
         native = read(stable)['objects_info']['init_info'][support_name]['args']
         require((native['category'], native['model']) == (supports[0]['category'], supports[0]['model']), 'support instance model differs')
         if not same_scale(native['scale'], supports[0]['scale'], 1e-9):
-            probe = find_probe(scene, support_name, supports[0]['scale'])
+            mh = {(a.get('arm'), float(a['height']['key'])) for a in arts.values() if a.get('native_kind') == 'reach_map'
+                  and (a.get('lookup') or {}).get('lookup_ok') and (a.get('height') or {}).get('key') is not None}
+            probe = find_probe(scene, support_name, supports[0]['scale'], mh)
             stable = Path(probe[2])
     init = read(stable)['objects_info']['init_info']
     floors = [n for n, v in init.items() if v['args'].get('category') == 'floors' and room in (v['args'].get('in_rooms') or [])]
@@ -461,6 +553,9 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
     # (sim_utils.floor_of_room; the BDDL `ontop agent floor` is judged on the floor under the robot, floor_object_under)
     floor_note = None if len(floors) == 1 else {'candidates': floors, 'bound': floors[0], 'rule': 'first in scene order (sim_utils.floor_of_room)'}
 
+    pair = [(r['category'], r['model']) for r in row['identity_roles'] if r['role'] in ('target', 'partner')]
+    require(len(pair) < 2 or pair[0] != pair[1],
+            'unsupported: target and partner share one model (the native choice drops the target model from the partner whitelist)')
     # ---- role -> canonical object; a role whose category differs re-renders the BDDL from the class IDDL (render_variant)
     objects, scales, inst_to_name, roles_customs = [], {}, {}, {}
     cobj = {(o['role'], o['category']): o for o in ctemplate['objects'] if o['semantic_kind'] != 'floor'}
@@ -478,7 +573,8 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
     rendered = None
     new_inst = {}   # canonical instance -> rendered instance
     if changed:
-        variant, rendered, canon_r, init_predicates, ipath = render_variant(can, {role: c2 for role, (c1, c2) in changed.items()})
+        variant, rendered, canon_r, init_predicates, ipath = render_variant(can, {role: c2 for role, (c1, c2) in changed.items()},
+                                                                            {r['role']: r['model'] for r in row['identity_roles']})
         for role, inst in canon_r.instances.items():
             if isinstance(inst, str) and role in rendered.instances:
                 new_inst[inst] = rendered.instances[role]
@@ -555,7 +651,12 @@ def author(cid, k, groups, kcollect, dry=False, lighting=None, removed_objects=(
         job = (DRY_ROOT['path'] / f'{key}_{int(time.time())}_{os.getpid()}_{time.time_ns() % 10**9}') if dry else VA / 'sources' / key
     require(not job.exists(), 'source exists: ' + str(job))
     job.mkdir(parents=True)
-    used = build_dependency_overlay(job, row, reg, arts, can['env'])
+    wants = {}
+    for r in row['identity_roles']:
+        if r['role'] != 'support':
+            g = ((can['entry']['roles'].get(r['role']) or {}).get('require') or {}).get('grasps')
+            wants[r['category'] + '/' + r['model']] = SPECIALIZED.get(g) if isinstance(g, str) else None
+    used = build_dependency_overlay(job, row, reg, arts, can['env'], wants)
     if probe:
         above = probe[1].get('measured_height_above_floor')
         heights = {float(m['height']) for m in used['maps'] if m.get('height') is not None}
