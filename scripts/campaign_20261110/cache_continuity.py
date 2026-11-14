@@ -204,29 +204,19 @@ def warm_prepare(settings_path,job):
     key=re.sub(r'[^A-Za-z0-9.]','_',gpu)+'_'+b1k
     root=Path(warm['local_root']);kits=root/'kits';textures=root/'textures';kits.mkdir(parents=True,exist_ok=True);textures.mkdir(exist_ok=True)
     report=W.restore(Store(warm['store']),kits,textures,warm['abi'],key,state)
-    baseline=[]
-    for old in warm.get('baseline_kit_roots',[]):
-        source=Path(old)/key
-        if(kits/key/'.complete').exists():break
-        files=W.safe_kit_files(source)
-        if files:
-            for f in files:
-                target=kits/key/f.relative_to(source);target.parent.mkdir(parents=True,exist_ok=True)
-                try:os.link(f,target)
-                except OSError:shutil.copyfile(f,target)
-            (kits/key/'.complete').touch();baseline.append({'kind':'kit','source':str(source),'files':len(files)})
+    baseline=[];read_kits=kits;read_textures=[]
+    if not(kits/key/'.complete').exists():
+        for old in warm.get('baseline_kit_roots',[]):
+            if(Path(old)/key/'.complete').is_file():
+                read_kits=Path(old);baseline.append({'kind':'kit','source':str(read_kits/key),'mode':'read_only_baseline'});break
     for old in warm.get('baseline_texture_roots',[]):
-        files=W.texture_files(old,set())
-        for f in sorted(files,key=lambda p:(p.name.endswith('.ovtex.desc'),p.name)):
-            target=textures/f.name
-            if target.exists():continue
-            try:os.link(f,target)
-            except OSError:shutil.copyfile(f,target)
-        baseline.append({'kind':'textures','source':old,'files':len(files)})
-    W.write(state/'baseline.json',{'textures':[p.name for p in textures.iterdir()if p.is_file()],'at':time.time()})
-    context={'key':key,'kit_root':str(kits),'textures':str(textures),'baseline':baseline,'settings':str(Path(settings_path).resolve()),'restore':report}
+        if Path(old).is_dir():read_textures.append(old)
+    read_textures.append(str(textures))
+    context={'key':key,'kit_root':str(kits),'read_kit_root':str(read_kits),'textures':str(textures),'read_texture_roots':read_textures,
+             'baseline':baseline,'settings':str(Path(settings_path).resolve()),'restore':report}
     write(state/'context.json',context)
-    (state/'environment.sh').write_text('export KIT_TPL_NFS_ROOT='+shlex.quote(str(kits))+'\nexport KIT_TEX_STORE='+shlex.quote(str(textures))+'\n')
+    (state/'environment.sh').write_text('export KIT_TPL_NFS_ROOT='+shlex.quote(str(read_kits))+'\nexport KIT_TEX_STORE='+shlex.quote(read_textures[0])+
+        '\nISG_WARM_EXTRA_TEXTURE_STORES=('+ ' '.join(shlex.quote(x)for x in read_textures[1:])+')\n')
     return report
 
 
@@ -238,7 +228,7 @@ def warm_flush(job,final=False):
     for name in([app]+[app+'.c'+str(i)for i in range(1,int(context.get('collectors',2))+1)]if app else[]):
         if not Path(name).exists():continue
         label=hashlib.sha256(name.encode()).hexdigest()[:16]
-        captured=W.capture(name,warmctx['textures'],root/'warm/captured'/label,final=final and (job/'sample.rc').exists()and(job/'sample.rc').read_text().strip()in('0','2'))
+        captured=W.capture(name,warmctx['textures'],Path(name+'.cache_export')/label,final=final and (job/'sample.rc').exists()and(job/'sample.rc').read_text().strip()in('0','2'))
         if captured['kit']:
             receipt=W.package(store,captured['kit'],W.safe_kit_files(captured['kit']),kind='kit',key=warmctx['key'],abi=warm['abi'],state_dir=root/'warm',instance=settings['owner'])
             if receipt:receipts.append(receipt)

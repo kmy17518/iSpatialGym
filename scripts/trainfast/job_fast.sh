@@ -37,6 +37,17 @@ if [ -n "${ISPATIALGYM_CACHE_CONTINUITY:-}" ]; then
   source "$JOBDIR/cache_continuity/warm/environment.sh"
 fi
 source $S/env_fast.sh
+if [ -n "${ISPATIALGYM_CACHE_CONTINUITY:-}" ]; then
+  # Baseline stores are read-only; the new lifecycle owns every publication.
+  _kit_tex_save() { :; }
+  _kit_publish() { :; }
+  primary_texture_store=$KIT_TEX_STORE
+  for extra_texture_store in "${ISG_WARM_EXTRA_TEXTURE_STORES[@]}"; do
+    KIT_TEX_STORE=$extra_texture_store
+    _kit_tex_link
+  done
+  KIT_TEX_STORE=$primary_texture_store
+fi
 [ -n "${ISGE_BAND_TRUNK_CHECK:-}" ] && export ISPATIALGYM_BAND_TRUNK_CHECK=$ISGE_BAND_TRUNK_CHECK
 export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR=$JB/numba_cache
 if [ "${START_PER_ATTEMPT:-0}" = 1 ]; then export ISPATIALGYM_START_PER_ATTEMPT=1; else unset ISPATIALGYM_START_PER_ATTEMPT; fi
