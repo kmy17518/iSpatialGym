@@ -105,7 +105,7 @@ def seconds_for(groups, L, cap):
     return int(min(14400, 1500 + groups * L + cap + 420))
 
 
-def author(cid, groups, kcollect=2, tag='canon', dry=False, lighting=None, gpu2080=False):
+def author(cid, groups, kcollect=2, tag='canon', dry=False, lighting=None, gpu2080=False, limits=None):
     row = proposal_row(cid)
     if row['status'] != 'RUN':
         raise SystemExit(f'{cid} is {row["status"]}')
@@ -113,6 +113,8 @@ def author(cid, groups, kcollect=2, tag='canon', dry=False, lighting=None, gpu20
     cfg = json.loads((src / 'campaign_config.json').read_text())
     release = json.loads(RELEASE.read_text())
     L, Lm, cap = int(row['train_group_limit_s']), int(row['train_member_limit_s']), int(row['demo_safety_cap_s'])
+    if limits:   # bounded demonstrations only (e.g. the ungated-demo test); recorded in source.json
+        L, Lm = int(limits[0]), int(limits[1])
     if cid == 'configuration_matching-articulation_open_large_scale_01':
         cap = max(cap, 3600)
     cfg['split'] = 'train'
@@ -208,6 +210,8 @@ if __name__ == '__main__':
     ap.add_argument('--class', dest='cid', required=True); ap.add_argument('--groups', type=int, default=1)
     ap.add_argument('--kcollect', type=int, default=2); ap.add_argument('--tag', default='canon')
     ap.add_argument('--lighting-json'); ap.add_argument('--gpu2080', action='store_true')
+    ap.add_argument('--test-limits', nargs=2, type=int, help='group_limit_s member_limit_s override (bounded tests only)')
     a = ap.parse_args()
-    s = author(a.cid, a.groups, a.kcollect, a.tag, lighting=json.loads(a.lighting_json) if a.lighting_json else None, gpu2080=a.gpu2080)
+    s = author(a.cid, a.groups, a.kcollect, a.tag, lighting=json.loads(a.lighting_json) if a.lighting_json else None,
+               gpu2080=a.gpu2080, limits=a.test_limits)
     print(json.dumps({k: s[k] for k in ('key', 'class_id', 'job_dir', 'seconds', 'start')}))
