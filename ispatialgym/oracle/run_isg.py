@@ -2361,7 +2361,20 @@ def run_queue(args) -> int:
                 shared.setdefault("compatible_template_dirs", set()).add(tdir)
                 log.info("train-fast COLLECTOR_PREBUILD: %s runs in the prebuilt world (%s)", iid, why)
         t0 = time.time()
-        code, result = run_instance(args, tro, shared)
+        # A grouped worker's member budget includes sampling and queue wait.
+        # Preserve the original physics/program and clamp only wallclock.
+        online = (load_tro(tro).meta.raw.get("campaign") or {}).get("runtime", {}).get("online_group")
+        previous_wallclock = args.wallclock
+        if online and t0 >= float(online["member_deadline"]):
+            code, result = 0, {"status": "expired", "success": False, "reason": "online_member_deadline_before_load"}
+        else:
+            if online:
+                remaining = float(online["member_deadline"]) - t0
+                args.wallclock = min(previous_wallclock, remaining) if previous_wallclock else remaining
+            try:
+                code, result = run_instance(args, tro, shared)
+            finally:
+                args.wallclock = previous_wallclock
         shared["signature"] = sig
         n += 1
         if args.results:
@@ -2370,7 +2383,8 @@ def run_queue(args) -> int:
                    "n_steps": result.get("n_steps"), "wall_s": round(time.time() - t0, 1), "tro": tro, "out": result.get("out"), "reused_world": n > 1,
                    "provisional": bool(n > 1 and not prov["queue_scene_restore"]), "provenance": prov,
                    "hdf5_ok": result.get("hdf5_ok"), "behavior_lerobot": result.get("behavior_lerobot"),
-                   "host": os.uname().nodename, "job_id": os.environ.get("SLURM_JOB_ID"), "pid": os.getpid(), "finished": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                   "host": os.uname().nodename, "job_id": os.environ.get("SLURM_JOB_ID"), "pid": os.getpid(), "finished": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                   "finished_at_unix": time.time()}
             # 2026-10-31 train-fast: k runners append to one results file - one O_APPEND write per line keeps the lines intact
             # (a buffered ``open(..., "a").write`` of several processes can interleave)
             line = (json.dumps(row, default=json_default) + "\n").encode()

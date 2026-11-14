@@ -347,7 +347,12 @@ def annotate(sampler, tro, draft, seed):
                      "lighting": "usd_lights_v1" if perturbations.lighting else "none"},
     }
     from ispatialgym.sampling.campaign_class_routes import record
-    route = record(config, getattr(sampler, '_campaign_attachment_active', None) or
+    online = getattr(sampler, '_online_groups', None)
+    private_goal_proposal = online is not None and not online.state['current'].get('plan')
+    # A private first draw may establish the goal required by a class recipe.
+    # It cannot become a member unless that recipe actually executed. The
+    # online publication hook enforces this before collectors see the summary.
+    route = None if private_goal_proposal else record(config, getattr(sampler, '_campaign_attachment_active', None) or
                    getattr(sampler, '_campaign_pair_active', None),
                    getattr(sampler, '_campaign_class_route_trace', []))
     if route is not None:

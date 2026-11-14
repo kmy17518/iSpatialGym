@@ -1779,6 +1779,9 @@ class SamplerV2(TaskSampler):
         per reason with the first three examples; a :class:`TemplateExhausted` one ends the template's attempts (counter
         ``template_exhausted``). ``indices``: the instance indices to sample (default ``n`` from ``start_index``,
         else after the instances written). Returns the TRO paths written."""
+        if os.environ.get("ISPATIALGYM_ONLINE_GROUPS") and not hasattr(self, "_online_groups"):
+            from ispatialgym.sampling.online_groups import run
+            return run(self, n, max_attempts, start_index, indices)
         written: List[str] = []
         if indices is None:
             start = self.existing_instances() if start_index is None else int(start_index)
@@ -1825,6 +1828,13 @@ class SamplerV2(TaskSampler):
                     clock.mark("reset")
                     phase = "sample"
                     cap_s, cap_why = self.attempt_cap()
+                    online = getattr(self, "_online_groups", None)
+                    if online is not None:
+                        remaining_s = online.member_deadline - time.time()
+                        if remaining_s <= 0:
+                            raise Reject("online_member_deadline", "online member budget exhausted")
+                        cap_s = min(cap_s, remaining_s) if cap_s and cap_s > 0 else remaining_s
+                        cap_why += "; bounded by online member deadline"
                     if os.environ.get("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"):
                         from ispatialgym.sampling.campaign_goal_queue import activate_initial
                         activate_initial(self)
@@ -1892,6 +1902,8 @@ class SamplerV2(TaskSampler):
                     self.check_goal_occlusion(draft, path)
                     self.constraints_write_back(draft, self.instance_id(index))
                     clock.mark("goal_occlusion")
+                    if online is not None:
+                        online.before_publish(draft, path, seed)
                     if publish_instance(path):  # i7-attachdef: only now can a collector claim it (ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS)
                         self.counters["publish_after_screens.published"] = self.counters.get("publish_after_screens.published", 0) + 1
                     self.instance_seeds.append(seed)
