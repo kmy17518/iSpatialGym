@@ -71,3 +71,63 @@ def test_native_clearance_search_is_bounded_and_keeps_fixed_goal(monkeypatch):
     with pytest.raises(Reject,match='highest allowed raise'):s.campaign_raised_release(p)
     s._campaign_pair_active=replace(p,release_policy='fixed')
     with pytest.raises(Reject,match='explicit fixed-goal'):s.raised_release()
+
+
+POLICY_DICT = dict(partner_clearance_m=.005, max_raise_m=.03, step_m=.001)
+
+
+def test_fresh_goal_clearance_only_for_online_first_candidate(monkeypatch):
+    from ispatialgym.sampling import online_groups as OG
+    monkeypatch.setattr(policy, 'settings', lambda template=None: dict(POLICY_DICT))
+    monkeypatch.delenv(OG.ENV, raising=False); monkeypatch.delenv(OG.PLAN_ENV, raising=False)
+    assert policy.fresh_goal_settings() is None                      # not an online worker
+    monkeypatch.setenv(OG.ENV, '/w/settings.json')
+    assert policy.fresh_goal_settings() == POLICY_DICT                # online, no fixed-goal plan yet
+    assert policy.fresh_goal_settings(plan()) is None                 # a fixed-goal plan is active
+    monkeypatch.setenv(OG.PLAN_ENV, '/w/goal_plan.json')
+    assert policy.fresh_goal_settings() is None                       # plan exported for the group's members
+    monkeypatch.delenv(OG.PLAN_ENV)
+    monkeypatch.setattr(policy, 'settings', lambda template=None: None)
+    assert policy.fresh_goal_settings() is None                       # option off / another class
+
+
+def _fresh_sampler(monkeypatch, rest_gap):
+    """An IORSSmall stub for the ontop fresh-goal release: partner top at z .83, target hull 2 cm tall."""
+    s = I.IORSSmall.__new__(I.IORSSmall); s.relation = 'ontop'; s._campaign_pair_active = None
+    st = NS(name='manipulation')
+    grasp = NS(eef_in_object=(th.zeros(3), th.tensor([0., 0., 0., 1.])))
+    s.sidecar = NS(stance=lambda name: st, grasp_of=lambda name: grasp); s.bindings = NS(one=lambda role: NS(name=role))
+    s.target_goal_quat = lambda *a: th.tensor([0., 0., 0., 1.])
+    s.hull = {'target': th.tensor([[-.02, -.02, -.01], [.02, .02, .01]]), 'partner': th.zeros((2, 3))}
+    s.world = NS(hull_at=lambda *a: th.tensor([[.0, .0, .80], [.2, .2, .83]]))
+    s.partner_aligned_to_target = lambda: False; s.gen = lambda key, default=None: default
+    s.release_surface = lambda *a: None
+    monkeypatch.setattr(I, 'contact_height_extra', lambda *a: (0., None))
+    monkeypatch.setattr(I, 'gripper_corners_world', lambda place, **kw: th.stack([place[0]]))
+    # the open jaw clears the partner by (eef z - partner top - rest_gap)
+    s.open_jaw_clearance = lambda place, *a: float(place[0][2]) - .83 - rest_gap
+    return s
+
+
+def test_fresh_goal_release_is_raised_by_native_clearance(monkeypatch):
+    from ispatialgym.sampling import online_groups as OG
+    monkeypatch.setattr(policy, 'settings', lambda template=None: dict(POLICY_DICT))
+    monkeypatch.delenv(OG.PLAN_ENV, raising=False); monkeypatch.delenv(OG.ENV, raising=False)
+    s = _fresh_sampler(monkeypatch, rest_gap=.01)
+    t_pose, p_pose = (th.tensor([.1, .1, .9]), th.tensor([0., 0., 0., 1.])), (th.zeros(3), th.tensor([0., 0., 0., 1.]))
+    native = s.goal_pose(t_pose, p_pose)                              # offline / non-online: unchanged native release
+    assert s.ontop_fresh_clearance() is None
+    with pytest.raises(Reject, match='explicit fixed-goal'): s.raised_release()
+    monkeypatch.setenv(OG.ENV, '/w/settings.json')
+    raised = s.goal_pose(t_pose, p_pose)
+    facts = s.raised_release_facts
+    assert raised[0][:2].tolist() == pytest.approx(native[0][:2].tolist())
+    assert float(raised[0][2]) - float(native[0][2]) == pytest.approx(facts['raise_m'], abs=1e-6)
+    assert 0 < facts['raise_m'] <= .03 and facts['jaw_clearance_m'] >= .005
+    assert s.raised_release() == POLICY_DICT
+    # a release that cannot clear within the 30 mm cap is rejected, never placed lower
+    s.open_jaw_clearance = lambda *a: -.01
+    with pytest.raises(Reject, match='highest allowed raise'): s.goal_pose(t_pose, p_pose)
+    # members of the group (fixed-goal plan active) keep the existing plan path
+    s._campaign_pair_active = plan()
+    assert s.ontop_fresh_clearance() is None

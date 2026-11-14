@@ -6063,7 +6063,13 @@ class IORSSmall(SamplerV2):
             above += contact_height_extra(self, "release")[0]  # A/B knob: the release height lifted by the constant
             self.release_above_m = above
             z = base_z + above - float(t_hull[:, 2].min())
-            return th.tensor([float(xy[0] - origin_off[0]), float(xy[1] - origin_off[1]), z]), t_quat
+            pos = th.tensor([float(xy[0] - origin_off[0]), float(xy[1] - origin_off[1]), z])
+            fresh = IORSSmall.ontop_fresh_clearance(self) if self.relation == "ontop" else None
+            if fresh is not None:
+                # online fresh-goal first candidate (audited ontop clearance class only): the native release raised by the same bounded
+                # open-jaw search the fixed-goal members use (campaign_raised_release), so the plan has measured clearance evidence
+                pos = pos + th.tensor([0., 0., self.release_raise(pos, t_quat, p_hull_w, fresh)])
+            return pos, t_quat
         if self.relation == "inside":
             return self.release_pose(t_quat, t_hull, p_hull_w, p_pose)
         gap = 0.0 if self.relation == "touching" else max(0.0, float(self.pair["g_NT"]) - 0.01)
@@ -6153,16 +6159,28 @@ class IORSSmall(SamplerV2):
         height = self.release_raise(base, quat, partner_hull, raised)
         return base + th.tensor([0., 0., height]), quat
 
+    def ontop_fresh_clearance(self) -> Optional[Dict[str, float]]:
+        """The audited ontop clearance (``campaign_release_clearance``) while the online worker draws its fresh-goal first candidate (no
+        fixed-goal plan yet), else None. The release is raised by the unchanged :meth:`release_raise` and recorded as ``raised_release``,
+        the evidence the fixed-goal plan of the group is then built from."""
+        if self.relation != 'ontop' or getattr(self, '_campaign_pair_active', None) is not None:
+            return None
+        from ispatialgym.sampling.campaign_release_clearance import fresh_goal_settings
+        return None if fresh_goal_settings(None) is None else self.raised_release()
+
     def raised_release(self) -> Optional[Dict[str, float]]:
         """nextto ``generation.raised_release`` (default unset = off): ``true`` or ``{"partner_clearance_m", "max_raise_m", "step_m"}``
         (defaults :data:`RAISED_RELEASE_DEFAULTS`). The release stays the open command (+1); the place rises over the resting goal to the
         lowest height at which the fully open jaw clears the partner (:meth:`release_raise`), the goal check drops the target from there
         and the settled pose is the recorded goal. None when unset or for another relation."""
         if self.relation == 'ontop':
-            from ispatialgym.sampling.campaign_release_clearance import settings, POLICY
+            from ispatialgym.sampling.campaign_release_clearance import settings, fresh_goal_settings, POLICY
             policy = settings()
             if policy is not None:
                 plan = getattr(self, '_campaign_pair_active', None)
+                if plan is None and fresh_goal_settings(plan) is not None:
+                    # online fresh-goal first candidate: the plan is built from this candidate's measured clearance
+                    return policy
                 if plan is None or plan.release_policy != POLICY:
                     raise Reject('campaign_release_policy', 'ontop clearance requires its explicit fixed-goal policy')
                 return policy
@@ -6718,6 +6736,10 @@ class IORSSmall(SamplerV2):
         goal_quat = draft.goal_poses[tname][1] if draft.pose_targets[tname].get("orientation") is None else th.tensor(draft.pose_targets[tname]["orientation"])
         raised = self.raised_release() if self.relation == "nextto" or getattr(
             getattr(self, '_campaign_pair_active', None), 'release_policy', None) == 'native_ontop_clearance' else None
+        if raised is None and self.relation == "ontop":
+            raised = IORSSmall.ontop_fresh_clearance(self)
+            if raised is not None and getattr(self, 'raised_release_facts', None) is None:
+                raise Reject('campaign_release_missing', 'fresh-goal ontop release lacks open-jaw clearance evidence')
         if self.relation == "inside":
             # the place is the release above the rim (``draft.goal_poses`` = the release pose of :meth:`release_pose`); the
             # recorded goal is what the drop settled to. The gripper never reaches into the partner, so it is not ignored.

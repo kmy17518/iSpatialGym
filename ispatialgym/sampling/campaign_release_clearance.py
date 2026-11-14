@@ -22,3 +22,19 @@ def settings(template=None):
         raise ValueError('native ontop release clearance belongs to the audited kielbasa class')
     # The same bounded native open-jaw clearance used by raised nextto releases.
     return {'partner_clearance_m': .005, 'max_raise_m': .030, 'step_m': .001}
+
+
+def fresh_goal_settings(plan=None):
+    """The same clearance for the online worker's fresh-goal first candidate.
+
+    A persistent online worker draws its first candidate before any fixed-goal
+    plan exists; that candidate's measured raised release is what the plan is
+    then built from (``goal_groups.prepare_group``). Only that situation is
+    covered: the online-groups worker is active, no fixed-goal plan is loaded
+    or exported, and the audited class enables the option (``settings``).
+    """
+    import os
+    from ispatialgym.sampling.online_groups import ENV, PLAN_ENV
+    if plan is not None or not os.environ.get(ENV) or os.environ.get(PLAN_ENV):
+        return None
+    return settings()
