@@ -23,6 +23,9 @@ from ispatialgym.sampling import goal_identity as identity
 ENV = 'ISPATIALGYM_ONLINE_GROUPS'
 PLAN_ENV = 'ISPATIALGYM_CAMPAIGN_GOAL_PLAN'
 CONFIG_ENV = 'ISPATIALGYM_CAMPAIGN_CONFIG'
+FIXED_CLOSING_CLASSES = frozenset(
+    'configuration_matching-articulation_close_large_scale_' + suffix
+    for suffix in ('01', '02', '03'))
 
 
 def read(path):
@@ -78,6 +81,17 @@ class GoalRegistry:
         cid = record['class_id']
         require(re.fullmatch(r'[A-Za-z0-9_.-]+', cid), 'unsafe class ID')
         identity.physical_goal(record)  # fail closed before acquiring the lock
+        exception = None
+        policy_path = self.root / 'quota_policy.json'
+        if policy_path.exists():
+            policy = read(policy_path)
+            require(policy.get('schema') == 'isg-goal-quota-policy-v1'
+                    and policy.get('authorized_by') == 'user'
+                    and policy.get('native_goal_definition_unchanged') is True,
+                    'invalid goal quota authorization')
+            exceptions = set(policy.get('fixed_goal_exceptions', []))
+            require(exceptions <= FIXED_CLOSING_CLASSES, 'unauthorized goal quota exception')
+            if cid in exceptions: exception = ref(policy_path)
         directory = self.root / cid
         directory.mkdir(exist_ok=True)
         lock = directory / '.lock'
@@ -96,11 +110,13 @@ class GoalRegistry:
                 if old['owner'] == owner:
                     require(identity.equivalent_goal(old['record'], record), 'resume owner changed physical goal')
                     return {'claimed': True, 'receipt': ref(path), 'resumed': True}
-                if identity.equivalent_goal(old['record'], record):
+                if identity.equivalent_goal(old['record'], record) and exception is None:
                     return {'claimed': False, 'duplicate_of': ref(path)}
             path = directory / (digest(owner) + '.json')
-            write_json_atomic(path, {'owner': owner, 'record': record, 'claimed_at': time.time()})
-            return {'claimed': True, 'receipt': ref(path), 'resumed': False}
+            write_json_atomic(path, {'owner': owner, 'record': record, 'claimed_at': time.time(),
+                                    'fixed_goal_quota_exception': exception})
+            return {'claimed': True, 'receipt': ref(path), 'resumed': False,
+                    'fixed_goal_quota_exception': exception}
         finally:
             (lock / 'owner.json').unlink(missing_ok=True)
             lock.rmdir()

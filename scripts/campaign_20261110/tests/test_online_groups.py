@@ -102,3 +102,23 @@ def test_deadline_success_and_provisional_world_are_not_accepted():
         verify_result(candidate, base, [])
     with pytest.raises(ValueError, match='provisional'):
         verify_result(candidate, {**base, 'finished_at_unix': 90, 'provisional': True}, [])
+
+
+def test_user_fixed_goal_exception_is_narrow_and_does_not_change_identity(tmp_path):
+    registry = GoalRegistry(tmp_path)
+    cid = 'configuration_matching-articulation_close_large_scale_01'
+    record = {'class_id': cid, 'requested_goal': {'pose': [[0, 0, 0], [0, 0, 0, 1]], 'joints': {'door': 0}}, 'goal_group': {}}
+    assert registry.claim(record, 'first', time.time()+10)['claimed']
+    assert not registry.claim(record, 'second', time.time()+10)['claimed']
+    policy = {'schema': 'isg-goal-quota-policy-v1', 'authorized_by': 'user',
+              'native_goal_definition_unchanged': True, 'fixed_goal_exceptions': [cid]}
+    (tmp_path/'quota_policy.json').write_text(json.dumps(policy))
+    claim = registry.claim(record, 'second', time.time()+10)
+    assert claim['claimed'] and claim['fixed_goal_quota_exception']['sha256']
+    assert identity.equivalent_goal(record, copy.deepcopy(record))
+    assert registry.claim(goal(), 'unaffected_first', time.time()+10)['claimed']
+    assert not registry.claim(goal(), 'unaffected_second', time.time()+10)['claimed']
+    policy['fixed_goal_exceptions'].append(goal()['class_id'])
+    (tmp_path/'quota_policy.json').write_text(json.dumps(policy))
+    with pytest.raises(ValueError, match='unauthorized'):
+        registry.claim(goal(.3), 'invalid', time.time()+10)
