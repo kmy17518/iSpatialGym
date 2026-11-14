@@ -109,15 +109,34 @@ def install(runner, contract, output, parent_install, request):
     proof = json.loads(Path(request['runtime_compatibility']['path']).read_text())
     inherited = {**request, 'runtime_compatibility': proof['parent_compatibility']}
     inherited.pop('pool_preserve_native_anchor_v1')
-    install_source_anchor(runner, contract, output, parent_install, inherited)
-    native_attach = runner.InstanceLoader.attach; observations = []; output = Path(output)
-    def attach(loader, shared):
-        with preserve_anchor_at_scene_load(shared['env'].scene, shared['robot'], runner.og.sim) as events:
-            try:
-                return native_attach(loader, shared)
-            finally:
-                observations.append({'tro': loader.tro_path, 'events': events})
-                write_json_atomic(output/'native_anchor_restore_audit.json', {
-                    'physical_delta': DELTA, 'observations': observations,
-                    'benchmark_credit': 0, 'production_released': False})
-    runner.InstanceLoader.attach = attach
+    return install_prepared(runner, contract, output, parent_install, inherited)
+
+
+def install_prepared(runner, contract, output, parent_install, source_anchor_request):
+    """Reuse the same native anchor operation after a separately checked source proof."""
+    from .training_pool_source_anchor_probe import install as install_source_anchor
+    install_source_anchor(runner, contract, output, parent_install, source_anchor_request)
+    observations = []; output = Path(output)
+    def persist(loader, events):
+        observations.append({'tro': loader.tro_path, 'events': events})
+        write_json_atomic(output/'native_anchor_restore_audit.json', {
+            'physical_delta': DELTA, 'observations': observations,
+            'benchmark_credit': 0, 'production_released': False})
+    if hasattr(runner.InstanceLoader, '_load_reused_scene_state'):
+        native_load = runner.InstanceLoader._load_reused_scene_state
+        def incoming(loader, state):
+            with preserve_anchor_at_scene_load(loader.env.scene, loader.robot, runner.og.sim) as events:
+                try:
+                    return native_load(loader, state)
+                finally:
+                    persist(loader, events)
+        runner.InstanceLoader._load_reused_scene_state = incoming
+    else:
+        native_attach = runner.InstanceLoader.attach
+        def attach(loader, shared):
+            with preserve_anchor_at_scene_load(shared['env'].scene, shared['robot'], runner.og.sim) as events:
+                try:
+                    return native_attach(loader, shared)
+                finally:
+                    persist(loader, events)
+        runner.InstanceLoader.attach = attach

@@ -45,6 +45,7 @@ try:
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from .campaign_inputs import ordered_gpu_offers, compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
     from .async_staging import StagingReservations, staging_parallelism, staging_compression_threads
+    from .async_results import ResultFetchReservations, CoordinatorStateCache, typed_preparation, execute_reserved_fetch
     from .lifecycle import retain_attempt
     from .cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
@@ -58,6 +59,7 @@ except ImportError:
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from campaign_inputs import ordered_gpu_offers, compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, register_exact_template_customs_inputs, camera_context_inputs
     from async_staging import StagingReservations, staging_parallelism, staging_compression_threads
+    from async_results import ResultFetchReservations, CoordinatorStateCache, typed_preparation, execute_reserved_fetch
     from lifecycle import retain_attempt
     from cost_provenance import scope as cost_scope, rental_intent, retain as retain_cost, assignment_identity
     from funding import read_snapshot as read_credit_snapshot, remaining_credit
@@ -105,6 +107,8 @@ DEFAULT_CONFIG = {"gpus": ["RTX 4090"], "default_gpu": "RTX 4090", "max_instance
                   "vram_per_job_gb": 20, "ram_per_job_gb": 40, "cpus_per_job": 9, "max_jobs_per_instance": 2, "retries": 2,
                   "search_every_s": 300, "max_contracts_per_machine": 4, "market_limit": 1000}
 STAGER = None
+RESULT_FETCHER = None
+JOB_STATE_CACHE = None
 STAGE_COMPRESSION_THREADS = 4
 
 
@@ -837,22 +841,29 @@ def load_states():
 def save_state(s):
     p = os.path.join(STATE, f"{s['id']}.json")
     temporary = p + '.' + uuid.uuid4().hex + '.tmp'
-    with open(temporary, "x") as stream:
-        json.dump(s, stream, indent=1); stream.flush(); os.fsync(stream.fileno())
-    os.replace(temporary, p)
+    try:
+        with open(temporary, "x") as stream:
+            json.dump(s, stream, indent=1); stream.flush(); os.fsync(stream.fileno())
+        os.replace(temporary, p)
+    except BaseException:
+        if JOB_STATE_CACHE is not None:JOB_STATE_CACHE.invalidate()
+        raise
 
 
 def ingest(states, C):
     for p in sorted(glob.glob(os.path.join(QUEUE, "9*.json"))):
         if p.endswith(".memory.json"):
             continue
+        if Path(p).stem in states:
+            continue  # Immutable queue entries are already owned by this coordinator.
         rec = json.load(open(p))
         jid = str(rec["id"])
+        if jid != Path(p).stem:raise ValueError('Queue filename identity differs')
         if jid not in states:
             s = {**rec, "id": jid, "status": "queued", "tries": 0, "history": []}
             s["gpu"] = rec.get("gpu") or C.get("default_gpu")
-            states[jid] = s
             save_state(s)
+            states[jid] = s
             log(f"QUEUED {jid} {rec['name']} {rec['job_dir']} gpu={s['gpu']}")
 
 
@@ -949,6 +960,14 @@ def stage_bounded(rec, C):
         return json.load(stream)
 
 
+def result_fetch_bounded(row, reservation):
+    log_path = os.path.join(VJ, 'logs', 'result_fetch_'+row['id']+'_'+row['token']+'.log')
+    command = [sys.executable, os.path.abspath(__file__), 'result-fetch', '--reservation', reservation]
+    run_bounded(command, log_path, timeout=row['timeout_seconds'], interval=10)
+    with open(row['result']) as stream:
+        return json.load(stream)
+
+
 def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed, hourly, phase,
                     eligibility=None):
     try:
@@ -992,6 +1011,7 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
     current_workers = [instance for instance in instance_metrics if instance['worker_observation_current']]
     metrics = {"observed_at_unix": t, "assignments_observed_at_unix": now(), "coordinator_phase": phase, "account_listing_complete": list_ok, "running_gpus": sum(int(i.get("num_gpus") or 1) for i in live.values() if i.get("actual_status") == "running") if list_ok else None,
                "instances": instance_metrics,
+               "result_fetch_scheduler": RESULT_FETCHER.metrics() if RESULT_FETCHER else None,
                "staging_scheduler": {**STAGER.metrics(now()),
                     'compression_threads_per_stage': staging_compression_threads(C)} if STAGER else None,
                'worker_heartbeat_max_age_seconds': heartbeat_max_age_seconds,
@@ -1015,8 +1035,8 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
     os.replace(mp + ".tmp", mp)
 
 
-def tick(c, s3, state):
-    global STAGER
+def tick(c, s3, state, states=None):
+    global STAGER, RESULT_FETCHER
     C = cfg()
     protected = preserved_instances(F)
     if os.path.isdir(os.path.join(F, 'ik_exchange', 'manifests')):
@@ -1024,7 +1044,7 @@ def tick(c, s3, state):
             ik_transport.reconcile(F, s3, BUCKET, PREFIX, max_descriptors=4, deadline_seconds=10)
         except Exception as exc:
             log('EXACT_IK_MERGE_DEFERRED ' + type(exc).__name__)
-    states = load_states()
+    states = load_states() if states is None else states
     ingest(states, C)
     presence_started = now()
     inst, list_ok = my_instances(c)
@@ -1044,6 +1064,12 @@ def tick(c, s3, state):
         if not str(owner).isdigit():return True  # unknown former local owner requires explicit reconciliation
         result=subprocess.run(['squeue','-h','-j',str(owner),'-o','%T'],capture_output=True,text=True,timeout=30,check=True)
         return bool(result.stdout.strip())
+    if RESULT_FETCHER is None:
+        RESULT_FETCHER = ResultFetchReservations(os.path.join(VJ, 'state', 'result_fetches'),
+            os.environ.get('SLURM_JOB_ID', 'pid'+str(os.getpid())), 8)
+    RESULT_FETCHER.recover(owner_alive)
+    RESULT_FETCHER.poll()
+    RESULT_FETCHER.reconcile_committed(states)
     def assignment(iid,jid):
         try:return json.loads(s3.get_object(Bucket=BUCKET,Key=f'{PREFIX}/assign/{iid}/{jid}.json')['Body'].read())
         except botocore.exceptions.ClientError as error:
@@ -1099,6 +1125,21 @@ def tick(c, s3, state):
     for s in states.values():
         if s["status"] in ("assigned",) and s["id"] in dones:
             d = r2_json(s3, f"done/{s['id']}.json") or {}
+            async_fetch = False
+            try:
+                async_fetch = typed_preparation(s)
+                if async_fetch:
+                    added = RESULT_FETCHER.result(s, d)
+                    if added is None:
+                        RESULT_FETCHER.submit(s, d, result_fetch_bounded,
+                                              timeout=C.get('result_fetch_timeout_s', 180))
+                        continue  # Preserve assignment and claims until main-thread completion.
+            except Exception as error:
+                message = repr(error)
+                if s.get('sync_error') != message:
+                    log(f"SYNC_FAILED {s['id']}: {message}")
+                    s['sync_error'] = message; save_state(s)
+                continue
             attempt_evidence = retain_attempt(os.path.join(VJ,'state','attempts'),s,d)
             cost_record('assignment_end',s.get('cost_assignment_identity') or assignment_identity(s,d.get('attempt_id')),
                 job_id=s['id'],instance=s.get('instance'),attempt_evidence=attempt_evidence,
@@ -1124,7 +1165,8 @@ def tick(c, s3, state):
                 save_state(s)
                 continue
             try:
-                added = sync_back(s3, s)
+                if not async_fetch:
+                    added = sync_back(s3, s)
                 s["status"] = "synced" if d.get("rc") == 0 and not d.get("upload_error") else "failed"
                 s["done"] = d
                 s['attempt_evidence'] = attempt_evidence
@@ -1136,11 +1178,15 @@ def tick(c, s3, state):
                 log(f"SYNC_FAILED {s['id']}: {e!r}")
                 s["sync_error"] = repr(e)
             save_state(s)
+            if async_fetch and s['status'] in ('synced', 'failed'):
+                RESULT_FETCHER.committed(s['id'])
 
     # 2. lost instances -> requeue their jobs
     for s in states.values():
         if s["status"] != "assigned" or s["id"] in dones:
             continue
+        if RESULT_FETCHER.retains_assignment(s):
+            continue  # Completed GPU work awaiting I/O must never become a GPU retry.
         iid = s.get("instance")
         if iid in protected:
             continue  # deliberately stopped, with on-disk evidence retained
@@ -1177,6 +1223,7 @@ def tick(c, s3, state):
     if cluster_return.has_pending(F):
         remote_jobs = {Path(key).stem for key in r2_list(s3, 'assign/')}
         cluster_return.reconcile(F, states, STAGER.active(), hbs, remote_jobs, save_state)
+        if JOB_STATE_CACHE is not None:JOB_STATE_CACHE.require_durable()
     coordinator_progress('eligibility_check', started_at=now())
     queued = dispatch_order(states.values(), C)
     eligibility = {'job_ids':{str(job['id']) for job in queued}, 'observed_at':now()}
@@ -1256,6 +1303,8 @@ def tick(c, s3, state):
                 for jid in assigned_to.get(iid,[]):
                     s = states[jid]
                     if s["status"] == "assigned":
+                        if RESULT_FETCHER.retains_assignment(s):
+                            continue
                         s["history"].append({"instance": iid, "lost": reason, "time": t})
                         s.update(status="queued" if s["tries"] < C["retries"] else "failed", instance=None)
                         save_state(s)
@@ -1369,6 +1418,7 @@ def status(c, s3):
 
 
 def main():
+    global JOB_STATE_CACHE
     global STAGE_COMPRESSION_THREADS
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1381,6 +1431,8 @@ def main():
     sg.add_argument("id")
     sg.add_argument("--output")
     sg.add_argument("--compression-threads", type=int, default=4)
+    rf = sub.add_parser('result-fetch')
+    rf.add_argument('--reservation', required=True)
     d = sub.add_parser("destroy")
     d.add_argument("instance")
     sub.add_parser("stop-all")
@@ -1400,17 +1452,27 @@ def main():
             if other != mine and r.stdout.strip() in ("RUNNING", "PENDING"):
                 raise SystemExit(f"another coordinator is running: slurm job {other}")
         open(lock, "w").write(mine)
+        # Audited writer boundary: queue clients never write STATE. Return
+        # callbacks receive this same mapping and save_state. Disk is loaded
+        # once after ownership and remains the authoritative restart baseline.
+        JOB_STATE_CACHE = CoordinatorStateCache(load_states)
         log(f"COORDINATOR {mine} job={JOB_ID} prefix={JOB_S3} config={cfg()}")
         while True:
             try:
-                tick(c, s3, state)
+                tick(c, s3, state, JOB_STATE_CACHE.get())
             except Exception as e:  # noqa: BLE001
+                JOB_STATE_CACHE.invalidate()
                 import traceback
                 log(f"TICK_FAILED {e!r}\n{traceback.format_exc()}")
                 coordinator_progress("error", error=repr(e))
             json.dump(state, open(sp + ".tmp", "w"))
             os.replace(sp + ".tmp", sp)
             time.sleep(a.every)
+    if a.cmd == 'result-fetch':
+        row = json.load(open(a.reservation))
+        job = json.load(open(os.path.join(STATE, row['id']+'.json')))
+        execute_reserved_fetch(a.reservation, job, lambda value: sync_back(s3, value))
+        return
     if a.cmd == "status":
         return status(c, s3)
     if a.cmd == "offers":

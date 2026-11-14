@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from .contracts import require, file_digest, write_json_atomic
-from .training_pool_world import prepare, checked, isolated_member_scene
+from .training_pool_world import prepare, checked, isolated_member_scene, private_member_filename
 from .training_pool_adapter import (source_member, merge_member_state,
     restart_without_steps, pool_restore_document, native_isolation, anchor_for_member)
 
@@ -134,7 +134,7 @@ def install(runner, contract, output):
         path = kwargs.get('tro_path') or args[3]
         row = source_member(contract, path)
         document, _ = isolated_member_scene(contract, json.loads(Path(row['scene']['path']).read_text()), row['active'])
-        destination = output/('private_union_'+row['active']+'.json')
+        destination = output/private_member_filename(row['active'])
         require(not destination.exists(), 'union initialization artifact already exists')
         write_json_atomic(destination, document)
         cfg['scene']['scene_file'] = str(destination)
@@ -146,6 +146,9 @@ def install(runner, contract, output):
         restore_export(loader.env.scene, runner.og.sim, pool_restore_document(document, isolation))
         loader._scene_state0 = copy.deepcopy(loader.env.scene.dump_state(serialized=False))
         loader._pool_cold_anchor = capture_robot_anchor(loader)
+        if row.get('task_definition') is not None:
+            from .training_pool_task import observe_task
+            loader.report['pool_exact_task_binding'] = observe_task(loader, row)
         save(loader, 'world_initialized_before_first_restore')
         return result
 
@@ -160,8 +163,12 @@ def install(runner, contract, output):
                                                               torch.tensor(orientation, dtype=torch.float32))
         state = merge_member_state(shared['scene_state0'], document, shared['robot'].name, anchor, to_local)
         prepared = {**shared, 'scene_state0': recursively_convert_to_torch(state)}
-        original = scene.load_state
-        had = 'load_state' in vars(scene); raw = vars(scene).get('load_state')
+        # A native incoming-state boundary excludes attachment cleanup's own
+        # stop/play/load. Legacy snapshots keep their unchanged old route.
+        boundary = hasattr(loader, '_load_reused_scene_state')
+        owner, name = (loader, '_load_reused_scene_state') if boundary else (scene, 'load_state')
+        original = getattr(owner, name)
+        had = name in vars(owner); raw = vars(owner).get(name)
         transitions = []
         def at_existing_load(*args, **kwargs):
             require(not transitions, 'unexpected repeated scene load in native attach')
@@ -170,18 +177,22 @@ def install(runner, contract, output):
             result = original(*args, **kwargs)
             restore_export(scene, runner.og.sim, pool_restore_document(document, isolation))
             return result
-        scene.load_state = at_existing_load
+        setattr(owner, name, at_existing_load)
         try:
             result = native_attach(loader, prepared)
         finally:
-            if had: scene.load_state = raw
-            else: del scene.load_state
+            if had: setattr(owner, name, raw)
+            else: delattr(owner, name)
         require(len(transitions) == 1, 'native attach scene restore was not observed')
         loader._pool_cold_anchor = baseline
-        loader.task._tro = loader.tro
-        loader.task._config_object_bindings = copy.deepcopy(loader.tro.meta.object_bindings)
-        ok, feedback = loader.task.initialize_activity(loader.env)
-        require(ok, 'incoming pool task binding failed: '+str(feedback))
+        if row.get('task_definition') is not None:
+            from .training_pool_task import rebind_task
+            loader.report['pool_exact_task_binding'] = rebind_task(loader, row)
+        else:
+            loader.task._tro = loader.tro
+            loader.task._config_object_bindings = copy.deepcopy(loader.tro.meta.object_bindings)
+            ok, feedback = loader.task.initialize_activity(loader.env)
+            require(ok, 'incoming pool task binding failed: '+str(feedback))
         save(loader, 'incoming_scene_loaded_before_task_restore', {'anchor': anchor, 'transition': transitions[0]})
         return result
 
@@ -253,8 +264,14 @@ def run(root, request_path, output):
         result['world_construction'] = construction
         for ordinal, index in enumerate(order):
             episode = source['episodes'][index]; row = records[index]
-            os.environ.update(episode['execution_environment'])
-            os.environ.update(value['source_environment_delta'])
+            environment_binding = None
+            if contract['members'][index].get('task_definition') is not None:
+                from .training_pool_task import select_episode_environment
+                environment_binding = select_episode_environment(os.environ,
+                    episode['execution_environment'], value['source_environment_delta'])
+            else:
+                os.environ.update(episode['execution_environment'])
+                os.environ.update(value['source_environment_delta'])
             destination = output/('episode_'+str(ordinal))
             argv = ['--instance', row['artifacts']['tro']['path'], '--load-only', '--mode', 'replay',
                     '--replay', row['artifacts']['demo']['path'], '--no-goal-override', '--out', str(destination)]
@@ -262,6 +279,8 @@ def run(root, request_path, output):
             report = destination/row['instance_id']/'meta.json'
             result['entries'].append({'source_index': index, 'canary_review': value['canaries'][index],
                 'returncode': code, 'result': entry, 'report': {'path': str(report), 'sha256': file_digest(report)}})
+            if environment_binding is not None:
+                result['entries'][-1]['exact_source_environment'] = environment_binding
             write_json_atomic(output/'probe.json', result)
             require(code == 0 and entry.get('status') == 'loaded', 'native pool load failed')
         require(construction['attempted'] == construction['completed'] == 1,

@@ -458,17 +458,36 @@ def _first_key(d: Dict[str, Any], suffix: str) -> Optional[str]:
 class InstanceLoader:
     """Loads one instance and re-applies what the TRO must let ``run_isg`` restore after every reset."""
 
-    def __init__(self, tro_path: str, robot_name: Optional[str] = None, image_size: int = DEFAULT_IMAGE_SIZE, head_aperture: float = DEFAULT_HEAD_APERTURE_MM):
+    def __init__(self, tro_path: str, robot_name: Optional[str] = None, image_size: int = DEFAULT_IMAGE_SIZE, head_aperture: float = DEFAULT_HEAD_APERTURE_MM, *, restoration_policy=None, pool_consumers=None, pool_world=None):
         self.tro_path = os.path.abspath(tro_path)
         self.iid, self.template_dir, self.tmeta, self.activity, self.did = resolve_instance(self.tro_path)
         # 2026-11-01 train-fast (PARTIAL_SCENE): the sampler's cropped world when the template was sampled in one (None: the full template)
         self.scene_crop = scene_crop_of(self.tmeta)
         self.tro = load_tro(self.tro_path)
+        self.pool_world = pool_world
+        if pool_world is not None:
+            from ispatialgym.oracle.pool_world import PoolWorld
+            if type(pool_world) is not PoolWorld or restoration_policy is not None:
+                raise ValueError("native pool needs its own reviewed lifecycle; combined restoration is not bound")
+            if pool_consumers is not None and pool_consumers is not pool_world.consumers:
+                raise ValueError("native pool and recording consumers differ")
+            pool_consumers = pool_world.consumers
+            pool_world.bind_loader(self)
+        self.pool_consumers = pool_consumers
+        if pool_consumers is not None and pool_world is None:
+            from ispatialgym.oracle.pool_consumers import PoolConsumers
+            if type(pool_consumers) is not PoolConsumers:
+                raise ValueError("loader needs exact native pool consumers")
+            pool_consumers.bind_loader(self)
         from pathlib import Path
         from scripts.campaign_20261110.training_canary_scope import restoration_execution
 
         self._restoration_execution = restoration_execution(
             self.tro.meta.raw.get("campaign") or {}, self.tro_path, Path(__file__).resolve().parents[2])
+        from ispatialgym.oracle.restoration_policy import validate as validate_restoration_policy
+
+        self._restoration_policy = validate_restoration_policy(
+            restoration_policy, self.tro_path, Path(__file__).resolve().parents[2])
         self.robot_name = robot_name or robot_name_from_tro(self.tro)
         self.image_size = int(image_size)
         self.head_aperture = float(head_aperture)
@@ -498,6 +517,8 @@ class InstanceLoader:
                     setattr(gm, name, value)
         self.cfg = build_env_config(self.template_dir, self.tmeta, self.tro, self.tro_path, self.activity, self.did, self.robot_name, self.image_size,
                                     behavior_output=getattr(self, "behavior_output", False), scene_crop=self.scene_crop)
+        if self.pool_world is not None:
+            self.cfg = self.pool_world.configuration(self.cfg)
         if self.scene_crop:
             # 2026-11-01 train-fast (PARTIAL_SCENE): the demo is recorded in the sampler's cropped world; the replayer combines it with the
             # full template (recorder attrs isg_scene_crop / isg_full_scene_file, replay --scene full)
@@ -560,8 +581,10 @@ class InstanceLoader:
                 from ispatialgym.oracle import qa as QA
 
                 self.report["physx_filtered_robot_pairs"] = M.filter_link_pairs_stopped(self.robot, QA.ELBOW_GRAZE_PAIRS)
+            if self.pool_world is not None:
+                self.pool_world.cold_stopped(og.sim)
 
-        self.report["base_link_mass_kg"] = M.apply_eval_base_mass(self.robot, while_stopped=_rigid if (ov or elbow) else None)
+        self.report["base_link_mass_kg"] = M.apply_eval_base_mass(self.robot, while_stopped=_rigid if (ov or elbow or self.pool_world is not None) else None)
         log.info("robot base_link mass %.2f -> %.2f kg (BEHAVIOR-1K eval: %.0f)", self.report["base_link_mass_kg"]["before"], self.report["base_link_mass_kg"]["after"], M.EVAL_BASE_LINK_MASS_KG)
         self.cam_key = _first_key(self.robot.sensors, M.HEAD_CAMERA_SENSOR_SUFFIX)
         if self.cam_key is None:
@@ -587,6 +610,11 @@ class InstanceLoader:
         self._pristine_mass0 = capture_pristine_mass(campaign, mass_constraint_objects(
             campaign, self.task.object_scope, (self.tro.meta.extras or {}).get("constraints") or [],
             execution=self._restoration_execution), execution=self._restoration_execution)
+        from ispatialgym.oracle.restoration_policy import capture as capture_fixed_frames
+
+        capture_fixed_frames(self)
+        if self.pool_world is not None:
+            self.pool_world.initialized()
         return self.env
 
     def share(self, shared: Dict[str, Any]) -> None:
@@ -595,6 +623,11 @@ class InstanceLoader:
                        "template_dir": self.template_dir, "template_key": (template_key(self.template_dir, self.tmeta) if fast_on("COLLECTOR_PREBUILD") else None), "floor_map": self._floor_map_template, "scene_state0": self._scene_state0,
                        "pristine_mass0": getattr(self, "_pristine_mass0", None),
                        "build_report": {k: v for k, v in self.report.items() if k != "trav_cells_blocked"}})
+        from ispatialgym.oracle.restoration_policy import share as share_fixed_frames
+
+        share_fixed_frames(self, shared)
+        if self.pool_world is not None:
+            self.pool_world.share(shared)
         if getattr(self, '_sequential_augmentation', None) is not None:
             shared['floor_map_before_augmentation'] = self._floor_map_before_augmentation
             shared['cold_robot_anchor'] = self._cold_robot_anchor
@@ -610,10 +643,15 @@ class InstanceLoader:
         if os.path.abspath(shared["template_dir"]) != os.path.abspath(self.template_dir):
             # 2026-10-31 train-fast (COLLECTOR_PREBUILD): another copy of the same template (equal template_key) is the same world
             same = fast_on("COLLECTOR_PREBUILD") and os.path.abspath(self.template_dir) in (shared.get("compatible_template_dirs") or ())
+            if self.pool_world is not None:
+                same = self.pool_world.compatible(shared)
             if not same:
                 raise RuntimeError(f"--queue: {self.iid} belongs to {self.template_dir}, the world to {shared['template_dir']}")
             self.report["world_built_from"] = shared["template_dir"]
         self.env, self.task, self.robot, self.cam_key, self.cfg = (shared[k] for k in ("env", "task", "robot", "cam_key", "cfg"))
+        from ispatialgym.oracle.restoration_policy import attach as attach_fixed_frames
+
+        attach_fixed_frames(self, shared)
         prev = shared.get("loader")
         for h in list(getattr(prev, "hinges", None) or []):
             remove_hinge(h)
@@ -639,6 +677,10 @@ class InstanceLoader:
         from ispatialgym.oracle.campaign_restore import restart_reused_world
 
         scene_state = copy.deepcopy(shared['scene_state0'])
+        if self.pool_world is not None:
+            if shared.get('sequential_augmentation') is not None:
+                raise ValueError('combined pool and augmentation lifecycle is not bound')
+            scene_state = self.pool_world.prepare_incoming(shared)
         anchor_callback = None
         if shared.get('sequential_augmentation') is not None:
             from ispatialgym.oracle.campaign_batch import prepare_robot_anchor, restore_robot_anchor_stopped
@@ -663,7 +705,9 @@ class InstanceLoader:
             self.report["reuse_native_lifecycle"] = lifecycle
         # every scene object (poses, velocities, joints of doors / drawers, object states) back to the template's, so that
         # only the TRO decides where this instance starts - as in a fresh process
-        self.env.scene.load_state(scene_state, serialized=False)
+        self._load_reused_scene_state(scene_state)
+        from ispatialgym.oracle.restoration_policy import restore_background_roots
+        restore_background_roots(self, scene_state, og.sim, phase='after_attach_state_restore')
         if anchor_callback is not None:
             from ispatialgym.oracle.campaign_batch import verify_robot_anchor
             verify_robot_anchor(self.robot, anchor_record)
@@ -682,18 +726,40 @@ class InstanceLoader:
             self._floor_map_template = _copy_map(self.env.scene.trav_map.floor_map[0])
         self.report["trav_cells_blocked"] = block_trav_map_from_meta(self.env.scene, self.tro.meta.scene or {})
         self.report["reused_world"] = True
+        if self.pool_world is not None:
+            self.pool_world.attached()
         return self.env
+
+    def _load_reused_scene_state(self, scene_state):
+        """Load the incoming snapshot after attachment cleanup has finished.
+
+        Cleanup may independently restore its own native snapshot. Keep that
+        lifecycle separate from the single incoming episode state boundary.
+        """
+        if self.pool_world is not None:
+            return self.pool_world.load_incoming(scene_state, og.sim)
+        return self.env.scene.load_state(scene_state, serialized=False)
 
     # -- the loader contract --------------------------------------------------------------------------------------
 
     def restore(self, settle_physics_steps: int = 25):
         """Restore with complete native snapshots, then reinstate the episode filter."""
         from ispatialgym.oracle.campaign_restore import complete_scene_snapshot_scope
+        from ispatialgym.oracle.restoration_policy import restore as restore_fixed_frames
+        from ispatialgym.oracle.restoration_policy import complete_snapshot_scope
+
+        restore_fixed_frames(self, og.sim)
+        if self._restoration_policy is not None:
+            with complete_snapshot_scope(self):
+                return self._restore_complete_snapshot(settle_physics_steps)
 
         with complete_scene_snapshot_scope(self.tro.meta.raw.get("campaign") or {},
                                            self.env.scene, self.report,
                                            execution=self._restoration_execution):
-            return self._restore_complete_snapshot(settle_physics_steps)
+            result = self._restore_complete_snapshot(settle_physics_steps)
+        if self.pool_world is not None:
+            self.pool_world.observe('after_complete_native_loader')
+        return result
 
     def _restore_complete_snapshot(self, settle_physics_steps: int = 25):
         """TRO → simulator, then the §3.14 restores, a settle with the task entities held, the snapshot, one reset."""
@@ -720,7 +786,15 @@ class InstanceLoader:
                 (self.tro.meta.extras or {}).get("constraints") or [], execution=self._restoration_execution)
             if early_mass is not None:
                 self.report["pre_reset_serialized_mass"] = early_mass
-        task.load_tro_instance(env, tro=self.tro, settle_steps=0)
+        from ispatialgym.oracle.restoration_policy import needs_reconstruction, reconstruction_reset_scope
+
+        reset_options = ({'reset_context': lambda: reconstruction_reset_scope(self, og.sim)}
+                         if needs_reconstruction(self) else {})
+        if self.pool_world is not None:
+            self.pool_world.observe_reset('before_task_restore', og.sim)
+        task.load_tro_instance(env, tro=self.tro, settle_steps=0, **reset_options)
+        if self.pool_world is not None:
+            self.pool_world.observe_reset('after_task_restore', og.sim)
         self.physical = {k: v for k, v in task.object_scope.items() if v is not None and not isinstance(v, GroupEntity)}
         if self.tro.meta.raw.get("campaign"):
             from ispatialgym.sampling.campaign_runtime import verify_loaded
@@ -745,38 +819,49 @@ class InstanceLoader:
         recorded = (self.tro.meta.robot_state or {}).get("controller_targets") or {}
         self.report["controller_targets_restored"] = apply_recorded_targets(self.hold, robot, recorded) if recorded else []
         robot.apply_action(self.hold.action())
+        if self.pool_world is not None:
+            self.pool_world.observe_reset('before_native_settle', og.sim)
         for _ in range(settle_physics_steps):
             og.sim.step_physics()
             self._hold_entities()
         for _ in range(2):  # full steps refresh the per-step caches (AABBs, contacts, kinematic 'changed' flags)
             og.sim.step()
             self._hold_entities()
-        env.scene.update_initial_file()
-        task._reset_tracking()
-        if PO.trim():
-            # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): Environment.reset renders 3 frames before it reads the observation (no
-            # config key for the count in OmniGibson 3.9); a physics-only run keeps no frame - the same reset and step, the
-            # observation read without the renders (its images are stale, nothing reads them)
-            env.reset(get_obs=False)
-            og.sim.step()
-            obs, obs_info = SE.get_obs(env)
-            info = {"obs_info": obs_info}
-            log.info("train-fast PHYSICS_ONLY_TRIM: reset without the 3 observation renders")
-        else:
-            obs, info = SE.reset(env)  # returns to the snapshot, activates pose_settled tracking, renders
-        self.report["after_reset"] = self.restore_after_reset()
-        # i7-attachfix: every TRO object starts where the TRO puts it (the plan, its grasps and its IK witnesses assume it); a world
-        # reused after a joined episode left the pair off its TRO pose and nothing compared them (meta.start_state was only recorded)
-        self.report["tro_pose_check"] = self._check_tro_poses()
-        if self.report["controller_targets_restored"]:
-            robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action
-        if self.tro.meta.raw.get("campaign"):
-            from ispatialgym.oracle.campaign_restore import restore_serialized_root_motion
+        if self.pool_world is not None:
+            self.pool_world.observe_reset('after_native_settle_before_reset', og.sim)
+        from contextlib import nullcontext
 
-            restored = restore_serialized_root_motion(self.tro.meta.raw["campaign"], self.physical,
-                                                      self.tro.object_states, execution=self._restoration_execution)
-            if restored is not None:
-                self.report["campaign_restoration"]["serialized_root_motion"] = restored
+        with self.pool_world.trace_reset(og.sim) if self.pool_world is not None else nullcontext() as reset_trace:
+            env.scene.update_initial_file()
+            task._reset_tracking()
+            if PO.trim():
+                # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): Environment.reset renders 3 frames before it reads the observation (no
+                # config key for the count in OmniGibson 3.9); a physics-only run keeps no frame - the same reset and step, the
+                # observation read without the renders (its images are stale, nothing reads them)
+                env.reset(get_obs=False)
+                og.sim.step()
+                obs, obs_info = SE.get_obs(env)
+                info = {"obs_info": obs_info}
+                log.info("train-fast PHYSICS_ONLY_TRIM: reset without the 3 observation renders")
+            else:
+                obs, info = SE.reset(env)  # returns to the snapshot, activates pose_settled tracking, renders
+            self.report["after_reset"] = self.restore_after_reset()
+            # i7-attachfix: every TRO object starts where the TRO puts it (the plan, its grasps and its IK witnesses assume it); a world
+            # reused after a joined episode left the pair off its TRO pose and nothing compared them (meta.start_state was only recorded)
+            self.report["tro_pose_check"] = self._check_tro_poses()
+            if self.report["controller_targets_restored"]:
+                robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action
+            if self.tro.meta.raw.get("campaign"):
+                from ispatialgym.oracle.campaign_restore import restore_serialized_root_motion
+
+                restored = restore_serialized_root_motion(self.tro.meta.raw["campaign"], self.physical,
+                                                          self.tro.object_states, execution=self._restoration_execution)
+                if restored is not None:
+                    self.report["campaign_restoration"]["serialized_root_motion"] = restored
+            if self.pool_world is not None:
+                self.pool_world.observe_reset('after_native_reset', og.sim)
+        if self.pool_world is not None:
+            self.report["model_pool_reset_internal_trace"] = reset_trace
         return obs, info
 
     def _tro_pose_pairs(self) -> Dict[str, Tuple[Any, Any]]:
@@ -1398,6 +1483,14 @@ def build_parser() -> argparse.ArgumentParser:
                    help="--queue (train-fast COLLECTOR_PREBUILD): build the world from this instance of the same template (e.g. the counted eval "
                         "instance) before the queue has any, so the scene load overlaps the sampler's; the first real instance must share its "
                         "template_key, else <claims>/../prebuild.mismatch is written and the process exits for a restart without it")
+    p.add_argument("--restoration-policy-manifest", default=None, metavar="JSON",
+                   help="Exact bounded per-source shared-loader policy manifest; does not release production")
+    p.add_argument("--restoration-policy-manifest-sha256", default=None, metavar="SHA256",
+                   help="Immutable SHA256 of --restoration-policy-manifest")
+    p.add_argument("--pool-world-request", default=None, metavar="JSON",
+                   help="Bounded exact-source native pool replay request; source arguments and driver settings are preserved")
+    p.add_argument("--pool-world-request-sha256", default=None, metavar="SHA256",
+                   help="Immutable SHA256 of --pool-world-request")
     p.add_argument("--sidecar", default=None, help="oracle sidecar (default: <iid>.oracle.json next to the TRO)")
     p.add_argument("--mode", default="oracle", choices=["oracle", "replay", "policy"])
     p.add_argument("--replay", default=None, help="replay mode: LeRobot dataset root or demo.hdf5 (default for an eval dataset instance: its demo)")
@@ -1607,6 +1700,10 @@ def main(argv=None, default_policy: bool = False) -> int:
 
 def _run_with_args(args, argv=None) -> int:
     logging.getLogger("ispatialgym").setLevel(args.log_level)
+    from ispatialgym.oracle.pool_inputs import enabled as pool_enabled, run as run_pool
+
+    if pool_enabled(args) and not args.queue:
+        return run_pool(sys.modules[__name__], args)
     apply_driver_env(args)
     if args.queue:
         return run_queue(args)
@@ -1643,7 +1740,7 @@ def run_task(args, argv=None) -> int:
     return max(codes)
 
 
-def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
+def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None, *, restoration_policy=None, pool_consumers=None, pool_world=None) -> Tuple[int, Dict[str, Any]]:
     """One instance end to end: load, oracle stack, episode, recording, ``meta.json`` and the ``RUN_ISG_RESULT`` line; returns
     ``(exit code, result)``. ``shared`` (``--queue``): the world and planner of the previous instance of the same template,
     reused (:meth:`InstanceLoader.attach`); the first instance fills it in."""
@@ -1667,6 +1764,10 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
     sidecar_path: Optional[str] = None
 
     try:
+        from ispatialgym.oracle.restoration_policy_inputs import from_arguments
+
+        restoration_policy = from_arguments(args, tro_arg,
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), provided=restoration_policy)
         image_size = int(args.image_size)
         if PO.trim() and image_size == DEFAULT_IMAGE_SIZE:
             # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): no frame is recorded, yet every step copies each camera buffer - the cameras
@@ -1674,7 +1775,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             image_size = int(fast_value("PHYSICS_ONLY_IMAGE_SIZE", 128))
             fast_meta["physics_only_trim"] = {"image_size": image_size, "skipped": []}
             log.info("train-fast PHYSICS_ONLY_TRIM: cameras at %d x %d (physics-only: no frame is recorded)", image_size, image_size)
-        loader = InstanceLoader(tro_arg, robot_name=args.robot_name, image_size=image_size, head_aperture=args.head_aperture)
+        loader = InstanceLoader(tro_arg, robot_name=args.robot_name, image_size=image_size, head_aperture=args.head_aperture,
+                                restoration_policy=restoration_policy, pool_consumers=pool_consumers, pool_world=pool_world)
         loader.external_camera = bool({"external", "tiled"} & set(args.record_view))
         loader.behavior_output = bool(args.behavior_shard)
         loader.physics_overrides = SA.rigid_overrides(args)
@@ -1873,6 +1975,9 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         else:
             room_filter = lambda: make_obstacle_filter(task_bounds(env.scene, loader.rooms) if loader.rooms else None, robot,  # noqa: E731
                                                        [o.name for o in tracked.values()])
+            if loader.pool_consumers is not None:
+                native_room_filter = room_filter
+                room_filter = lambda: loader.pool_consumers.obstacle_filter(native_room_filter())
             planner_kw = executor_mesh_cache_kw(robot, room_filter)
             if fast_on("PLAN_LADDER"):
                 # 2026-10-31 train-fast (PLAN_LADDER): fewer trajopt seeds per attempt (cuRobo default 4); a plan costs ~37 s on a TITAN RTX
@@ -1886,8 +1991,12 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             meta["executor_mesh_cache"] = int(backend.mesh_cache_size)
         bounds = task_bounds(env.scene, loader.rooms) if loader.rooms else None
         backend.obstacle_filter = make_obstacle_filter(bounds, robot, [o.name for o in tracked.values()])
+        if loader.pool_consumers is not None:
+            backend.obstacle_filter = loader.pool_consumers.obstacle_filter(backend.obstacle_filter)
         # load the collision world *before* attaching the held objects (their meshes must be known to be disabled)
         backend.update_world()
+        if loader.pool_consumers is not None:
+            loader.pool_consumers.observe_planner(backend)
         mcfg = MotionsConfig()
         if fast_on("PLAN_LADDER"):
             # 2026-10-31 train-fast (PLAN_LADDER): a shorter ladder in arm_to - attempts per round (4 -> 2), retry rounds to a witness (4 -> 1)
@@ -1934,7 +2043,13 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                                  external_camera=EXTERNAL_CAMERA_NAME if loader.external_camera else None,
                                  behavior_shard=args.behavior_shard, behavior_task=meta.get("variant") or loader.activity)
         recorder = Recorder(out_dir, env, robot, cam_key, tracked, fps=int(loader.cfg["env"]["action_frequency"]), cfg=rec_cfg,
-                            task_name=loader.activity.replace("_", " "), instance_id=iid)
+                            task_name=loader.activity.replace("_", " "), instance_id=iid,
+                            pool_consumers=loader.pool_consumers)
+        if loader.pool_consumers is not None:
+            loader.pool_consumers.prepare_recording(build_env_config(
+                loader.template_dir, loader.tmeta, loader.tro, loader.tro_path,
+                loader.activity, loader.did, loader.robot_name, loader.image_size,
+                behavior_output=loader.behavior_output, scene_crop=loader.scene_crop))
         if loader.scene_crop and hasattr(recorder, "scene_crop"):
             # 2026-11-01 train-fast (PARTIAL_SCENE): the hdf5 says its recorded scene file is the cropped world and where the full one is
             recorder.scene_crop = dict(loader.scene_crop)
@@ -1970,7 +2085,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             ex_cfg.brace_retry_aim_frac = float(os.environ["ISG_AIM_FRAC"])
         meta["rush_env"] = {k: v for k, v in os.environ.items() if k.startswith("ISG_")}
         executor = Executor(env, task, sidecar, recorder=recorder, motions=motions, monitors=monitors, cfg=ex_cfg, sim=og.sim, state=state,
-                            tracked_objects=tracked, cam_key=cam_key, task_variant=meta["variant"])
+                            tracked_objects=tracked, cam_key=cam_key, task_variant=meta["variant"],
+                            pool_consumers=loader.pool_consumers)
         meta["qa_task_variant"] = executor.task_variant
         executor.qa_program = qa_program
         executor.last_obs, executor.last_info = obs, info
@@ -1997,7 +2113,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         # the scene file start() saves must hold every object's state (BEHAVIOR's playback loads the scene from it); in queue
         # mode the previous instance left the per-step filter on
         executor.enable_recording_filter(False)
-        recorder.start(obs, info, state0=executor._dump_state(full=True))
+        recorder.start(obs, info, state0=executor.initial_recording_state())
         if rec_cfg.hdf5:
             executor.enable_recording_filter(True)
 
@@ -2091,6 +2207,8 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         meta["status"] = "error"
         meta["error"] = repr(e)
         meta["traceback"] = traceback.format_exc()
+        if locals().get("loader") is not None:
+            meta["loader"] = loader.report
         result.update({"status": "error", "success": False, "reason": "error", "error": repr(e)})
         traceback.print_exc()
         exit_code = EXIT_ERROR
@@ -2294,6 +2412,10 @@ def run_queue(args) -> int:
     instance. Returns 0 once ``--done-file`` exists and no ready instance is left unclaimed (or at ``--deadline`` /
     ``--max-instances``), :data:`EXIT_QUEUE_RESTART` when the next instance needs a world of its own, and the instance's
     exit code after an error (the world may be inconsistent)."""
+    from ispatialgym.oracle.pool_inputs import enabled as pool_enabled, run as run_pool
+
+    if pool_enabled(args):
+        return run_pool(sys.modules[__name__], args)
     claims = args.claims or os.path.join(os.path.dirname(os.path.abspath(args.queue.rstrip("/"))), "claims")
     os.makedirs(claims, exist_ok=True)
     shared: Dict[str, Any] = {}
@@ -2306,7 +2428,12 @@ def run_queue(args) -> int:
         image_size = int(args.image_size)
         if PO.trim() and image_size == DEFAULT_IMAGE_SIZE:
             image_size = int(fast_value("PHYSICS_ONLY_IMAGE_SIZE", 128))
-        pre = InstanceLoader(args.prebuild, robot_name=args.robot_name, image_size=image_size, head_aperture=args.head_aperture)
+        from ispatialgym.oracle.restoration_policy_inputs import from_arguments
+
+        pre_policy = from_arguments(args, args.prebuild,
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        pre = InstanceLoader(args.prebuild, robot_name=args.robot_name, image_size=image_size,
+                             head_aperture=args.head_aperture, restoration_policy=pre_policy)
         pre.external_camera = bool({"external", "tiled"} & set(args.record_view))
         pre.behavior_output = bool(args.behavior_shard)
         pre.build_env()

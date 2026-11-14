@@ -304,9 +304,11 @@ def reserve_unobserved_receipts(root, capacity):
     root = Path(root); observed = {row[6] for row in capacity['probe']['jobs']}
     paths = set()
     policy = coordinator.read(root/'infra/coordinator_dispatch/policy.json')
-    for reference in policy['prepared_manifests']:
+    for entry in policy.get('preparation_scope', {}).get('normalized_manifests', []):
+        reference = entry['manifest']
         coordinator.verify_ref(reference)
-        paths.update(Path(t['submission_path']) for t in coordinator.read(reference['path'])['tickets'])
+        paths.update(Path(t['submission_path']) for t in coordinator.read(reference['path'])['tickets']
+                     if t.get('workstream') == 'training preparation')
     returned = root/'vast/consumed_cluster_return'
     paths.update((returned/'submissions').glob('*.json'))
     paths.update(p for p in (returned/'submission_intents').glob('*.json')
@@ -395,7 +397,8 @@ def reconcile(root, account, capacity_probe=probe, runner=subprocess.run):
     root = Path(root); policy = coordinator.read(root/'infra/coordinator_dispatch/policy.json')
     require(policy.get('owner') == '/root' and policy.get('production_released') is False, 'Root policy differs')
     tickets = []
-    for reference in policy['prepared_manifests']:
+    for entry in policy.get('preparation_scope', {}).get('normalized_manifests', []):
+        reference = entry['manifest']
         coordinator.verify_ref(reference)
         tickets.extend({**ticket, '_prepared_manifest': reference} for ticket in coordinator.read(reference['path'])['tickets']
                        if ticket.get('workstream') == 'training preparation' and ticket.get('expected_account') == account)

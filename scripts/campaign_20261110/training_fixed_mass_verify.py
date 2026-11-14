@@ -7,7 +7,8 @@ from .training_restoration import checked
 from .training_fixed_mass_probe import DELTA, matches
 
 
-def audit_persistence(root, references, probe_ref, request, records, episodes, *, additional_reconstruction_reference=None):
+def audit_persistence(root, references, probe_ref, request, records, episodes, *, additional_reconstruction_reference=None,
+                      separate_reconstruction_lifecycle=False):
     probe = checked(root, probe_ref)
     directory = Path(probe_ref['path']).resolve().parent
     require(set(references) == {'audit', 'baseline'}, 'exact mass audit and baseline required')
@@ -72,6 +73,9 @@ def audit_persistence(root, references, probe_ref, request, records, episodes, *
             restores.append(pending_episode); pending_episode=None
     expected_ids = [checked(root, entry['report'])['instance_id'] for entry in probe['entries']]
     additional = 0
+    require(not separate_reconstruction_lifecycle or
+            (request.get('integrated_candidate_v1') is True and additional_reconstruction_reference is not None),
+            'separate lifecycle evidence requires a declared integrated reconstruction')
     if additional_reconstruction_reference is not None:
         from .training_late_rebuild_probe import DELTA as LATE_DELTA
         require(request.get('late_incoming_physics_rebuild_v1') is True and
@@ -94,9 +98,15 @@ def audit_persistence(root, references, probe_ref, request, records, episodes, *
                     lifecycle['time_step_settings_before'] == lifecycle['time_step_settings_after'],
                     'additional reconstruction physical persistence or no-step proof failed')
         additional = episodes
-    require(len(expected_ids) == episodes and restores == expected_ids and restarts == episodes-1+additional and
+    # The common candidate captures the reconstruction callback before the mass
+    # observer is installed. Its independent native audit above owns those
+    # lifecycle events; requiring duplicate mass-hook events invents missing work.
+    # This mode is explicit, and the caller still verifies the exact runtime proof.
+    mass_observed_additional = 0 if separate_reconstruction_lifecycle else additional
+    require(len(expected_ids) == episodes and restores == expected_ids and restarts == episodes-1+mass_observed_additional and
             not pending_restart and pending_episode is None, 'incomplete episode/reconstruction persistence matrix')
     return {'status':'verified','references':references,'actors':sorted(expected),
             'episodes':episodes,'initial_actor_reconstructions':1,'reused_actor_reconstructions':restarts,
             'additional_declared_reconstructions':additional,
+            'additional_lifecycle_evidence': 'separate_native_audit' if separate_reconstruction_lifecycle else 'mass_and_native_audits',
             'physics_steps_added':0,'production_released':False,'benchmark_credit':0}

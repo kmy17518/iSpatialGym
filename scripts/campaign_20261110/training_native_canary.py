@@ -53,6 +53,18 @@ def prepare(root, requests, index):
     return row,job,environment,decision,argv,output
 
 
+def verify_native_rooms(problem, job, config):
+    """Keep the exact candidate's complete room set, including multi-room doors."""
+    template = config['template']
+    expected = template.get('scene_setup', {}).get('task_rooms', [template['room']])
+    actual = problem.rooms(job['scene'])
+    require(template['scene'] == job['scene'] and template['room'] == job['room']
+            and isinstance(expected, list) and expected and len(expected) == len(set(expected))
+            and job['room'] in expected and len(actual) == len(set(actual))
+            and set(actual) == set(expected), 'native room binding differs from the exact candidate')
+    return list(actual)
+
+
 def run(root, requests, index, *, preflight=False):
     row,job,environment,decision,argv,output=prepare(root,requests,index)
     # Parsing the real native declaration catches role/name/BDDL errors before
@@ -66,12 +78,14 @@ def run(root, requests, index, *, preflight=False):
     args=SimpleNamespace(seed=int(argv[argv.index('--seed')+1]),seed_index=0,seed_split=None,
         scene=job['scene'],room=argv[argv.index('--room')+1] if '--room' in argv else None,scene_from_split=False)
     variant_split(args,gp)
-    require(gp.rooms(job['scene'])==[job['room']], 'native room binding differs from the exact candidate')
+    require(file_digest(row['config_path']) == row['config_sha256'], 'native configuration changed during declaration parsing')
+    native_rooms = verify_native_rooms(gp, job, json.loads(Path(row['config_path']).read_text()))
     campaign_runtime.configuration()
     proof={'campaign_id':'campaign_20261110','candidate_id':row['candidate_id'],'request_sha256':file_digest(requests),
            'config_sha256':row['config_sha256'],'gate':decision,'argv':argv,'native_runtime':row['native_runtime'],
            'created_at':dt.datetime.now(dt.timezone.utc).isoformat(),'slurm_job_id':os.environ.get('SLURM_JOB_ID'),
-           'cpu_affinity':sorted(os.sched_getaffinity(0)),'production_released':False,'eligible_accepted':0}
+           'cpu_affinity':sorted(os.sched_getaffinity(0)),'native_task_rooms':native_rooms,
+           'production_released':False,'eligible_accepted':0}
     if preflight:
         proof['native_declaration_parsed']=True
         write_json_atomic(Path(row['config_path']).parent/'preflight.json',proof)

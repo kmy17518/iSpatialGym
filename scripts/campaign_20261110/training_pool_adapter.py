@@ -8,7 +8,7 @@ import copy
 from pathlib import Path
 
 from .contracts import require, file_digest
-from .training_pool_world import cold_anchor_transform, isolated_member_scene, verify_pool_isolation
+from .training_pool_world import cold_anchor_transform, isolated_member_scene, verify_pool_isolation, active_actor_names
 
 
 def source_member(contract, tro_path):
@@ -103,12 +103,13 @@ def active_export(scene_document, pool_names, active_name):
     from ispatialgym.sampling.model_pool import active_scene
     document = copy.deepcopy(scene_document)
     meta = document.get('metadata', {}).get('ispatialgym', {}).get('model_pool')
-    require(meta is not None and active_name in meta.get('active_properties', {}),
+    active = active_actor_names(active_name)
+    require(meta is not None and set(active) <= set(meta.get('active_properties', {})),
             'pool export lacks measured active properties')
-    meta['active_names'] = [active_name]
-    meta['active_properties'] = {active_name: meta['active_properties'][active_name]}
-    meta['inactive_omitted'] = len(pool_names) - 1
-    return active_scene(document, pool_names, [active_name])
+    meta['active_names'] = list(active)
+    meta['active_properties'] = {name: meta['active_properties'][name] for name in active}
+    meta['inactive_omitted'] = len(pool_names) - len(active)
+    return active_scene(document, pool_names, active)
 
 
 def anchor_for_member(baseline, incoming_spawn):

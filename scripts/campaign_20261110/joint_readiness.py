@@ -33,16 +33,22 @@ def project(root, flow, now):
     if not path.exists():
         return {'status': 'unavailable', 'observed_at': now, 'common_finish_range': None,
                 'preparation_extra_delay_seconds': None}
-    spec = read(path); errors = []; samples = []; keys = set()
+    spec = read(path); errors = []; samples = []; keys = set(); families = []
     for wave in spec['preparation_waves']:
+        family_keys = set(); family_samples = []
         chunks = checked(wave['index'])['chunks'] if 'index' in wave else [{'manifest': wave['manifest']}]
         for chunk in chunks:
-            keys.update(t['physical_dedup_key'] for t in checked(chunk['manifest'])['jobs'])
+            family_keys.update(t['physical_dedup_key'] for t in checked(chunk['manifest'])['jobs'])
+        family_keys -= keys
+        keys.update(family_keys)
         for status in Path(wave['reader_directory']).glob(wave.get('reader_glob', '*/status.json')):
             for row in read(status).get('rows', []):
                 elapsed = row.get('builder_elapsed_seconds')
                 if row.get('status') in ('verified_positive', 'verified_zero') and isinstance(elapsed, (int, float)) and elapsed > 0:
                     samples.append(elapsed)
+                    family_samples.append(elapsed)
+        families.append({'label': wave.get('label', wave['reader_directory']), 'keys': family_keys,
+                         'samples': family_samples})
     items = {r['physical_dedup_key']: r for r in flow.get('items', []) if r['physical_dedup_key'] in keys}
     missing = keys-items.keys()
     if missing:
@@ -67,7 +73,21 @@ def project(root, flow, now):
     other_current = max(0, all_current-current)
     desired = int(spec['desired_preparation_gpus'])
     desired_maps = min(max(0, desired-other_current), len(remaining))
-    conditional = [{'useful_gpus': c, 'known_wave_finish_range': forecast(len(remaining), samples, c, now)}
+    remaining_keys = {r['physical_dedup_key'] for r in remaining}
+    family_reports = []
+    for family in families:
+        count = len(family['keys'] & remaining_keys); timings = family['samples']
+        work = ([count*quantile(timings, q)/3600 for q in (.5, .9)] if timings else
+                [0, 0] if count == 0 else None)
+        family_reports.append({'label': family['label'], 'physical_jobs': len(family['keys']),
+                               'remaining_gpu_jobs': count, 'timing_sample_count': len(timings),
+                               'native_seconds_p50': quantile(timings, .5) if timings else None,
+                               'native_seconds_p90': quantile(timings, .9) if timings else None,
+                               'remaining_native_gpu_hours_range': work})
+    work_known = all(row['remaining_native_gpu_hours_range'] is not None for row in family_reports) and not missing
+    work = [sum(row['remaining_native_gpu_hours_range'][i] for row in family_reports) for i in (0, 1)] if work_known else None
+    conditional = [{'useful_gpus': c, 'known_wave_finish_range':
+                    [now+work[i]*3600/c+delay for i, delay in enumerate((600, 1200))] if work is not None else None}
                    for c in sorted({c for c in (current, min(100, len(remaining)), desired_maps) if c > 0})]
     streams = spec['streams']
     ranges = [r.get('finish_range') for r in streams]
@@ -93,9 +113,10 @@ def project(root, flow, now):
                            'failed_needing_diagnosis': failed, 'timing_sample_count': len(samples),
                            'native_seconds_p50': quantile(samples, .5) if samples else None,
                            'native_seconds_p90': quantile(samples, .9) if samples else None,
-                           'remaining_native_gpu_hours_range': [len(remaining)*quantile(samples,q)/3600 for q in (.5,.9)] if samples else None,
+                           'remaining_native_gpu_hours_range': work,
+                           'families': family_reports, 'pooled_quantiles_are_summary_only': True,
                            'conditional_finish_ranges': conditional,
-                           'assumption': 'Measured native p50-p90 planning scenarios plus10-20minutes for startup/transfer/verification. Not a confidence interval or full preparation ETA; failed items require repair.'},
+                           'assumption': 'Sum of separately measured family native p50-p90 work, shared useful GPU allocation, plus10-20minutes startup/transfer/verification. Missing family timings keep combined forecast unknown. Not a confidence interval or full preparation ETA; failed items require repair.'},
             'capacity': {'desired_preparation_gpus': desired, 'cluster_running_wave_jobs': cluster_running,
                          'vast_heartbeat_running_wave_jobs': len(vast_running), 'current_executing_wave_jobs': current,
                          'current_executing_preparation_jobs': all_current,

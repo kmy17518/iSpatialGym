@@ -4,6 +4,7 @@ The Vast coordinator alone tombstones queued ownership. Root account clients
 only submit after that durable acknowledgement; ambiguous intents are retained.
 """
 import argparse
+import bisect
 from contextlib import contextmanager
 import fcntl
 import getpass
@@ -61,27 +62,30 @@ def allocation_lock(root):
         yield
 
 
-def resolve_ticket(root, reference, index, account, *, verify_inputs=True):
-    policy = read(Path(root)/'infra/coordinator_dispatch/policy.json')
+def resolve_ticket(root, reference, index, account, *, verify_inputs=True, cache=None):
+    policy = cache.policy if cache is not None else read(Path(root)/'infra/coordinator_dispatch/policy.json')
+    pinned = cache.checked if cache is not None else checked
     require(reference in policy['prepared_manifests'], 'Route is not admitted')
-    ticket = checked(reference)['tickets'][index]
+    ticket = pinned(reference)['tickets'][index]
     require(ticket['expected_account'] == account and ticket['consumer_kind'] == 'tabletop'
             and ticket['computation_kind'] == 'reach_map' and ticket['production_released'] is False,
             'Only admitted consumed tabletop maps may return')
-    scope = policy['preparation_scope']; contract = checked(scope['policy_ref'])
+    scope = policy['preparation_scope']; contract = pinned(scope['policy_ref'])
     link = next((v for v in scope['normalized_manifests'] if v['manifest'] == reference), None)
     require(link is not None, 'Missing exact normalized source')
     source = next((v for v in contract['approved_manifests'] if v['manifest'] == link['source_manifest']), None)
     require(source is not None and source['account'] == account and source['consumer_kind'] == 'tabletop',
             'Source account or consumed scope differs')
-    original = checked(link['source_manifest'])
+    original = pinned(link['source_manifest'])
     key = ticket['physical_dedup_key']
     require(key == ticket['dedup_key'] and any(e['physical_dedup_key'] == key for e in original['jobs']), 'Physical source differs')
     for field, namespace in [('claim_path','claim_namespace'),('submission_path','receipt_namespace')]:
         require(Path(ticket[field]).parent == Path(source[namespace]) and Path(ticket[field]).name == key+'.json', 'Shared ownership path differs')
     require(ticket['command'][0] == 'sbatch' and ticket['hard_time_seconds'] <= 1800, 'Unexpected map launch')
     if verify_inputs:
-        for path,digest in ticket['inputs'].items(): require(sha(path) == digest, 'Pinned cluster input changed: '+path)
+        for path,digest in ticket['inputs'].items():
+            if cache is None: require(sha(path) == digest, 'Pinned cluster input changed: '+path)
+            else: cache.verify({'path':path,'sha256':digest})
     output = Path(ticket['output'])
     owned = Path(root) if account == 'minyeong' else Path('/vision/u/shiyuc/minyeong')/Path(root).name
     require(output.is_relative_to(owned) and not any((output/n).exists() for n in ('started.json','terminal.json')),
@@ -200,31 +204,83 @@ def probe():
     return observed_capacity()
 
 
+class ClientInputs:
+    """One-call cache for hash-bound immutable inputs, never mutable receipts."""
+    def __init__(self, root):
+        self.policy = read(Path(root)/'infra/coordinator_dispatch/policy.json')
+        self.verified = set(); self.values = {}
+
+    def verify(self, reference):
+        path = reference['path']; expected = reference['sha256']
+        key = (path, expected)
+        if key not in self.verified:
+            payload = Path(path).read_bytes()
+            require(hashlib.sha256(payload).hexdigest() == expected, 'Immutable input changed: '+path)
+            # Retain identities, not potentially large native binary inputs.
+            self.verified.add(key)
+
+    def checked(self, reference):
+        key = (reference['path'], reference['sha256'])
+        if key not in self.values:
+            payload = Path(reference['path']).read_bytes()
+            require(hashlib.sha256(payload).hexdigest() == reference['sha256'],
+                    'Immutable input changed: '+reference['path'])
+            self.values[key] = json.loads(payload); self.verified.add(key)
+        return self.values[key]
+
+
+def scan_order(keys, cursor):
+    keys = sorted(keys); at = bisect.bisect_right(keys, cursor or '')
+    return keys[at:]+keys[:at]
+
+
+def fresh_capacity(root, capacity_probe, helper):
+    cap = helper.probe() if capacity_probe is probe and helper is not None else capacity_probe()
+    require(cap.get('status') == 'observed' and 0 <= time.time()-cap['observed_at'] <= 60,
+            'Fresh cluster capacity unavailable')
+    if helper is not None:helper.reserve_unobserved_receipts(root, cap)
+    require(0 <= time.time()-cap['observed_at'] <= 60, 'Capacity expired while reserving receipts')
+    return cap
+
+
+def preparation_slots(cap):
+    return max(0, cap['preparation_slots'] if 'preparation_slots' in cap else cap['compatible_available_slots']-4)
+
+
 def select(root, capacity_probe=probe):
-    root=Path(root);report={'requested':[],'errors':[]};began=time.monotonic()
+    root=Path(root);report={'requested':[],'errors':[],'scanned':0};started=time.monotonic()
+    cursor_path=base(root)/'select_cursor.json'
     with allocation_lock(root):
-        capacity=capacity_probe();now=time.time()
-        if capacity.get('status')!='observed' or not 0<=now-capacity['observed_at']<=60:return {'blocked':'Fresh cluster capacity unavailable'}
+        cache=ClientInputs(root);policy=cache.policy;routes={}
+        # Only the admitted consumed-preparation namespace may be traversed.
+        for link in policy['preparation_scope']['normalized_manifests']:
+            manifest=link['manifest']
+            require(manifest in policy['prepared_manifests'],'Normalized route is not admitted')
+            for i,t in enumerate(cache.checked(manifest)['tickets']):
+                if (t.get('workstream')=='training preparation' and t.get('consumer_kind')=='tabletop'
+                        and t.get('computation_kind')=='reach_map'):
+                    routes.setdefault(t['physical_dedup_key'],[]).append((manifest,i,t))
         helper=client_route_helper()
-        if helper is not None:
-            helper.reserve_unobserved_receipts(root,capacity)
-            capacity=helper.build_capacity(capacity['probe'],reservations=capacity.get('_reservations',[]))
-        outstanding=outstanding_claims(root);pending={}
+        try:
+            capacity=fresh_capacity(root,capacity_probe,helper)
+            if helper is not None:capacity=helper.build_capacity(capacity['probe'],reservations=capacity.get('_reservations',[]))
+        except (OSError,ValueError,KeyError,subprocess.SubprocessError) as error:
+            report['errors'].append({'owner':'/root','stage':'capacity_probe','error':str(error)})
+            report['blocked']='Fresh cluster capacity unavailable'
+            report['observed_at']=time.time();write(base(root)/'select_status.json',report);return report
+        now=time.time();outstanding=outstanding_claims(root);pending={}
         for p in (base(root)/'requests').glob('*.json'):
             if not(base(root)/'acknowledgements'/p.name).exists() and not(base(root)/'rejected'/p.name).exists():
                 r=read(p)
                 if r['expires_at']>=now:pending[r['job_id']]=r['account']
-        reserved={**outstanding,**pending};slots=max(0,capacity.get('preparation_slots',capacity['compatible_available_slots']-4))
+        reserved={**outstanding,**pending};slots=preparation_slots(capacity)
         available=max(0,slots-len(reserved));accounts={a:max(0,n-sum(x==a for x in reserved.values()))for a,n in capacity['account_slots'].items()}
-        if not available:return {'blocked':'No preparation capacity after four critical GPUs and prior returns','capacity':capacity}
-        policy=read(root/'infra/coordinator_dispatch/policy.json');routes={}
-        for manifest in policy['prepared_manifests']:
-            for i,t in enumerate(checked(manifest)['tickets']):
-                if t.get('consumer_kind')=='tabletop' and t.get('computation_kind')=='reach_map':routes.setdefault(t['physical_dedup_key'],[]).append((manifest,i,t))
-        chosen=[];seen=set()
-        for alternatives in routes.values():
+        cursor=read(cursor_path).get('after','') if cursor_path.exists() else ''
+        chosen=[];seen=set();began=time.monotonic()
+        for key in scan_order(routes,cursor):
             if len(chosen)>=min(available,128) or time.monotonic()-began>12:break
-            for manifest,index,ticket in sorted(alternatives,key=lambda v:-accounts.get(v[2]['expected_account'],0)):
+            cursor=key;report['scanned']+=1
+            for manifest,index,ticket in sorted(routes[key],key=lambda v:-accounts.get(v[2]['expected_account'],0)):
                 account=ticket['expected_account'];receipt_path=Path(ticket['submission_path'])
                 if accounts.get(account,0)<=0 or not receipt_path.exists():continue
                 receipt=read(receipt_path);jid=str(receipt.get('job_id',''))
@@ -234,12 +290,15 @@ def select(root, capacity_probe=probe):
                 job=read(state_path)
                 if job.get('status')!='queued' or job.get('tries') or job.get('instance') or job.get('history'):continue
                 try:
-                    resolve_ticket(root,manifest,index,account)
+                    resolve_ticket(root,manifest,index,account,cache=cache)
                     request={'schema':SCHEMA,'campaign_id':root.name,'job_id':jid,'account':account,'observed_at':now,'expires_at':now+180,
                              'manifest':manifest,'ticket_index':index,'prior_receipt':ref(receipt_path),
                              'queue':ref(root/'vast/queue'/(jid+'.json')),'native_inputs':ref(Path(job['job_dir'])/'native_inputs.json')}
                     chosen.append(request);seen.add(jid);accounts[account]-=1;break
                 except (OSError,ValueError,KeyError)as error:report['errors'].append({'job_id':jid,'error':str(error)})
+        write(cursor_path,{'after':cursor,'observed_at':time.time()})
+        if chosen and not 0 <= time.time()-capacity['observed_at'] <= 60:
+            report['blocked']='Capacity expired during selection; no requests published';chosen=[]
         if chosen:
             stamp=str(time.time_ns());p=base(root)/'capacity'/(stamp+'.json')
             write(p,{'observed_at':capacity['observed_at'],'preparation_slots':slots,'critical_reserved_physical_slots':4,
@@ -247,39 +306,47 @@ def select(root, capacity_probe=probe):
                      'critical_titan_slots_actually_held':capacity.get('critical_titan_slots_actually_held'),
                      'account_slots':capacity['account_slots'],'selected_job_ids':[r['job_id']for r in chosen],
                      'selected_accounts':{r['job_id']:r['account']for r in chosen},'observation':capacity})
-            for r in chosen:r['capacity']=ref(p);write(base(root)/'requests'/(r['job_id']+'_'+stamp+'.json'),r)
+            capacity_ref=ref(p)
+            for r in chosen:r['capacity']=capacity_ref;write(base(root)/'requests'/(r['job_id']+'_'+stamp+'.json'),r)
             report['requested']=[r['job_id']for r in chosen]
-    report['observed_at']=time.time();write(base(root)/'select_status.json',report);return report
+        if not available:report['blocked']='No preparation capacity after four critical GPUs and prior returns'
+    report.update(observed_at=time.time(),elapsed_seconds=time.monotonic()-started)
+    write(base(root)/'select_status.json',report);return report
 
 
 def submit(root, account, capacity_probe=probe, runner=subprocess.run):
-    root=Path(root);report={'submitted':[],'errors':[],'preserved_intents':[]};began=time.monotonic();route_submissions=[]
-    for path in sorted((base(root)/'acknowledgements').glob('*.json')):
-        if time.monotonic()-began>12:break
-        ack=read(path)
-        if ack['account']!=account:continue
-        current=read(ack['submission_path'])
-        if current.get('backend')=='cluster' and current.get('previous_vast_job_id')==ack['job_id']:continue
-        intent=base(root)/'submission_intents'/path.name
-        if intent.exists():report['preserved_intents'].append(str(intent));continue
-        try:
-            ticket=resolve_ticket(root,ack['manifest'],ack['ticket_index'],account)
-            checked(ack['request']);checked(ack['prior_receipt'])
-            job=read(root/'vast/state/jobs'/(ack['job_id']+'.json'))
-            require(job['status']=='cluster_reserved' and job['consumed_cluster_return']['request']==ack['request'],'Sole coordinator acknowledgement differs')
-            with allocation_lock(root):
-                cap=capacity_probe()
-                if cap.get('status')!='observed' or not 0<=time.time()-cap['observed_at']<=60 or min(cap['account_slots'].get(account,0),cap.get('preparation_slots',cap['compatible_available_slots']-4))<=0:continue
-                routes=client_route_helper()
-                if routes is not None:
-                    routes.reserve_unobserved_receipts(root,cap)
-                    observed={row[6]for row in cap['probe']['jobs']}
-                    already=set(cap.get('unobserved_route_receipts',[]))
-                    cap.setdefault('_reservations',[]).extend(value['route']for value in route_submissions if value['job_id']not in observed|already)
-                routing=routes.route_ticket(ticket,cap,account)if routes is not None else None
-                if routes is not None and routing is None:continue
+    root=Path(root);report={'submitted':[],'errors':[],'preserved_intents':[],'scanned':0,'capacity_probes':0}
+    started=time.monotonic();cursor_path=base(root)/('submit_'+account+'_cursor.json')
+    # The observation and all local reservations stay under the same existing
+    # lock. Other account clients cannot spend the same physical observation.
+    with allocation_lock(root):
+        cache=ClientInputs(root);helper=client_route_helper();cap=None;began=time.monotonic()
+        cursor=read(cursor_path).get('after','') if cursor_path.exists() else ''
+        paths={p.name:p for p in (base(root)/'acknowledgements').glob('*.json')}
+        for name in scan_order(paths,cursor):
+            if len(report['submitted'])>=128 or time.monotonic()-began>12:break
+            cursor=name;report['scanned']+=1;path=paths[name]
+            ack=read(path)
+            if ack['account']!=account:continue
+            current=read(ack['submission_path'])
+            if current.get('backend')=='cluster' and current.get('previous_vast_job_id')==ack['job_id']:continue
+            intent=base(root)/'submission_intents'/path.name
+            if intent.exists():report['preserved_intents'].append(str(intent));continue
+            try:
+                ticket=resolve_ticket(root,ack['manifest'],ack['ticket_index'],account,cache=cache)
+                cache.checked(ack['request']);cache.checked(ack['prior_receipt'])
+                job=read(root/'vast/state/jobs'/(ack['job_id']+'.json'))
+                require(job['status']=='cluster_reserved' and job['consumed_cluster_return']['request']==ack['request'],'Sole coordinator acknowledgement differs')
+                if cap is None or not 0<=time.time()-cap['observed_at']<=60:
+                    cap=fresh_capacity(root,capacity_probe,helper);report['capacity_probes']+=1
+                    # Setup/probe/history reconciliation is not the useful-work budget.
+                    if report['capacity_probes']==1:began=time.monotonic()
+                if min(cap['account_slots'].get(account,0),preparation_slots(cap))<=0:break
+                routing=helper.route_ticket(ticket,cap,account)if helper is not None else None
+                if helper is not None and routing is None:continue
                 command=routing['command']if routing is not None else ticket['command']
-                value={'at':time.time(),'account':account,'acknowledgement':ref(path),'previous_vast_job_id':ack['job_id'],
+                acknowledgement=ref(path)
+                value={'at':time.time(),'account':account,'acknowledgement':acknowledgement,'previous_vast_job_id':ack['job_id'],
                        'prepared_command':ticket['command'],'command':command,'preparation_route':routing,'status':'submitting'}
                 intent.parent.mkdir(parents=True,exist_ok=True)
                 if intent.parent.stat().st_uid==os.geteuid():intent.parent.chmod(0o2770)
@@ -290,16 +357,23 @@ def submit(root, account, capacity_probe=probe, runner=subprocess.run):
                 require(result.returncode==0,'Cluster submission failed; preserve intent')
                 jid=result.stdout.strip().split(';')[0];require(jid.isdigit(),'Unknown scheduler acknowledgement; preserve intent')
                 receipt={**current,'backend':'cluster','account':account,'job_id':jid,'status':'submitted','submitted_at':time.time(),
-                         'previous_vast_job_id':ack['job_id'],'previous_vast_receipt':current,'return_acknowledgement':ref(path),
+                         'previous_vast_job_id':ack['job_id'],'previous_vast_receipt':current,'return_acknowledgement':acknowledgement,
                          'prepared':ticket['request'],'output':ticket['output'],'prepared_command':ticket['command'],
                          'command':command,'preparation_route':routing}
                 write(ack['submission_path'],receipt);write(base(root)/'submissions'/path.name,receipt)
                 report['submitted'].append({'job_id':jid,'previous_vast_job_id':ack['job_id'],'account':account})
-                if routing is not None:route_submissions.append({'job_id':jid,'route':routing['route']})
-        except (OSError,ValueError,KeyError,subprocess.SubprocessError)as error:
-            report['errors'].append({'ack':str(path),'error':str(error)})
-            if os.environ.get('ISG_CONSUMED_RETURN_ROUTE_HELPER')and intent.exists():break
-    report['observed_at']=time.time();write(base(root)/('submit_'+account+'_status.json'),report);return report
+                if routing is not None:cap.setdefault('_reservations',[]).append(routing['route'])
+                else:
+                    cap['account_slots'][account]-=1
+                    cap['preparation_slots']=max(0,preparation_slots(cap)-1)
+            except (OSError,ValueError,KeyError,subprocess.SubprocessError)as error:
+                report['errors'].append({'ack':str(path),'error':str(error)})
+                # Any uncertain external effect ends the batch, with its durable
+                # intent left intact for explicit reconciliation, never retry.
+                if intent.exists():break
+        write(cursor_path,{'after':cursor,'observed_at':time.time()})
+    report.update(observed_at=time.time(),elapsed_seconds=time.monotonic()-started)
+    write(base(root)/('submit_'+account+'_status.json'),report);return report
 
 
 def main():

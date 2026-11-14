@@ -139,7 +139,8 @@ def test_existing_claim_and_durable_intent_prevent_duplicate_routed_submission(t
     d = tmp_path/'infra/coordinator_dispatch'; d.mkdir(parents=True); (d/'capacity_allocation.lock').touch()
     row = ticket(tmp_path); manifest = tmp_path/'tickets.json'; manifest.write_text(json.dumps({'tickets': [row]}))
     (d/'policy.json').write_text(json.dumps({'owner': '/root', 'production_released': False,
-        'prepared_manifests': [{'path': str(manifest), 'sha256': coordinator.sha(manifest)}]}))
+        'prepared_manifests': [{'path': str(manifest), 'sha256': coordinator.sha(manifest)}],
+        'preparation_scope': {'normalized_manifests': [{'manifest': {'path': str(manifest), 'sha256': coordinator.sha(manifest)}}]}}))
     monkeypatch.setattr(coordinator, 'authorize_preparation', lambda t, p: {'verified': True})
     calls = []
     def interrupted(argv, **kwargs):
@@ -160,7 +161,8 @@ def test_changed_native_input_fails_before_any_claim(tmp_path, monkeypatch):
     row = ticket(tmp_path); Path(row['command'][-2]).write_text('changed')
     manifest = tmp_path/'tickets.json'; manifest.write_text(json.dumps({'tickets': [row]}))
     (d/'policy.json').write_text(json.dumps({'owner': '/root', 'production_released': False,
-        'prepared_manifests': [{'path': str(manifest), 'sha256': coordinator.sha(manifest)}]}))
+        'prepared_manifests': [{'path': str(manifest), 'sha256': coordinator.sha(manifest)}],
+        'preparation_scope': {'normalized_manifests': [{'manifest': {'path': str(manifest), 'sha256': coordinator.sha(manifest)}}]}}))
     monkeypatch.setattr(coordinator, 'authorize_preparation', lambda t, p: {'verified': True})
     result = routes.reconcile(tmp_path, 'minyeong', capacity, lambda *a, **k: pytest.fail('must not submit'))
     assert result['errors'] and not Path(row['claim_path']).exists()
@@ -181,7 +183,8 @@ def test_unobserved_receipts_reserve_until_terminal_accounting(tmp_path, monkeyp
     from scripts.campaign_20261110 import coordinator_dispatch as coordinator
     d = tmp_path/'infra/coordinator_dispatch'; d.mkdir(parents=True)
     row = ticket(tmp_path); manifest = tmp_path/'tickets.json'; manifest.write_text(json.dumps({'tickets': [row]}))
-    (d/'policy.json').write_text(json.dumps({'prepared_manifests': [{'path': str(manifest), 'sha256': coordinator.sha(manifest)}]}))
+    (d/'policy.json').write_text(json.dumps({'prepared_manifests': [{'path': str(manifest), 'sha256': coordinator.sha(manifest)}],
+        'preparation_scope': {'normalized_manifests': [{'manifest': {'path': str(manifest), 'sha256': coordinator.sha(manifest)}}]}}))
     routing = routes.route_ticket(row, capacity(), 'minyeong', now=1000)
     Path(row['submission_path']).write_text(json.dumps({'job_id': '123', 'preparation_route': routing}))
     monkeypatch.setattr(routes.subprocess, 'run', lambda *a, **k: SimpleNamespace(stdout=''))
@@ -200,3 +203,24 @@ def test_unavailable_capacity_is_explicit_owned_error_even_without_tickets(tmp_p
     assert result['status'] == 'blocked_capacity_unknown'
     assert result['errors'] == [{'owner': '/root', 'stage': 'capacity_probe', 'error': 'sacctmgr unavailable', 'capacity_status': 'unavailable'}]
     assert not result['submitted']
+
+
+def test_private_unroutable_receipt_is_never_statted(tmp_path, monkeypatch):
+    from scripts.campaign_20261110 import coordinator_dispatch as coordinator
+    d = tmp_path/'infra/coordinator_dispatch'; d.mkdir(parents=True)
+    private = tmp_path/'retired_private/submission.json'
+    row = ticket(tmp_path)
+    admitted = tmp_path/'admitted.json'; admitted.write_text(json.dumps({'tickets': [row,
+        {'workstream': 'pipeline', 'submission_path': str(private)}]}))
+    retired = tmp_path/'retired.json'; retired.write_text(json.dumps({'tickets': [
+        {'workstream': 'training preparation', 'submission_path': str(private)}]}))
+    aref = {'path': str(admitted), 'sha256': coordinator.sha(admitted)}
+    (d/'policy.json').write_text(json.dumps({'prepared_manifests': [aref,
+        {'path': str(retired), 'sha256': coordinator.sha(retired)}],
+        'preparation_scope': {'normalized_manifests': [{'manifest': aref}]}}))
+    original = Path.stat
+    def checked_stat(path, *args, **kwargs):
+        if path == private: pytest.fail('unroutable private receipt must not even be statted')
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'stat', checked_stat)
+    assert routes.reserve_unobserved_receipts(tmp_path, capacity())['_reservations'] == []

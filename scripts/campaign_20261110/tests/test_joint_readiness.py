@@ -1,5 +1,6 @@
 import hashlib
 import json
+import pytest
 from scripts.campaign_20261110.joint_readiness import forecast, project
 
 
@@ -75,3 +76,17 @@ def test_incremental_manifest_and_stale_vast_are_explicit(tmp_path):
     assert value['capacity']['vast_observation_current'] is False
     assert value['capacity']['vast_provider_gpus'] is None
     assert value['capacity']['current_executing_preparation_jobs']==1
+    assert value['known_wave']['remaining_native_gpu_hours_range'] is None
+
+
+def test_separate_families_do_not_borrow_fast_map_timing(tmp_path):
+    spec,flow=setup(tmp_path)
+    extra=put(tmp_path/'slow.json',{'jobs':[{'physical_dedup_key':'slow'}]})
+    put(tmp_path/'slow_reader/status.json',{'rows':[{'status':'verified_positive','builder_elapsed_seconds':1200}]})
+    spec['preparation_waves'].append({'manifest':extra,'reader_directory':str(tmp_path/'slow_reader'),
+                                      'reader_glob':'status.json','label':'specialized'})
+    put(tmp_path/'infra/coordination/joint_schedule_inputs.json',spec)
+    flow['items'].append({'physical_dedup_key':'slow','backend':'cluster','execution_state':'PENDING'})
+    value=project(tmp_path,flow,1000)
+    assert value['known_wave']['remaining_native_gpu_hours_range']==pytest.approx([.4,.4])
+    assert value['known_wave']['families'][1]['native_seconds_p50']==1200

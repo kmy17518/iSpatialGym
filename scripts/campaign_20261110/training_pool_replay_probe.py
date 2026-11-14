@@ -10,6 +10,7 @@ from pathlib import Path
 import sys
 
 from .contracts import require, file_digest, write_json_atomic
+from .training_pool_world import active_actor_names
 
 SCHEMA = 'isg-pool-native-action-replay-runtime-v1'
 PARENT_COMMIT = 'a05963e4342e024e8da58dc57011637b8a24b9ef'
@@ -71,7 +72,7 @@ def install_planner(runner, initialized, current, observe):
     original_filter = runner.make_obstacle_filter
     original_update = runner.R1ProCuRobo.update_world
     def filtered(*args, **kwargs):
-        return excluding_inactive(original_filter(*args, **kwargs), initialized, {current['active']})
+        return excluding_inactive(original_filter(*args, **kwargs), initialized, active_actor_names(current['active']))
     def updated(backend, *args, **kwargs):
         result = original_update(backend, *args, **kwargs)
         if current.get('planner_observed') is not True:
@@ -93,26 +94,34 @@ def run(root, request_path, output):
     from .training_pool_adapter import source_member
     root = Path(root).resolve(); output = Path(output).resolve()
     require(output.is_relative_to(root) and not output.exists(), 'pool replay output must be new and private')
-    request, records = inputs(root, request_path)
-    source, contract = pool.verify_inputs(root, request, records)
     runtime = Path(__file__).resolve().parents[2]
-    require(file_digest(runtime/'.snapshot_commit') == request['probe_runtime_sha256'], 'pool replay runtime changed')
-    pool.verify_runtime(root, request, records, runtime)
-    operation_request = request
-    if request.get('integrated_candidate_v1') is True:
-        from .training_integrated_runtime import source_request
-        operation_request, _ = source_request(root, request)
-    action_request = operation_request
-    recovery = None
-    recording = None
-    if request.get('pool_active_recording_v1') is True:
+    multi_active = json.loads(Path(request_path).read_text()).get('multi_active_replay_v1') is True
+    if multi_active:
+        from .training_multi_active_replay import inputs as multi_inputs
+        request, records, source, contract = multi_inputs(root, request_path, runtime)
+        action_request = request
         from . import training_pool_recording_probe as recording
-        action_request = recording.parent_request(operation_request,
-            json.loads(Path(operation_request['runtime_compatibility']['path']).read_text()))
-    if request.get('pool_recovery_v1') is True:
-        from . import training_pool_recovery_probe as recovery
-        action_request = recovery.parent_request(operation_request,
-            json.loads(Path(operation_request['runtime_compatibility']['path']).read_text()))
+        recovery = None
+    else:
+        request, records = inputs(root, request_path)
+        source, contract = pool.verify_inputs(root, request, records)
+        require(file_digest(runtime/'.snapshot_commit') == request['probe_runtime_sha256'], 'pool replay runtime changed')
+        pool.verify_runtime(root, request, records, runtime)
+        operation_request = request
+        if request.get('integrated_candidate_v1') is True:
+            from .training_integrated_runtime import source_request
+            operation_request, _ = source_request(root, request)
+        action_request = operation_request
+        recovery = None
+        recording = None
+        if request.get('pool_active_recording_v1') is True:
+            from . import training_pool_recording_probe as recording
+            action_request = recording.parent_request(operation_request,
+                json.loads(Path(operation_request['runtime_compatibility']['path']).read_text()))
+        if request.get('pool_recovery_v1') is True:
+            from . import training_pool_recovery_probe as recovery
+            action_request = recovery.parent_request(operation_request,
+                json.loads(Path(operation_request['runtime_compatibility']['path']).read_text()))
     proof = json.loads(Path(action_request['runtime_compatibility']['path']).read_text())
     output.mkdir(parents=True)
     os.environ['ISPATIALGYM_TRAINING_OBSERVATION_REQUEST'] = str(Path(request_path).resolve())
@@ -120,7 +129,11 @@ def run(root, request_path, output):
     from ispatialgym.oracle import run_isg as runner
     import omnigibson as og
     native_build_config = runner.build_env_config
-    install_anchor(runner, contract, output, pool.install, load_request(action_request, proof))
+    if multi_active:
+        from .training_pool_native_anchor_probe import install_prepared
+        install_prepared(runner, contract, output, pool.install, action_request)
+    else:
+        install_anchor(runner, contract, output, pool.install, load_request(action_request, proof))
     current = {}; planner = []
     flush_recording = recording.install(runner, contract, current, output, native_build_config) if recording else None
     cleanups = []
@@ -151,22 +164,53 @@ def run(root, request_path, output):
             result['world_construction'] = construction
             for ordinal, index in enumerate(order):
                 row = records[index]; source_episode = source['episodes'][index]
+                if multi_active:
+                    from .training_multi_active_replay import authorize_member
+                    authorize_member(root, request, source_episode, row)
                 member = source_member(contract, row['artifacts']['tro']['path'])
                 current.clear(); current.update(active=member['active'], tro=row['artifacts']['tro'], ordinal=ordinal)
-                os.environ.update(source_episode['execution_environment'])
-                os.environ.update(request['source_environment_delta'])
+                environment_binding = None
+                if member.get('task_definition') is not None:
+                    from .training_pool_task import select_episode_environment
+                    environment_binding = select_episode_environment(os.environ,
+                        source_episode['execution_environment'], request['source_environment_delta'])
+                else:
+                    os.environ.update(source_episode['execution_environment'])
+                    os.environ.update(request['source_environment_delta'])
                 destination = output/('episode_'+str(ordinal))
                 argv = ['--instance', row['artifacts']['tro']['path'], '--mode', 'replay',
                         '--replay', row['artifacts']['demo']['path'], '--record', 'hdf5',
                         '--no-goal-override', '--out', str(destination)]
+                driver = None
+                if request.get('native_cli_driver_v1') is True:
+                    from .training_native_driver import (canary_driver, replay_arguments,
+                                                         apply_native_driver, verify_driver_report)
+                    driver_source, driver_original, driver_binding = canary_driver(root, request, index)
+                    argv = replay_arguments(driver_original, driver_source, destination)
+                    if multi_active:
+                        from .training_native_driver import apply_source_fast_settings
+                        fast_settings = apply_source_fast_settings(driver_original, request['source_environment_delta'])
+                args = runner.parse_args(argv)
+                if request.get('native_cli_driver_v1') is True:
+                    driver = apply_native_driver(runner, args, driver_original,
+                        driver_binding['original_own_report'], world_already_loaded=bool(shared.get('env')))
                 try:
-                    code, entry = runner.run_instance(runner.parse_args(argv), argv[1], shared)
+                    code, entry = runner.run_instance(args, driver_source['source_tro']['path']
+                        if driver is not None else argv[1], shared)
                 finally:
                     while cleanups: cleanups.pop()()
                 report = destination/row['instance_id']/'meta.json'
+                if driver is not None:
+                    verify_driver_report(driver_original, json.loads(report.read_text()))
                 result['entries'].append({'source_index': index, 'canary_review': request['canaries'][index],
                     'returncode': code, 'result': entry,
                     'report': {'path': str(report), 'sha256': file_digest(report)}})
+                if driver is not None:
+                    result['entries'][-1]['native_cli_driver'] = driver
+                if multi_active:
+                    result['entries'][-1]['source_fast_settings'] = fast_settings
+                if environment_binding is not None:
+                    result['entries'][-1]['exact_source_environment'] = environment_binding
                 if recording is not None:
                     result['entries'][-1]['active_recording_scene'] = current.get('active_recording_scene')
                     flush_recording()
@@ -188,7 +232,8 @@ def run(root, request_path, output):
                                         'phase': 'after_native_action_replay', 'isolation': measured})
                 write_json_atomic(output/'pool_final_isolation.json', {'observations': final_isolation})
             require(construction == {'attempted': 1, 'completed': 1}, 'pool replay rebuilt its loaded world')
-        inputs(root, request_path)
+        if multi_active: multi_inputs(root, request_path, runtime)
+        else: inputs(root, request_path)
         return result
     finally:
         if flush_recording is not None: flush_recording()

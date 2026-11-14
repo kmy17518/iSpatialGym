@@ -351,9 +351,9 @@ def _campaign_support_footprints(scene, metadata: dict) -> dict:
     obj = scene.object_registry("name", name)
     if obj is None or metadata.get("model_key") != f"{obj.category}/{obj.model}":
         raise ValueError("campaign support is absent or has a different model")
-    scale = metadata.get("default_scale", [])
+    scale = metadata.get("applied_scale", metadata.get("default_scale", []))
     if len(scale) != 3 or any(abs(float(a)-float(b)) > 1e-6 for a,b in zip(obj.scale, scale)):
-        raise ValueError("campaign support default scale mismatch")
+        raise ValueError("campaign support initialized scale mismatch")
     fps = metadata.get("blocked_footprints") or {}
     polygons = fps.get("block") or []
     if fps.get("free") or len(polygons) != 1 or len(polygons[0]) != 4:

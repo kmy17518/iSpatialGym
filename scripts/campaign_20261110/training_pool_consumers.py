@@ -6,6 +6,7 @@ an explicitly scoped recording operation, leaving internal snapshots intact.
 """
 from contextlib import contextmanager
 from .contracts import require
+from .training_pool_world import active_actor_names
 
 
 def excluding_inactive(previous, initialized, active):
@@ -28,7 +29,8 @@ def planner_observation(backend, objects, active):
     active actor collider must be present and enabled at this specific boundary.
     This is not a planner path or collision-clearance success claim.
     """
-    require(objects and active in objects and all(k == v.name for k,v in objects.items()),
+    active = set(active_actor_names(active))
+    require(objects and active <= set(objects) and all(k == v.name for k,v in objects.items()),
             'planner pool inventory differs')
     store = backend.checker.data.meshes
     names, enabled, counts = store.names, _list(store.enable), _list(store.count)
@@ -47,10 +49,10 @@ def planner_observation(backend, objects, active):
         paths = [str(mesh.prim_path) for link in obj.links.values() for mesh in link.collision_meshes.values()]
         require(paths and len(paths) == len(set(paths)), 'pool collider inventory absent or duplicated')
         rows = {path:{'allocated':path in slots,'enabled':slots.get(path,False)} for path in paths}
-        require(all(r['allocated'] and r['enabled'] for r in rows.values()) if name == active
+        require(all(r['allocated'] and r['enabled'] for r in rows.values()) if name in active
                 else not any(r['enabled'] for r in rows.values()),
                 'native pool planner participation differs: '+name)
-        observations[name] = {'active':name == active,'colliders':rows}
+        observations[name] = {'active':name in active,'colliders':rows}
     return {'boundary':'after_full_world_sync_before_grasp_attachment','objects':observations,
             'native_enable_mask_read':True,'allocated_mesh_count':count,
             'enabled_mesh_count':sum(enabled[0]),'trajectory_collision_clearance_verified':False}

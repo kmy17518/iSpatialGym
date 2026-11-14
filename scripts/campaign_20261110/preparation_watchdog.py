@@ -44,10 +44,12 @@ def project(root, scheduled, now, previous=None):
     approved = {r['manifest']['path']: r for r in contract.get('approved_manifests', [])}
     links = policy.get('preparation_scope', {}).get('normalized_manifests', [])
     links = {r['manifest']['path']: r for r in links}
-    statuses = {}; status_rows = {}
+    statuses = {}; status_rows = {}; typed_capacity = {}
     for account in ('minyeong', 'shiyuc'):
         status = read(directory/('status_'+account+'.json'), errors)
         statuses[account] = status
+        routing = read(directory/('prep_routes_'+account+'.json'), errors, optional=True)
+        typed_capacity[account] = routing.get('capacity', {})
         observed = epoch(status.get('last_reconciliation_at'))
         if observed is None or now-observed > 60 or observed > now+5:
             errors.append({'kind': 'preparation_dispatcher_missed_two_cycles', 'account': account,
@@ -88,10 +90,12 @@ def project(root, scheduled, now, previous=None):
             physical_routes.setdefault(ticket['physical_dedup_key'], []).append(ticket)
 
     def account_capacity(account):
-        cap = statuses[account].get('capacity', {}); cap_at = epoch(cap.get('observed_at'))
-        if cap.get('status') == 'observed' and cap_at is not None and -5 <= now-cap_at <= 60:
-            return min(cap.get('account_slots', {}).get(account, 0),
-                       max(0, cap.get('compatible_available_slots', 0)-policy.get('critical_reserved_physical_slots', 4)))
+        for cap in (typed_capacity[account], statuses[account].get('capacity', {})):
+            cap_at = epoch(cap.get('observed_at'))
+            if cap.get('status') == 'observed' and cap_at is not None and -5 <= now-cap_at <= 60:
+                slots = cap.get('preparation_slots', max(0, cap.get('compatible_available_slots', 0)
+                                -policy.get('critical_reserved_physical_slots', 4)))
+                return min(cap.get('account_slots', {}).get(account, 0), slots)
         return None
 
     for ref, source, manifest in required_manifests:
@@ -108,7 +112,7 @@ def project(root, scheduled, now, previous=None):
             request = read(ticket['request']['path'], [], optional=True)
             jid = str(receipt.get('job_id') or '')
             backend = receipt.get('backend', 'cluster')
-            job = by_id.get(jid, {})
+            job = by_id.get(jid, {}); state = {}
             if backend == 'vast' and jid:
                 state = read(root/'vast/state/jobs'/(jid+'.json'), errors, optional=True)
                 status = state.get('status', 'UNKNOWN')
@@ -136,6 +140,13 @@ def project(root, scheduled, now, previous=None):
             slots = route_slots[account]
             blocked = status_rows.get((account, ticket['claim_path']), {}).get('blocker')
             compatible = slots is not None and slots > 0 or idle_vast > 0 and key in vast_routable
+            queued = backend == 'vast' and status == 'queued'
+            # A virtual queue receipt is not a running GPU. Only the untouched
+            # map class supported by the existing return protocol is eligible.
+            return_candidate = bool(queued and not state.get('tries') and not state.get('instance')
+                                    and not state.get('history') and ticket.get('consumer_kind') == 'tabletop'
+                                    and ticket.get('computation_kind') == 'reach_map')
+            return_capacity = return_candidate and any(n is not None and n > 0 for n in route_slots.values())
             artifact_ready = epoch(request.get('artifact_ready_at') or request.get('observed_at'))
             row = {'physical_dedup_key': key, 'id': ticket['id'], 'owner': ticket['owner'],
                    'required_for_readiness': source['required_for_readiness'], 'consumer_kind': source['consumer_kind'],
@@ -148,6 +159,9 @@ def project(root, scheduled, now, previous=None):
                    'verified_at': epoch(disposition.get('verified_at')),
                    'downstream_submitted_at': epoch(disposition.get('downstream_submitted_at')),
                    'execution_state': status, 'verification_status': disposition.get('status', 'unknown'),
+                   'queued_unassigned': queued, 'queued_since': dispatched if queued else None,
+                   'cluster_return_candidate': return_candidate,
+                   'cluster_return_capacity_available': bool(return_capacity),
                    'ready_unsubmitted': ready, 'compatible_available_slots': slots,
                    'compatible_capacity_available': bool(compatible), 'blocker': disposition.get('blocker') or blocked,
                    'next_check_at': disposition.get('next_check_at'), 'evidence': disposition.get('evidence', []),
@@ -179,6 +193,14 @@ def project(root, scheduled, now, previous=None):
     ready = [r for r in required if r['ready_unsubmitted']]
     recent = [r for r in required if r['submitted_at'] is not None and 0 <= now-r['submitted_at'] <= 600]
     waiting = [now-r['manifest_ready_at'] for r in ready if r['manifest_ready_at'] is not None]
+    queued = [r for r in required if r['queued_unassigned']]
+    return_waiting = [r for r in queued if r['cluster_return_capacity_available']
+                      and r['queued_since'] is not None and now-r['queued_since'] > 120]
+    if return_waiting:
+        errors.append({'kind': 'preparation_queued_capacity_stall', 'owner': '/root',
+                       'eligible_queued_jobs': len(return_waiting),
+                       'oldest_queued_since': min(r['queued_since'] for r in return_waiting),
+                       'detail': 'Untouched queued maps have an admitted cluster route with fresh spare capacity; virtual queue submission does not resolve allocation delay.'})
     # An empty admitted queue cannot establish an empty campaign queue. Surface
     # an enumeration gap when capacity sits idle after the last real submission.
     any_capacity = idle_vast > 0 or any(
@@ -214,6 +236,9 @@ def project(root, scheduled, now, previous=None):
             'campaign_inventory_enumeration': 'incomplete; independent ready batches continue',
             'optional_builders_excluded_from_required_flow': True,
             'ready_count': len(ready) if complete else None, 'known_ready_count': len(ready),
+            'queued_unassigned_count': len(queued),
+            'queued_with_cluster_capacity_count': sum(r['cluster_return_capacity_available'] for r in queued),
+            'oldest_queued_age_seconds': max((now-r['queued_since'] for r in queued if r['queued_since'] is not None), default=None),
             'oldest_ready_age_seconds': max(waiting, default=None),
             'completed_awaiting_verification': sum(r['awaiting_verification'] for r in required),
             'completed_awaiting_downstream': sum(r['awaiting_downstream'] for r in required),

@@ -27,6 +27,43 @@ ALLOWED = {'scripts/campaign_20261110/training_pool_source_anchor_probe.py',
            'scripts/campaign_20261110/tests/test_training_pool_source_anchor_probe.py',
            'scripts/campaign_20261110/training_pool_probe.py'}
 
+COLD_PRESERVE_DELTA = {
+    'name': 'preserve_original_scene_cold_robot_anchor_v1',
+    'cold_change': 'omit_only_redundant_robot_set_position_orientation_during_existing_mass_stop',
+    'anchor_source': 'own_loaded_native_scene',
+    'incoming_TRO_spawn': 'unchanged_input_checked_without_reauthoring',
+    'warm_behavior_changed': False, 'extra_physics_steps': 0,
+    'extra_stop_play_pairs': 0, 'reference_state_copied': False,
+    'thresholds_changed': False, 'physical_equivalence_established': False,
+}
+
+
+def checked_cold_anchor_mode(request, proof):
+    enabled = request.get('preserve_original_cold_pool_anchor_v1', False)
+    require(type(enabled) is bool, 'cold native anchor selector must be boolean')
+    if enabled:
+        require(request.get('cold_anchor_override') == proof.get('cold_anchor_override') == COLD_PRESERVE_DELTA
+                and request.get('diagnostic_control') in ('FRESH_A', 'FRESH_B'),
+                'cold native anchor needs its exact bounded operation proof')
+    else:
+        require('cold_anchor_override' not in request and 'cold_anchor_override' not in proof,
+                'undeclared cold native anchor operation')
+    return enabled
+
+
+def apply_cold_anchor(robot, incoming, *, preserve):
+    if not preserve:
+        robot.set_position_orientation(position=incoming['position'], orientation=incoming['orientation'])
+        return {'mode': 'existing_exact_TRO_setter'}
+    position, orientation = (v.tolist() for v in robot.root_link.get_position_orientation())
+    require(math.dist(position, incoming['position']) <= 1e-6
+            and min(math.dist(orientation, incoming['orientation']),
+                    math.dist(orientation, [-v for v in incoming['orientation']])) <= 1e-6,
+            'own cold native anchor is not the declared incoming source spawn')
+    return {'mode': 'own_loaded_native_anchor_no_setter',
+            'native_anchor_before_existing_mass_play': [position, orientation],
+            'reference_state_copied': False, 'extra_native_pose_writes': 0}
+
 
 def verify_runtime(root, request, records, runtime, verify_parent):
     require(request.get('pool_exact_source_anchor_v1') is True and request.get('selected_pool_world') is True
@@ -106,9 +143,12 @@ def install(runner, contract, output, parent_install, request):
     build = runner.InstanceLoader.build_env; attach = runner.InstanceLoader.attach
     events = []; output = Path(output)
     proof = json.loads(Path(request['runtime_compatibility']['path']).read_text())
+    preserve_cold = checked_cold_anchor_mode(request, proof)
     def persist():
-        write_json_atomic(output/'source_anchor_audit.json', {'physical_delta': DELTA, 'events': events,
-            'benchmark_credit': 0, 'production_released': False})
+        value = {'physical_delta': DELTA, 'events': events,
+                 'benchmark_credit': 0, 'production_released': False}
+        if preserve_cold: value['cold_anchor_override'] = COLD_PRESERVE_DELTA
+        write_json_atomic(output/'source_anchor_audit.json', value)
     anchor_calls = []
     def measured_anchor(baseline, incoming):
         result = source_anchor(baseline, incoming)
@@ -126,12 +166,14 @@ def install(runner, contract, output, parent_install, request):
             require(target_mass > 0 and abs(float(robot.base_footprint_link.mass)-target_mass) >= 1e-6,
                     'cold anchor may only join an already-required mass lifecycle')
             incoming = pool._incoming_spawn(loader, robot)
+            anchor_event = {}
             def stopped():
                 require(runner.og.sim.is_stopped(), 'native cold anchor callback was not stopped')
                 if while_stopped is not None: while_stopped()
-                robot.set_position_orientation(position=incoming['position'], orientation=incoming['orientation'])
+                anchor_event.update(apply_cold_anchor(robot, incoming, preserve=preserve_cold))
             result, steps = observed_no_steps(runner.og.sim, lambda:
                 original(robot, mass_kg=mass_kg, while_stopped=stopped))
+            if preserve_cold: steps['cold_anchor_override'] = anchor_event
             observations.append(steps)
             return result
         runner.M.apply_eval_base_mass = with_anchor

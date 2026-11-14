@@ -37,10 +37,11 @@ def fixture(tmp_path):
                runtime_compatibility=compat,physics_steps_added=0,production_released=False,
                expected=expected,events=events)
     probe=put('probe.json',dict(entries=entries,runtime_compatibility=compat))
-    def run(value=audit,late=None):
+    def run(value=audit,late=None,*,separate=False,integrated=False):
         refs={'audit':put('fixed_mass_audit.json',value),'baseline':put('fixed_mass_baseline_config.json',baseline)}
         request={'fixed_mass_baseline':True,'runtime_compatibility':compat}
-        extra={}
+        if integrated: request['integrated_candidate_v1']=True
+        extra={'separate_reconstruction_lifecycle':separate}
         if late is not None:
             request['late_incoming_physics_rebuild_v1']=True
             extra['additional_reconstruction_reference']=put('late_rebuild_audit.json',late)
@@ -87,3 +88,26 @@ def test_separately_declared_late_reconstructions_require_exact_native_evidence(
     result=run(audit,late);assert result['additional_declared_reconstructions']==3
     late['events'][1]['whole_boundary_physics_step_calls']=['step']
     with pytest.raises(ContractError):run(audit,late)
+
+
+def test_common_candidate_separate_lifecycle_still_requires_complete_native_proof(tmp_path):
+    from scripts.campaign_20261110.training_late_rebuild_probe import DELTA as LATE_DELTA
+    audit,run=fixture(tmp_path)
+    late={'physical_delta':LATE_DELTA,'production_released':False,'benchmark_credit':0,
+          'explicit_sdk_reconstructions':3,'events':[]}
+    for iid in ['A','B','A']:
+        late['events'].append(dict(instance_id=iid,status='completed',static_body_properties_bit_identical=True,
+            before_static_bodies={'all':'native'},after_static_bodies={'all':'native'},
+            whole_boundary_physics_step_calls=[],reference_state_copied=False,
+            sdk=dict(explicit_sdk_reconstructions=1,release_calls=1,force_load_calls=1,manual_attached_stage=0),
+            lifecycle=copy.deepcopy(audit['events'][0]['initial_actor_reconstruction'])))
+    with pytest.raises(ContractError):run(audit,late,separate=True)
+    with pytest.raises(ContractError):run(audit,None,separate=True,integrated=True)
+    result=run(audit,late,separate=True,integrated=True)
+    assert result['reused_actor_reconstructions']==2
+    assert result['additional_declared_reconstructions']==3
+    for mutate in [lambda v:v['events'].pop(),
+                   lambda v:v['events'][1]['lifecycle'].__setitem__('native_calls',['play']),
+                   lambda v:v['events'][1]['after_static_bodies'].__setitem__('all','changed')]:
+        bad=copy.deepcopy(late);mutate(bad)
+        with pytest.raises(ContractError):run(audit,bad,separate=True,integrated=True)

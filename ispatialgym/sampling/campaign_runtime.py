@@ -184,7 +184,8 @@ def contact_recovery(option: str) -> bool:
                     [('magazine', 'tfovwy', (1.0, 1.0, 1.0))],
                     'axial contact height belongs to its exact canonical magazine')
         if option == 'lid_vertical_final_retreat':
-            require(template.split == 'eval_standard' and
+            from scripts.campaign_20261110.lid_pipeline_recovery import authorized
+            require((template.split == 'eval_standard' or authorized(template)) and
                     [(o.category, o.model) for o in template.objects if o.role == 'target'] == [('lid', 'pbmsji')] and
                     all(len(o.default_scale) == 3 and all(abs(float(v)-.65) <= 1e-7 for v in o.default_scale)
                         for o in template.objects if o.role == 'target'),

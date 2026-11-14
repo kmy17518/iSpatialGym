@@ -309,10 +309,15 @@ def scene_crop_attrs(scene_crop: Optional[Dict[str, Any]], full_scene_file: Opti
 
 class Recorder:
     def __init__(self, out_dir: str, env, robot, cam_key: str, objects: Dict[str, Any], fps: int = 30, cfg: Optional[RecorderConfig] = None,
-                 task_name: Optional[str] = None, instance_id: Optional[str] = None):
+                 task_name: Optional[str] = None, instance_id: Optional[str] = None, *, pool_consumers=None):
         self.out_dir = out_dir
         os.makedirs(out_dir, exist_ok=True)
         self.env, self.robot, self.cam_key = env, robot, cam_key
+        self.pool_consumers = pool_consumers
+        if pool_consumers is not None:
+            from ispatialgym.oracle.pool_consumers import PoolConsumers
+            if type(pool_consumers) is not PoolConsumers or pool_consumers.loader.env is not env:
+                raise ValueError("recorder pool consumers do not belong to this loaded world")
         self.objects = dict(objects)
         self.fps = int(fps)
         self.cfg = cfg or RecorderConfig()
@@ -485,6 +490,10 @@ class Recorder:
             self._pending_bproprio = []
         if self.cfg.hdf5:
             self._snapshot_scene()
+            if self.pool_consumers is not None:
+                # A failed exact projection must fail this recording, outside
+                # the legacy best-effort snapshot handler.
+                self.pool_consumers.snapshot(self)
         if self.view_paths:
             self._open_views(robs)
         if self.cfg.lerobot:

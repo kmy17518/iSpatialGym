@@ -64,8 +64,6 @@ def prepare(root, runtime, graph_path, audit_path, output, *, family='attachment
             binding = source.get('consumer_binding') or {}
             assert binding.get('required_constraint') in {'tabletop_insert', 'flower_stem_top'}
             assert source['entry']['constraint'] == binding['required_constraint']
-            if source['entry'].get('rest_hint_wxyz'):
-                missing['designated_rest_reader_extension_pending'] += 1; continue
         support = dep['inputs']['support']; measured = supports.get((support['support_profile'], support['height_slot']))
         if measured is None: missing['support_height_missing'] += 1; continue
         proof, value = measured

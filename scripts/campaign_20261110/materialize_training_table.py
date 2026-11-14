@@ -52,6 +52,9 @@ def scale_plan(template, request, probe, profile, job):
 
 def bind_training_candidate(template, job, metadata_path, code, reservations, hashes, pointer):
     require(template.split=='train' and job['production_released'] is False, 'training preparation only')
+    from scripts.campaign_20261110.training_selection_join import verify_generated_binding
+
+    handle_lookup = verify_generated_binding(template, job, metadata_path)
     plan=job['training_scale_plan']
     require(digest(plan)==template.scene_setup['training_scale_plan_sha256'], 'training scale plan changed')
     states={name:ScaleState(**value) for name,value in plan['scales'].items()}
@@ -68,6 +71,8 @@ def bind_training_candidate(template, job, metadata_path, code, reservations, ha
         refs.append(replace(o,default_scale=original.default_scale));mapped[o.instance]=state
     setup={**bound.scene_setup,'candidate_fingerprint':template.fingerprint,
         'training_scale_plan_sha256':digest(plan),'training_original_defaults_preserved':True}
+    if handle_lookup is not None:
+        setup['prepared_handle_native_lookup'] = handle_lookup
     return replace(bound,objects=tuple(refs),scene_setup=setup),Perturbations(mapped)
 
 
