@@ -1950,6 +1950,10 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             fast_meta.setdefault("physics_only_trim", {"skipped": []})["hdf5_config_image_size"] = int(args.image_size)
         if sidecar is not None:
             recorder.episode = episode_annotations(sidecar)
+        online_deadline = getattr(args, "online_member_deadline", None)
+        if online_deadline is not None:
+            remaining = max(0.001, online_deadline - time.time())
+            budget["wallclock_s"] = min(budget["wallclock_s"], remaining) if budget["wallclock_s"] else remaining
         ex_cfg = ExecutorConfig(max_steps=budget["episode_cap"], max_wall_s=budget["wallclock_s"], retries=args.retries, settle_steps=budget["settle_steps"],
                                 success_metric=args.success_metric, stop_on_success=args.mode == "policy", goal_image=args.goal_image,
                                 record_state=rec_cfg.hdf5, qa=args.qa)
@@ -2365,18 +2369,24 @@ def run_queue(args) -> int:
         # Preserve the original physics/program and clamp only wallclock.
         online = (load_tro(tro).meta.raw.get("campaign") or {}).get("runtime", {}).get("online_group")
         previous_wallclock = args.wallclock
+        previous_online_deadline = getattr(args, "online_member_deadline", None)
+        executed = False
         if online and t0 >= float(online["member_deadline"]):
             code, result = 0, {"status": "expired", "success": False, "reason": "online_member_deadline_before_load"}
         else:
             if online:
-                remaining = float(online["member_deadline"]) - t0
+                args.online_member_deadline = float(online["member_deadline"])
+                remaining = args.online_member_deadline - t0
                 args.wallclock = min(previous_wallclock, remaining) if previous_wallclock else remaining
             try:
                 code, result = run_instance(args, tro, shared)
+                executed = True
             finally:
                 args.wallclock = previous_wallclock
-        shared["signature"] = sig
-        n += 1
+                args.online_member_deadline = previous_online_deadline
+        if executed:
+            shared["signature"] = sig
+            n += 1
         if args.results:
             prov = provenance()
             row = {"instance": iid, "rc": code, "status": result.get("status"), "success": bool(result.get("success")), "reason": result.get("reason"),

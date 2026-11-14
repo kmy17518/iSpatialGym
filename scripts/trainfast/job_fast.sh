@@ -31,6 +31,11 @@ JOB_END=${SLURM_JOB_END_TIME:-$(( T_START + TIME_LIMIT_S ))}
 KIT_RC=1
 export ISGE_BAND_STORE=1 ISGE_CODE
 [ -n "${TRUNK_CHECK:-}" ] && export ISGE_BAND_TRUNK_CHECK=$TRUNK_CHECK
+# Load a published compatible Kit/texture version before Kit creates appdata.
+if [ -n "${ISPATIALGYM_CACHE_CONTINUITY:-}" ]; then
+  PYTHONPATH="$ISGE_CODE" python -m scripts.campaign_20261110.cache_continuity warm-prepare --settings "$ISPATIALGYM_CACHE_CONTINUITY" --job "$JOBDIR" > "$JOBDIR/cache_warm_prepare.log" 2>&1 || exit 2
+  source "$JOBDIR/cache_continuity/warm/environment.sh"
+fi
 source $S/env_fast.sh
 [ -n "${ISGE_BAND_TRUNK_CHECK:-}" ] && export ISPATIALGYM_BAND_TRUNK_CHECK=$ISGE_BAND_TRUNK_CHECK
 export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR=$JB/numba_cache
@@ -68,7 +73,24 @@ if [ -n "${ISPATIALGYM_MAP_OVERLAY:-}" ] && [ -z "${ISPATIALGYM_MAP_OVERLAY_RELE
   echo "ISPATIALGYM_MAP_OVERLAY_RELEASE=$ISPATIALGYM_MAP_OVERLAY_RELEASE" >> $JOBDIR/job.env
 fi
 [ -n "${ISPATIALGYM_MAP_OVERLAY:-}" ] && echo "MAP_OVERLAY $ISPATIALGYM_MAP_OVERLAY release r${ISPATIALGYM_MAP_OVERLAY_RELEASE}" >> $JOBDIR/job.txt
-trap 'kit_appdata_teardown; case "$JB" in /tmp/*|$F/jobs/*|${ISGF_JB_NFS:-$F/jobs}/*) rm -rf "$JB" ;; esac; rm -rf ${OMNIGIBSON_APPDATA_PATH}.c* 2>/dev/null' EXIT
+CACHE_CONTINUITY_PID=""
+if [ -n "${ISPATIALGYM_CACHE_CONTINUITY:-}" ]; then
+  python -m scripts.campaign_20261110.cache_continuity prepare --settings "$ISPATIALGYM_CACHE_CONTINUITY" --job "$JOBDIR" > "$JOBDIR/cache_prepare.log" 2>&1 || exit 2
+  source "$JOBDIR/cache_continuity/environment.sh"
+  python -m scripts.campaign_20261110.cache_continuity watch --job "$JOBDIR" > "$JOBDIR/cache_watch.log" 2>&1 &
+  CACHE_CONTINUITY_PID=$!
+fi
+finish_cache_continuity() {
+  if [ -n "$CACHE_CONTINUITY_PID" ]; then
+    touch "$JOBDIR/cache_continuity/drain"
+    wait "$CACHE_CONTINUITY_PID"
+    local cache_rc=$?
+    echo "$cache_rc" > "$JOBDIR/cache_continuity/final.rc"
+    # A failed transfer keeps the local paths intact for the fleet's stopped-disk retry.
+    [ "$cache_rc" -eq 0 ] || return "$cache_rc"
+  fi
+}
+trap 'finish_cache_continuity && kit_appdata_teardown; if [ -z "$CACHE_CONTINUITY_PID" ] || [ "$(cat "$JOBDIR/cache_continuity/final.rc" 2>/dev/null)" = 0 ]; then case "$JB" in /tmp/*|$F/jobs/*|${ISGF_JB_NFS:-$F/jobs}/*) rm -rf "$JB" ;; esac; rm -rf ${OMNIGIBSON_APPDATA_PATH}.c* 2>/dev/null; fi' EXIT
 mkdir -p $JOBDIR/claims
 echo "$SLURM_JOB_ID" > $JOBDIR/jobid
 # 2026-11-01: sharing between this campaign's jobs is opt-in (ISPATIALGYM_FAST_BAND_SHARE=1; default off after the contamination of
@@ -109,6 +131,13 @@ t0=$(date +%s)
     --out $JOBDIR/inst --eval-run $EVAL_INDEX --no-write-back --max-attempts $MAX_ATTEMPTS $KEEP_SCENE $CUSTOMS_ARG --log-level INFO > $JOBDIR/sample.log 2>&1
   echo $? > $JOBDIR/sample.rc ) &
 SPID=$!
+ONLINE_WATCH_PID=""
+if [ -n "${ISPATIALGYM_ONLINE_GROUPS:-}" ]; then
+  python -m scripts.campaign_20261110.online_deadline_watch --settings "$ISPATIALGYM_ONLINE_GROUPS" --ancestor "$SPID" > "$JOBDIR/online_deadline_watch.log" 2>&1 &
+  ONLINE_WATCH_PID=$!
+  ISGF_QUEUE_WATCH_POLL_S=2
+  ISGF_QUEUE_KILL_GRACE_S=5
+fi
 # ---- collectors: K long-lived queue consumers, each restarted while work may still come ----
 collector() {
   local i=$1 q=0 barren=0 rc=0 app=${OMNIGIBSON_APPDATA_PATH}.c$i
@@ -127,11 +156,11 @@ collector() {
       --results $JOBDIR/results.jsonl --deadline $DEADLINE --mode oracle --out $JOBDIR/demo --record hdf5 $COLLECT_EXTRA $( [ -e $JOBDIR/prebuild.mismatch ] || echo $PREBUILD_ARG ) > $JOBDIR/collect_c${i}_q$q.log 2>&1 &
     local qpid=$! killed=""
     while kill -0 $qpid 2>/dev/null; do
-      sleep 20
+      sleep "${ISGF_QUEUE_WATCH_POLL_S:-20}"
       local over=$(python $S/queue_watch.py $JOBDIR over $qpid $DEMO_LIMIT_S)
       if [ -n "$over" ]; then
         echo "DEMO_TIMEOUT $over c$i pid=$qpid limit_s=$DEMO_LIMIT_S" | tee -a $JOBDIR/job.txt; echo "$over" >> $JOBDIR/demo_timeouts.txt
-        kill -INT $qpid 2>/dev/null; sleep 60; kill -KILL $qpid 2>/dev/null; killed=1; break
+        kill -INT $qpid 2>/dev/null; sleep "${ISGF_QUEUE_KILL_GRACE_S:-60}"; kill -KILL $qpid 2>/dev/null; killed=1; break
       fi
     done
     wait $qpid; rc=$?; [ -n "$killed" ] && rc=124
@@ -180,6 +209,7 @@ fi
 CPIDS=""
 for i in $(seq 1 $K); do collector $i & CPIDS="$CPIDS $!"; done
 wait $SPID
+[ -z "$ONLINE_WATCH_PID" ] || kill "$ONLINE_WATCH_PID" 2>/dev/null
 SAMPLE_RC=$(cat $JOBDIR/sample.rc 2>/dev/null || echo 1)
 echo "SAMPLE_EXIT $SAMPLE_RC wall_s=$(( $(date +%s) - t0 )) written=$(grep -c ' written (attempt ' $JOBDIR/sample.log)" | tee -a $JOBDIR/job.txt
 if [ "$BAND_SHARE" = 1 ]; then

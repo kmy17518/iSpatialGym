@@ -164,6 +164,9 @@ class OnlineGroups:
         if self.template.split != self.config['split']:
             from dataclasses import replace
             self.template = replace(self.template, split=self.config['split'])
+        if self.options.get('wallclock_policy'):
+            from scripts.campaign_20261110.class_wallclock import resolve
+            self.options.update(resolve(self.options['wallclock_policy'],self.template.class_id,self.config['split']))
         self.target = int(self.options.get('target_members', 3))
         self.minimum = int(self.options.get('minimum_members', 2 if self.config['split'] == 'eval_standard' else 1))
         require(1 <= self.minimum <= self.target <= 3, 'invalid accepted-member quota')
@@ -360,7 +363,9 @@ class OnlineGroups:
         original_deadline = getattr(sampler, 'deadline', None)
         paths = []
         try:
-            while len(self.state['groups']) < self.options['groups']:
+            def completed():
+                return sum(g['qualifies']for g in self.state['groups'])if self.options.get('require_qualifying_groups')else len(self.state['groups'])
+            while completed() < self.options['groups']:
                 if original_deadline and time.time() >= original_deadline: break
                 if self.state['current'] is None:
                     now = time.time()
@@ -382,14 +387,27 @@ class OnlineGroups:
                     # Legacy family counters count writes. For online operation
                     # only accepted and in-flight members occupy the quota.
                     sampler._campaign_group_written = accepted + pending
-                    paths.extend(sampler.run_instances(1, max_attempts=max_attempts, indices=[index]))
+                    from scripts.campaign_20261110.online_deadline_watch import process
+                    self.state['sampling_operation'] = {**process(os.getpid()), 'active': True,
+                                                        'member_deadline': self.member_deadline, 'index': index}
+                    self.save()
+                    try:
+                        paths.extend(sampler.run_instances(1, max_attempts=max_attempts, indices=[index]))
+                    finally:
+                        self.state['sampling_operation']['active'] = False
+                        self.save()
                     self.collect()
                 accepted, pending = self.collect()
                 for member in group['members']:
                     if member['status'] == 'pending': member.update(status='expired', reason='group_deadline')
                 group.update(finished_at=time.time(), accepted_members=accepted,
                              qualifies=accepted >= self.minimum, reason='target_reached' if accepted >= self.target else 'budget_or_indices_exhausted')
-                self.event('group_finalized', group_id=group['id'], accepted=accepted, qualifies=group['qualifies'], reason=group['reason'])
+                times = sorted(m['evidence']['result']['finished_at_unix']-group['started_at'] for m in group['members'] if m['status']=='accepted')
+                group['timing'] = {'class_id':self.template.class_id,'group_seconds':group['finished_at']-group['started_at'],
+                    'seconds_to_accepted_members':times,'policy':self.options.get('wallclock_policy'),
+                    'group_limit_s':self.options['group_limit_s'],'member_limit_s':self.options['member_limit_s'],
+                    'censored':not group['qualifies']}
+                self.event('group_finalized', group_id=group['id'], accepted=accepted, qualifies=group['qualifies'], reason=group['reason'],timing=group['timing'])
                 self.state['groups'].append(group); self.state['current'] = None; self.save()
                 if self.state['next_index'] >= self.state['index_end']: break
             return paths

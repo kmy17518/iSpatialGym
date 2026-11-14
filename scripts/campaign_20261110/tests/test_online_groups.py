@@ -65,6 +65,7 @@ def test_two_groups_one_worker_oracle_failures_do_not_fill_quota(tmp_path, monke
     worker.state = {'owner': 'test', 'next_index': 40, 'index_end': 60, 'groups': [], 'current': None}
     sampler = SimpleNamespace(world=object(), kit=object(), deadline=None)
     worker.sampler = sampler
+    worker.template = SimpleNamespace(class_id="test")
     calls = []
     def sample(n, max_attempts, indices):
         group = worker.state['current']; index = indices[0]
@@ -79,7 +80,9 @@ def test_two_groups_one_worker_oracle_failures_do_not_fill_quota(tmp_path, monke
     def collect():
         g = worker.state['current']
         for m in g['members']:
-            if m['status'] == 'pending': m['status'] = 'rejected' if m['instance_id'] == '40' else 'accepted'
+            if m['status'] == 'pending':
+                m['status'] = 'rejected' if m['instance_id'] == '40' else 'accepted'
+                m['evidence'] = {'result': {'finished_at_unix': time.time()}}
         return sum(m['status'] == 'accepted' for m in g['members']), 0
     worker.collect = collect
     worker.run(3)

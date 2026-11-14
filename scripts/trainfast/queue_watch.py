@@ -47,12 +47,20 @@ def main():
         pid, limit = sys.argv[3], float(sys.argv[4])
         done = finished(job)
         now = time.time()
+        member_deadlines = {}
+        try:
+            state = json.load(open(os.path.join(job, "online", "state.json")))
+            for group in state.get("groups", []) + ([state["current"]] if state.get("current") else []):
+                for member in group["members"]:
+                    member_deadlines[member["instance_id"]] = min(member["deadline"], group["deadline"])
+        except (OSError, ValueError, KeyError):
+            pass
         for c in glob.glob(os.path.join(claims, "*")):
             try:
                 parts = open(c).read().split()
             except OSError:
                 continue
-            if len(parts) >= 2 and parts[1] == pid and os.path.basename(c) not in done and now - os.path.getmtime(c) > limit:
+            if len(parts) >= 2 and parts[1] == pid and os.path.basename(c) not in done and (now - os.path.getmtime(c) > limit or now > member_deadlines.get(os.path.basename(c), float("inf"))):
                 print(os.path.basename(c))
                 return 0
         print("")
