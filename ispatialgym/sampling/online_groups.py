@@ -204,12 +204,16 @@ class OnlineGroups:
             'groups': [], 'current': None}
         require(self.state['settings_sha256'] == file_digest(self.settings_path), 'resume settings changed')
         require(self.state['config_sha256'] == file_digest(self.config_path), 'resume template/config changed')
+        # Parked groups: target reachable by accepted + in-flight members; the
+        # sampler has moved on and they finalize when their members resolve.
+        self.state.setdefault('open', [])
         self.member_deadline = None
         # A crash between sealing and publication leaves a known screened
         # pending summary. Republish only those exact immutable candidates.
-        if self.state['current']:
+        resumed = ([self.state['current']] if self.state['current'] else []) + self.state['open']
+        if resumed:
             from ispatialgym.sampling.v2.core import publish_instance
-            for member in self.state['current']['members']:
+            for member in (m for g in resumed for m in g['members']):
                 if member['status'] == 'pending' and time.time() < member['deadline']:
                     require(file_digest(member['tro']['path']) == member['tro']['sha256'], 'resume TRO changed')
                     require(file_digest(member['sidecar']['path']) == member['sidecar']['sha256'], 'resume sidecar changed')
@@ -342,22 +346,28 @@ class OnlineGroups:
         side = read(side_path); side['tro_sha256'] = file_digest(path); write_json_atomic(side_path, side)
         summary.update(campaign_goal_group=draft.summary['campaign_goal_group'], online_group=draft.summary['online_group'])
         write_json_atomic(summary_path, summary)
-        candidate = {'instance_id': iid, 'tro': ref(path), 'sidecar': ref(side_path),
+        candidate = {'instance_id': iid, 'tro': ref(path), 'sidecar': ref(side_path), 'group_id': group['id'],
                      'deadline': self.member_deadline, 'status': 'pending', 'published_at': time.time()}
         group['members'].append(candidate)
         self.save()
 
-    def collect(self):
+    def results(self):
         rows = {}
         if self.results_path.exists():
             for line in self.results_path.read_text().splitlines():
                 try:
                     row = json.loads(line); rows[row['instance']] = row
                 except (ValueError, KeyError): continue  # partial O_APPEND line
-        group = self.state['current']
+        return rows
+
+    def collect(self):
+        return self.collect_group(self.state['current'], self.results())
+
+    def collect_group(self, group, rows):
         accepted = [m for m in group['members'] if m['status'] == 'accepted']
         for member in group['members']:
             if member['status'] != 'pending': continue
+            require(member.get('group_id', group['id']) == group['id'], 'member attributed to another group')
             result = rows.get(member['instance_id'])
             if result is not None:
                 try:
@@ -374,28 +384,74 @@ class OnlineGroups:
             self.save()
         return len(accepted), sum(m['status'] == 'pending' for m in group['members'])
 
+    @staticmethod
+    def counts(group):
+        return (sum(m['status'] == 'accepted' for m in group['members']),
+                sum(m['status'] == 'pending' for m in group['members']))
+
+    def finalize(self, group, accepted):
+        for member in group['members']:
+            if member['status'] == 'pending': member.update(status='expired', reason='group_deadline')
+        group.update(finished_at=time.time(), accepted_members=accepted,
+                     qualifies=accepted >= self.minimum, reason='target_reached' if accepted >= self.target else 'budget_or_indices_exhausted')
+        times = sorted(m['evidence']['result']['finished_at_unix']-group['started_at'] for m in group['members'] if m['status']=='accepted')
+        group['timing'] = {'class_id':self.template.class_id,'group_seconds':group['finished_at']-group['started_at'],
+            'seconds_to_accepted_members':times,'policy':self.options.get('wallclock_policy'),
+            'group_limit_s':self.options['group_limit_s'],'member_limit_s':self.options['member_limit_s'],
+            'censored':not group['qualifies']}
+        self.event('group_finalized', group_id=group['id'], accepted=accepted, qualifies=group['qualifies'], reason=group['reason'],timing=group['timing'])
+        self.state['groups'].append(group)
+
+    def poll_open(self):
+        """Resolve parked groups from collector results; finalize resolved ones."""
+        if not self.state['open']: return
+        rows = self.results()
+        for group in list(self.state['open']):
+            accepted, pending = self.collect_group(group, rows)
+            if pending and time.time() < group['deadline']: continue
+            group['parked_resolution'] = 'members_resolved' if not pending else 'group_deadline'
+            self.state['open'].remove(group)
+            self.finalize(group, accepted)
+            self.save()
+
     def run(self, max_attempts):
         sampler = self.sampler
         original_deadline = getattr(sampler, 'deadline', None)
+        poll_s = getattr(self, 'poll_s', 1.)
+        self.state.setdefault('open', [])
         paths = []
         try:
+            require_qualifying = self.options.get('require_qualifying_groups')
             def completed():
-                return sum(g['qualifies']for g in self.state['groups'])if self.options.get('require_qualifying_groups')else len(self.state['groups'])
-            while completed() < self.options['groups']:
-                if original_deadline and time.time() >= original_deadline: break
+                return sum(g['qualifies']for g in self.state['groups'])if require_qualifying else len(self.state['groups'])
+            def committed():
+                # Upper bound on the final total: a parked group can only lose
+                # in-flight members, so one that cannot reach the minimum never will.
+                return completed() + sum(1 for g in self.state['open']
+                                         if not require_qualifying or sum(self.counts(g)) >= self.minimum)
+            while True:
+                self.poll_open()
                 if self.state['current'] is None:
+                    if (completed() >= self.options['groups'] or self.state['next_index'] >= self.state['index_end']
+                            or (original_deadline and time.time() >= original_deadline)):
+                        break
+                    if committed() >= self.options['groups']:
+                        time.sleep(poll_s); continue  # a parked group may still finalize short
                     now = time.time()
                     self.state['current'] = {'id': 'online-' + uuid.uuid4().hex, 'started_at': now,
                                              'deadline': min(now + self.options['group_limit_s'], original_deadline or math.inf),
                                              'members': []}
                     self.reset_goal(); self.save(); self.event('group_started', group_id=self.state['current']['id'])
+                elif original_deadline and time.time() >= original_deadline: break
                 group = self.state['current']
                 if group.get('plan') and time.time() < group['deadline']: self.activate()
+                parked = False
                 while time.time() < group['deadline']:
+                    self.poll_open()
                     accepted, pending = self.collect()
                     if accepted >= self.target: break
                     if accepted + pending >= self.target:
-                        time.sleep(min(1., max(0., group['deadline'] - time.time()))); continue
+                        parked = True; break  # move on; collectors finish this group's members
                     if self.state['next_index'] >= self.state['index_end']: break
                     index = self.state['next_index']; self.state['next_index'] += 1; self.save()
                     self.member_deadline = min(group['deadline'], time.time() + self.options['member_limit_s'])
@@ -413,19 +469,20 @@ class OnlineGroups:
                         self.state['sampling_operation']['active'] = False
                         self.save()
                     self.collect()
+                if parked:
+                    group['parked_at'] = time.time()
+                    self.state['open'].append(group); self.state['current'] = None
+                    self.reset_goal(); self.save()
+                    self.event('group_parked', group_id=group['id'], accepted=accepted, pending=pending)
+                    continue
                 accepted, pending = self.collect()
-                for member in group['members']:
-                    if member['status'] == 'pending': member.update(status='expired', reason='group_deadline')
-                group.update(finished_at=time.time(), accepted_members=accepted,
-                             qualifies=accepted >= self.minimum, reason='target_reached' if accepted >= self.target else 'budget_or_indices_exhausted')
-                times = sorted(m['evidence']['result']['finished_at_unix']-group['started_at'] for m in group['members'] if m['status']=='accepted')
-                group['timing'] = {'class_id':self.template.class_id,'group_seconds':group['finished_at']-group['started_at'],
-                    'seconds_to_accepted_members':times,'policy':self.options.get('wallclock_policy'),
-                    'group_limit_s':self.options['group_limit_s'],'member_limit_s':self.options['member_limit_s'],
-                    'censored':not group['qualifies']}
-                self.event('group_finalized', group_id=group['id'], accepted=accepted, qualifies=group['qualifies'], reason=group['reason'],timing=group['timing'])
-                self.state['groups'].append(group); self.state['current'] = None; self.save()
-                if self.state['next_index'] >= self.state['index_end']: break
+                self.finalize(group, accepted)
+                self.state['current'] = None; self.save()
+            # Parked members resolve in the collectors; each group is bounded by
+            # its own deadline, so this wait is bounded.
+            while self.state['open']:
+                self.poll_open()
+                if self.state['open']: time.sleep(poll_s)
             return paths
         finally:
             sampler.deadline = original_deadline

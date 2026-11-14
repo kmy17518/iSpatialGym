@@ -50,7 +50,7 @@ def main():
         member_deadlines = {}
         try:
             state = json.load(open(os.path.join(job, "online", "state.json")))
-            for group in state.get("groups", []) + ([state["current"]] if state.get("current") else []):
+            for group in state.get("groups", []) + state.get("open", []) + ([state["current"]] if state.get("current") else []):
                 for member in group["members"]:
                     member_deadlines[member["instance_id"]] = min(member["deadline"], group["deadline"])
         except (OSError, ValueError, KeyError):
