@@ -29,6 +29,17 @@ def cap_start_within_reach(position, base_pose2d):
     return 0 < depth <= CAP_START_DEPTH_M
 
 
+def cap_shallow_start_applies(plan):
+    """The shallow-start screen needs the measured source stance it was calibrated on.
+
+    Production 2026-11-14 (attachment_02, 9 online workers, 1859 attempts): with no
+    goal plan, or a plan without ``anchor_manipulation_stance``, every drawn start
+    was rejected by the screen (0 positions reached grasp IK) and no goal was ever
+    selected. Plans that carry the anchored source stance keep the screen.
+    """
+    return plan is not None and getattr(plan, 'anchor_manipulation_stance', None) is not None
+
+
 @dataclass(frozen=True)
 class AttachmentGoalPlan:
     campaign_id: str

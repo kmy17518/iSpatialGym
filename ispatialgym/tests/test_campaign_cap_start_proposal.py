@@ -43,3 +43,14 @@ def test_proposal_is_opt_in_and_bound_to_exact_canonical_pair(monkeypatch):
         previous = getattr(obj, key); setattr(obj, key, value)
         with pytest.raises(ContractError): runtime.contact_recovery('cap_shallow_start_proposal')
         setattr(obj, key, previous)
+
+
+def test_shallow_start_screen_needs_the_anchored_source_stance():
+    # Online fresh-goal draw (no plan) and online plans without the source stance: the screen is not applied.
+    assert not goals.cap_shallow_start_applies(None)
+    assert not goals.cap_shallow_start_applies(NS(anchor_manipulation_stance=None))
+    assert not goals.cap_shallow_start_applies(NS())
+    # The measured fixed-goal plans (source stance base 9.19 m, focus 0.67 m forward) keep it.
+    anchored = NS(anchor_manipulation_stance={'base_pose2d': [9.1918, 3.4242, 3.1390], 'focus': [8.5218, 3.4259, .8182],
+                                              'translate': .5, 'tilt': -.4542})
+    assert goals.cap_shallow_start_applies(anchored)

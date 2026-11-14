@@ -1305,6 +1305,13 @@ class Attachment(SamplerV2):
         m_pose, grasp = None, None
         from ispatialgym.sampling import campaign_runtime
         shallow_start = campaign_runtime.contact_recovery('cap_shallow_start_proposal')
+        plan = getattr(self, '_campaign_attachment_active', None)
+        if shallow_start and not CAG.cap_shallow_start_applies(plan):
+            # The 0.66 m screen was measured with the source manipulation stance (focus 0.67 m forward).
+            # Without that anchored stance (online fresh-goal draw; online plans of this class carry none)
+            # no drawn start passes it, so the native unscreened proposal is used.
+            shallow_start = False
+            log.info("%s: cap_shallow_start_proposal not applied: no anchored source manipulation stance", self.gp.variant)
         pose_allowed = None
         if shallow_start:
             pose_allowed = lambda pose: CAG.cap_start_within_reach(pose[0], manip.base_pose2d)
