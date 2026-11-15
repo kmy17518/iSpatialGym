@@ -17,6 +17,9 @@ export KIT_KEY KIT_TPL_NFS_ROOT KIT_TEX_STORE
 if [ "$USER" = minyeong ]; then export ISGREND_TEX_OUT=$KIT_TEX_STORE ISGREND_TPL_OUT=$KIT_TPL_NFS_ROOT
 else export ISGREND_TEX_OUT=/vision/u/shiyuc/minyeong/isgrend/cache_delta/kit_textures ISGREND_TPL_OUT=/vision/u/shiyuc/minyeong/isgrend/cache_delta/kit_templates; fi
 export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR="$JB/numba_cache" ISPATIALGYM_SHARD_FORMAT=legacy ISGREND_SCRATCH=$JB/isgrend
+# OmniGibson writes its .kit app file into $EXP_PATH at every start: a job-local copy of the overlay (symlinks + small files)
+rm -rf "$JB/isaacsim_overlay" && cp -a "$(dirname "$EXP_PATH")" "$JB/isaacsim_overlay" && chmod -R u+w "$JB/isaacsim_overlay" \
+  && export EXP_PATH=$JB/isaacsim_overlay/apps
 unset ISPATIALGYM_HEAD_CAMERA_ONLY ISPATIALGYM_PHYSICS_ONLY
 # minyeong publishes the Kit template / converted textures to the shared stores at the end; shiyuc only reads them
 KIT_RC=1
