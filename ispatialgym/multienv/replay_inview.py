@@ -177,6 +177,45 @@ def line_clear(img: np.ndarray, a, b, doors: Sequence[Tuple[np.ndarray, np.ndarr
     return True
 
 
+def wall_frames(objs: Mapping[str, Any], roots: Sequence[str]) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """(centres (W, 3), rotations (W, 3, 3), half extents (W, 3)) of the walls objects' oriented boxes (straight wall pieces)."""
+    cs, rs, hs = [], [], []
+    for o in objs.values():
+        if o["category"] != "walls":
+            continue
+        b = model_box(o["category"], o["model"], roots)
+        if b is None:
+            continue
+        R = _quat_to_mat(o["quat"])
+        s = np.asarray(o["scale"])
+        cs.append(np.asarray(o["pos"]) + R @ (np.asarray(b["offset"]) * s))
+        rs.append(R)
+        hs.append(np.asarray(b["size"]) * s / 2)
+    if not cs:
+        return None
+    return np.asarray(cs), np.asarray(rs), np.asarray(hs)
+
+
+def segments_blocked(a: np.ndarray, pts: np.ndarray, walls: Tuple[np.ndarray, np.ndarray, np.ndarray], shrink: float = 0.02) -> np.ndarray:
+    """(N,) bool: the segment camera ``a`` -> ``pts[i]`` passes through a wall box (slab test in every wall's frame; walls that
+    contain the end point - a wall-mounted object - do not count). Vectorised over walls x points; no rendering."""
+    c, R, h = walls
+    h = np.maximum(h - shrink, 1e-3)
+    A = np.einsum("wji,wj->wi", R, a[None, :] - c)  # (W, 3) camera in wall frames
+    P = np.einsum("wji,nwj->nwi", R, pts[:, None, :] - c[None])  # (N, W, 3)
+    D = P - A[None]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t1 = (-h[None] - A[None]) / D
+        t2 = (h[None] - A[None]) / D
+    lo = np.where(np.abs(D) < 1e-12, np.where(np.abs(A[None]) <= h[None], -np.inf, np.inf), np.minimum(t1, t2))
+    hi = np.where(np.abs(D) < 1e-12, np.where(np.abs(A[None]) <= h[None], np.inf, -np.inf), np.maximum(t1, t2))
+    tmin = np.maximum(lo.max(axis=2), 0.0)
+    tmax = np.minimum(hi.min(axis=2), 1.0)
+    hit = tmin <= tmax
+    inside_end = np.all(np.abs(P) <= h[None], axis=2)
+    return np.any(hit & ~inside_end, axis=1)
+
+
 def room_of(xy, rooms: Mapping[str, Tuple[np.ndarray, np.ndarray]]) -> Optional[str]:
     hits = [(float(np.prod(hi - lo)), r) for r, (lo, hi) in rooms.items() if np.all(xy >= lo) and np.all(xy <= hi)]
     return min(hits)[1] if hits else None  # the smallest room box containing the point
@@ -222,6 +261,7 @@ def score_demo(demo_dir: str, roots: Sequence[str], K: Optional[Mapping[str, flo
     scene_model = ((full.get("init_info") or {}).get("args") or {}).get("scene_model") or \
         ((recorded.get("init_info") or {}).get("args") or {}).get("scene_model")
     room_map = load_room_map(roots, scene_model)
+    walls = wall_frames(objs, roots)
     doors = [(_xy_box(corners[n])[0] - door_margin, _xy_box(corners[n])[1] + door_margin)
              for n, o in objs.items() if n in corners and "door" in str(o["category"])]
     skip = set(structural) | set(STRUCTURAL_EXTRA)
@@ -243,7 +283,10 @@ def score_demo(demo_dir: str, roots: Sequence[str], K: Optional[Mapping[str, flo
             if projected_area(corners[n], cp, cq, K) < min_area:
                 continue
             c = corners[n].mean(axis=0)
-            if room_map is not None:  # wall test on the room instance map (doors open)
+            if walls is not None:  # wall pieces as occluders: visible when any of centre / shrunk corners is unblocked
+                pts = np.vstack([c[None], c + 0.6 * (corners[n] - c)])
+                ok = not bool(np.all(segments_blocked(cp, pts, walls)))
+            elif room_map is not None:  # wall test on the room instance map (doors open)
                 ok = line_clear(room_map, cp, c, doors)
             else:  # fallback: room boxes from the floors objects
                 oroom = room_of(c[:2], rooms)
@@ -256,7 +299,7 @@ def score_demo(demo_dir: str, roots: Sequence[str], K: Optional[Mapping[str, flo
     return {"schema": SCHEMA, "demo": os.path.basename(os.path.normpath(demo_dir)), "cropped": cropped, "frames": n_frames,
             "step": int(step), "min_area": min_area, "intrinsics": K, "candidates": len(cands), "missing_metadata": len(missing),
             "rooms": len(rooms), "doors": len(doors), "load_rooms": sorted(loaded) if loaded else None,
-            "occlusion": "room instance map" if room_map is not None else "floor boxes",
+            "occlusion": "wall boxes" if walls is not None else ("room instance map" if room_map is not None else "floor boxes"),
             "probe": {n: round(scores.get(n, 0) / max(1, len(idx)), 4) for n in probe},
             "scores": {n: round(c / max(1, n_frames), 4) for n, c in sorted(scores.items()) if c and n in set(cands)},
             "cpu_s": round(time.process_time() - t0, 3)}

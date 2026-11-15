@@ -77,3 +77,10 @@ def test_line_clear_walls_and_doors():
     assert IV.line_clear(img, [-2.0, 0.0], [2.0, 0.0], doors=[(np.array([-0.1, -0.5]), np.array([0.2, 0.5]))])  # door opening
     assert IV.line_clear(img, [-2.0, 0.0], [-0.5, 0.0], doors=[])  # same room
     assert IV.line_clear(img, [-2.0, 0.0], [0.3, 0.0], doors=[])  # a wall-mounted object: the wall lies in the trimmed end
+
+
+def test_wall_boxes_block_segments():
+    walls = (np.array([[0.05, 0.0, 1.5]]), np.eye(3)[None], np.array([[0.05, 5.0, 1.5]]))  # 10 cm wall at x = 0 .. 0.1
+    pts = np.array([[2.0, 0.0, 1.0], [-1.0, 0.0, 1.0], [0.05, 0.0, 1.0], [2.0, 0.0, 8.0]])
+    out = IV.segments_blocked(np.array([-2.0, 0.0, 1.0]), pts, walls)
+    assert out.tolist() == [True, False, False, False]  # behind the wall; same side; wall-mounted (inside the wall); above it
