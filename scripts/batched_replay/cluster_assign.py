@@ -55,6 +55,8 @@ def main():
     ap.add_argument("--vast-share", type=float, default=0.25)
     ap.add_argument("--units", default="")
     ap.add_argument("--unstarted", action="store_true")
+    ap.add_argument("--lanes-shortest", action="store_true", help="assign: lanes take the shortest open units only")
+    ap.add_argument("--lane-frames", type=float, default=0, help="assign: frame budget per lane (instead of --vast-share)")
     a = ap.parse_args()
     base = f"{os.environ['JOB_S3']}/runs/{a.run}"
     spec = json.load(open(RV / "runs" / a.run / "units.json"))
@@ -66,12 +68,28 @@ def main():
         total = sum(u["frames"] for u in open_units)
         wsum = sum(w for _, _, w in lanes)
         target = {"vast": a.vast_share * total, **{n: (1 - a.vast_share) * total * w / wsum for n, _, w in lanes}}
+        if a.lane_frames:
+            target = {"vast": total - a.lane_frames * len(lanes), **{n: a.lane_frames for n, _, _ in lanes}}
         got = {k: 0 for k in target}
         plan = {k: [] for k in target}
-        for u in open_units:  # longest first to the share furthest below its target
-            k = min(target, key=lambda k: got[k] / max(1.0, target[k]))
-            plan[k].append(u["unit"])
-            got[k] += u["frames"]
+        if a.lanes_shortest:
+            # the lanes (slow GPUs) take only the SHORTEST open units, up to their share, so they never hold the tail; the Vast
+            # queue keeps every longer unit; each lane's list stays longest first
+            for u in sorted(open_units, key=lambda u: u["frames"]):
+                k = min((n for n, _, _ in lanes), key=lambda n: got[n] / max(1.0, target[n]))
+                if got[k] + u["frames"] > target[k]:
+                    plan["vast"].append(u["unit"])
+                    got["vast"] += u["frames"]
+                    continue
+                plan[k].append(u["unit"])
+                got[k] += u["frames"]
+            for n, _, _ in lanes:
+                plan[n].sort(key=lambda uid: -units[uid]["frames"])
+        else:
+            for u in open_units:  # longest first to the share furthest below its target
+                k = min(target, key=lambda k: got[k] / max(1.0, target[k]))
+                plan[k].append(u["unit"])
+                got[k] += u["frames"]
         for name, path, _ in lanes:
             ok = []
             for uid in plan[name]:
