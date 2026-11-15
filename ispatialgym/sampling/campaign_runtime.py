@@ -61,6 +61,50 @@ def training_soft_buckets() -> bool:
     return active() and configuration()[0]["split"] == "train"
 
 
+#: train_r6 (2026-11-15): the TRAIN clone of an audited canonical eval_standard template (train_gen author_canonical: the
+#: eval template unchanged except split, scales fixed at the eval's). OnlineGroups gives every group configuration the
+#: config split, so each eval-only recovery scope below refused the canonical template's own train groups. A train
+#: template qualifies only when its eval_standard fingerprint and its scale fingerprint equal the reviewed canonical
+#: selection's: another scene, room, model, scale, scene_setup or recovery option is a different template and still fails.
+#: class_id -> (template_sha256 of the template with split='eval_standard', scale_sha256)
+CANONICAL_TRAIN_CLONES = {
+    'configuration_matching-attachment_02': ('a5af6405f14944a04d9745b47595c5ab843f3d49a04e6e17c62d7a83c7a3ac8b',
+                                             '83e7e6d5e24baa9b6ed67fca084da4d971c71b0c756f6a504184d54e33c2e308'),
+    'alignment-axial_04': ('53c2207c15fc6eff94e8fc136287b77e0a1cea07947fc0e94051a14358cc46be',
+                           '50c06400a9500b10f9f9c9696cae9593f001dc25d6709e302743154f561d8172'),
+    'inter_object_relation_satisfaction-inside_01': ('f4a70919f2edff45825665440f74e07c2b8244c230e3d42f2c742d7e171b0ee2',
+                                                     '8ab89408559b39eab98796b79d484cf8a385ca4d0d7b73635c916af82ccaee22'),
+    'inter_object_relation_satisfaction-touching_02': ('27295a266d23f7d63cb374e07be2564c8cf0e29b6093f8b3ddafe67bcbba7a91',
+                                                       '4079d475fffca23e596a335e183cf12a28adcd96be6972f46c7b7d468b8b7002'),
+    'disembedding_01': ('4cf10ec8922438c24bb1cf5ca4cd988126a840bb830d9147d17a86cd4fb03f5f',
+                        '732387eadeea6c0d3aa4bda49ca507c58d28653ae9738d2f5371539ba08ac578'),
+    'disembedding_10': ('8e83f44a5eb5c65eaa4b05a3a02d1d67af843307d83210ca6eb25e9324338a93',
+                        '2a459eba5b7dc7dc0c7a951ab16378b5926f157a4345b00417047c38a7d9b065'),
+    'inter_object_relation_satisfaction-nextto_large_scale_01': (
+        'b22482e0684bbf35f3e2d20006c1a48d282e9d2b2a8a340153e7a707698afd11',
+        '05ec3144e810414a6ef3e2d4f06fe052d05b7fe73a0b5bfd0858c2a179f1e775'),
+}
+
+
+def canonical_scope(template, perturbations=None) -> bool:
+    """True for eval_standard, or for the train clone of the exact canonical template (see CANONICAL_TRAIN_CLONES).
+
+    ``perturbations`` defaults to the active configuration's (fail closed without one).
+    """
+    if template.split == 'eval_standard':
+        return True
+    expected = CANONICAL_TRAIN_CLONES.get(template.class_id)
+    if template.split != 'train' or expected is None:
+        return False
+    if perturbations is None:
+        if not active():
+            return False
+        perturbations = configuration()[2]
+    from dataclasses import replace
+    return ((replace(template, split='eval_standard').fingerprint, perturbations.scale_fingerprint) == expected
+            and all(s.mode == 'fixed' and list(s.applied) == list(s.default) for s in perturbations.scales.values()))
+
+
 def inside_frame_recovery() -> bool:
     """Hash-bound ranking/retry policy for the blocked saucepot configuration.
 
@@ -150,7 +194,7 @@ def contact_recovery(option: str) -> bool:
         if option in ('cereal_brace_gap_1mm', 'cereal_horizontal_push_proposal'):
             expected = {'target': ('box_of_cereal', 'iucshm', .8),
                         'partner': ('box_of_cereal', 'dkhgxn', 1.)}
-            require(template.split == 'eval_standard' and all(
+            require(canonical_scope(template) and all(
                 len(objects := [o for o in template.objects if o.role == role]) == 1 and
                 (objects[0].category, objects[0].model) == spec[:2] and
                 len(objects[0].default_scale) == 3 and
@@ -158,7 +202,7 @@ def contact_recovery(option: str) -> bool:
                 for role, spec in expected.items()),
                 'cereal brace gap belongs to its exact canonical models and scales')
         if option in ('inside_goal_grasp_proposal', 'inside_goal_stance_proposal'):
-            require(template.split == 'eval_standard' and all(
+            require(canonical_scope(template) and all(
                 [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == role] == [spec]
                 for role, spec in {'target': ('brussels_sprouts', 'mbkrxe', (1., 1., 1.)),
                                    'partner': ('bowl', 'belcml', (1., 1., 1.))}.items()),
@@ -170,7 +214,7 @@ def contact_recovery(option: str) -> bool:
                     'held jar brace belongs to its exact ready default-scale category model')
         if option in ('cap_capture_margin', 'cap_vertical_final_retreat', 'cap_source_stance_proposal',
                       'cap_geometry_above_pregrasp', 'cap_shallow_start_proposal'):
-            require(template.split == 'eval_standard' and
+            require(canonical_scope(template) and
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('cap', 'xxqyrt', (1.0, 1.0, 1.0))],
                     'cap capture margin belongs to its exact default-scale canonical model')
@@ -179,7 +223,7 @@ def contact_recovery(option: str) -> bool:
                     [('lemonade_bottle', 'yprkek', (1.0, 1.0, 1.0))],
                     'cap pregrasp geometry belongs to its exact canonical bottle')
         if option in ('axial_magazine_contact_height', 'axial_magazine_contact_inward_1cm', 'axial_magazine_radial_escape'):
-            require(template.split == 'eval_standard' and
+            require(canonical_scope(template) and
                     [(o.category, o.model, tuple(o.default_scale)) for o in template.objects if o.role == 'target'] ==
                     [('magazine', 'tfovwy', (1.0, 1.0, 1.0))],
                     'axial contact height belongs to its exact canonical magazine')

@@ -62,7 +62,9 @@ def reference_start_proposal(template):
     hint = template.scene_setup.get('reference_start_proposal')
     if hint is None:
         return None
-    standard_reference = template.class_id in ('disembedding_01', 'disembedding_10') and template.split == 'eval_standard'
+    from ispatialgym.sampling.campaign_runtime import canonical_scope
+    # train_r6: the train clone of the exact canonical D01/D10 template keeps its audited reference (canonical_scope).
+    standard_reference = template.class_id in ('disembedding_01', 'disembedding_10') and canonical_scope(template)
     native_reference = template.class_id == 'disembedding_07' and template.split == 'eval_model'
     _require(template.task == 'disembedding' and (standard_reference or native_reference),
              'reference tray proposal has wrong scope')

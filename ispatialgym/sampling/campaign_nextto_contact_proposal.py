@@ -15,7 +15,9 @@ def checked_hint(template):
     hint = template.scene_setup.get(FIELD)
     if hint is None:
         return None
-    _require(template.class_id == CLASS_ID and template.split == 'eval_standard'
+    from ispatialgym.sampling.campaign_runtime import canonical_scope
+    # train_r6: the train clone of the exact canonical template keeps its audited contact (canonical_scope).
+    _require(template.class_id == CLASS_ID and canonical_scope(template)
              and template.task == 'inter_object_relation_satisfaction-nextto_large_scale',
              'nextto contact proposal has wrong class/task/split')
     target = [o for o in template.objects if o.role == 'target']
