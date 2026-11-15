@@ -6,7 +6,7 @@ from pathlib import Path
 from scripts.campaign_20261110.contracts import file_digest, require, validate_campaign_block
 
 
-def selected_records(manifest, demo_dirs, *, sequential_augmentation=False, slots=1):
+def selected_records(manifest, demo_dirs, *, sequential_augmentation=False, slots=1, replay_lighting=False):
     """Select accepted episodes only, with one exact rendering configuration."""
     records = {}
     for line in Path(manifest).read_text().splitlines():
@@ -31,10 +31,13 @@ def selected_records(manifest, demo_dirs, *, sequential_augmentation=False, slot
     else:
         require(len({row["render_compatibility_sha256"] for row in selected.values()}) == 1,
                 "campaign rendering batch mixes scene, scale, light or validation configuration")
-        # Defense in depth: the skybox is global to the simulator, so a batch must share one lighting record even
-        # when an exporter computed equal compatibility hashes (render_compatibility_sha256 is the only guard today).
-        from ispatialgym.sampling.campaign_augmentation import require_shared_skybox
-        require_shared_skybox([{"perturbations": row.get("perturbations") or {}} for row in selected.values()])
+        if not replay_lighting:
+            # Defense in depth: the skybox is global to the simulator, so a batch must share one lighting record even
+            # when an exporter computed equal compatibility hashes (render_compatibility_sha256 is the only guard today).
+            from ispatialgym.sampling.campaign_augmentation import require_shared_skybox
+            require_shared_skybox([{"perturbations": row.get("perturbations") or {}} for row in selected.values()])
+        # replay-time lighting (owner 2026-11-15): the recorded collection lighting is not rendered, so it cannot conflict; the
+        # skybox guard is the replay's own one-draw-per-batch check (replay_lighting.check_batch_skybox / check_group_skybox)
     return selected
 
 

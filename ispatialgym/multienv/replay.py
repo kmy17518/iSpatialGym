@@ -770,8 +770,9 @@ def main(argv=None) -> int:
                      "cameras and full state loads")
         from ispatialgym.multienv.campaign_rendering import selected_records
 
+        replay_light = (args.lighting_pert in ("auto", "replay") or bool(args.lighting_pert_from) or bool(args.replay_tro_dir))
         campaign_records = selected_records(args.campaign_manifest, demo_dirs,
-            sequential_augmentation=args.sequential_augmentation, slots=int(args.slots))
+            sequential_augmentation=args.sequential_augmentation, slots=int(args.slots), replay_lighting=replay_light)
     if args.diagnostic_episode_fault and (not args.campaign_manifest or int(args.slots) != 1 or
             os.environ.get("ISPATIALGYM_CAMPAIGN_RESTORATION_PROBE") != "1"):
         ap.error("episode-fault control requires an explicit single-slot campaign probe")
