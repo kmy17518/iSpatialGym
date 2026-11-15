@@ -606,6 +606,47 @@ class Slot:
         return len(objs), len(changed)
 
 
+def RSP_camera(d: Demo) -> bool:
+    from ispatialgym.multienv.replay_scene_perturbation import _read_json, is_camera_relocalization
+
+    return is_camera_relocalization(_read_json(os.path.join(d.dir, "meta.json")))
+
+
+def replay_goal_image(s: "Slot", d: Demo, obs: Dict[str, Any], out_dir: str) -> Dict[str, Any]:
+    """Camera relocalization (owner 2026-11-15, eval semantics: ``eval.instances.set_goal`` = the head camera's last frame of a replay of
+    the demo, posed at the demo's last ``isg/head_camera_pose``): the last replayed frame of this episode - same env, same replay
+    lighting and removals - saved next to the replayed TRO as ``<instance>[-r<k>]-goal_rgb.png`` and registered as its
+    ``goal_observation``."""
+    import hashlib as _h
+
+    from PIL import Image
+
+    from ispatialgym.oracle.r1pro_model import HEAD_CAMERA_SENSOR_SUFFIX
+
+    robot = s.scene.robots[0]
+    key = next(k for k in robot.sensors if k.endswith(HEAD_CAMERA_SENSOR_SUFFIX))
+    rgb_key = next(k for k in obs if k.endswith("rgb") and key.replace(robot.name + ":", "") in k)
+    a = obs[rgb_key].numpy()[..., :3].astype(np.uint8)
+    ri = (s.scene_pert or {}).get("replay_index", 0)
+    os.makedirs(out_dir, exist_ok=True)
+    name = d.name + (f"-r{ri}" if ri else "") + "-goal_rgb.png"
+    path = os.path.join(out_dir, name)
+    Image.fromarray(a).save(path)
+    with h5py.File(os.path.join(d.dir, "demo.hdf5"), "r") as f:
+        pose = [float(v) for v in f["data/demo_0/isg/head_camera_pose"][-1]]
+    try:
+        from ispatialgym.oracle.qa import CameraModel
+
+        intr = CameraModel.from_sensor(robot.sensors[key]).intrinsics()
+    except Exception:  # noqa: BLE001
+        intr = None
+    return {"sensor_key": key, "rgb_path": name, "rgb_sha256": _h.sha256(open(path, "rb").read()).hexdigest(),
+            "resolution": [int(a.shape[1]), int(a.shape[0])], "intrinsics": intr,
+            "camera_pose_world": {"position": pose[:3], "orientation": pose[3:7]}, "n_render_iterations": 1,
+            "source": "batched replay: the episode's last frame (eval set_goal semantics), replay lighting and removals of this episode",
+            "frame": int(d.T - 1)}
+
+
 def save_frames(out_dir: str, s: "Slot", d: Demo, i: int, obs: Dict[str, Any]) -> None:
     """--scene-pert-frames: the slot's rgb observations of frame ``i`` as png."""
     from PIL import Image
@@ -1126,6 +1167,8 @@ def main(argv=None) -> int:
                                              "lighting": (s.scene_pert.get("lighting") or {}).get("fixtures_draw")},
                                          "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
                                                                                       "occluded": occl.get("occluded")}})
+                    if s.scene_pert is not None and d.tro_path and RSP_camera(d):
+                        s.scene_pert["goal_observation"] = replay_goal_image(s, d, obs, os.path.join(args.root, "instances"))
                     if s.scene_pert is not None and (s.scene_pert.get("removed") or s.scene_pert.get("lighting")) and d.tro_path:
                         s.scene_pert["replayed_tro"] = RL.write_replayed_tro(d.tro_path, os.path.join(args.root, "instances"), s.scene_pert)
                     if s.scene_pert is not None:

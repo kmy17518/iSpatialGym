@@ -57,7 +57,8 @@ def test_task_objects_and_exempt():
     t = RSP.task_objects(meta, tro)
     assert set(t) == {"target_x", "dest_y", "floors_a", "distractor_z"}
     assert not RSP.exempt(meta)
-    assert RSP.exempt({"task_family": "camera_relocalization", "variant": "camera_relocalization-standard"})
+    cam = {"task_family": "camera_relocalization", "variant": "camera_relocalization-standard"}
+    assert not RSP.exempt(cam) and RSP.is_camera_relocalization(cam) and RSP.exempt(cam, ("camera_relocalization",))
 
 
 def test_structural_and_frames():
@@ -198,10 +199,15 @@ def test_plan_on_fake_scene(tmp_path):
         pass
 
 
-def test_plan_exempt_camera_relocalization(tmp_path):
-    (tmp_path / "meta.json").write_text(json.dumps({"task_family": "camera_relocalization"}))
-    rec = RSP.plan(_Scene(), _Demo(str(tmp_path)), 0, 0, {"p_episode": 1.0, "p_unit": 1.0})
-    assert rec["exempt"] == "camera_relocalization" and rec["removed"] == []
+def test_plan_camera_relocalization_not_exempt_obstacle_protected(tmp_path):
+    (tmp_path / "meta.json").write_text(json.dumps({"task_family": "camera_relocalization", "tracked_objects": {}}))
+    tro = tmp_path / "t-tro_state.json"
+    tro.write_text(json.dumps({"ispatialgym": {"object_bindings": {"obstacle.n.01_1": {"scene_object_name": "sofa"}}}}))
+    demo = _Demo(str(tmp_path))
+    demo.tro_path = str(tro)
+    rec = RSP.plan(_Scene(), demo, 0, 0, {"p_episode": 1.0, "p_unit": 1.0})
+    assert "exempt" not in rec and rec["protected"]["sofa"].startswith("tro_binding:obstacle")
+    assert "sofa" not in rec["removed"] and "pillow" not in rec["removed"]  # the obstacle's unit stays whole
 
 
 def test_aabb_gap():

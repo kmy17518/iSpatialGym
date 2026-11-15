@@ -55,7 +55,9 @@ STRUCTURAL = frozenset((
 #: building parts the replay also never hides (not in the sampling-time list; hiding them opens holes in the building)
 EXTRA_STRUCTURAL = frozenset(('elevator_door', 'lintel', 'trim', 'molding', 'ceiling_light', 'wall_mounted_light'))
 
-EXEMPT_FAMILIES = ("camera_relocalization",)
+#: owner 2026-11-15: camera relocalization is no longer exempt - its goal image is rendered at batched replay (the last frame, as eval's
+#: set-goal does), in the same env with the same replay lighting and removals; the obstacle of an obstructed instance is a TRO binding
+EXEMPT_FAMILIES: Tuple[str, ...] = ()
 
 DEFAULTS = {"p_episode": 0.5, "p_unit": 0.5, "contact_margin": 0.02, "touch_margin": 0.01, "contact_frames": 40,
             "move_tol": 1e-4, "move_frames": 300, "offstage_m": 50.0}
@@ -65,10 +67,14 @@ def is_structural(category: Optional[str]) -> bool:
     return (category or "") in STRUCTURAL or (category or "") in EXTRA_STRUCTURAL
 
 
-def exempt(meta: Mapping[str, Any]) -> bool:
-    """Camera relocalization keeps its scene (owner: every class except camera relocalization)."""
+def exempt(meta: Mapping[str, Any], families: Sequence[str] = None) -> bool:
+    """Is the demo's family exempt from replay-time perturbation (``EXEMPT_FAMILIES``, empty since 2026-11-15)?"""
     text = " ".join(str(meta.get(k) or "") for k in ("task_family", "variant", "task", "subtask", "activity"))
-    return any(f in text for f in EXEMPT_FAMILIES)
+    return any(f in text for f in (EXEMPT_FAMILIES if families is None else families))
+
+
+def is_camera_relocalization(meta: Mapping[str, Any]) -> bool:
+    return exempt(meta, ("camera_relocalization",))
 
 
 def episode_key(seed: int, demo_name: str, replay_index: int) -> int:
@@ -325,7 +331,7 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
     rec: Dict[str, Any] = {"schema": SCHEMA, "demo": demo.dir, "demo_name": demo.name, "replay_index": int(replay_index),
                            "seed": int(seed), "cfg": cfg, "removed": [], "units": [], "perturbed": False}
     if exempt(meta):
-        rec["exempt"] = "camera_relocalization"
+        rec["exempt"] = "exempt family"
         return rec
     robots = {r.name for r in scene.robots}
     objs = {o.name: o for o in scene.objects if o.name not in robots}

@@ -217,6 +217,11 @@ def write_replayed_tro(src_tro: str, out_dir: str, rec: Mapping[str, Any]) -> st
 
     block["source_tro"] = {"path": src_tro, "sha256": file_digest(src_tro)}
     camp[REPLAY_BLOCK] = block
+    if rec.get("goal_observation"):
+        # camera relocalization: the goal image rendered by this replay replaces the collection's (physics-only: none)
+        if tro["ispatialgym"].get("goal_observation") is not None:
+            tro["ispatialgym"]["goal_observation_collection"] = tro["ispatialgym"]["goal_observation"]
+        tro["ispatialgym"]["goal_observation"] = dict(rec["goal_observation"])
     os.makedirs(out_dir, exist_ok=True)
     name = os.path.basename(src_tro)
     if int(rec["replay_index"]):
