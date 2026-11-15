@@ -137,7 +137,8 @@ class _Scene:
                      _Obj(self, "sofa", "sofa", [7, 0, 0], [8, 1, 1]),
                      _Obj(self, "pillow", "pillow", [7.2, 0.2, 1.0], [7.5, 0.5, 1.2]),
                      _Obj(self, "lamp", "floor_lamp", [9, 0, 0], [9.2, 0.2, 1.5], light=True),
-                     _Obj(self, "walls_a", "walls", [0, -1, 0], [10, -0.9, 3])]
+                     _Obj(self, "walls_a", "walls", [0, -1, 0], [10, -0.9, 3]),
+                     _Obj(self, "parked_chair", "chair", [200, 200, 0], [200.5, 200.5, 1])]
         self.robots = [_Robot(self)]
         self.objects = self.objs + [type("R", (), {"name": "robot_r1"})()]
 
@@ -179,6 +180,7 @@ def test_plan_on_fake_scene(tmp_path):
     p = rec["protected"]
     assert p["target_cup"].startswith("tracked_objects") and p["table"] == "task/moved contact@0" and p["vase"].startswith("unit:")
     assert p["shelf"].startswith("robot contact@1") and p["lamp"] == "holds light" and "walls_a" not in p
+    assert rec["offstage"] == ["parked_chair"] and "parked_chair" not in p
     assert rec["robot_boxes_min"] == 1 and rec["removed_min_gap_m"]["chair"]["robot"] > 3.0
     hidden = RSP.apply(scene, rec["removed"])
     assert sorted(o.name for o in scene.objs if not o.visible) == hidden

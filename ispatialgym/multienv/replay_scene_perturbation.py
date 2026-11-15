@@ -58,7 +58,7 @@ EXTRA_STRUCTURAL = frozenset(('elevator_door', 'lintel', 'trim', 'molding', 'cei
 EXEMPT_FAMILIES = ("camera_relocalization",)
 
 DEFAULTS = {"p_episode": 0.5, "p_unit": 0.5, "contact_margin": 0.02, "touch_margin": 0.01, "contact_frames": 40,
-            "move_tol": 1e-4, "move_frames": 300}
+            "move_tol": 1e-4, "move_frames": 300, "offstage_m": 50.0}
 
 
 def is_structural(category: Optional[str]) -> bool:
@@ -381,6 +381,10 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
                 hits[n] = f"task/moved contact@{i}"
     for n, why in hits.items():
         protected.setdefault(n, why)
+    # offstage: an object farther than offstage_m from the robot at every sampled frame (a template's own far parking, e.g. chairs
+    # parked ~200 m away) - hiding it changes no image, so it is neither a unit nor counted as a removal
+    offstage = sorted(n for n in static if n not in protected and gaps[n][0] is not None and gaps[n][0] > float(cfg["offstage_m"]))
+    candidates = [n for n in candidates if n not in set(offstage)]
     if not n_robot_boxes or min(n_robot_boxes) == 0:
         raise RuntimeError(f"scene perturbation: no robot link boxes for {demo.name} (robot contact cannot be protected)")
     units, protected = removable_units(candidates, boxes, protected, float(cfg["touch_margin"]))
@@ -394,7 +398,7 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
     rec.update(d)
     rec.update({"units": units, "n_candidates": len(candidates), "n_objects": len(objs),
                 "protected": dict(sorted(protected.items())), "contact_frames": len(contact_frames), "move_frames": len(idx),
-                "parked_by_campaign": sorted(parked), "robot_boxes_min": min(n_robot_boxes),
+                "parked_by_campaign": sorted(parked), "offstage": offstage, "robot_boxes_min": min(n_robot_boxes),
                 "removed_min_gap_m": {n: {"robot": None if gaps.get(n, [None])[0] is None else round(gaps[n][0], 4),
                                           "task": None if gaps.get(n, [None, None])[1] is None else round(gaps[n][1], 4)}
                                       for n in rec.get("removed", [])}})
