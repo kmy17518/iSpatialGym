@@ -30,7 +30,8 @@ SCHEMA = "isg-replay-lighting-v1"
 
 #: owner 2026-11-15: intensity x0.5-1.5 from a normal centred at 1. sigma 0.17 puts the clip bounds at 2.9 sigma (0.4 % of draws
 #: clipped), 68 % of draws within +-17 %, 95 % within +-34 %: large changes stay possible but rare (long tail)
-DEFAULTS = {"p": 0.5, "sigma": 0.17, "lo": 0.5, "hi": 1.5, "color_sigma": 0.04, "color_lo": 0.88, "color_hi": 1.12,
+#: owner 2026-11-15 03:55: the intensity factor is drawn UNIFORMLY from [lo, hi] = [0.5, 1.5] (dist "normal" keeps N(1, sigma) clipped)
+DEFAULTS = {"dist": "uniform", "p": 0.5, "sigma": 0.17, "lo": 0.5, "hi": 1.5, "color_sigma": 0.04, "color_lo": 0.88, "color_hi": 1.12,
             "sky_sigma": 0.17, "sky_lo": 0.5, "sky_hi": 1.5, "sky_color_sigma": 0.03, "sky_color_lo": 0.92, "sky_color_hi": 1.08}
 
 
@@ -42,6 +43,16 @@ def _clip(x, lo, hi):
     return min(float(hi), max(float(lo), float(x)))
 
 
+def _factor(rng, c, prefix=""):
+    """The intensity factor: uniform on [lo, hi] (default) or N(1, sigma) clipped to [lo, hi]."""
+    lo, hi = c[prefix + "lo"], c[prefix + "hi"]
+    if c.get("dist", "uniform") == "uniform":
+        return float(rng.uniform(float(lo), float(hi)))
+    if c["dist"] != "normal":
+        raise ValueError(f"replay lighting: unknown dist {c['dist']!r}")
+    return _clip(rng.gauss(1.0, c[prefix + "sigma"]), lo, hi)
+
+
 def draw_fixtures(seed: int, group: str, round_: int, cfg: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
     """One goal group's fixture draw (owner 2026-11-15: all members of a goal group share it): defaults with probability 1 - p,
     else an intensity factor ~ N(1, sigma) clipped and per-channel colour factors."""
@@ -49,7 +60,7 @@ def draw_fixtures(seed: int, group: str, round_: int, cfg: Optional[Mapping[str,
     rng = random.Random(_key(seed, "fixtures", group, round_))
     if rng.random() >= float(c["p"]):
         return {"perturbed": False, "intensity_factor": 1.0, "color_factors": [1.0, 1.0, 1.0]}
-    return {"perturbed": True, "intensity_factor": _clip(rng.gauss(1.0, c["sigma"]), c["lo"], c["hi"]),
+    return {"perturbed": True, "intensity_factor": _factor(rng, c), "dist": c.get("dist", "uniform"), "range": [c["lo"], c["hi"]],
             "color_factors": [_clip(rng.gauss(1.0, c["color_sigma"]), c["color_lo"], c["color_hi"]) for _ in range(3)]}
 
 
@@ -77,7 +88,8 @@ def draw_skybox(seed: int, key: str, cfg: Optional[Mapping[str, Any]] = None) ->
     rng = random.Random(_key(seed, "skybox", key))
     if rng.random() >= float(c["p"]):
         return {"perturbed": False, "intensity_factor": 1.0, "color_factors": [1.0, 1.0, 1.0], "batch_key": key}
-    return {"perturbed": True, "intensity_factor": _clip(rng.gauss(1.0, c["sky_sigma"]), c["sky_lo"], c["sky_hi"]),
+    return {"perturbed": True, "intensity_factor": _factor(rng, c, "sky_"), "dist": c.get("dist", "uniform"),
+            "range": [c["sky_lo"], c["sky_hi"]],
             "color_factors": [_clip(rng.gauss(1.0, c["sky_color_sigma"]), c["sky_color_lo"], c["sky_color_hi"]) for _ in range(3)],
             "batch_key": key}
 

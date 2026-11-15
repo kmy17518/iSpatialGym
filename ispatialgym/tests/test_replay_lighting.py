@@ -15,7 +15,13 @@ def test_fixture_draw_deterministic_ranges_and_rate():
     assert all(0.88 <= c <= 1.12 for d in draws for c in d["color_factors"])
     import statistics
 
-    assert 0.14 < statistics.pstdev(f) < 0.19 and abs(statistics.mean(f) - 1.0) < 0.03
+    # default: uniform on [0.5, 1.5] (sd 1/sqrt(12) = 0.289), dist and range recorded in the draw
+    assert 0.26 < statistics.pstdev(f) < 0.32 and abs(statistics.mean(f) - 1.0) < 0.04 and min(f) < 0.55 and max(f) > 1.45
+    assert draws[0]["dist"] == "uniform" and draws[0]["range"] == [0.5, 1.5]
+    g = [RL.draw_fixtures(1, "demo", r, {"p": 1.0, "dist": "normal"})["intensity_factor"] for r in range(400)]
+    assert 0.14 < statistics.pstdev(g) < 0.19 and min(g) >= 0.5 and max(g) <= 1.5
+    sk = [RL.draw_skybox(1, str(r), {"p": 1.0})["intensity_factor"] for r in range(400)]
+    assert 0.5 <= min(sk) < 0.55 and 1.45 < max(sk) <= 1.5
     n = sum(RL.draw_fixtures(2, "d", r)["perturbed"] for r in range(2000))
     assert 900 < n < 1100
     off = RL.draw_fixtures(2, "d", next(r for r in range(50) if not RL.draw_fixtures(2, "d", r)["perturbed"]))

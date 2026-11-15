@@ -737,7 +737,9 @@ def main(argv=None) -> int:
                          "--campaign-manifest unless every demo is camera relocalization (exempt: recorded lighting), else off")
     ap.add_argument("--lighting-pert-seed", type=int, default=None, help="default: --scene-pert-seed")
     ap.add_argument("--lighting-pert-p", type=float, default=0.5)
-    ap.add_argument("--lighting-pert-sigma", type=float, default=0.17, help="fixture / skybox intensity factor ~ N(1, sigma)")
+    ap.add_argument("--lighting-pert-dist", choices=("uniform", "normal"), default="uniform",
+                    help="intensity factor: uniform on --lighting-pert-range (owner 2026-11-15 03:55), or N(1, sigma) clipped to it")
+    ap.add_argument("--lighting-pert-sigma", type=float, default=0.17, help="--lighting-pert-dist normal: N(1, sigma)")
     ap.add_argument("--lighting-pert-range", default="0.5,1.5", help="intensity factor clip lo,hi")
     ap.add_argument("--lighting-pert-color-sigma", type=float, default=0.04, help="fixture colour factors ~ N(1, sigma) per channel")
     ap.add_argument("--lighting-pert-from", default=None, help="REPLAY_SCENE_PERT records: re-apply their lighting exactly")
@@ -812,7 +814,7 @@ def main(argv=None) -> int:
 
     groups_of = {os.path.basename(os.path.normpath(d)): goal_group(d) for d in demo_dirs}
     lo, hi = (float(x) for x in args.lighting_pert_range.split(","))
-    light_cfg = {"p": args.lighting_pert_p, "sigma": args.lighting_pert_sigma, "lo": lo, "hi": hi,
+    light_cfg = {"dist": args.lighting_pert_dist, "p": args.lighting_pert_p, "sigma": args.lighting_pert_sigma, "lo": lo, "hi": hi,
                  "color_sigma": args.lighting_pert_color_sigma, "sky_sigma": args.lighting_pert_sigma, "sky_lo": lo, "sky_hi": hi}
     light_seed = args.scene_pert_seed if args.lighting_pert_seed is None else args.lighting_pert_seed
     light_from = RL.load_from_records(args.lighting_pert_from) if args.lighting_pert_from else None
