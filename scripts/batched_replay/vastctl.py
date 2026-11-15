@@ -572,6 +572,8 @@ def reap(c, s3, dry=False):
             continue
         cl = r2_json(s3, f"claims/{k}") or {}
         owner = str(cl.get("instance"))
+        if owner.startswith("cluster"):  # cluster lanes (cluster_assign.py) hold their units; never released here
+            continue
         hb = hbs.get(owner)
         # other providers' workers (rp-<pod>): only silence counts; nothing is gone while an account's list is missing
         gone = owner.isdigit() and owner not in live and not SHOW_ERRORS
