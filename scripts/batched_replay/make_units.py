@@ -270,6 +270,9 @@ def build(a):
         f = facts[r["demo_dir"]]
         key = (r["purpose"], f.get("world_key") or f["template_key"], json.dumps(f["rooms"]), json.dumps(r.get("extra_args") or []),
                r.get("class_id"))
+        if a.group_removals:  # demos of one world must share their collection-time removals (camera relocalization)
+            t = json.load(open(r.get("tro_override") or r["tree_tro"]))
+            key += (json.dumps(sorted(((t["ispatialgym"].get("campaign") or {}).get("perturbations") or {}).get("removed_objects") or [])),)
         groups[key].append(r)
     units = []
     for key, rs in sorted(groups.items()):
@@ -419,6 +422,7 @@ def main():
     p.add_argument("--upload", action="store_true")
     p.add_argument("--repeat", type=int, default=1, help="sweep runs: copies of every unit")
     p.add_argument("--split-groups", action="store_true", help="cut units between demos of one goal group (per-demo draws)")
+    p.add_argument("--group-removals", action="store_true", help="a unit's demos share their collection-time removed objects")
     p.add_argument("--conv-last", action="store_true", help="at most one conversion demo per unit, as its last demo")
     p.add_argument("--resume", action="store_true", help="keep the units already packed in an existing run dir (same rows)")
     p.add_argument("--pack-workers", type=int, default=24)
