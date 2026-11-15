@@ -115,6 +115,9 @@ def merge(a):
         uid = u["unit"]
         ds = d / uid
         info = json.load(open(ds / "meta/info.json"))
+        if int(info.get("total_episodes") or 0) == 0:
+            print(f"skip {run}/{uid}: no kept episode (every demo dropped by the goal-occlusion screen)")
+            continue
         if info0 is None:
             info0 = info
             video_keys = [k for k, v in info["features"].items() if v["dtype"] == "video"]
