@@ -24,8 +24,14 @@ from pathlib import Path
 RV = Path("/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1")
 PURPOSE_FLAGS = {  # = vast/worker.py PURPOSE_FLAGS
     "train": ["--scene-pert", "remove", "--scene-pert-plan", "auto", "--lighting-pert", "replay", "--lighting-skybox", "episode",
-              "--pert-unit", "demo", "--scene-pert-inview-pick", "random", "--goal-occlusion", "auto"],
+              "--pert-unit", "demo", "--scene-pert-inview-pick", "random", "--goal-occlusion", "off"],
     "eval": ["--scene-pert", "off", "--lighting-pert", "off", "--goal-occlusion", "off"],
+    # REPLAY_DIFF_20261115 held-out siblings (never in a training merge): clean = eval rules; perturbed = scene + lighting, each with
+    # probability 1.0 (camera relocalization: lighting only, the replayer never removes for it)
+    "heldout_clean": ["--scene-pert", "off", "--lighting-pert", "off", "--goal-occlusion", "off"],
+    "heldout_perturbed": ["--scene-pert", "remove", "--scene-pert-plan", "auto", "--lighting-pert", "replay", "--lighting-skybox", "episode",
+                          "--pert-unit", "demo", "--scene-pert-inview-pick", "random", "--scene-pert-p-episode", "1",
+                          "--lighting-pert-p", "1", "--goal-occlusion", "off"],
 }
 JOB = os.environ.get("SLURM_JOB_ID", f"local{os.getpid()}")
 UNITS_FILE = [None]
