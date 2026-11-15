@@ -546,6 +546,8 @@ class Slot:
         self.hidden: List[str] = []
         self.scene_pert: Optional[Dict[str, Any]] = None
         self.pert_check: Dict[str, Any] = {}
+        #: replay-time lighting: campaign restoration leaves the recorded collection lighting out
+        self.ignore_recorded_lighting = False
 
     def start(self, demo: Demo) -> None:
         from omnigibson.envs.data_wrapper import _align_scene_object_states_with_recorded_schema
@@ -580,7 +582,8 @@ class Slot:
             # merged (full) scene of a cropped demo: restoration against the recorded crop's objects, outside fixtures lit alike
             crop = (set(demo.scene_file["objects_info"]["init_info"]) if self.scene_mode == "full" and is_cropped(demo.scene_crop)
                     else None)
-            self.campaign_restoration = restore_campaign_scene(self.scene, og.sim, demo.campaign_meta, crop_names=crop)
+            self.campaign_restoration = restore_campaign_scene(self.scene, og.sim, demo.campaign_meta, crop_names=crop,
+                                                               ignore_lighting=self.ignore_recorded_lighting)
         self.n_objects_scene = len(self.scene.object_registry.get_dict("name"))
         self.demo, self.i, self.t0 = demo, 0, time.time()
         self.loaded = None
@@ -684,6 +687,16 @@ def main(argv=None) -> int:
                     help="after the slots' first episodes start: point every slot's head camera at up to 3 objects removed in some "
                          "slots and kept in others, save the views to this dir and print REPLAY_SCENE_PERT_PROBE (cameras restored)")
     ap.add_argument("--scene-pert-probe-only", action="store_true", help="stop after the probe (no dataset written)")
+    ap.add_argument("--lighting-pert", choices=("auto", "off", "replay"), default="auto",
+                    help="replay-time lighting (owner 2026-11-15; ispatialgym.multienv.replay_lighting): replay = ignore the recorded "
+                         "collection lighting and apply a fresh draw per env (fixtures) and per batch (skybox); auto = replay with "
+                         "--campaign-manifest unless every demo is camera relocalization (exempt: recorded lighting), else off")
+    ap.add_argument("--lighting-pert-seed", type=int, default=None, help="default: --scene-pert-seed")
+    ap.add_argument("--lighting-pert-p", type=float, default=0.5)
+    ap.add_argument("--lighting-pert-sigma", type=float, default=0.3, help="fixture / skybox intensity factor ~ N(1, sigma)")
+    ap.add_argument("--lighting-pert-range", default="0.4,1.8", help="intensity factor clip lo,hi")
+    ap.add_argument("--lighting-pert-color-sigma", type=float, default=0.06, help="fixture colour factors ~ N(1, sigma) per channel")
+    ap.add_argument("--lighting-pert-from", default=None, help="REPLAY_SCENE_PERT records: re-apply their lighting exactly")
     ap.add_argument("--profile-ticks", default=None, help="START:COUNT: cProfile those ticks, stats to <results>.prof.txt (or stdout)")
     args = ap.parse_args(argv)
 
@@ -727,6 +740,35 @@ def main(argv=None) -> int:
     import omnigibson as og
     from omnigibson.macros import gm
 
+    # replay-time lighting: camera relocalization keeps its collection lighting; a run must not mix it with the other classes
+    from ispatialgym.multienv import replay_lighting as RL
+    from ispatialgym.multienv.replay_scene_perturbation import _read_json as _rj, exempt as _exempt
+
+    exempt_dirs = {d for d in demo_dirs if _exempt(_rj(os.path.join(d, "meta.json")))}
+    lighting_mode = args.lighting_pert
+    if lighting_mode == "auto":
+        lighting_mode = "replay" if (args.campaign_manifest and len(exempt_dirs) < len(demo_dirs)) else "off"
+    if args.lighting_pert_from:
+        lighting_mode = "replay"
+    if lighting_mode == "replay" and exempt_dirs:
+        ap.error("replay-time lighting: camera relocalization (exempt, collection lighting) renders in its own batch")
+    lo, hi = (float(x) for x in args.lighting_pert_range.split(","))
+    light_cfg = {"p": args.lighting_pert_p, "sigma": args.lighting_pert_sigma, "lo": lo, "hi": hi,
+                 "color_sigma": args.lighting_pert_color_sigma, "sky_sigma": args.lighting_pert_sigma, "sky_lo": lo, "sky_hi": hi}
+    light_seed = args.scene_pert_seed if args.lighting_pert_seed is None else args.lighting_pert_seed
+    light_from = RL.load_from_records(args.lighting_pert_from) if args.lighting_pert_from else None
+    sky_draw = None
+    if lighting_mode == "replay":
+        names = [os.path.basename(os.path.normpath(d)) for d in demo_dirs]
+        if light_from is not None:
+            mine = [r for (n, _), r in light_from.items() if n in set(names)]
+            RL.check_batch_skybox(mine)
+            if not mine:
+                ap.error("--lighting-pert-from: no record for these demos")
+            sky_draw = mine[0]["skybox"]
+        else:
+            sky_draw = RL.draw_skybox(light_seed, RL.batch_key(names), light_cfg)
+
     if args.sequential_augmentation:
         from ispatialgym.oracle import run_isg
         from ispatialgym.oracle.campaign_batch import saved_world_scope
@@ -748,6 +790,13 @@ def main(argv=None) -> int:
     env = og.Environment(configs=config)
     load_s = time.time() - t_start
     robot_name = env.scenes[0].robots[0].name
+    sky_applied = None
+    if lighting_mode == "replay":
+        for sc in env.scenes:  # untouched fixture defaults of every slot, before any restoration
+            RL.fixture_defaults(sc)
+        RL.sky_defaults(og.sim)
+        sky_applied = RL.apply_skybox(og.sim, sky_draw)
+        print("REPLAY_LIGHTING_SKYBOX " + json.dumps({"draw": sky_draw, "applied": sky_applied}), flush=True)
     from ispatialgym.multienv.campaign_render_cleanup import processing_cleanup
     writers = []
     with processing_cleanup(writers):
@@ -764,6 +813,7 @@ def main(argv=None) -> int:
         pert_path = os.path.join(args.root, "scene_perturbation.jsonl")
 
         def start_slot(s: "Slot", demo: Demo) -> None:
+            s.ignore_recorded_lighting = lighting_mode == "replay"
             s.start(demo)
             if args.scene_pert_verify:
                 from ispatialgym.multienv.replay_scene_perturbation import _read_json
@@ -771,7 +821,7 @@ def main(argv=None) -> int:
                 meta = _read_json(os.path.join(demo.dir, "meta.json"))
                 s.pert_check = {"tracked": meta.get("tracked_objects") or {}, "pos_m": 0.0, "ori_rad": 0.0, "frames": 0,
                                 "recorded_success": meta.get("success")}
-            if args.scene_pert == "off" and pert_from is None:
+            if args.scene_pert == "off" and pert_from is None and lighting_mode != "replay":
                 return
             from ispatialgym.multienv import replay_scene_perturbation as RSP
 
@@ -779,20 +829,41 @@ def main(argv=None) -> int:
             s.hidden = []
             ri = args.scene_pert_index_base + replay_counts[demo.dir]
             replay_counts[demo.dir] += 1
-            forced = None
-            if pert_from is not None:
-                forced = pert_from.get((demo.name, ri))
-                if forced is None:
-                    raise SystemExit(f"--scene-pert-from: no record for {demo.name} replay {ri}")
             t_p = time.perf_counter()
-            inside = None
-            if args.scene_pert_scope == "outside_crop" and is_cropped(demo.scene_crop):
-                inside = set(demo.scene_file["objects_info"]["init_info"])
-            rec = RSP.plan(s.scene, demo, ri, args.scene_pert_seed,
-                           {"p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit}, forced=forced,
-                           inside_crop=inside)
-            rec["scope"], rec["scene_mode"] = args.scene_pert_scope, s.scene_mode
-            s.hidden = RSP.apply(s.scene, rec["removed"])
+            if args.scene_pert != "off" or pert_from is not None:
+                forced = None
+                if pert_from is not None:
+                    forced = pert_from.get((demo.name, ri))
+                    if forced is None:
+                        raise SystemExit(f"--scene-pert-from: no record for {demo.name} replay {ri}")
+                inside = None
+                if args.scene_pert_scope == "outside_crop" and is_cropped(demo.scene_crop):
+                    inside = set(demo.scene_file["objects_info"]["init_info"])
+                rec = RSP.plan(s.scene, demo, ri, args.scene_pert_seed,
+                               {"p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit}, forced=forced,
+                               inside_crop=inside)
+                rec["scope"], rec["scene_mode"] = args.scene_pert_scope, s.scene_mode
+                s.hidden = RSP.apply(s.scene, rec["removed"])
+            else:
+                rec = {"schema": RSP.SCHEMA, "demo": demo.dir, "demo_name": demo.name, "replay_index": ri, "seed": args.scene_pert_seed,
+                       "removed": [], "perturbed": False, "scene_pert": "off"}
+            if lighting_mode == "replay":
+                if light_from is not None:
+                    lrec = light_from.get((demo.name, ri))
+                    if lrec is None:
+                        raise SystemExit(f"--lighting-pert-from: no record for {demo.name} replay {ri}")
+                    fdraw = lrec["fixtures_draw"]
+                    RL.check_batch_skybox([lrec, {"skybox": sky_draw}])
+                else:
+                    fdraw = RL.draw_fixtures(light_seed, demo.name, ri, light_cfg)
+                fixtures = RL.apply_fixtures(s.scene, og.sim, fdraw)
+                if abs(float(og.sim.skybox.intensity) - sky_applied["intensity"]) > 1e-5 * max(1.0, sky_applied["intensity"]):
+                    RL.apply_skybox(og.sim, sky_draw)  # a restoration reset it: the batch keeps one skybox
+                rec["lighting"] = {"schema": RL.SCHEMA, "mode": "replay", "seed": light_seed, "cfg": light_cfg,
+                                   "fixtures_draw": fdraw, "fixtures_applied": fixtures, "skybox": sky_draw,
+                                   "skybox_applied": RL.apply_skybox(og.sim, sky_draw),
+                                   "recorded_ignored": RL.ignored_recorded(getattr(demo, "campaign_meta", None)),
+                                   "forced": light_from is not None}
             s.scene.load_state(demo.state_at(0), serialized=True)
             rec["slot"], rec["plan_s"] = s.k, round(time.perf_counter() - t_p, 2)
             s.scene_pert = rec
@@ -1008,7 +1079,8 @@ def main(argv=None) -> int:
                                          "scene_perturbation": None if s.scene_pert is None else {
                                              "removed": s.scene_pert["removed"], "replay_index": s.scene_pert["replay_index"],
                                              "seed": s.scene_pert["seed"], "perturbed": s.scene_pert["perturbed"],
-                                             "exempt": s.scene_pert.get("exempt")},
+                                             "exempt": s.scene_pert.get("exempt"),
+                                             "lighting": (s.scene_pert.get("lighting") or {}).get("fixtures_draw")},
                                          "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
                                                                                       "occluded": occl.get("occluded")}})
                     if s.scene_pert is not None:

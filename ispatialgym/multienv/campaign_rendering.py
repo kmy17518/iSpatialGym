@@ -119,13 +119,19 @@ def apply_outside_lighting(scene, sim, crop_names, request):
             "applied_range": [min((full[n] * factor for n in attrs), default=None), max((full[n] * factor for n in attrs), default=None)]}
 
 
-def restore_campaign_scene(scene, sim, meta, crop_names=None):
+def restore_campaign_scene(scene, sim, meta, crop_names=None, ignore_lighting=False):
     """Call after loading the first recorded state, before rendering any frame. ``crop_names`` (merged replay of a cropped demo:
     the recorded crop's object names): restoration runs against the crop view and the outside-crop fixtures get the same light."""
     from ispatialgym.sampling.campaign_runtime import verify_loaded
 
     merged = crop_names is not None
     target = crop_view(scene, crop_names) if merged else scene
+    if ignore_lighting:
+        # replay-time lighting (owner 2026-11-15): the collection lighting is neither applied nor verified; fixtures stay at their
+        # defaults here and the replay's own draw is applied by the caller
+        from ispatialgym.multienv.replay_lighting import without_lighting
+
+        meta = without_lighting(meta)
     physical = {}
     for instance in meta["campaign"]["perturbations"]["scales"]:
         binding = meta["object_bindings"][instance]
@@ -139,8 +145,11 @@ def restore_campaign_scene(scene, sim, meta, crop_names=None):
                     require(getattr(obj, field) == binding[field], f"campaign render {field} differs: {instance}")
         physical[instance] = obj
     result = verify_loaded(meta["campaign"], physical, scene=target, sim=sim)
-    if merged:
+    if merged and not ignore_lighting:
         result = dict(result)
         result["merged_lighting"] = apply_outside_lighting(scene, sim, crop_names,
                                                            meta["campaign"]["perturbations"].get("lighting") or {})
+    if ignore_lighting:
+        result = dict(result)
+        result["recorded_lighting"] = "ignored: replay-time lighting"
     return result
