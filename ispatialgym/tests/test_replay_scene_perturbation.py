@@ -174,7 +174,7 @@ class _Demo:
 def test_plan_on_fake_scene(tmp_path):
     (tmp_path / "meta.json").write_text(json.dumps({"tracked_objects": {"cup.n.01_1": "target_cup"}, "task_family": "x"}))
     scene, demo = _Scene(), _Demo(str(tmp_path))
-    rec = RSP.plan(scene, demo, 0, 0, {"p_episode": 1.0, "p_unit": 1.0})
+    rec = RSP.plan(scene, demo, 0, 0, {"mode": "subset", "p_episode": 1.0, "p_unit": 1.0})
     # table: touches the target cup; vase: same unit as the table; shelf: robot contact at frame 1; lamp holds a light; walls structural
     assert rec["units"] == [["chair"], ["pillow", "sofa"]]
     assert rec["removed"] == ["chair", "pillow", "sofa"]
@@ -318,3 +318,29 @@ def test_merged_lighting_crop_view_and_outside():
     assert abs(scene.objects[0].prim.children[0].attr.v - 80.0) < 1e-9 and abs(scene.objects[1].prim.children[0].attr.v - 40.0) < 1e-9
     # the recorded record of the crop (as collected in the cropped world) is accepted against the view
     A.apply_lighting(view, sim, req, expected=rec)
+
+
+def test_draw_one_single_object_group_keyed():
+    units = [["chair"], ["pillow", "sofa"], ["lamp_table"], ["stool"]]
+    keys = [RSP.group_key(0, f"group{g}") for g in range(40)]
+    picks = [RSP.draw_one(units, k, 1.0) for k in keys]
+    assert all(len(p["removed"]) == 1 and p["removed"][0] in ("chair", "lamp_table", "stool") for p in picks)  # groups never split
+    assert len({p["removed"][0] for p in picks}) == 3
+    assert RSP.draw_one(units, keys[0], 1.0) == picks[0]  # same group -> same object
+    assert RSP.draw_one([["a", "b"]], keys[0], 1.0) == {"perturbed": False, "removed": [], "no_single": True,
+                                                         "order_head": RSP.draw_one([["a", "b"]], keys[0], 1.0)["order_head"]}
+    n = sum(RSP.draw_one(units, RSP.group_key(1, f"g{i}"), 0.5)["perturbed"] for i in range(2000))
+    assert 900 < n < 1100
+    # a member whose removable set lacks the group's first pick takes the next one in the same order
+    k = keys[0]
+    first = picks[0]["removed"][0]
+    other = RSP.draw_one([u for u in units if u != [first]], k, 1.0)["removed"][0]
+    assert other != first
+
+
+def test_plan_one_object_same_for_group(tmp_path):
+    (tmp_path / "meta.json").write_text(json.dumps({"tracked_objects": {"cup.n.01_1": "target_cup"}, "task_family": "x"}))
+    a = RSP.plan(_Scene(), _Demo(str(tmp_path), "member_a"), 0, 0, {"p_episode": 1.0}, group="G1")
+    b = RSP.plan(_Scene(), _Demo(str(tmp_path), "member_b"), 0, 0, {"p_episode": 1.0}, group="G1")
+    assert a["removed"] == b["removed"] and len(a["removed"]) == 1 and a["group"] == "G1"
+    assert a["removed"][0] == "chair"  # the only single-object unit (pillow+sofa is a group)

@@ -59,7 +59,7 @@ EXTRA_STRUCTURAL = frozenset(('elevator_door', 'lintel', 'trim', 'molding', 'cei
 #: set-goal does), in the same env with the same replay lighting and removals; the obstacle of an obstructed instance is a TRO binding
 EXEMPT_FAMILIES: Tuple[str, ...] = ()
 
-DEFAULTS = {"p_episode": 0.5, "p_unit": 0.5, "contact_margin": 0.02, "touch_margin": 0.01, "contact_frames": 40,
+DEFAULTS = {"mode": "one", "p_episode": 0.5, "p_unit": 0.5, "contact_margin": 0.02, "touch_margin": 0.01, "contact_frames": 40,
             "move_tol": 1e-4, "move_frames": 300, "offstage_m": 50.0}
 
 
@@ -153,6 +153,31 @@ def removable_units(candidates: Iterable[str], boxes: Mapping[str, Optional[Tupl
             for n in comp:
                 protected.setdefault(n, f"unit:{hit}")
     return units, protected
+
+
+def group_key(seed: int, group: str, round_: int = 0) -> int:
+    """Owner 2026-11-15 (spec: same perturbation for one goal group): the draw key of a goal group (and replay round)."""
+    digest = hashlib.sha256(f"{SCHEMA}|group|{int(seed)}|{group}|{int(round_)}".encode()).hexdigest()
+    return int(digest[:16], 16)
+
+
+def draw_one(units: Sequence[Sequence[str]], key: int, p_episode: float) -> Dict[str, Any]:
+    """Owner 2026-11-15: a perturbed instance (probability ``p_episode``) loses exactly ONE object. The object is the first
+    removable *single-object* unit (it carries nothing and touches no other candidate) in a key-seeded order of all candidate names,
+    so every member of a goal group whose removable set contains it picks the same object. A multi-object touch group is never
+    split and never removed; with no single-object unit the instance stays unperturbed (``no_single``)."""
+    rng = random.Random(int(key))
+    perturbed = rng.random() < float(p_episode)
+    singles = sorted(u[0] for u in units if len(u) == 1)
+    names = sorted({n for u in units for n in u})
+    order = names[:]
+    rng.shuffle(order)
+    if not perturbed:
+        return {"perturbed": False, "removed": [], "order_head": order[:5]}
+    pick = next((n for n in order if n in set(singles)), None)
+    if pick is None:
+        return {"perturbed": False, "removed": [], "no_single": True, "order_head": order[:5]}
+    return {"perturbed": True, "removed": [pick], "rank": order.index(pick), "order_head": order[:5]}
 
 
 def draw(units: Sequence[Sequence[str]], key: int, p_episode: float, p_unit: float) -> Dict[str, Any]:
@@ -322,7 +347,8 @@ def demo_task_context(demo) -> Tuple[Dict[str, Any], Dict[str, Any], List[str]]:
 
 
 def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, Any]] = None,
-         forced: Optional[Sequence[str]] = None, inside_crop: Optional[Set[str]] = None) -> Dict[str, Any]:
+         forced: Optional[Sequence[str]] = None, inside_crop: Optional[Set[str]] = None, group: Optional[str] = None,
+         round_: int = 0) -> Dict[str, Any]:
     """Decide this replayed episode's removals in ``scene`` (a slot's scene). Loads sampled recorded states into the scene (the
     caller reloads frame 0 afterwards). ``forced``: the removed names of a previous record (``--scene-pert-from``), checked
     against this run's protection."""
@@ -410,7 +436,12 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
             raise ValueError(f"--scene-pert-from: {demo.name} r{replay_index}: recorded removals now protected or unknown: {bad}")
         d = {"perturbed": bool(forced), "units_removed": None, "removed": sorted(forced), "forced": True}
     else:
-        d = draw(units, episode_key(seed, demo.name, replay_index), float(cfg["p_episode"]), float(cfg["p_unit"]))
+        if cfg.get("mode", "one") == "one":
+            # one object per perturbed instance, keyed by the goal group (the demo when it has none)
+            d = draw_one(units, group_key(seed, group or demo.name, round_), float(cfg["p_episode"]))
+        else:
+            d = draw(units, episode_key(seed, demo.name, replay_index), float(cfg["p_episode"]), float(cfg["p_unit"]))
+        d["group"], d["round"] = group or demo.name, int(round_)
     rec.update(d)
     rec.update({"units": units, "n_candidates": len(candidates), "n_objects": len(objs),
                 "protected": dict(sorted(protected.items())), "contact_frames": len(contact_frames), "move_frames": len(idx),

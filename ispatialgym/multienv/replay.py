@@ -715,7 +715,10 @@ def main(argv=None) -> int:
                          "are candidates (with --scene full: the merged scene's objects the collection never simulated); an uncropped "
                          "demo: every object. all: every object of the replay scene")
     ap.add_argument("--scene-pert-p-episode", type=float, default=0.5, help="probability that a replayed episode is perturbed")
-    ap.add_argument("--scene-pert-p-unit", type=float, default=0.5, help="probability that a removable unit is removed")
+    ap.add_argument("--scene-pert-p-unit", type=float, default=0.5, help="--scene-pert-mode subset: probability that a removable unit is removed")
+    ap.add_argument("--scene-pert-mode", choices=("one", "subset"), default="one",
+                    help="one (owner 2026-11-15): a perturbed instance loses exactly one single-object unit, drawn per goal group; "
+                         "subset: every removable unit with --scene-pert-p-unit (per episode)")
     ap.add_argument("--scene-pert-index-base", type=int, default=0,
                     help="replay index of a demo's first replay in this run (the n-th replay of a demo in the run is base + n)")
     ap.add_argument("--scene-pert-from", default=None, help="REPLAY_SCENE_PERT records (results jsonl or log): apply exactly these removals")
@@ -798,7 +801,16 @@ def main(argv=None) -> int:
     if args.lighting_pert_from:
         lighting_mode = "replay"
     if lighting_mode == "replay" and exempt_dirs:
-        ap.error("replay-time lighting: camera relocalization (exempt, collection lighting) renders in its own batch")
+        ap.error("replay-time lighting: an exempt family (collection lighting) renders in its own batch")
+
+    def goal_group(d: str) -> str:
+        """The demo's goal group (campaign goal_group_id of its TRO, else the online group, else the demo itself)."""
+        m = _rj(os.path.join(d, "meta.json"))
+        tro = _rj(m.get("tro_path")).get("ispatialgym") or {}
+        g = (tro.get("campaign") or {}).get("goal_group_id") or (m.get("group_assignments") or {}).get("group_id")
+        return str(g) if g else os.path.basename(os.path.normpath(d))
+
+    groups_of = {os.path.basename(os.path.normpath(d)): goal_group(d) for d in demo_dirs}
     lo, hi = (float(x) for x in args.lighting_pert_range.split(","))
     light_cfg = {"p": args.lighting_pert_p, "sigma": args.lighting_pert_sigma, "lo": lo, "hi": hi,
                  "color_sigma": args.lighting_pert_color_sigma, "sky_sigma": args.lighting_pert_sigma, "sky_lo": lo, "sky_hi": hi}
@@ -819,7 +831,7 @@ def main(argv=None) -> int:
                 ap.error("--lighting-pert-from: no record for these demos")
             sky_draw = mine[0]["skybox"]
         else:
-            sky_draw = RL.draw_skybox(light_seed, RL.batch_key(names), light_cfg)
+            sky_draw = RL.draw_skybox(light_seed, RL.batch_key([groups_of[n] for n in names]) + f"|r{args.scene_pert_index_base}", light_cfg)
 
     if args.sequential_augmentation:
         from ispatialgym.oracle import run_isg
@@ -893,9 +905,14 @@ def main(argv=None) -> int:
                 inside = None
                 if args.scene_pert_scope == "outside_crop" and is_cropped(demo.scene_crop):
                     inside = set(demo.scene_file["objects_info"]["init_info"])
-                rec = RSP.plan(s.scene, demo, ri, args.scene_pert_seed,
-                               {"p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit}, forced=forced,
-                               inside_crop=inside)
+                if RSP.is_camera_relocalization(RSP._read_json(os.path.join(demo.dir, "meta.json"))) and forced is None:
+                    # owner 2026-11-15: camera relocalization keeps its collection-time removals; no replay-time removal
+                    rec = {"schema": RSP.SCHEMA, "demo": demo.dir, "demo_name": demo.name, "replay_index": ri,
+                           "seed": args.scene_pert_seed, "removed": [], "perturbed": False, "camera": "collection-time removals kept"}
+                else:
+                    rec = RSP.plan(s.scene, demo, ri, args.scene_pert_seed,
+                                   {"mode": args.scene_pert_mode, "p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit},
+                                   forced=forced, inside_crop=inside, group=groups_of.get(demo.name), round_=args.scene_pert_index_base)
                 rec["scope"], rec["scene_mode"] = args.scene_pert_scope, s.scene_mode
                 s.hidden = RSP.apply(s.scene, rec["removed"])
             else:
@@ -909,7 +926,7 @@ def main(argv=None) -> int:
                     fdraw = lrec["fixtures_draw"]
                     RL.check_batch_skybox([lrec, {"skybox": sky_draw}])
                 else:
-                    fdraw = RL.draw_fixtures(light_seed, demo.name, ri, light_cfg)
+                    fdraw = RL.draw_fixtures(light_seed, groups_of.get(demo.name, demo.name), args.scene_pert_index_base, light_cfg)
                 fixtures = RL.apply_fixtures(s.scene, og.sim, fdraw)
                 if abs(float(og.sim.skybox.intensity) - sky_applied["intensity"]) > 1e-5 * max(1.0, sky_applied["intensity"]):
                     RL.apply_skybox(og.sim, sky_draw)  # a restoration reset it: the batch keeps one skybox
@@ -919,6 +936,8 @@ def main(argv=None) -> int:
                                    "recorded_ignored": RL.ignored_recorded(getattr(demo, "campaign_meta", None)),
                                    "forced": light_from is not None}
             s.scene.load_state(demo.state_at(0), serialized=True)
+            rec["group"] = groups_of.get(demo.name, demo.name)
+            rec.setdefault("round", args.scene_pert_index_base)
             rec["slot"], rec["plan_s"] = s.k, round(time.perf_counter() - t_p, 2)
             s.scene_pert = rec
             print("REPLAY_SCENE_PERT " + json.dumps(rec), flush=True)

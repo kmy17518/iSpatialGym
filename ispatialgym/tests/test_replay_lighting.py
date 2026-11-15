@@ -7,8 +7,8 @@ from ispatialgym.multienv import replay_lighting as RL
 
 
 def test_fixture_draw_deterministic_ranges_and_rate():
-    a = RL.draw_fixtures(1, "demo", 0, {"p": 1.0})
-    assert a == RL.draw_fixtures(1, "demo", 0, {"p": 1.0}) and a["perturbed"]
+    a = RL.draw_fixtures(1, "group", 0, {"p": 1.0})
+    assert a == RL.draw_fixtures(1, "group", 0, {"p": 1.0}) and a["perturbed"]  # one draw per goal group
     draws = [RL.draw_fixtures(1, "demo", r, {"p": 1.0}) for r in range(400)]
     f = [d["intensity_factor"] for d in draws]
     assert min(f) >= 0.5 and max(f) <= 1.5 and len(set(f)) > 300
@@ -26,8 +26,13 @@ def test_fixture_draw_deterministic_ranges_and_rate():
 
 
 def test_skybox_per_batch_and_guard():
-    k = RL.batch_key(["b", "a"])
+    k = RL.batch_key(["b", "a", "a"])
     assert k == RL.batch_key(["a", "b"])
+    rec = lambda g, sky: {"group": g, "lighting": {"skybox": sky, "fixtures_draw": RL.draw_fixtures(3, g, 0, {"p": 1.0})}}
+    sky0 = RL.draw_skybox(3, k, {"p": 1.0})
+    RL.check_group_skybox([rec("a", sky0), rec("a", sky0), rec("b", sky0)])
+    with pytest.raises(ValueError):
+        RL.check_group_skybox([rec("a", sky0), rec("a", RL.draw_skybox(3, "other", {"p": 1.0}))])
     s = RL.draw_skybox(3, k, {"p": 1.0})
     assert s == RL.draw_skybox(3, k, {"p": 1.0}) and s["batch_key"] == k
     RL.check_batch_skybox([{"skybox": s}, {"skybox": dict(s)}])

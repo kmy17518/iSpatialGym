@@ -42,18 +42,34 @@ def _clip(x, lo, hi):
     return min(float(hi), max(float(lo), float(x)))
 
 
-def draw_fixtures(seed: int, demo_name: str, replay_index: int, cfg: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
-    """One env's fixture draw: {} (defaults) with probability 1 - p, else an intensity factor and per-channel colour factors."""
+def draw_fixtures(seed: int, group: str, round_: int, cfg: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """One goal group's fixture draw (owner 2026-11-15: all members of a goal group share it): defaults with probability 1 - p,
+    else an intensity factor ~ N(1, sigma) clipped and per-channel colour factors."""
     c = {**DEFAULTS, **(cfg or {})}
-    rng = random.Random(_key(seed, "fixtures", demo_name, replay_index))
+    rng = random.Random(_key(seed, "fixtures", group, round_))
     if rng.random() >= float(c["p"]):
         return {"perturbed": False, "intensity_factor": 1.0, "color_factors": [1.0, 1.0, 1.0]}
     return {"perturbed": True, "intensity_factor": _clip(rng.gauss(1.0, c["sigma"]), c["lo"], c["hi"]),
             "color_factors": [_clip(rng.gauss(1.0, c["color_sigma"]), c["color_lo"], c["color_hi"]) for _ in range(3)]}
 
 
-def batch_key(demo_names: Sequence[str]) -> str:
-    return hashlib.sha256(json.dumps(sorted(demo_names)).encode()).hexdigest()[:16]
+def batch_key(groups: Sequence[str]) -> str:
+    """The skybox key of a batch: its sorted set of goal groups. A goal group must be rendered within one batch (the planner groups
+    by goal group; ``check_group_skybox`` verifies the written records), so all its members share the skybox too."""
+    return hashlib.sha256(json.dumps(sorted(set(groups))).encode()).hexdigest()[:16]
+
+
+def check_group_skybox(records: Sequence[Mapping[str, Any]]) -> Dict[str, int]:
+    """Every goal group's records carry one skybox and one fixture draw (members rendered in two batches with different skies fail)."""
+    seen: Dict[str, str] = {}
+    for r in records:
+        g = r.get("group")
+        if g is None or not r.get("lighting"):
+            continue
+        v = json.dumps([r["lighting"]["skybox"], r["lighting"]["fixtures_draw"]], sort_keys=True)
+        if seen.setdefault(g, v) != v:
+            raise ValueError(f"goal group {g} rendered with two lighting draws (skybox per batch: keep a group in one batch)")
+    return {g: 1 for g in seen}
 
 
 def draw_skybox(seed: int, key: str, cfg: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
@@ -199,6 +215,7 @@ def replay_block(rec: Mapping[str, Any]) -> Dict[str, Any]:
     return {"schema": REPLAY_BLOCK_SCHEMA, "replay_index": int(rec["replay_index"]), "demo_name": rec["demo_name"],
             "scene": {"schema": rec.get("schema"), "seed": rec.get("seed"), "scope": rec.get("scope"), "scene_mode": rec.get("scene_mode"),
                       "removed_objects": list(rec.get("removed") or []), "perturbed": bool(rec.get("perturbed"))},
+            "goal_group": rec.get("group"), "round": rec.get("round"),
             "lighting": None if light is None else {"schema": light.get("schema"), "seed": light.get("seed"), "cfg": light.get("cfg"),
                                                     "fixtures_draw": light["fixtures_draw"], "skybox": light["skybox"],
                                                     "recorded_ignored": light.get("recorded_ignored")}}
