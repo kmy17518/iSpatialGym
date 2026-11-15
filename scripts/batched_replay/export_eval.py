@@ -96,7 +96,11 @@ def main():
     customs = json.load(open(EC.CUSTOMS))
     items = []
     for run, u, d, e in episodes_of(a.runs.split(",")):
-        inst = e["instance"]
+        inst = dict(e["instance"])
+        if inst.get("tree_tro"):  # eval_production tree: its readable copies
+            inst.update({"tro_path": inst["tree_tro"], "oracle_sidecar": inst["tree_oracle"],
+                         "template_json": os.path.join(inst["tree_template_dir"], "template.json"),
+                         "template_meta": os.path.join(inst["tree_template_dir"], "template_meta.json")})
         tro = json.load(open(readable(inst["tro_path"])))
         block = tro["ispatialgym"]
         variant = canonical_variant(block.get("task_variant") or inst.get("variant"))
@@ -133,7 +137,7 @@ def main():
                 bddl = os.path.join(it["inst"]["template_dir"], "activity_definitions", activity, f"problem{did}.bddl")
                 activity, did, _, added = EC.release_bddl({"subtask": sub, "bddl": bddl, "run_problem": it["tmeta"]["problem"]}, customs)
                 psrc = "repository (isg_customs)"
-            except (KeyError, SystemExit, FileNotFoundError, ValueError) as err:
+            except (KeyError, SystemExit, FileNotFoundError, PermissionError, ValueError) as err:
                 print(f"{sub} #{i}: problem from the template ({str(err)[:120]})")
             problems[psrc] += 1
             if not (out / files["template"]).exists():
@@ -177,7 +181,9 @@ def main():
             task_counts[it["task"]] += 1
             names_ = {"task_family": it["task_family"], "task": it["task"], "subtask": sub, "instance": i, "task_instance": ti}
             src = {k: it["inst"].get(k) for k in ("class_id", "eval_manifest", "eval_unit_id", "eval_unit_dir", "eval_instance_id",
-                                                   "eval_source", "instance_id", "variant", "demo_dir", "demo_sha256", "template_dir",
+                                                   "eval_source", "instance_id", "variant", "demo_dir", "demo_sha256", "template_dir", "category", "goal_group_id",
+                                                   "goal_key", "eval_production", "relation", "origin", "production_group_id", "tree_tro",
+                                                   "tree_template_dir",
                                                    "template_json", "tro_path", "tro_sha256", "oracle_sidecar")}
             src.update({"template_sha256": sha, "template_index": t, "problem_source": psrc})
             replay = {"run": it["run"], "unit": it["unit"]["unit"], "dataset": it["ep"]["dataset"], "episode_index": it["ep"]["episode_index"],

@@ -89,6 +89,45 @@ def rows_eval1000(a):
     print(f"{len(rows)} rows -> {a.out} ({dict(per_fam)})")
 
 
+def rows_eval_production(a):
+    """Rows of the consolidated eval_production tree (<root>/<category>/<class>/<group>/<instance>/, index.json): standard-eval ->
+    purpose eval (no perturbation), standard-eval-sibling and train -> purpose train (replay-time lighting + scene perturbation; camera
+    relocalization: lighting only). Inputs are the tree's readable copies (tro.json, oracle.json, _templates/...) packed at the
+    original paths the demo names; the tree's group_id keys the replay-time draws."""
+    root = Path(a.root)
+    rows_idx = json.load(open(root / "index.json"))
+    cats = a.categories.split(",")
+    classes = set(a.classes.split(",")) if a.classes else None
+    rows = []
+    for r in rows_idx:
+        if r.get("kind") != "demo" or r.get("category") not in cats:
+            continue
+        if classes and r["class_id"] not in classes:
+            continue
+        inst = root / os.path.dirname(r["dest"])
+        tdir = os.path.normpath(inst / (inst / "TEMPLATE").read_text().strip())
+        rows.append({"demo_dir": str(inst), "purpose": "eval" if r["category"] == "standard-eval" else "train",
+                     "category": r["category"], "class_id": r["class_id"], "task_family": family_of(r["class_id"]),
+                     "goal_group_id": r["group_id"], "goal_key": r.get("goal_key"), "instance_id": r.get("instance_id"),
+                     "eval_unit_id": r.get("eval_unit_id"), "production_group_id": r.get("production_group_id"),
+                     "sibling_of_unit": r.get("sibling_of_unit"), "relation": r.get("relation"), "origin": r.get("origin"),
+                     "demo_sha256": r.get("sha256"), "eval_production": str(root),
+                     "tree_tro": str(inst / "tro.json"), "tree_oracle": str(inst / "oracle.json"), "tree_template_dir": tdir})
+    if a.limit_per_category:
+        per = collections.Counter()
+        keep = []
+        for r in rows:
+            if per[r["category"]] < a.limit_per_category:
+                keep.append(r)
+                per[r["category"]] += 1
+        rows = keep
+    with open(a.out, "w") as fo:
+        for r in rows:
+            fo.write(json.dumps(r) + "\n")
+    print(f"{len(rows)} rows -> {a.out}: {dict(collections.Counter(r['category'] for r in rows))}, "
+          f"{len({r['goal_group_id'] for r in rows})} goal groups")
+
+
 def rows_receipts(a):
     """Training rows from admission receipts (TG/admission_r1/receipts/<class>/*.json, TG/camera_eval100/admission/receipts/...):
     decision admitted, members allocated to train and eligible; --exclude lists member ids to leave out (e.g. the wrong-PhysX ones)."""
@@ -129,8 +168,12 @@ def rows_receipts(a):
 
 
 # ------------------------------------------------------------------------------------------------------------------- units
-def demo_facts(demo_dir: str) -> dict:
-    """What grouping and packing need from one demo (read-only)."""
+def demo_facts(demo_dir: str, row: dict = None) -> dict:
+    """What grouping and packing need from one demo (read-only). ``pack``: (content file, archive path) pairs; a row of the
+    eval_production tree packs the tree's copies at the original paths."""
+    row = row or {}
+    if row.get("tree_tro"):
+        return tree_facts(demo_dir, row)
     d = Path(demo_dir)
     meta = json.load(open(readable(str(d / "meta.json"))))
     with h5py.File(readable(str(d / "demo.hdf5")), "r") as f:
@@ -162,10 +205,48 @@ def demo_facts(demo_dir: str) -> dict:
     files += [os.path.join(tdir, n) for n in ("template.json", "template_meta.json", "template-partial_rooms.json")
               if os.path.exists(os.path.join(tdir, n))]
     files.append(template)
+    files = sorted(set(os.path.realpath(p) if os.path.islink(p) else p for p in files) | set(files))
     return {"dir": str(d), "name": d.name, "T": T, "action_steps": a, "scene": cfg["scene"]["scene_model"],
             "crop": (crop or {}).get("mode"), "template_key": full_sha or _sha_readable(template),
             "rooms": sorted(rooms) if rooms else None, "group": str(group), "tro": tro, "template_dir": tdir,
-            "files": sorted(set(os.path.realpath(p) if os.path.islink(p) else p for p in files) | set(files))}
+            "pack": [(p if os.path.islink(p) else readable(p), p) for p in files]}
+
+
+def tree_facts(demo_dir: str, row: dict) -> dict:
+    d = Path(demo_dir)
+    meta = json.load(open(d / "meta.json"))
+    with h5py.File(d / "demo.hdf5", "r") as f:
+        at = f["data"].attrs
+        cfg = json.loads(at["config"])
+        T = int(f["data/demo_0/action"].shape[0])
+        crop = json.loads(at["isg_scene_crop"]) if "isg_scene_crop" in at else None
+        full_file = json.loads(at["isg_full_scene_file"]) if "isg_full_scene_file" in at else None
+        full_sha = json.loads(at["isg_full_scene_sha256"]) if "isg_full_scene_sha256" in at else None
+        rooms = json.loads(at["isg_full_load_room_instances"]) if "isg_full_load_room_instances" in at else None
+    tro = (cfg.get("task") or {}).get("tro_path") or meta.get("tro_path")
+    a = meta.get("n_action_steps")
+    if not isinstance(a, int):
+        raise ValueError(f"{demo_dir}: meta.json has no n_action_steps")
+    T_dir = Path(row["tree_template_dir"])
+    tdir = os.path.dirname(os.path.dirname(tro))
+    stem = tro[: -len("-tro_state.json")]
+    pack = [(str(d / n), str(d / n)) for n in ("demo.hdf5", "meta.json", "oracle.json", "tro.json")]
+    pack += [(row["tree_tro"], tro), (row["tree_oracle"], stem + ".oracle.json")]
+    if meta.get("tro_path") and meta["tro_path"] != tro:
+        pack.append((row["tree_tro"], meta["tro_path"]))
+    for n in ("template.json", "template_meta.json", "template-partial_rooms.json"):
+        if (T_dir / n).exists():
+            pack.append((str(T_dir / n), os.path.join(tdir, n)))
+    if full_file and full_file != os.path.join(tdir, "template.json"):
+        pack.append((str(T_dir / "template.json"), full_file))
+    try:  # the sampler's summary (goal-occlusion verdict), when readable here or mirrored
+        if os.path.exists(stem + ".summary.json"):
+            pack.append((readable(stem + ".summary.json"), stem + ".summary.json"))
+    except PermissionError:
+        pass
+    return {"dir": str(d), "name": d.name, "T": T, "action_steps": a, "scene": cfg["scene"]["scene_model"],
+            "crop": (crop or {}).get("mode"), "template_key": full_sha or sha256_file(T_dir / "template.json"),
+            "rooms": sorted(rooms) if rooms else None, "group": row["goal_group_id"], "tro": tro, "template_dir": tdir, "pack": pack}
 
 
 def replay_frames(action_steps: int, frac: float, min_steps: int) -> int:
@@ -180,8 +261,11 @@ def build(a):
     (run / "inputs").mkdir(parents=True)
     (run / "meta").mkdir()
     facts = {}
-    for r in rows:
-        facts[r["demo_dir"]] = demo_facts(r["demo_dir"])
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(16) as ex:
+        for r, f in zip(rows, ex.map(lambda r: demo_facts(r["demo_dir"], r), rows)):
+            facts[r["demo_dir"]] = f
     groups = collections.defaultdict(list)
     for r in rows:
         f = facts[r["demo_dir"]]
@@ -218,11 +302,14 @@ def build(a):
                           "inputs": f"inputs/{uid}.tar.zst", "meta": f"meta/{uid}.jsonl", "_rows": ch})
     # inputs + meta per unit
     for u in units:
-        files = sorted({p for r in u["_rows"] for p in facts[r["demo_dir"]]["files"]})
+        pack = sorted({(src, arc) for r in u["_rows"] for src, arc in facts[r["demo_dir"]]["pack"]}, key=lambda x: x[1])
+        files = [arc for _, arc in pack]
+        if len(set(files)) != len(files):
+            raise ValueError(f"{u['unit']}: two contents for one archive path")
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w") as tf:
-            for p in files:
-                tf.add(p if os.path.islink(p) else readable(p), arcname=p.lstrip("/"), recursive=False)
+            for src, arc in pack:
+                tf.add(src, arcname=arc.lstrip("/"), recursive=False)
         zst = subprocess.run(["zstd", "-q", "-T4", "-10", "-c"], input=buf.getvalue(), capture_output=True, check=True).stdout
         (run / u["inputs"]).write_bytes(zst)
         with open(run / u["meta"], "w") as f:
@@ -270,6 +357,12 @@ def main():
     p.add_argument("--per-family", type=int, default=0)
     p.add_argument("--per-class", type=int, default=0)
     p.add_argument("--classes", default="")
+    p = sp.add_parser("rows-eval-production")
+    p.add_argument("--root", default="/vision/u/minyeong/ispatialgym/eval_production")
+    p.add_argument("--out", required=True)
+    p.add_argument("--categories", default="standard-eval,standard-eval-sibling,train")
+    p.add_argument("--classes", default="")
+    p.add_argument("--limit-per-category", type=int, default=0)
     p = sp.add_parser("rows-receipts")
     p.add_argument("--receipts", required=True, help="receipt roots (comma-separated), each <root>/<class>/*.json")
     p.add_argument("--out", required=True)
@@ -289,7 +382,7 @@ def main():
     p.add_argument("--repeat", type=int, default=1, help="sweep runs: copies of every unit")
     p.add_argument("--demo-repeat", type=int, default=1, help="sweep runs: every unit plays its demos this many times")
     a = ap.parse_args()
-    {"rows-eval1000": rows_eval1000, "rows-receipts": rows_receipts, "build": build}[a.cmd](a)
+    {"rows-eval1000": rows_eval1000, "rows-eval-production": rows_eval_production, "rows-receipts": rows_receipts, "build": build}[a.cmd](a)
 
 
 if __name__ == "__main__":

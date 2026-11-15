@@ -177,13 +177,17 @@ def merge(a):
             if rec.get("replayed_tro"):
                 cand = d / "instances" / os.path.basename(rec["replayed_tro"])
                 tro_src = cand if cand.exists() else None
+            if tro_src is None and inst.get("tree_tro") and os.path.exists(inst["tree_tro"]):
+                tro_src = Path(inst["tree_tro"])
             tro_src = tro_src or (Path(readable(inst["tro_path"])) if inst.get("tro_path") and os.path.exists(inst["tro_path"]) else None)
             tro_rel = None
             if tro_src is not None:
                 link(tro_src, tmp / "isg_meta/tro" / f"{gname}-tro_state.json", True)
                 tro_rel = f"isg_meta/tro/{gname}-tro_state.json"
             tkey = None
-            tj = inst.get("template_json")
+            tj = os.path.join(inst["tree_template_dir"], "template.json") if inst.get("tree_template_dir") else inst.get("template_json")
+            if inst.get("tree_template_dir"):
+                inst = dict(inst, template_meta=os.path.join(inst["tree_template_dir"], "template_meta.json"))
             if tj and os.path.exists(tj):
                 sha = sha256_file(readable(tj))
                 tkey = sha[:12]

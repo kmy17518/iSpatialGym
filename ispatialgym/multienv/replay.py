@@ -876,6 +876,10 @@ def save_frames(out_dir: str, s: "Slot", d: Demo, i: int, obs: Dict[str, Any]) -
         Image.fromarray(a).save(os.path.join(out_dir, f"slot{s.k}_{d.name[-14:]}_r{ri}_f{i:05d}_{cam}.png"))
 
 
+def n_slots_req(args) -> int:
+    return int(args.slots)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--demos", default="", help="demo dirs (demo.hdf5 inside), comma-separated, or @file with one per line")
@@ -962,6 +966,9 @@ def main(argv=None) -> int:
     ap.add_argument("--lighting-pert-sigma", type=float, default=0.17, help="--lighting-pert-dist normal: N(1, sigma)")
     ap.add_argument("--lighting-pert-range", default="0.5,1.5", help="intensity factor clip lo,hi")
     ap.add_argument("--lighting-pert-color-sigma", type=float, default=0.04, help="fixture colour factors ~ N(1, sigma) per channel")
+    ap.add_argument("--lighting-skybox", choices=("batch", "group"), default="batch",
+                    help="batch: one skybox draw per process (its goal groups); group (--slots 1 only): drawn per goal group, applied "
+                         "before each episode")
     ap.add_argument("--lighting-pert-from", default=None, help="REPLAY_SCENE_PERT records: re-apply their lighting exactly")
     ap.add_argument("--replay-tro-dir", default=None,
                     help="replayed-instance TROs (campaign.replay_perturbations, written to <root>/instances by every perturbed replay): "
@@ -1046,6 +1053,13 @@ def main(argv=None) -> int:
     from ispatialgym.multienv.replay_scene_perturbation import goal_group
 
     groups_of = {os.path.basename(os.path.normpath(d)): goal_group(d) for d in demo_dirs}
+    # batched replay 2026-11-15: a goal group named by the caller (--instance-meta goal_group_id, e.g. eval_production's
+    # <class>__<goal key>) keys the replay-time draws
+    for name, row in read_instance_meta(args.instance_meta).items():
+        if row.get("goal_group_id") and name in groups_of:
+            groups_of[name] = str(row["goal_group_id"])
+    if args.lighting_skybox == "group" and n_slots_req(args) != 1:
+        ap.error("--lighting-skybox group needs --slots 1 (the skybox is one per simulator)")
     inview_plan = None
     if args.scene_pert_plan == "auto":
         # batched replay 2026-11-15: the render planner's offline in-view ranking (CPU, recorded data only), built here
@@ -1210,11 +1224,17 @@ def main(argv=None) -> int:
                 else:
                     fdraw = RL.draw_fixtures(light_seed, groups_of.get(demo.name, demo.name), args.scene_pert_index_base, light_cfg)
                 fixtures = RL.apply_fixtures(s.scene, og.sim, fdraw)
-                if abs(float(og.sim.skybox.intensity) - sky_applied["intensity"]) > 1e-5 * max(1.0, sky_applied["intensity"]):
+                sky_ep = sky_draw
+                if args.lighting_skybox == "group" and light_from is None:
+                    # one slot: the simulator's one skybox belongs to this episode; drawn per goal group, so a goal group split over
+                    # several processes (different template worlds) still shares one lighting draw
+                    sky_ep = RL.draw_skybox(light_seed, f"group:{groups_of.get(demo.name, demo.name)}|r{args.scene_pert_index_base}", light_cfg)
+                elif abs(float(og.sim.skybox.intensity) - sky_applied["intensity"]) > 1e-5 * max(1.0, sky_applied["intensity"]):
                     RL.apply_skybox(og.sim, sky_draw)  # a restoration reset it: the batch keeps one skybox
                 rec["lighting"] = {"schema": RL.SCHEMA, "mode": "replay", "seed": light_seed, "cfg": light_cfg,
-                                   "fixtures_draw": fdraw, "fixtures_applied": fixtures, "skybox": sky_draw,
-                                   "skybox_applied": RL.apply_skybox(og.sim, sky_draw),
+                                   "fixtures_draw": fdraw, "fixtures_applied": fixtures, "skybox": sky_ep,
+                                   "skybox_scope": args.lighting_skybox,
+                                   "skybox_applied": RL.apply_skybox(og.sim, sky_ep),
                                    "recorded_ignored": RL.ignored_recorded(getattr(demo, "campaign_meta", None)),
                                    "forced": light_from is not None}
             s.scene.load_state(demo.state_at(0), serialized=True)

@@ -611,7 +611,8 @@ def demo_timing(status):
 PURPOSE_FLAGS = {
     # owner 2026-11-15: training instances get replay-time scene perturbation (never camera relocalization: the replayer keeps its
     # collection-time removals) and replay-time lighting (the recorded collection lighting is ignored); eval instances neither
-    "train": ["--scene-pert", "remove", "--scene-pert-plan", "auto", "--lighting-pert", "replay", "--goal-occlusion", "auto"],
+    "train": ["--scene-pert", "remove", "--scene-pert-plan", "auto", "--lighting-pert", "replay", "--lighting-skybox", "group",
+              "--goal-occlusion", "auto"],
     "eval": ["--scene-pert", "off", "--lighting-pert", "off", "--goal-occlusion", "off"],
 }
 
@@ -1035,8 +1036,10 @@ def main():
     GPUS = gpus()
     NCPU, MEM = cpu_count(), mem_gb()
     # a replay process holds ~10 GB of VRAM, ~3 busy cores and ~11 GB of RAM (measured on RTX 3090s)
-    per_gpu = int(os.environ.get("ISG_PROCS_PER_GPU", "0")) or max(1, min(4, min(g["mem_mb"] for g in GPUS) // 10500,
-                                                                            NCPU // len(GPUS) // 3, int(MEM / len(GPUS) // 16)))
+    # 2026-11-15 sweep (RTX 5090, 224 px): 4 processes per 32 GB GPU gave the most frames/s (VRAM peak 30.5 GB); 24 GB GPUs run 2
+    vram = min(g["mem_mb"] for g in GPUS)
+    by_vram = 4 if vram >= 30000 else 2 if vram >= 20000 else 1
+    per_gpu = int(os.environ.get("ISG_PROCS_PER_GPU", "0")) or max(1, min(by_vram, NCPU // len(GPUS) // 3, int(MEM / len(GPUS) // 12)))
     PER_GPU = per_gpu
     SLOTS = [(i * per_gpu + j, g["index"]) for j in range(per_gpu) for i, g in enumerate(GPUS)]
     SLOTS.sort()
