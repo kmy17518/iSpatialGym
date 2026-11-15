@@ -91,6 +91,8 @@ def main():
     ap.add_argument("--startup-s", type=float, default=1800)
     ap.add_argument("--tail-eta-s", type=float, default=1500)
     ap.add_argument("--drain-s", type=float, default=1200)
+    ap.add_argument("--drain-max-running", type=int, default=3, help="drain only instances running at most this many units "
+                    "(any instance once no unit is open)")
     ap.add_argument("--short-frames", type=int, default=2500)
     ap.add_argument("--fast-fps", type=float, default=12.0, help="per-process frames/s of a fast Vast GPU (restart estimate)")
     ap.add_argument("--lane-stall-s", type=float, default=1800)
@@ -187,6 +189,12 @@ def main():
                 by_inst.setdefault(iid, []).append(uid)
             for uid, why in flagged.items():
                 iid = running[uid][0]
+                if iid not in state["draining"] and n_open > 0 and len(by_inst.get(iid, [])) > a.drain_max_running:
+                    # a big instance: draining would idle all its GPUs; the worker kills a stalled process itself (stall_s)
+                    if uid not in state.setdefault("left", []):
+                        state["left"].append(uid)
+                        act(a, "stall_left_to_worker", instance=iid, unit=uid, why=why, running=len(by_inst.get(iid, [])))
+                    continue
                 if iid not in state["draining"]:
                     state["draining"][iid] = {"since": t, "units": [], "why": why}
                     put(f"ctl/stop_{iid}", {"by": "watchdog", "why": why, "time": t})
