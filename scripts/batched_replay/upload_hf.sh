@@ -20,6 +20,11 @@ from pathlib import Path
 from huggingface_hub import HfApi
 repo, stage, src = os.environ["REPO"], Path(os.environ["STAGE"]), Path(os.environ["SRC"])
 local = sorted(str(p.relative_to(src)) for p in src.rglob("*") if p.is_file())
+import collections
+per_dir = collections.Counter(os.path.dirname(f) for f in local)
+big = {d: n for d, n in per_dir.items() if n > 10000}
+if big:  # the Hub rejects commits with more than 10,000 files in one folder (400 Bad Request)
+    raise SystemExit(f"refusing: folders over 10,000 files {big}")
 api = HfApi()
 api.create_repo(repo_id=repo, repo_type="dataset", private=True, exist_ok=True)
 assert api.dataset_info(repo_id=repo).private is True, f"refusing: {repo} is not private"

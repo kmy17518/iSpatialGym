@@ -13,9 +13,9 @@ Beside the LeRobot files, isg_meta/ (read by ACT / Diffusion Policy / openpi loa
                         program_length, settle_steps, recorded lengths), perturbation record (scene removal, lighting draw, goal
                         group), goal image file, and the instance linkage: demo dir + sha256, instance_id, variant, subtask,
                         template dir / template.json / template_meta.json, TRO path + sha256, oracle sidecar, eval ids
-  goal_images/episode_<i>.png   the episode's goal image: its last rendered head-camera frame (224 x 224), the same image as the
+  goal_images/chunk-<c>/episode_<i>.png   the episode's goal image: its last rendered head-camera frame (224 x 224), the same image as the
                         episode's last frame of observation.rgb.zed_link_camera_0 before video compression
-  tro/episode_<i>-tro_state.json   the instance's TRO (the replayed TRO with campaign.replay_perturbations when the replay perturbed
+  tro/chunk-<c>/episode_<i>-tro_state.json   the instance's TRO (the replayed TRO with campaign.replay_perturbations when the replay perturbed
                         it, else the source TRO), so an episode can be reloaded as an instance
   templates/<sha12>/template.json, template_meta.json   the episode's template (episodes.jsonl names its <sha12>)
   settle_windows.json   isg-settle-windows/v1: program_length (action steps) and length of every episode (--settle-steps of ACT)
@@ -273,8 +273,8 @@ def merge(a):
             gname = f"episode_{gidx:06d}"
             goal_rel = None
             if rec.get("goal_image"):
-                link(d / rec["goal_image"]["rgb_path"], tmp / "isg_meta/goal_images" / f"{gname}.png", True)
-                goal_rel = f"isg_meta/goal_images/{gname}.png"
+                link(d / rec["goal_image"]["rgb_path"], tmp / "isg_meta/goal_images" / f"chunk-{chunk:03d}" / f"{gname}.png", True)
+                goal_rel = f"isg_meta/goal_images/chunk-{chunk:03d}/{gname}.png"
             tro_src = None
             if rec.get("replayed_tro"):
                 cand = d / "instances" / os.path.basename(rec["replayed_tro"])
@@ -284,8 +284,8 @@ def merge(a):
             tro_src = tro_src or (Path(readable(inst["tro_path"])) if inst.get("tro_path") and os.path.exists(inst["tro_path"]) else None)
             tro_rel = None
             if tro_src is not None:
-                link(tro_src, tmp / "isg_meta/tro" / f"{gname}-tro_state.json", True)
-                tro_rel = f"isg_meta/tro/{gname}-tro_state.json"
+                link(tro_src, tmp / "isg_meta/tro" / f"chunk-{chunk:03d}" / f"{gname}-tro_state.json", True)
+                tro_rel = f"isg_meta/tro/chunk-{chunk:03d}/{gname}-tro_state.json"
             tkey = None
             tj = os.path.join(inst["tree_template_dir"], "template.json") if inst.get("tree_template_dir") else inst.get("template_json")
             if inst.get("tree_template_dir"):
@@ -427,9 +427,10 @@ p59fc36c6 patches, Isaac Sim 5.1.0) on Vast.ai GPUs; runs {', '.join(runs)}.
 - Selection: the eval_production tree as curated on 2026-11-15 (categories {", ".join(SETS[purpose][1])}); duplicate-start demos are never
   included; isg_meta/excluded.jsonl lists every replayed episode left out and why.
 - Settle: every episode is its demo's action steps A followed by max(ceil(0.2 A), 50) settle frames (isg_meta/settle_windows.json).
-- Goal image: isg_meta/goal_images/episode_<i>.png, the episode's last rendered head-camera frame (= the last frame of
+- Goal image: isg_meta/goal_images/chunk-<family chunk>/episode_<i>.png (the path is in isg_meta/episodes.jsonl `goal_image`), the episode's last rendered head-camera frame (= the last frame of
   `observation.rgb.zed_link_camera_0` before compression; ACT's goal_source=episode_last reads the same frame from the video).
-- Instance linkage: isg_meta/episodes.jsonl (demo, TRO, template, eval ids, sha256), isg_meta/tro/, isg_meta/templates/.
+- Instance linkage: isg_meta/episodes.jsonl (demo, TRO, template, eval ids, sha256), isg_meta/tro/chunk-<family chunk>/,
+  isg_meta/templates/.
 - Tasks ({len(tasks)}, `meta/tasks.parquet`), grouped by task family in isg_meta/task_groups.json:
 
 | task family | tasks | |
