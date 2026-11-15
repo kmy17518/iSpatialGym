@@ -314,7 +314,8 @@ def load_test(root, n=4):
     """LeRobot's own loader on the merged dataset (videos decoded), then a few random items."""
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-    ds = LeRobotDataset(repo_id=Path(root).name, root=root)
+    # PyAV, not torchcodec: torchcodec's native libraries do not load on every cluster node (visionlab CPU nodes)
+    ds = LeRobotDataset(repo_id=Path(root).name, root=root, video_backend="pyav")
     rng = np.random.default_rng(0)
     for i in rng.integers(len(ds), size=n):
         it = ds[int(i)]
