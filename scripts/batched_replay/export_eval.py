@@ -32,6 +32,9 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from readable import readable  # noqa: E402
+
 RV = Path(os.environ.get("RV", "/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1"))
 FAMILY_ORDER = ("alignment", "camera_relocalization", "configuration_matching", "disembedding", "inter_object_relation_satisfaction",
                 "mental_rotation", "object_scaling")
@@ -94,10 +97,10 @@ def main():
     items = []
     for run, u, d, e in episodes_of(a.runs.split(",")):
         inst = e["instance"]
-        tro = json.load(open(inst["tro_path"]))
+        tro = json.load(open(readable(inst["tro_path"])))
         block = tro["ispatialgym"]
         variant = canonical_variant(block.get("task_variant") or inst.get("variant"))
-        tmeta = from_legacy_keys(json.load(open(inst["template_meta"]))) if inst.get("template_meta") and os.path.exists(inst["template_meta"]) else {}
+        tmeta = from_legacy_keys(json.load(open(readable(inst["template_meta"])))) if inst.get("template_meta") and os.path.exists(inst["template_meta"]) else {}
         items.append({"run": run, "unit": u, "dir": d, "ep": e, "inst": inst, "tro": tro, "variant": variant, "tmeta": tmeta,
                       "task_family": N.task_family(variant), "task": N.task_name(variant), "subtask": N.subtask_name(variant),
                       "scene": tmeta.get("scene") or block.get("scene", {}).get("model"),
@@ -113,7 +116,7 @@ def main():
         tsha = {}
         for i, it in enumerate(its):
             scene = it["scene"]
-            sha = sha256_file(it["inst"]["template_json"])
+            sha = sha256_file(readable(it["inst"]["template_json"]))
             t = tsha.setdefault(sha, len(tsha))
             json_dir = Path("scenes") / scene / "json"
             prefix = f"{scene}_task_{sub}"
@@ -135,7 +138,7 @@ def main():
             problems[psrc] += 1
             if not (out / files["template"]).exists():
                 (out / files["template"]).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(it["inst"]["template_json"], out / files["template"])
+                shutil.copyfile(readable(it["inst"]["template_json"]), out / files["template"])
                 tm = dict(it["tmeta"])
                 tm["problem"] = f"{activity}-{did}"
                 tm["eval"] = {"task_family": it["task_family"], "task": it["task"], "subtask": sub, "variant": it["variant"]}
@@ -160,15 +163,15 @@ def main():
                                        "evaluation_profile": EVALUATION_PROFILE, "n_render_iterations": g.get("n_render_iterations", 1)}
             write_json(out / files["tro_state"], tro, 2)
             if it["inst"].get("oracle_sidecar"):
-                sc = from_legacy_keys(json.load(open(it["inst"]["oracle_sidecar"])))
+                sc = from_legacy_keys(json.load(open(readable(it["inst"]["oracle_sidecar"]))))
                 sc["tro_sha256"] = sha256_file(out / files["tro_state"])
                 write_json(out / files["oracle"], sc, 2, newline=True)
             else:
                 files.pop("oracle")
             demo_src = os.path.join(it["inst"]["demo_dir"], "demo.hdf5")
             (demos / demo_rel).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(demo_src, demos / demo_rel)
-            meta = json.load(open(os.path.join(it["inst"]["demo_dir"], "meta.json")))
+            shutil.copyfile(readable(demo_src), demos / demo_rel)
+            meta = json.load(open(readable(os.path.join(it["inst"]["demo_dir"], "meta.json"))))
             length = int(it["ep"]["length_recorded"])
             ti = task_counts[it["task"]]
             task_counts[it["task"]] += 1

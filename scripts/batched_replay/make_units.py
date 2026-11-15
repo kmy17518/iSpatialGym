@@ -35,6 +35,9 @@ from pathlib import Path
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 import h5py  # noqa: E402
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from readable import readable  # noqa: E402
+
 RV = Path(os.environ.get("RV", "/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1"))
 FAMILIES = ("alignment", "camera_relocalization", "configuration_matching", "disembedding", "inter_object_relation_satisfaction",
             "mental_rotation", "object_scaling")
@@ -50,6 +53,10 @@ def sha256_file(p, bs=8 << 20):
         for b in iter(lambda: f.read(bs), b""):
             h.update(b)
     return h.hexdigest()
+
+
+def _sha_readable(p):
+    return sha256_file(readable(p))
 
 
 # ------------------------------------------------------------------------------------------------------------------- rows
@@ -86,8 +93,8 @@ def rows_eval1000(a):
 def demo_facts(demo_dir: str) -> dict:
     """What grouping and packing need from one demo (read-only)."""
     d = Path(demo_dir)
-    meta = json.load(open(d / "meta.json"))
-    with h5py.File(d / "demo.hdf5", "r") as f:
+    meta = json.load(open(readable(str(d / "meta.json"))))
+    with h5py.File(readable(str(d / "demo.hdf5")), "r") as f:
         at = f["data"].attrs
         cfg = json.loads(at["config"])
         T = int(f["data/demo_0/action"].shape[0])
@@ -107,7 +114,7 @@ def demo_facts(demo_dir: str) -> dict:
     a = meta.get("n_action_steps")
     if not isinstance(a, int):
         raise ValueError(f"{demo_dir}: meta.json has no n_action_steps")
-    tro_json = json.load(open(tro))
+    tro_json = json.load(open(readable(tro)))
     camp = (tro_json.get("ispatialgym") or {}).get("campaign") or {}
     group = camp.get("goal_group_id") or (meta.get("group_assignments") or {}).get("group_id") or d.name
     files = [str(d / n) for n in sorted(os.listdir(d)) if n == "demo.hdf5" or n.endswith(".json")]
@@ -117,7 +124,7 @@ def demo_facts(demo_dir: str) -> dict:
               if os.path.exists(os.path.join(tdir, n))]
     files.append(template)
     return {"dir": str(d), "name": d.name, "T": T, "action_steps": a, "scene": cfg["scene"]["scene_model"],
-            "crop": (crop or {}).get("mode"), "template_key": full_sha or sha256_file(template),
+            "crop": (crop or {}).get("mode"), "template_key": full_sha or _sha_readable(template),
             "rooms": sorted(rooms) if rooms else None, "group": str(group), "tro": tro, "template_dir": tdir,
             "files": sorted(set(os.path.realpath(p) if os.path.islink(p) else p for p in files) | set(files))}
 
@@ -176,7 +183,7 @@ def build(a):
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w") as tf:
             for p in files:
-                tf.add(p, arcname=p.lstrip("/"), recursive=False)
+                tf.add(p if os.path.islink(p) else readable(p), arcname=p.lstrip("/"), recursive=False)
         zst = subprocess.run(["zstd", "-q", "-T4", "-10", "-c"], input=buf.getvalue(), capture_output=True, check=True).stdout
         (run / u["inputs"]).write_bytes(zst)
         with open(run / u["meta"], "w") as f:

@@ -37,6 +37,9 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from readable import readable  # noqa: E402
+
 RV = Path(os.environ.get("RV", "/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1"))
 FAMILIES = ("alignment", "camera_relocalization", "configuration_matching", "disembedding", "inter_object_relation_satisfaction",
             "mental_rotation", "object_scaling")
@@ -174,7 +177,7 @@ def merge(a):
             if rec.get("replayed_tro"):
                 cand = d / "instances" / os.path.basename(rec["replayed_tro"])
                 tro_src = cand if cand.exists() else None
-            tro_src = tro_src or (Path(inst["tro_path"]) if inst.get("tro_path") and os.path.exists(inst["tro_path"]) else None)
+            tro_src = tro_src or (Path(readable(inst["tro_path"])) if inst.get("tro_path") and os.path.exists(inst["tro_path"]) else None)
             tro_rel = None
             if tro_src is not None:
                 link(tro_src, tmp / "isg_meta/tro" / f"{gname}-tro_state.json", True)
@@ -182,15 +185,15 @@ def merge(a):
             tkey = None
             tj = inst.get("template_json")
             if tj and os.path.exists(tj):
-                sha = sha256_file(tj)
+                sha = sha256_file(readable(tj))
                 tkey = sha[:12]
                 if tkey not in templates:
                     templates[tkey] = {"template_json": tj, "sha256": sha, "template_meta": inst.get("template_meta"),
                                        "template_dir": inst.get("template_dir")}
-                    link(Path(tj), tmp / "isg_meta/templates" / tkey / "template.json", True)
+                    link(Path(readable(tj)), tmp / "isg_meta/templates" / tkey / "template.json", True)
                     tm = inst.get("template_meta")
                     if tm and os.path.exists(tm):
-                        link(Path(tm), tmp / "isg_meta/templates" / tkey / "template_meta.json", True)
+                        link(Path(readable(tm)), tmp / "isg_meta/templates" / tkey / "template_meta.json", True)
             st = rec.get("settle") or {}
             settle[str(gidx)] = {"length": L, "program_length": int(st.get("action_steps") or L)}
             isg_eps.append({"episode_index": gidx, "task": u["task"], "task_family": family_of(u["task"]), "purpose": u["purpose"],
