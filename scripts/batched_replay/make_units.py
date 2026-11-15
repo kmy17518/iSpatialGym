@@ -301,6 +301,10 @@ def build(a):
         chunks = []
         for g, members in by_group.items():
             fr = sum(replay_frames(facts[m["demo_dir"]]["action_steps"], a.settle_pad, a.settle_pad_min) for m in members)
+            if a.conv_alone and any(os.path.exists(os.path.join(m["demo_dir"], "conversion.json")) for m in members):
+                # a one_object_v1 conversion demo replays only first in a fresh world: a unit of its own
+                chunks.append(list(members))
+                continue
             if cur and (frames + fr > a.frames or len(cur) + len(members) > a.max_demos):
                 chunks.append(cur)
                 cur, frames = [], 0
@@ -423,6 +427,7 @@ def main():
     p.add_argument("--repeat", type=int, default=1, help="sweep runs: copies of every unit")
     p.add_argument("--split-groups", action="store_true", help="cut units between demos of one goal group (per-demo draws)")
     p.add_argument("--group-removals", action="store_true", help="a unit's demos share their collection-time removed objects")
+    p.add_argument("--conv-alone", action="store_true", help="every conversion demo in a unit of its own (needs --split-groups)")
     p.add_argument("--conv-last", action="store_true", help="at most one conversion demo per unit, as its last demo")
     p.add_argument("--resume", action="store_true", help="keep the units already packed in an existing run dir (same rows)")
     p.add_argument("--pack-workers", type=int, default=24)
