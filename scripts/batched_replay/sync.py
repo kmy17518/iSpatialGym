@@ -68,7 +68,12 @@ def main():
             if (dst / ".synced").exists():
                 continue
             dst.mkdir(parents=True, exist_ok=True)
-            s5("sync", f"{base}/out/{uid}/*", f"{dst}/")
+            # replayed TROs have ~240-character names: s5cmd's temporary download name would pass 255, so they are streamed
+            s5("sync", "--exclude", "*-tro_state.json", f"{base}/out/{uid}/*", f"{dst}/")
+            for name in ls(f"{base}/out/{uid}/instances/*"):
+                (dst / "instances").mkdir(exist_ok=True)
+                r = subprocess.run(os.environ["S5"].split() + ["cat", f"{base}/out/{uid}/instances/{name}"], capture_output=True, check=True)
+                (dst / "instances" / name).write_bytes(r.stdout)
             (dst / "done.json").write_text(json.dumps(cat_json(f"{base}/done/{uid}.json"), indent=1))
             (dst / ".synced").touch()
             print(f"pulled {uid} -> {dst}")
