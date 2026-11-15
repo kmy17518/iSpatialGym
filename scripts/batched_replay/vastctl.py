@@ -74,10 +74,12 @@ IMAGE = os.environ.get("ISG_IMAGE", "ghcr.io/kmy17518/isg-replay:v3")
 # RTX only (owner): no L40 / L40S / A40 / A10
 GPU_OK = ["RTX 3090", "RTX 3090 Ti", "RTX 4090", "RTX 5090", "RTX A5000", "RTX A6000", "RTX 6000Ada",
           "RTX 5880Ada", "RTX 5000Ada", "RTX 4500Ada", "RTX PRO 5000", "RTX PRO 6000 S", "RTX PRO 6000 WS",
-          "RTX PRO 6000 Max-Q", "Q RTX 8000"]
+          "RTX PRO 6000 Max-Q"]  # no Turing (Q RTX 8000): slow per $
 # relative replay throughput per GPU (RTX 3090 = 1); replaced by measured values in $W/ledger/speed.json when present
-SPEED = {"RTX 3090": 1.0, "RTX 3090 Ti": 1.05, "RTX A5000": 0.9, "RTX A6000": 1.0, "A40": 0.9, "RTX 4090": 1.4,
-         "RTX 5090": 1.6, "L40": 1.3, "L40S": 1.4, "RTX 6000Ada": 1.4}
+# 224 px batched replay, 2026-11-15: RTX 5090 ~36-40 fps/GPU (4 procs), RTX 4090 ~22-25 (2 procs), A5000 (cluster) ~9 per proc
+SPEED = {"RTX 3090": 1.0, "RTX 3090 Ti": 1.05, "RTX A5000": 0.8, "RTX A6000": 1.0, "RTX 4090": 1.4, "RTX 5090": 2.0,
+         "RTX 6000Ada": 1.5, "RTX 5880Ada": 1.4, "RTX 5000Ada": 1.2, "RTX 4500Ada": 1.0, "RTX PRO 5000": 1.5,
+         "RTX PRO 6000 S": 2.0, "RTX PRO 6000 WS": 2.0, "RTX PRO 6000 Max-Q": 1.8}
 HB_STALE_S = 900
 LOADING_MAX_S = 1500
 
@@ -277,7 +279,7 @@ def cached_offers(max_eff, live_machines=None):
             continue
         o = dict(o)
         o["_eff"], o["_disk"], o["_cpu_g"], o["_ram_g"], o["_procs"] = eff, disk_for(n, p_est), cpu_g, ram_g, p_est
-        o["_value"] = eff / p_est
+        o["_value"] = eff / speeds().get(o.get("gpu_name"), 0.7)  # $ per unit of measured replay throughput
         out.append(o)
     out.sort(key=lambda o: (o.get("verification") != "verified", -int(o.get("num_gpus") or 1), o["_value"]))
     by_machine = {}
