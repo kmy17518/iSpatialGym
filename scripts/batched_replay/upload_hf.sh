@@ -6,10 +6,13 @@
 set -euo pipefail
 source /vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1/tool/creds.sh >/dev/null
 SRC=${SRC:?dataset dir}; REPO=${REPO:?hf repo id}
-STAGE=$RV/hf_staging/$(basename "$SRC")
+# staging per REPO (2026-11-15: per source basename let an older dataset's staging dir stand in for a new one of the same name);
+# rebuilt whenever its manifest differs from SRC, so it always mirrors SRC exactly (resume cache kept only for the same SRC)
+STAGE=$RV/hf_staging/${REPO//\//__}
 mkdir -p "$(dirname "$STAGE")"
+if [ -d "$STAGE" ] && [ "$(cat "$STAGE.src" 2>/dev/null)" != "$(readlink -f "$SRC")" ]; then rm -rf "$STAGE"; fi
 # hard-link mirror so upload_large_folder's .cache/huggingface/upload stays out of the dataset
-[ -d "$STAGE" ] || cp -al "$SRC" "$STAGE"
+[ -d "$STAGE" ] || { cp -al "$SRC" "$STAGE" && readlink -f "$SRC" > "$STAGE.src"; }
 export STAGE REPO SRC PYTHONDONTWRITEBYTECODE=1
 /vision/u/minyeong/miniconda3/envs/ispatialgym-vectorized-envs/bin/python -u - <<'EOF'
 import os, time
@@ -26,6 +29,9 @@ api.upload_large_folder(repo_id=repo, repo_type="dataset", folder_path=stage, pr
 info = api.dataset_info(repo_id=repo, files_metadata=False)
 remote = {s.rfilename for s in (info.siblings or [])}
 missing = [f for f in local if f not in remote]
+extra = sorted(f for f in remote - set(local) if f != ".gitattributes")
+if extra:
+    raise SystemExit(f"files on the Hub that are not in {src}: {extra[:10]} ({len(extra)})")
 print(f"DONE in {(time.time() - t0) / 60:.1f} min: {len(remote)} remote / {len(local)} local files, missing {len(missing)}, private {info.private}")
 if missing:
     raise SystemExit(f"missing on the Hub: {missing[:10]}")
