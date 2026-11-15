@@ -135,6 +135,48 @@ def _segment_hits_box(p, q, lo, hi) -> bool:
     return True
 
 
+ROOM_MAP_RES = 0.01  # floor_insseg_0.png: 1 px = 1 cm, centred on the world origin (OmniGibson SegmentationMap / BaseMap.world_to_map)
+
+
+def load_room_map(roots: Sequence[str], scene_model: Optional[str]) -> Optional[np.ndarray]:
+    if not scene_model:
+        return None
+    for r in roots:
+        p = os.path.join(r, "scenes", str(scene_model), "layout", "floor_insseg_0.png")
+        if os.path.exists(p):
+            from PIL import Image
+
+            return np.asarray(Image.open(p).convert("L"))
+    return None
+
+
+def map_room(img: np.ndarray, xy) -> int:
+    n = img.shape[0]
+    r, c = int(float(xy[1]) / ROOM_MAP_RES + n / 2.0), int(float(xy[0]) / ROOM_MAP_RES + n / 2.0)
+    return int(img[r, c]) if 0 <= r < n and 0 <= c < img.shape[1] else 0
+
+
+def line_clear(img: np.ndarray, a, b, doors: Sequence[Tuple[np.ndarray, np.ndarray]], step: float = 0.025, trim: float = 0.35,
+               max_wall: float = 0.07) -> bool:
+    """No wall between camera ``a`` and object ``b`` on the room instance map: along the 2D segment (``trim`` m left out at the
+    object end - wall-mounted objects sit in the wall), a run of more than ``max_wall`` m (walls are 10-30 cm) of non-room pixels (id 0) that is
+    not inside a door box blocks the view. No rendering."""
+    a, b = np.asarray(a, float)[:2], np.asarray(b, float)[:2]
+    d = float(np.linalg.norm(b - a))
+    if d <= trim:
+        return True
+    run = 0.0
+    for t in np.arange(step, d - trim, step):
+        p = a + (b - a) * (t / d)
+        if map_room(img, p) == 0 and not any(np.all(p >= lo) and np.all(p <= hi) for lo, hi in doors):
+            run += step
+            if run > max_wall:
+                return False
+        else:
+            run = 0.0
+    return True
+
+
 def room_of(xy, rooms: Mapping[str, Tuple[np.ndarray, np.ndarray]]) -> Optional[str]:
     hits = [(float(np.prod(hi - lo)), r) for r, (lo, hi) in rooms.items() if np.all(xy >= lo) and np.all(xy <= hi)]
     return min(hits)[1] if hits else None  # the smallest room box containing the point
@@ -177,6 +219,9 @@ def score_demo(demo_dir: str, roots: Sequence[str], K: Optional[Mapping[str, flo
                 else:
                     rooms[r] = [lo, hi]
     rooms = {r: (v[0], v[1]) for r, v in rooms.items()}
+    scene_model = ((full.get("init_info") or {}).get("args") or {}).get("scene_model") or \
+        ((recorded.get("init_info") or {}).get("args") or {}).get("scene_model")
+    room_map = load_room_map(roots, scene_model)
     doors = [(_xy_box(corners[n])[0] - door_margin, _xy_box(corners[n])[1] + door_margin)
              for n, o in objs.items() if n in corners and "door" in str(o["category"])]
     skip = set(structural) | set(STRUCTURAL_EXTRA)
@@ -198,16 +243,20 @@ def score_demo(demo_dir: str, roots: Sequence[str], K: Optional[Mapping[str, flo
             if projected_area(corners[n], cp, cq, K) < min_area:
                 continue
             c = corners[n].mean(axis=0)
-            oroom = room_of(c[:2], rooms)
-            same = croom is not None and (oroom == croom or croom in objs[n]["in_rooms"])
-            ok = same or (croom is not None and oroom is not None
-                          and any(_segment_hits_box(cp[:2], c[:2], lo, hi) for lo, hi in doors))
+            if room_map is not None:  # wall test on the room instance map (doors open)
+                ok = line_clear(room_map, cp, c, doors)
+            else:  # fallback: room boxes from the floors objects
+                oroom = room_of(c[:2], rooms)
+                same = croom is not None and (oroom == croom or croom in objs[n]["in_rooms"])
+                ok = same or (croom is not None and oroom is not None
+                              and any(_segment_hits_box(cp[:2], c[:2], lo, hi) for lo, hi in doors))
             if ok:
                 scores[n] += 1
     n_frames = len(idx)
     return {"schema": SCHEMA, "demo": os.path.basename(os.path.normpath(demo_dir)), "cropped": cropped, "frames": n_frames,
             "step": int(step), "min_area": min_area, "intrinsics": K, "candidates": len(cands), "missing_metadata": len(missing),
             "rooms": len(rooms), "doors": len(doors), "load_rooms": sorted(loaded) if loaded else None,
+            "occlusion": "room instance map" if room_map is not None else "floor boxes",
             "probe": {n: round(scores.get(n, 0) / max(1, len(idx)), 4) for n in probe},
             "scores": {n: round(c / max(1, n_frames), 4) for n, c in sorted(scores.items()) if c and n in set(cands)},
             "cpu_s": round(time.process_time() - t0, 3)}

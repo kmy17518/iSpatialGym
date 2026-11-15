@@ -66,3 +66,14 @@ def test_merged_extent_is_task_rooms_plus_adjacent(tmp_path):
     assert ok["equal"] and ok["scene_extent"] == "task_rooms+adjacent"
     demo.full_rooms = demo.full_rooms + ["kitchen_0"]  # the whole house (or any extra room) is refused
     assert not merged_extent(demo, adjacent=adj)["equal"]
+
+
+def test_line_clear_walls_and_doors():
+    img = np.ones((1000, 1000), np.uint8)  # 10 m x 10 m map centred on the origin
+    img[:, 500:510] = 0  # a 10 cm wall at x = 0.0 .. 0.1 m
+    img[:, 520:540] = 2
+    assert IV.map_room(img, [-1.0, 0.0]) == 1 and IV.map_room(img, [0.05, 0.0]) == 0 and IV.map_room(img, [20, 0]) == 0
+    assert not IV.line_clear(img, [-2.0, 0.0], [2.0, 0.0], doors=[])
+    assert IV.line_clear(img, [-2.0, 0.0], [2.0, 0.0], doors=[(np.array([-0.1, -0.5]), np.array([0.2, 0.5]))])  # door opening
+    assert IV.line_clear(img, [-2.0, 0.0], [-0.5, 0.0], doors=[])  # same room
+    assert IV.line_clear(img, [-2.0, 0.0], [0.3, 0.0], doors=[])  # a wall-mounted object: the wall lies in the trimmed end
