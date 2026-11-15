@@ -255,10 +255,10 @@ def replay_frames(action_steps: int, frac: float, min_steps: int) -> int:
 def build(a):
     rows = [json.loads(x) for x in open(a.rows) if x.strip()]
     run = RV / "runs" / a.run
-    if run.exists() and any(run.iterdir()):
+    if run.exists() and any(run.iterdir()) and not a.resume:
         sys.exit(f"{run} exists")
-    (run / "inputs").mkdir(parents=True)
-    (run / "meta").mkdir()
+    (run / "inputs").mkdir(parents=True, exist_ok=True)
+    (run / "meta").mkdir(exist_ok=True)
     facts = {}
     from concurrent.futures import ThreadPoolExecutor
 
@@ -302,8 +302,13 @@ def build(a):
                           "goal_groups": sorted({facts[r["demo_dir"]]["group"] for r in ch}),
                           "extra_args": ch[0].get("extra_args") or [],
                           "inputs": f"inputs/{uid}.tar.zst", "meta": f"meta/{uid}.jsonl", "_rows": ch})
-    # inputs + meta per unit
-    for u in units:
+    # inputs + meta per unit (in parallel; --resume keeps the units whose meta file exists: it is written after the inputs)
+    def pack_unit(u):
+        if a.resume and (run / u["meta"]).exists() and (run / u["inputs"]).exists():
+            u["inputs_bytes"] = (run / u["inputs"]).stat().st_size
+            u["n_files"] = None
+            del u["_rows"]
+            return
         by_arc = {}
         for r in u["_rows"]:
             for src, arc in facts[r["demo_dir"]]["pack"]:
@@ -329,6 +334,11 @@ def build(a):
         u["inputs_bytes"] = len(zst)
         u["n_files"] = len(files)
         del u["_rows"]
+
+    with ThreadPoolExecutor(a.pack_workers) as ex:
+        for i, _ in enumerate(ex.map(pack_unit, units)):
+            if i % 100 == 99:
+                print(f"packed {i + 1}/{len(units)}", flush=True)
     if a.demo_repeat > 1 or a.repeat > 1:
         # throughput sweeps: identical workloads (each unit's demos played demo_repeat times, each unit copied repeat times)
         rep_units = []
@@ -391,6 +401,8 @@ def main():
     p.add_argument("--upload", action="store_true")
     p.add_argument("--repeat", type=int, default=1, help="sweep runs: copies of every unit")
     p.add_argument("--split-groups", action="store_true", help="cut units between demos of one goal group (per-demo draws)")
+    p.add_argument("--resume", action="store_true", help="keep the units already packed in an existing run dir (same rows)")
+    p.add_argument("--pack-workers", type=int, default=24)
     p.add_argument("--demo-repeat", type=int, default=1, help="sweep runs: every unit plays its demos this many times")
     a = ap.parse_args()
     {"rows-eval1000": rows_eval1000, "rows-eval-production": rows_eval_production, "rows-receipts": rows_receipts, "build": build}[a.cmd](a)
