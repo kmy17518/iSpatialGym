@@ -1,5 +1,5 @@
 #!/bin/bash
-# REPLAY_DIFF_20261115 final: wait for diff1 + diff1c, merge (train / standard-eval / held-out; one chunk per task family), verify
+# REPLAY_DIFF_20261115 final: wait for diff1 + diff1c + diff1d, merge (train / standard-eval / held-out; one chunk per task family), verify
 # against the curated tree, push to NEW private repos (owner 2026-11-15: new names, the earlier repos stay untouched).
 set -uo pipefail
 RV=/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1
@@ -8,16 +8,16 @@ source $RV/tool/creds.sh >/dev/null; export RV VPY
 CPY=/vision/u/minyeong/miniconda3/envs/ispatialgym-vectorized-envs/bin/python
 export PYTHONPATH=$C:$C/Behavior-1K/OmniGibson:$C/Behavior-1K/bddl3 OMNIGIBSON_DATA_PATH=$C/Behavior-1K/datasets HDF5_USE_FILE_LOCKING=FALSE
 export HF_HOME=/tmp/isgrend_hf_$SLURM_JOB_ID HF_HUB_OFFLINE=1
-RUNS=evalprod2,evalprod2t,evalprod2o,diff1,diff1c
+RUNS=evalprod2,evalprod2t,evalprod2o,diff1,diff1c,diff1d
 EX=$RV/rows/v2_exclude_units.txt
-cat $RV/rows/evalprod2_replaced_units.txt $RV/rows/diff1_retired_camera_units.txt > $EX
-# 1. wait: every unit of diff1 / diff1c done (or dead) on R2 and pulled
+cat $RV/rows/evalprod2_replaced_units.txt $RV/rows/diff1_retired_camera_units.txt $RV/rows/diff1c_retired_units.txt > $EX
+# 1. wait: every unit of diff1 / diff1c / diff1d done (or dead) on R2 and pulled
 while true; do
-  for r in diff1 diff1c; do $CPY $T/sync.py --run $r pull 2>&1 | tail -1; done
+  for r in diff1 diff1c diff1d; do $CPY $T/sync.py --run $r pull 2>&1 | tail -1; done
   left=$($CPY - <<'PY'
 import json, os, subprocess
 RV = os.environ["RV"]; n = 0
-for run in ("diff1", "diff1c"):
+for run in ("diff1", "diff1c", "diff1d"):
     units = [u["unit"] for u in json.load(open(f"{RV}/runs/{run}/units.json"))["units"]]
     ls = lambda sub: {l.split()[-1][:-5] for l in subprocess.run(os.environ["S5"].split() + ["ls", f"{os.environ['JOB_S3']}/runs/{run}/{sub}/*"], capture_output=True, text=True).stdout.splitlines() if l.strip()}
     done, dead = ls("done"), ls("dead")
