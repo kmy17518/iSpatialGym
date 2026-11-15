@@ -29,7 +29,12 @@ def refresh(inst: dict) -> dict:
     if r is None:
         return {**inst, "tree_missing": True}
     d = os.path.join(root, os.path.dirname(r["dest"]))
-    tdir = os.path.normpath(os.path.join(d, open(os.path.join(d, "TEMPLATE")).read().strip()))
+    if os.path.exists(os.path.join(d, "TEMPLATE")):
+        tdir = os.path.normpath(os.path.join(d, open(os.path.join(d, "TEMPLATE")).read().strip()))
+    elif os.path.exists(os.path.join(d, "conversion.json")):  # camera one_object_v1 conversions: the template is in conversion.json
+        tdir = os.path.dirname(json.load(open(os.path.join(d, "conversion.json")))["template"])
+    else:
+        tdir = inst.get("tree_template_dir")
     new = {"demo_dir": d, "tree_tro": os.path.join(d, "tro.json"), "tree_oracle": os.path.join(d, "oracle.json"), "tree_template_dir": tdir,
            "category": r["category"], "goal_group_id": r["group_id"], "goal_key": r.get("goal_key"), "relation": r.get("relation"),
            "origin": r.get("origin"), "eval_unit_id": r.get("eval_unit_id"), "duplicate_start_flagged": iid in flagged}

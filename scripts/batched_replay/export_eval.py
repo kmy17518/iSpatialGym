@@ -57,13 +57,16 @@ def write_json(path, data, indent, newline=False):
             f.write("\n")
 
 
-def episodes_of(runs):
+SETS = {"eval": (("eval",), "standard-eval"), "heldout": (("heldout_clean", "heldout_perturbed"), "eval-heldout-sibling")}
+
+
+def episodes_of(runs, purposes=("eval",), exclude=()):
     out = []
     for run in runs:
         spec = json.load(open(RV / "runs" / run / "units.json"))
         for u in spec["units"]:
             d = RV / "runs" / run / "out" / u["unit"]
-            if u["purpose"] != "eval":
+            if u["purpose"] not in purposes or f"{run}/{u['unit']}" in exclude or u["unit"] in exclude:
                 continue
             if not (d / ".synced").exists():
                 print(f"skip {run}/{u['unit']}: not pulled")
@@ -81,7 +84,11 @@ def main():
     ap.add_argument("--runs", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--demos-out", default=None)
+    ap.add_argument("--set", default="eval", choices=tuple(SETS),
+                    help="eval: standard-eval instances; heldout: the held-out siblings (clean + perturbed replays, never trained on)")
+    ap.add_argument("--exclude-units", default="", help="file of unit ids (or <run>/<unit>) to leave out")
     a = ap.parse_args()
+    from merge_train import flagged_ids
     from ispatialgym.activity.problem import canonical_variant
     from ispatialgym.eval import names as N
     from ispatialgym.eval.instances import DEMO_SUFFIX, EVALUATION_PROFILE
@@ -95,23 +102,41 @@ def main():
     if out.exists() and any(out.iterdir()):
         sys.exit(f"{out} exists and is not empty")
     customs = json.load(open(EC.CUSTOMS))
-    items = []
-    for run, u, d, e in episodes_of(a.runs.split(",")):
+    items, excluded, seen = [], [], {}
+    purposes, category = SETS[a.set]
+    flagged = flagged_ids()
+    exclude = set(open(a.exclude_units).read().split()) if a.exclude_units else set()
+    for run, u, d, e in episodes_of(a.runs.split(","), purposes, exclude):
         inst = tree_refresh(dict(e["instance"]))
-        if inst.get("category") not in (None, "standard-eval"):
-            continue  # the eval layout holds standard-eval instances only
+        iid = inst.get("instance_id") or inst.get("demo_name")
+        hv = u["purpose"].split("_", 1)[1] if u["purpose"].startswith("heldout_") else None
+        why = ("not in the current tree" if inst.get("tree_missing") else
+               "flagged duplicate start" if iid in flagged or inst.get("duplicate_start_flagged") else
+               f"category now {inst.get('category')}" if inst.get("category") != category else
+               f"duplicate of {seen[(iid, hv)]}" if (iid, hv) in seen else None)
+        if why:  # the layout holds the current set's instances only, each once (held-out: once per variant)
+            excluded.append({"run": run, "unit": u["unit"], "episode_index": e["episode_index"], "instance_id": iid, "reason": why})
+            continue
+        seen[(iid, hv)] = f"{run}/{u['unit']}#{e['episode_index']}"
+        inst["heldout_variant"] = hv
         if inst.get("tree_tro"):  # eval_production tree: its readable copies
             inst.update({"tro_path": inst["tree_tro"], "oracle_sidecar": inst["tree_oracle"],
                          "template_json": os.path.join(inst["tree_template_dir"], "template.json"),
                          "template_meta": os.path.join(inst["tree_template_dir"], "template_meta.json")})
-        tro = json.load(open(readable(inst["tro_path"])))
+        tro_file = readable(inst["tro_path"])
+        if hv == "perturbed":  # the replayed TRO: it records the replay-time perturbation (campaign.replay_perturbations)
+            cand = d / "instances" / os.path.basename(e.get("replayed_tro") or "")
+            if not (e.get("replayed_tro") and cand.is_file()):
+                raise SystemExit(f"{run}/{u['unit']} episode {e['episode_index']}: perturbed held-out replay without its replayed TRO")
+            tro_file = str(cand)
+        tro = json.load(open(tro_file))
         block = tro["ispatialgym"]
         variant = canonical_variant(block.get("task_variant") or inst.get("variant"))
         tmeta = from_legacy_keys(json.load(open(readable(inst["template_meta"])))) if inst.get("template_meta") and os.path.exists(inst["template_meta"]) else {}
         items.append({"run": run, "unit": u, "dir": d, "ep": e, "inst": inst, "tro": tro, "variant": variant, "tmeta": tmeta,
                       "task_family": N.task_family(variant), "task": N.task_name(variant), "subtask": N.subtask_name(variant),
                       "scene": tmeta.get("scene") or block.get("scene", {}).get("model"),
-                      "order": (inst.get("class_id") or "", inst.get("eval_unit_id") or inst["demo_name"])})
+                      "order": (inst.get("class_id") or "", inst.get("eval_unit_id") or inst["demo_name"], hv or "")})
     items.sort(key=lambda x: (FAMILY_ORDER.index(x["task_family"]), x["task"], x["subtask"], x["order"]))
     index, episodes, tasks, available, task_lines = [], [], {}, {}, []
     per_sub = collections.defaultdict(list)
@@ -183,10 +208,12 @@ def main():
             ti = task_counts[it["task"]]
             task_counts[it["task"]] += 1
             names_ = {"task_family": it["task_family"], "task": it["task"], "subtask": sub, "instance": i, "task_instance": ti}
+            if a.set == "heldout":
+                names_["heldout_variant"] = it["inst"]["heldout_variant"]
             src = {k: it["inst"].get(k) for k in ("class_id", "eval_manifest", "eval_unit_id", "eval_unit_dir", "eval_instance_id",
                                                    "eval_source", "instance_id", "variant", "demo_dir", "demo_sha256", "template_dir", "category", "goal_group_id",
                                                    "goal_key", "eval_production", "relation", "origin", "production_group_id", "tree_tro",
-                                                   "tree_template_dir", "duplicate_start_flagged", "tree_stale_fields",
+                                                   "tree_template_dir", "duplicate_start_flagged", "tree_stale_fields", "heldout_variant",
                                                    "template_json", "tro_path", "tro_sha256", "oracle_sidecar")}
             src.update({"template_sha256": sha, "template_index": t, "problem_source": psrc})
             replay = {"run": it["run"], "unit": it["unit"]["unit"], "dataset": it["ep"]["dataset"], "episode_index": it["ep"]["episode_index"],
@@ -207,7 +234,7 @@ def main():
         task_lines.append({"task_index": len(task_lines), "task_name": sub, "task": its[0]["task"], "task_family": its[0]["task_family"],
                            "num_instances": len(its), "length": max(r["length"] for r in index if r["subtask"] == sub)})
     (out / "metadata").mkdir(parents=True, exist_ok=True)
-    for name, lines in (("instances.jsonl", index), ("episodes.jsonl", episodes), ("task.jsonl", task_lines)):
+    for name, lines in (("instances.jsonl", index), ("episodes.jsonl", episodes), ("task.jsonl", task_lines), ("excluded.jsonl", excluded)):
         with open(out / "metadata" / name, "w") as f:
             for line in lines:
                 f.write(json.dumps(line) + "\n")
@@ -219,7 +246,7 @@ def main():
                      for fam, ts in tasks.items() for task, subs in ts.items())
     (out / "README.md").write_text(f"""# iSpatialGym eval instances (batched replay {', '.join(a.runs.split(','))})
 
-{len(index)} eval instances of the campaign_20261110 standard-eval set, laid out like BEHAVIOR-1K's `2026-challenge-task-instances`
+{len(index)} {"eval instances of the campaign_20261110 standard-eval set" if a.set == "eval" else "replays of the campaign_20261110 held-out siblings (eval-heldout-sibling: goals never trained on; per held-out goal group one clean replay and one perturbed replay, scene + lighting perturbation each with probability 1.0, camera relocalization lighting only; `heldout_variant` in metadata/instances.jsonl; a perturbed replay's TRO is the replayed one, with campaign.replay_perturbations)"}, laid out like BEHAVIOR-1K's `2026-challenge-task-instances`
 (the layout of scripts/eval_instances/export_counted.py: task family -> task -> subtask, `<scene>_task_<subtask>_<template>_<instance>`),
 with their demos in the sibling dataset `ispatialgym-eval-demos`. Written by `scripts/batched_replay/export_eval.py`.
 
@@ -233,7 +260,8 @@ with their demos in the sibling dataset `ispatialgym-eval-demos`. Written by `sc
 |---|---|---|---|
 {rows}
 """)
-    print(f"{len(index)} instances, {len(task_lines)} subtasks -> {out}; demos -> {demos}; problems {dict(problems)}")
+    print(f"{len(index)} instances, {len(task_lines)} subtasks -> {out}; demos -> {demos}; problems {dict(problems)}; excluded "
+          f"{len(excluded)}: {dict(collections.Counter(x['reason'].split(' of ')[0] for x in excluded))}")
     from ispatialgym.eval.instances import load_index
 
     recs = load_index(str(out))

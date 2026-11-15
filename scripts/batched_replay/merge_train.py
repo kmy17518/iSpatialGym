@@ -42,8 +42,15 @@ from readable import readable  # noqa: E402
 from tree_index import refresh as tree_refresh  # noqa: E402
 
 RV = Path(os.environ.get("RV", "/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1"))
-FAMILIES = ("alignment", "camera_relocalization", "configuration_matching", "disembedding", "inter_object_relation_satisfaction",
-            "mental_rotation", "object_scaling")
+# one LeRobot chunk per task family (owner 2026-11-15): chunk-000 .. chunk-006 in this order, for data/ and every videos/<key>/
+FAMILIES = ("camera_relocalization", "object_scaling", "mental_rotation", "disembedding", "alignment", "configuration_matching",
+            "inter_object_relation_satisfaction")
+SETS = {  # merge set -> (unit purposes, current eval_production categories)
+    "train": (("train",), ("standard-eval-sibling", "train")),
+    "eval": (("eval",), ("standard-eval",)),
+    "heldout": (("heldout_clean", "heldout_perturbed"), ("eval-heldout-sibling",)),
+}
+DIFF = "/vision/u/minyeong/ispatialgym/eval_production/REPLAY_DIFF_20261115"
 REMAPPED = ("episode_index", "index", "task_index")
 CHUNK = 1000
 
@@ -71,13 +78,63 @@ def link(src: Path, dst: Path, copy: bool):
             shutil.copy2(src, dst)
 
 
+def flagged_ids():
+    """Duplicate-start demos (never in any merge): the REPLAY_DIFF flag lists + the tree's FLAGGED_DUPLICATE_STARTS.txt."""
+    ids = set()
+    for f in ("flagged_not_listed.jsonl", "flagged_already_rendered.jsonl", "drop_replayed_flagged.jsonl"):
+        p = os.path.join(DIFF, f)
+        if os.path.exists(p):
+            ids |= {json.loads(x)["instance_id"] for x in open(p) if x.strip()}
+    return ids
+
+
+def remux_segments(src: Path, dst: Path, segs, fps):
+    """Stream-copy the frame ranges segs [(start_frame, end_frame), ...] of src into dst, back to back (no re-encode: every episode
+    of a unit video starts on a keyframe and is coded independently). Returns the new [(from_ts, to_ts)]."""
+    import av
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    inp = av.open(str(src))
+    s = inp.streams.video[0]
+    tb = s.time_base
+    out = av.open(str(dst), "w", format="mp4")
+    o = out.add_stream_from_template(s)
+    per = 1 / (fps * tb)  # pts ticks per frame
+    starts, new, cur = [], [], 0
+    for a0, a1 in segs:
+        starts.append(cur)
+        new.append((cur / fps, (cur + a1 - a0) / fps))
+        cur += a1 - a0
+    n = [0] * len(segs)
+    for pk in inp.demux(s):
+        if pk.pts is None:
+            continue
+        fr = int(round(float(pk.pts) / per))
+        i = next((j for j, (a0, a1) in enumerate(segs) if a0 <= fr < a1), None)
+        if i is None:
+            continue
+        shift = int(round((segs[i][0] - starts[i]) * per))
+        pk.pts -= shift
+        pk.dts = pk.dts - shift if pk.dts is not None else None
+        pk.stream = o
+        out.mux(pk)
+        n[i] += 1
+    out.close()
+    inp.close()
+    bad = [(segs[i], n[i]) for i in range(len(segs)) if n[i] != segs[i][1] - segs[i][0]]
+    if bad:
+        raise ValueError(f"{src}: packets per kept episode {bad}")
+    return new
+
+
 def units_of(runs, purpose, exclude=()):
     out = []
+    purposes = SETS[purpose][0] if purpose in SETS else (purpose,)
     for run in runs:
         spec = json.load(open(RV / "runs" / run / "units.json"))
         for u in spec["units"]:
             d = RV / "runs" / run / "out" / u["unit"]
-            if u["purpose"] != purpose or f"{run}/{u['unit']}" in exclude or u["unit"] in exclude:
+            if u["purpose"] not in purposes or f"{run}/{u['unit']}" in exclude or u["unit"] in exclude:
                 continue
             if not (d / ".synced").exists():
                 print(f"skip {run}/{u['unit']}: not pulled (sync.py pull)")
@@ -106,8 +163,11 @@ def merge(a):
     task_index = {t: i for i, t in enumerate(tasks)}
     info0 = None
     video_keys = None
+    flagged = flagged_ids()
+    _, categories = SETS[a.purpose]
+    seen, excluded, trimmed = {}, [], []
     ep_rows, isg_eps, settle = [], [], {}
-    n_data = 0
+    n_data = collections.Counter()
     n_vid = collections.Counter()
     gidx, gframe = 0, 0
     templates = {}
@@ -123,15 +183,41 @@ def merge(a):
             video_keys = [k for k, v in info["features"].items() if v["dtype"] == "video"]
         elif info["features"] != info0["features"] or info.get("cam_intrinsics") != info0.get("cam_intrinsics") or info["fps"] != info0["fps"]:
             raise ValueError(f"{run}/{uid}: features / intrinsics / fps differ from the first unit's")
-        rows = sorted((r for p in sorted((ds / "meta/episodes").glob("*/*.parquet")) for r in pq.read_table(p).to_pylist()),
-                      key=lambda r: r["episode_index"])
+        all_rows = sorted((r for p in sorted((ds / "meta/episodes").glob("*/*.parquet")) for r in pq.read_table(p).to_pylist()),
+                          key=lambda r: r["episode_index"])
         recs = {e["episode_index"]: e for e in (json.loads(x) for x in (d / "episodes_isg.jsonl").read_text().splitlines() if x.strip())
                 if e.get("kept")}
-        if sorted(recs) != [r["episode_index"] for r in rows]:
-            raise ValueError(f"{run}/{uid}: episodes {[r['episode_index'] for r in rows]} vs kept records {sorted(recs)}")
+        if sorted(recs) != [r["episode_index"] for r in all_rows]:
+            raise ValueError(f"{run}/{uid}: episodes {[r['episode_index'] for r in all_rows]} vs kept records {sorted(recs)}")
+        # selection against the CURRENT eval_production tree: category of this merge set, never a flagged demo, each instance once
+        # (held-out: once per variant)
+        rows = []
+        for r in all_rows:
+            inst = tree_refresh(recs[r["episode_index"]].get("instance") or {})
+            iid = inst.get("instance_id") or inst.get("demo_name")
+            variant = u["purpose"].split("_", 1)[1] if u["purpose"].startswith("heldout_") else None
+            why = ("not in the current tree" if inst.get("tree_missing") else
+                   "flagged duplicate start" if iid in flagged or inst.get("duplicate_start_flagged") else
+                   f"category now {inst.get('category')}" if inst.get("category") not in categories else
+                   f"duplicate of {seen[(iid, variant)]}" if (iid, variant) in seen else None)
+            if why:
+                excluded.append({"run": run, "unit": uid, "unit_episode_index": r["episode_index"], "instance_id": iid, "reason": why,
+                                 "replayed_category": (recs[r["episode_index"]].get("instance") or {}).get("category")})
+                continue
+            seen[(iid, variant)] = f"{run}/{uid}#{r['episode_index']}"
+            rows.append(r)
+        if not rows:
+            print(f"skip {run}/{uid}: no episode selected")
+            continue
+        fam = family_of(u["task"])
+        chunk = FAMILIES.index(fam)
+        partial = len(rows) != len(all_rows)
+        if partial:
+            trimmed.append(f"{run}/{uid}")
         # data: one file per source data file, rows remapped
         dmap, vmap = {}, {}
         tables = {}
+        newts = {}
         for r in rows:
             key = (r["data/chunk_index"], r["data/file_index"])
             if key not in tables:
@@ -139,11 +225,21 @@ def merge(a):
             for k in video_keys:
                 vk = (k, r[f"videos/{k}/chunk_index"], r[f"videos/{k}/file_index"])
                 if vk not in vmap:
-                    n = n_vid[k]
-                    n_vid[k] += 1
-                    link(ds / info["video_path"].format(video_key=k, chunk_index=vk[1], file_index=vk[2]),
-                         tmp / info["video_path"].format(video_key=k, chunk_index=n // CHUNK, file_index=n % CHUNK), a.copy)
-                    vmap[vk] = (n // CHUNK, n % CHUNK)
+                    n = n_vid[(fam, k)]
+                    n_vid[(fam, k)] += 1
+                    if n >= CHUNK:
+                        raise ValueError(f"{fam}: more than {CHUNK} {k} files in one chunk")
+                    src = ds / info["video_path"].format(video_key=k, chunk_index=vk[1], file_index=vk[2])
+                    dst = tmp / info["video_path"].format(video_key=k, chunk_index=chunk, file_index=n)
+                    if partial:  # drop the unselected episodes' frames from the file too (stream copy)
+                        sel = [x for x in rows if (x[f"videos/{k}/chunk_index"], x[f"videos/{k}/file_index"]) == vk[1:]]
+                        segs = [(int(round(x[f"videos/{k}/from_timestamp"] * info["fps"])),
+                                 int(round(x[f"videos/{k}/to_timestamp"] * info["fps"]))) for x in sel]
+                        for x, ts in zip(sel, remux_segments(src, dst, segs, info["fps"])):
+                            newts[(k, x["episode_index"])] = ts
+                    else:
+                        link(src, dst, a.copy)
+                    vmap[vk] = (chunk, n)
         new_tables = collections.defaultdict(list)
         for r in rows:
             key = (r["data/chunk_index"], r["data/file_index"])
@@ -168,8 +264,9 @@ def merge(a):
                    "dataset_from_index": gframe, "dataset_to_index": gframe + L, "_stats": stats}
             for k in video_keys:
                 ci, fi = vmap[(k, r[f"videos/{k}/chunk_index"], r[f"videos/{k}/file_index"])]
+                f0, f1 = newts.get((k, r["episode_index"]), (r[f"videos/{k}/from_timestamp"], r[f"videos/{k}/to_timestamp"]))
                 row.update({f"videos/{k}/chunk_index": ci, f"videos/{k}/file_index": fi,
-                            f"videos/{k}/from_timestamp": r[f"videos/{k}/from_timestamp"], f"videos/{k}/to_timestamp": r[f"videos/{k}/to_timestamp"]})
+                            f"videos/{k}/from_timestamp": f0, f"videos/{k}/to_timestamp": f1})
             ep_rows.append(row)
             # isg_meta
             inst = tree_refresh(rec.get("instance") or {})
@@ -205,7 +302,9 @@ def merge(a):
                         link(Path(readable(tm)), tmp / "isg_meta/templates" / tkey / "template_meta.json", True)
             st = rec.get("settle") or {}
             settle[str(gidx)] = {"length": L, "program_length": int(st.get("action_steps") or L)}
-            isg_eps.append({"episode_index": gidx, "task": u["task"], "task_family": family_of(u["task"]), "purpose": u["purpose"],
+            isg_eps.append({"episode_index": gidx, "task": u["task"], "task_family": fam, "chunk_index": chunk, "purpose": u["purpose"],
+                            "category": inst.get("category"), "goal_group_id": inst.get("goal_group_id"),
+                            "heldout_variant": u["purpose"].split("_", 1)[1] if u["purpose"].startswith("heldout_") else None,
                             "run": run, "unit": uid, "unit_episode_index": r["episode_index"], "length": L, "settle": st,
                             "image_size": rec.get("image_size"), "scene_mode": rec.get("scene_mode"),
                             "perturbation": rec.get("perturbation"), "goal_image": goal_rel,
@@ -214,14 +313,14 @@ def merge(a):
             gidx += 1
             gframe += L
         for key, parts in new_tables.items():
-            n = n_data
-            n_data += 1
-            p = tmp / info0["data_path"].format(chunk_index=n // CHUNK, file_index=n % CHUNK)
+            n = n_data[fam]
+            n_data[fam] += 1
+            p = tmp / info0["data_path"].format(chunk_index=chunk, file_index=n)
             p.parent.mkdir(parents=True, exist_ok=True)
             pq.write_table(pa.concat_tables(parts), p, compression="snappy")
             for row in ep_rows:
                 if row.get("_dkey") == key and "data/chunk_index" not in row:
-                    row["data/chunk_index"], row["data/file_index"] = n // CHUNK, n % CHUNK
+                    row["data/chunk_index"], row["data/file_index"] = chunk, n
         for row in ep_rows:
             row.pop("_dkey", None)
         print(f"[{time.time() - t0:6.1f}s] {run}/{uid}: {len(rows)} episodes", flush=True)
@@ -278,8 +377,15 @@ def merge(a):
     for t in tasks:
         groups.setdefault(family_of(t), []).append(t)
     (im / "task_groups.json").write_text(json.dumps({"format": "isg-task-groups/v1",
-                                                     "description": "task family -> the eval class ids (meta/tasks.parquet) of this dataset",
-                                                     "groups": groups}, indent=2))
+                                                     "description": "task family -> the eval class ids (meta/tasks.parquet) of this dataset; "
+                                                                    "chunks: task family -> its LeRobot chunk index (data/chunk-XXX, "
+                                                                    "videos/<key>/chunk-XXX hold that family only)",
+                                                     "groups": groups, "chunks": {f: FAMILIES.index(f) for f in groups}}, indent=2))
+    with open(im / "excluded.jsonl", "w") as f:
+        for e in excluded:
+            f.write(json.dumps(e) + "\n")
+    print(f"selected {n_ep} episodes; excluded {len(excluded)}: {dict(collections.Counter(e['reason'].split(' of ')[0] for e in excluded))}; "
+          f"units trimmed (stream copy) {len(trimmed)}")
     (im / "templates.json").write_text(json.dumps(templates, indent=1))
     (tmp / "README.md").write_text(readme(a.name, n_ep, n_frames, tasks, groups, video_keys, info0, runs, a.purpose))
     tmp.rename(out)
@@ -287,12 +393,25 @@ def merge(a):
     return out
 
 
+PERT = {
+    "train": "Training perturbations, drawn per demo: replay-time lighting (fixture intensity x U[0.5, 1.5] + colour tint, skybox per "
+             "episode; the collection-time lighting is ignored) and replay-time scene perturbation (one object outside the recorded crop, "
+             "picked at random among those in view, removed with what rests on it; never for camera relocalization, whose removals were "
+             "made at collection). Each episode's draw is in isg_meta/episodes.jsonl `perturbation` and in its TRO "
+             "(`campaign.replay_perturbations`).",
+    "eval": "No replay-time perturbation (standard-eval instances).",
+    "heldout": "Held-out siblings (goals never trained on): per held-out goal group one clean replay (no perturbation) and one perturbed "
+               "replay (scene and lighting perturbation, each with probability 1.0; camera relocalization: lighting only); "
+               "isg_meta/episodes.jsonl `heldout_variant` says which.",
+}
+
+
 def readme(name, n_ep, n_frames, tasks, groups, video_keys, info0, runs, purpose):
     fam = "\n".join(f"| {f} | {len(ts)} | {', '.join(ts[:6])}{' ...' if len(ts) > 6 else ''} |" for f, ts in groups.items())
     size = info0["features"][video_keys[0]]["shape"][:2]
     return f"""# {name}
 
-iSpatialGym oracle demos (R1Pro), {"training instances" if purpose == "train" else "eval instances"}: {n_ep} episodes, {n_frames}
+iSpatialGym oracle demos (R1Pro), { {"train": "training instances", "eval": "standard-eval instances", "heldout": "held-out sibling instances (eval side)"}[purpose] }: {n_ep} episodes, {n_frames}
 frames at {info0['fps']} fps, LeRobot v3.0. Replayed kinematically from each demo's demo.hdf5 by the batched replay of 2026-11-15
 (`python -m ispatialgym.multienv.replay --slots 1 --batched-usd-edits --async-flush --proprio loaded --warmup-s 15 --scene full
 --image-size 224 --settle-pad 0.2 --settle-pad-min 50 --goal-images on`, ISPATIALGYM_SHARD_FORMAT=legacy, Behavior-1K 6a6194600 +
@@ -302,7 +421,11 @@ p59fc36c6 patches, Isaac Sim 5.1.0) on Vast.ai GPUs; runs {', '.join(runs)}.
   12-bit HEVC log depth), with `observation.robot2cam_pose.*`. `observation.state`: the replayed robot's 61-D proprioception;
   `action`: 23-D. Frame i pairs action i with the observation of recorded state i.
 - Scene: the demo's recorded (cropped) world merged back into its template's task rooms + adjacent rooms (`--scene full`).
-- {"Training perturbations, per goal group with p = 0.5 each: replay-time lighting (fixture intensity x U[0.5, 1.5] + colour tint; the skybox per replay process; the collection-time lighting is ignored) and replay-time scene perturbation (one object outside the recorded crop removed with what rests on it; never for camera relocalization, whose removals were made at collection). The draws are in isg_meta/episodes.jsonl `perturbation` and in the episode's TRO (`campaign.replay_perturbations`)." if purpose == "train" else "No replay-time perturbation (eval instances)."}
+- {PERT[purpose]}
+- Layout: one LeRobot chunk per task family: {", ".join(f"chunk-{FAMILIES.index(f):03d} = {f}" for f in groups)} (data/ and every
+  videos/<key>/; isg_meta/task_groups.json `chunks`).
+- Selection: the eval_production tree as curated on 2026-11-15 (categories {", ".join(SETS[purpose][1])}); duplicate-start demos are never
+  included; isg_meta/excluded.jsonl lists every replayed episode left out and why.
 - Settle: every episode is its demo's action steps A followed by max(ceil(0.2 A), 50) settle frames (isg_meta/settle_windows.json).
 - Goal image: isg_meta/goal_images/episode_<i>.png, the episode's last rendered head-camera frame (= the last frame of
   `observation.rgb.zed_link_camera_0` before compression; ACT's goal_source=episode_last reads the same frame from the video).
@@ -339,7 +462,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--runs", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--purpose", default="train", choices=("train", "eval"))
+    ap.add_argument("--purpose", default="train", choices=tuple(SETS))
     ap.add_argument("--name", default="isg-train")
     ap.add_argument("--copy", action="store_true", help="copy unit files instead of hard-linking them")
     ap.add_argument("--load-test", action="store_true")
