@@ -80,12 +80,14 @@ def stop_reason():
     return None
 
 
-def ledger_ids():
+def ledger_ids(run=None):
+    """Instance ids this ledger created; with ``run`` only that run's (several loops share the ledger: a loop must never list,
+    reap or destroy another run's instances - their heartbeats live under the other run's prefix)."""
     ids = set()
     if LEDGER.exists():
         for line in open(LEDGER):
             e = json.loads(line)
-            if e["ev"] == "create" and e.get("instance"):
+            if e["ev"] == "create" and e.get("instance") and (run is None or e.get("run") == run):
                 ids.add(str(e["instance"]))
     return ids
 IMAGE = os.environ.get("ISG_IMAGE", "ghcr.io/kmy17518/isg-replay:v3")
@@ -384,7 +386,7 @@ def my_instances(c):
     SHOW_ERRORS names the accounts whose list could not be read (their instances are missing from the result)."""
     out = []
     SHOW_ERRORS.clear()
-    mine = ledger_ids()
+    mine = ledger_ids(RUN[0])
     for name, cl in c.items():
         try:
             pace()
@@ -401,8 +403,8 @@ def my_instances(c):
 def destroy(c, iid, reason, key_name=None):
     """Destroy with the owning account (key_name, else the ledger's), falling back to the other accounts. Only ids this ledger
     created (og-isgrend- fleet rule)."""
-    if str(iid) not in ledger_ids():
-        print(f"REFUSE destroy {iid}: not created by this ledger")
+    if str(iid) not in ledger_ids(RUN[0]):
+        print(f"REFUSE destroy {iid}: not created by this ledger for run {RUN[0]}")
         return False
     owner = key_name or owner_of(iid)
     order = ([owner] if owner in c else []) + [k for k in c if k != owner]
@@ -556,7 +558,7 @@ def reap(c, s3, dry=False):
     if LEDGER.exists():
         for line in open(LEDGER):
             e = json.loads(line)
-            if e["ev"] == "create" and e.get("instance"):
+            if e["ev"] == "create" and e.get("instance") and e.get("run") == RUN[0]:
                 created[str(e["instance"])] = e
             elif e["ev"] == "destroy":
                 ended.add(str(e["instance"]))
