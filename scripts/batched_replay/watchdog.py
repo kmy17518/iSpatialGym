@@ -178,9 +178,9 @@ def main():
                 if t - p["since"] > a.stall_s:
                     flagged[uid] = f"stalled: no new demo for {(t - p['since']) / 60:.0f} min ({d}/{n} demos)"
                     continue
-                if n_open == 0:
-                    rate = r.get("steady_fps") or (d / n * r["frames"]) / max(1.0, t - float(r["started"]))
-                    eta = (1 - d / n) * r["frames"] / max(0.1, float(rate))
+                if n_open == 0 and d >= 2 and r.get("steady_fps"):  # the steady rate only: a first demo carries the start-up
+                    rate = float(r["steady_fps"])
+                    eta = (1 - d / n) * r["frames"] / max(0.1, rate)
                     restart = 300 + r["frames"] / a.fast_fps
                     if eta > a.tail_eta_s and restart < 0.5 * eta:
                         flagged[uid] = f"slow in the tail: eta {eta / 60:.0f} min at {rate:.1f} fps, restart ~{restart / 60:.0f} min"
@@ -205,7 +205,7 @@ def main():
                 still = by_inst.get(iid, [])
                 healthy = [u for u in still if u not in dr["units"] and u not in flagged]
                 gone = iid not in hbs or t - hbs[iid].get("time", 0) > V.HB_STALE_S
-                if healthy and not gone and t - dr["since"] < a.drain_s:
+                if healthy and not gone:  # never destroy progressing units (a stalled process is killed by its worker)
                     continue
                 if not gone:
                     ok = a.dry_run or V.destroy(c, int(iid), f"watchdog: {dr['why']}")
