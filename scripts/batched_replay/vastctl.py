@@ -646,7 +646,7 @@ def loop(c, s3, a):
             # without an error: count the fleet as the larger of the listing and this ledger's live instances (created, no
             # destroy, heartbeat not finished) so an under-count never rents past the target
             gpus = max(gpus, ledger_live_gpus(hbs))
-            tf = W / "target_gpus"
+            tf = W / f"target_gpus_{RUN[0]}" if (W / f"target_gpus_{RUN[0]}").exists() else W / "target_gpus"
             if tf.exists():
                 a.gpus = int(tf.read_text().split()[0])
             remaining = pr["open"]
