@@ -71,13 +71,13 @@ def link(src: Path, dst: Path, copy: bool):
             shutil.copy2(src, dst)
 
 
-def units_of(runs, purpose):
+def units_of(runs, purpose, exclude=()):
     out = []
     for run in runs:
         spec = json.load(open(RV / "runs" / run / "units.json"))
         for u in spec["units"]:
             d = RV / "runs" / run / "out" / u["unit"]
-            if u["purpose"] != purpose:
+            if u["purpose"] != purpose or f"{run}/{u['unit']}" in exclude or u["unit"] in exclude:
                 continue
             if not (d / ".synced").exists():
                 print(f"skip {run}/{u['unit']}: not pulled (sync.py pull)")
@@ -93,7 +93,8 @@ def merge(a):
 
     t0 = time.time()
     runs = a.runs.split(",")
-    units = units_of(runs, a.purpose)
+    exclude = set(open(a.exclude_units).read().split()) if a.exclude_units else set()
+    units = units_of(runs, a.purpose, exclude)
     if not units:
         sys.exit("no pulled units")
     out = Path(a.out).resolve()
@@ -339,6 +340,7 @@ def main():
     ap.add_argument("--name", default="isg-train")
     ap.add_argument("--copy", action="store_true", help="copy unit files instead of hard-linking them")
     ap.add_argument("--load-test", action="store_true")
+    ap.add_argument("--exclude-units", default="", help="file of unit ids (or <run>/<unit>) to leave out, e.g. units replaced by a side run")
     a = ap.parse_args()
     out = merge(a)
     if a.load_test:
