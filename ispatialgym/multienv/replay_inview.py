@@ -141,7 +141,8 @@ def room_of(xy, rooms: Mapping[str, Tuple[np.ndarray, np.ndarray]]) -> Optional[
 
 
 def score_demo(demo_dir: str, roots: Sequence[str], K: Optional[Mapping[str, float]] = None, step: int = 10,
-               min_area: float = 0.002, door_margin: float = 0.3, structural: Sequence[str] = ()) -> Dict[str, Any]:
+               min_area: float = 0.002, door_margin: float = 0.3, structural: Sequence[str] = (),
+               extra: Sequence[str] = ()) -> Dict[str, Any]:
     """In-view scores of the outside-crop, non-structural objects of one demo's merged scene (CPU, recorded data only)."""
     import h5py
 
@@ -152,6 +153,7 @@ def score_demo(demo_dir: str, roots: Sequence[str], K: Optional[Mapping[str, flo
         recorded = json.loads(attrs["scene_file"])
         full_ref = json.loads(attrs["isg_full_scene_file"]) if "isg_full_scene_file" in attrs else None
         cams = f["data/demo_0/isg/head_camera_pose"][()]
+        load_rooms = json.loads(attrs["isg_full_load_room_instances"]) if "isg_full_load_room_instances" in attrs else None
     full = recorded
     if isinstance(full_ref, str) and os.path.exists(full_ref):
         with open(full_ref) as fh:
@@ -178,16 +180,21 @@ def score_demo(demo_dir: str, roots: Sequence[str], K: Optional[Mapping[str, flo
     doors = [(_xy_box(corners[n])[0] - door_margin, _xy_box(corners[n])[1] + door_margin)
              for n, o in objs.items() if n in corners and "door" in str(o["category"])]
     skip = set(structural) | set(STRUCTURAL_EXTRA)
+    # the merged replay scene loads the task rooms + their neighbours only (isg_full_load_room_instances)
+    loaded = set(load_rooms) if load_rooms else None
     cands = [n for n, o in objs.items() if n in corners and (not cropped or not o["in_crop"])
+             and (loaded is None or o["in_crop"] or bool(loaded & set(o["in_rooms"])))
              and str(o["category"]) not in skip and not str(o.get("type", "")).endswith("Robot")]
+    probe = list(extra or ())
     idx = list(range(0, len(cams), max(1, int(step))))
     if idx and idx[-1] != len(cams) - 1:
         idx.append(len(cams) - 1)
-    scores = {n: 0 for n in cands}
+    scored = cands + [n for n in probe if n in corners and n not in cands]
+    scores = {n: 0 for n in scored}
     for i in idx:
         cp, cq = cams[i, :3].astype(float), cams[i, 3:7].astype(float)
         croom = room_of(cp[:2], rooms)
-        for n in cands:
+        for n in scored:
             if projected_area(corners[n], cp, cq, K) < min_area:
                 continue
             c = corners[n].mean(axis=0)
@@ -200,8 +207,9 @@ def score_demo(demo_dir: str, roots: Sequence[str], K: Optional[Mapping[str, flo
     n_frames = len(idx)
     return {"schema": SCHEMA, "demo": os.path.basename(os.path.normpath(demo_dir)), "cropped": cropped, "frames": n_frames,
             "step": int(step), "min_area": min_area, "intrinsics": K, "candidates": len(cands), "missing_metadata": len(missing),
-            "rooms": len(rooms), "doors": len(doors),
-            "scores": {n: round(c / max(1, n_frames), 4) for n, c in sorted(scores.items()) if c},
+            "rooms": len(rooms), "doors": len(doors), "load_rooms": sorted(loaded) if loaded else None,
+            "probe": {n: round(scores.get(n, 0) / max(1, len(idx)), 4) for n in probe},
+            "scores": {n: round(c / max(1, n_frames), 4) for n, c in sorted(scores.items()) if c and n in set(cands)},
             "cpu_s": round(time.process_time() - t0, 3)}
 
 
