@@ -42,7 +42,9 @@ RENDER_SCENE_MODE = "full"
 RENDER_SCENE_EXTENT = "task_rooms+adjacent"
 REPLAY_PERTURBATION = {"schema": "isg-replay-perturbation-policy-v1",
                        "scene": {"mode": "one", "unit": "chosen object + what rests on or inside it", "scope": "outside_crop",
-                                 "p": 0.5, "prefer": "in_view (replay_inview, offline CPU)"},
+                                 "p": 0.5, "visibility": "seg", "vis_threshold_px": 500,
+                                 "prefer": "seg_instance at 3 recorded head-camera poses per goal group; offline in-view ranking "
+                                           "(replay_inview) as prefilter / fallback"},
                        "lighting": {"mode": "replay", "p": 0.5, "dist": "uniform", "range": [0.5, 1.5], "color_sigma": 0.04,
                                     "skybox": "per shard"},
                        "keyed_by": "goal group", "camera_relocalization": "collection-time removals kept; replay lighting"}

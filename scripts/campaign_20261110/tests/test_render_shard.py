@@ -22,6 +22,7 @@ def test_render_plan_only_accepts_committed_members_and_is_exclusive(tmp_path):
     assert shard["scene_mode"] == plan["scene_mode"] == "full" and plan["scene_extent"] == shard["scene_extent"] == "task_rooms+adjacent"
     args = (output / "replay.args").read_text().split()
     assert args[:2] == ["--scene", "full"] and "--scene-pert-plan" in args and args[args.index("--lighting-pert") + 1] == "replay"
+    assert args[args.index("--scene-pert-visibility") + 1] == "seg" and args[args.index("--scene-pert-mode") + 1] == "one"
     assert args[args.index("--scene-pert-seed") + 1] == args[args.index("--lighting-pert-seed") + 1] == str(shard["replay_perturbation"]["seed"])
     assert (output / "scene_pert_plan.json").exists() and plan["scene_pert_plan"]["sha256"]
     with pytest.raises(FileExistsError):

@@ -51,6 +51,8 @@ def prepare(root, release, shard_id, snapshot, output, limit=None):
         replay_args = ["--scene", "full", "--scene-pert", "remove", "--scene-pert-mode", policy["scene"]["mode"],
                        "--scene-pert-scope", policy["scene"]["scope"], "--scene-pert-p-episode", str(policy["scene"]["p"]),
                        "--scene-pert-seed", str(seed), "--scene-pert-plan", str(output / "scene_pert_plan.json"),
+                       "--scene-pert-visibility", policy["scene"].get("visibility", "off"),
+                       "--scene-pert-vis-threshold", str(policy["scene"].get("vis_threshold_px", 500)),
                        "--lighting-pert", "replay", "--lighting-pert-seed", str(seed), "--lighting-pert-p", str(policy["lighting"]["p"]),
                        "--lighting-pert-dist", policy["lighting"]["dist"],
                        "--lighting-pert-range", ",".join(str(x) for x in policy["lighting"]["range"]),
