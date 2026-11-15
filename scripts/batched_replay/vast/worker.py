@@ -611,7 +611,8 @@ def demo_timing(status):
 PURPOSE_FLAGS = {
     # owner 2026-11-15: training instances get replay-time scene perturbation (never camera relocalization: the replayer keeps its
     # collection-time removals) and replay-time lighting (the recorded collection lighting is ignored); eval instances neither
-    "train": ["--scene-pert", "remove", "--scene-pert-plan", "auto", "--lighting-pert", "replay", "--lighting-skybox", "group",
+    "train": ["--scene-pert", "remove", "--scene-pert-plan", "auto", "--lighting-pert", "replay", "--lighting-skybox", "episode",
+              "--pert-unit", "demo", "--scene-pert-inview-pick", "random",
               "--goal-occlusion", "auto"],
     "eval": ["--scene-pert", "off", "--lighting-pert", "off", "--goal-occlusion", "off"],
 }

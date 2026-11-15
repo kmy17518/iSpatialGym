@@ -938,6 +938,9 @@ def main(argv=None) -> int:
                          "scene at 3 recorded head-camera poses ranks the removal units by visible pixels (the group's choice); "
                          "nothing visible: the offline ranking / group-keyed draw")
     ap.add_argument("--scene-pert-vis-threshold", type=int, default=500, help="min visible pixels of a unit (summed over the poses)")
+    ap.add_argument("--scene-pert-inview-pick", choices=("first", "random"), default="first",
+                    help="which in-view candidate a perturbed episode removes: the top-ranked one, or (owner 2026-11-15, variance) a "
+                         "uniform pick among all in-view candidates seeded by the draw key")
     ap.add_argument("--scene-pert-p-episode", type=float, default=0.5, help="probability that a replayed episode is perturbed")
     ap.add_argument("--scene-pert-p-unit", type=float, default=0.5, help="--scene-pert-mode subset: probability that a removable unit is removed")
     ap.add_argument("--scene-pert-mode", choices=("one", "subset"), default="one",
@@ -966,9 +969,12 @@ def main(argv=None) -> int:
     ap.add_argument("--lighting-pert-sigma", type=float, default=0.17, help="--lighting-pert-dist normal: N(1, sigma)")
     ap.add_argument("--lighting-pert-range", default="0.5,1.5", help="intensity factor clip lo,hi")
     ap.add_argument("--lighting-pert-color-sigma", type=float, default=0.04, help="fixture colour factors ~ N(1, sigma) per channel")
-    ap.add_argument("--lighting-skybox", choices=("batch", "group"), default="batch",
-                    help="batch: one skybox draw per process (its goal groups); group (--slots 1 only): drawn per goal group, applied "
-                         "before each episode")
+    ap.add_argument("--lighting-skybox", choices=("batch", "episode", "group"), default="batch",
+                    help="batch: one skybox draw per process (its goal groups); episode (--slots 1 only; 'group' is an alias): drawn with "
+                         "each episode's draw key (--pert-unit) and applied before it")
+    ap.add_argument("--pert-unit", choices=("demo", "group"), default="demo",
+                    help="what one replay-time draw covers: demo (owner 2026-11-15: an independent coin flip and draw per demo) or group "
+                         "(one shared draw per goal group)")
     ap.add_argument("--lighting-pert-from", default=None, help="REPLAY_SCENE_PERT records: re-apply their lighting exactly")
     ap.add_argument("--replay-tro-dir", default=None,
                     help="replayed-instance TROs (campaign.replay_perturbations, written to <root>/instances by every perturbed replay): "
@@ -1058,7 +1064,10 @@ def main(argv=None) -> int:
     for name, row in read_instance_meta(args.instance_meta).items():
         if row.get("goal_group_id") and name in groups_of:
             groups_of[name] = str(row["goal_group_id"])
-    if args.lighting_skybox == "group" and n_slots_req(args) != 1:
+    # owner 2026-11-15 11:xx: --pert-unit demo (default) = an independent draw per demo (lighting coin + factor, skybox, scene coin +
+    # object), keyed by (seed, demo); group = one shared draw per goal group (the 2026-11-15 morning render switch)
+    draw_key_of = {n: (n if args.pert_unit == "demo" else g) for n, g in groups_of.items()}
+    if args.lighting_skybox in ("group", "episode") and n_slots_req(args) != 1:
         ap.error("--lighting-skybox group needs --slots 1 (the skybox is one per simulator)")
     inview_plan = None
     if args.scene_pert_plan == "auto":
@@ -1068,7 +1077,7 @@ def main(argv=None) -> int:
 
         data = os.environ.get("OMNIGIBSON_DATA_PATH") or ""
         t_plan = time.time()
-        inview_plan = build_plan(demo_dirs, {os.path.basename(os.path.normpath(d)): groups_of[os.path.basename(os.path.normpath(d))]
+        inview_plan = build_plan(demo_dirs, {os.path.basename(os.path.normpath(d)): draw_key_of[os.path.basename(os.path.normpath(d))]
                                              for d in demo_dirs},
                                  [os.path.join(data, "behavior-1k-assets"), os.path.join(data, "ispatialgym-assets")],
                                  structural=sorted(STRUCTURAL | EXTRA_STRUCTURAL))
@@ -1193,7 +1202,7 @@ def main(argv=None) -> int:
                     rec = {"schema": RSP.SCHEMA, "demo": demo.dir, "demo_name": demo.name, "replay_index": ri,
                            "seed": args.scene_pert_seed, "removed": [], "perturbed": False, "camera": "collection-time removals kept"}
                 else:
-                    g = groups_of.get(demo.name, demo.name)
+                    g = draw_key_of.get(demo.name, demo.name)
                     vis_px = None
                     if (args.scene_pert_visibility == "seg" and forced is None and args.scene_pert_mode == "one"
                             and RSP.group_gate(RSP.group_key(args.scene_pert_seed, g, args.scene_pert_index_base), args.scene_pert_p_episode)):
@@ -1203,9 +1212,10 @@ def main(argv=None) -> int:
                             seg_time[1] += 1
                         vis_px = seg_decisions[g]["px"]
                     rec = RSP.plan(s.scene, demo, ri, args.scene_pert_seed,
-                                   {"mode": args.scene_pert_mode, "p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit},
-                                   forced=forced, inside_crop=inside, group=groups_of.get(demo.name), round_=args.scene_pert_index_base,
-                                   prefer=(inview_plan or {}).get("rankings", {}).get(groups_of.get(demo.name)),
+                                   {"mode": args.scene_pert_mode, "p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit,
+                                    "prefer_pick": args.scene_pert_inview_pick},
+                                   forced=forced, inside_crop=inside, group=draw_key_of.get(demo.name), round_=args.scene_pert_index_base,
+                                   prefer=(inview_plan or {}).get("rankings", {}).get(draw_key_of.get(demo.name)),
                                    visible_px=vis_px, vis_threshold=args.scene_pert_vis_threshold)
                     if vis_px is not None and rec.get("visibility") is not None:
                         rec["visibility"].update({k: seg_decisions[g][k] for k in ("poses", "renders", "s")})
@@ -1222,13 +1232,12 @@ def main(argv=None) -> int:
                     fdraw = lrec["fixtures_draw"]
                     RL.check_batch_skybox([lrec, {"skybox": sky_draw}])
                 else:
-                    fdraw = RL.draw_fixtures(light_seed, groups_of.get(demo.name, demo.name), args.scene_pert_index_base, light_cfg)
+                    fdraw = RL.draw_fixtures(light_seed, draw_key_of.get(demo.name, demo.name), args.scene_pert_index_base, light_cfg)
                 fixtures = RL.apply_fixtures(s.scene, og.sim, fdraw)
                 sky_ep = sky_draw
-                if args.lighting_skybox == "group" and light_from is None:
-                    # one slot: the simulator's one skybox belongs to this episode; drawn per goal group, so a goal group split over
-                    # several processes (different template worlds) still shares one lighting draw
-                    sky_ep = RL.draw_skybox(light_seed, f"group:{groups_of.get(demo.name, demo.name)}|r{args.scene_pert_index_base}", light_cfg)
+                if args.lighting_skybox in ("group", "episode") and light_from is None:
+                    # one slot: the simulator's one skybox belongs to this episode, drawn with the episode's draw key (--pert-unit)
+                    sky_ep = RL.draw_skybox(light_seed, f"episode:{draw_key_of.get(demo.name, demo.name)}|r{args.scene_pert_index_base}", light_cfg)
                 elif abs(float(og.sim.skybox.intensity) - sky_applied["intensity"]) > 1e-5 * max(1.0, sky_applied["intensity"]):
                     RL.apply_skybox(og.sim, sky_draw)  # a restoration reset it: the batch keeps one skybox
                 rec["lighting"] = {"schema": RL.SCHEMA, "mode": "replay", "seed": light_seed, "cfg": light_cfg,
@@ -1239,6 +1248,7 @@ def main(argv=None) -> int:
                                    "forced": light_from is not None}
             s.scene.load_state(demo.state_at(0), serialized=True)
             rec["group"] = groups_of.get(demo.name, demo.name)
+            rec["draw_key"], rec["pert_unit"] = draw_key_of.get(demo.name, demo.name), args.pert_unit
             rec.setdefault("round", args.scene_pert_index_base)
             rec["slot"], rec["plan_s"] = s.k, round(time.perf_counter() - t_p, 2)
             s.scene_pert = rec

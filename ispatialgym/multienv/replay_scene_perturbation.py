@@ -220,7 +220,8 @@ def seg_prefer(units: Sequence[Sequence[str]], visible_px: Mapping[str, int], th
     return [h for h, v in sorted(px.items(), key=lambda kv: (-kv[1], kv[0])) if v >= int(threshold)]
 
 
-def draw_one(units: Sequence[Sequence[str]], key: int, p_episode: float, prefer: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+def draw_one(units: Sequence[Sequence[str]], key: int, p_episode: float, prefer: Optional[Sequence[str]] = None,
+             prefer_pick: str = "first") -> Dict[str, Any]:
     """Owner 2026-11-15: a perturbed instance (probability ``p_episode``) loses ONE chosen object (``units``: [object, objects it
     carries...], see :func:`carried_units`; a carried object goes with it - the minimal group, never a floating one). The object is
     the first of the planner's in-view ranking ``prefer`` that has a unit, else the first in a key-seeded order of all unit heads,
@@ -233,7 +234,12 @@ def draw_one(units: Sequence[Sequence[str]], key: int, p_episode: float, prefer:
     if not perturbed:
         return {"perturbed": False, "removed": [], "order_head": order[:5]}
     # owner 2026-11-15 04:15: prefer the planner's in-view ranking (offline, CPU); fall back to the group-keyed order
-    inview = next((n for n in (prefer or ()) if n in heads), None)
+    if prefer_pick == "random":
+        # owner 2026-11-15: variance across demos - a key-seeded uniform pick among every in-view candidate that has a unit
+        cands = [n for n in (prefer or ()) if n in heads]
+        inview = cands[rng.randrange(len(cands))] if cands else None
+    else:
+        inview = next((n for n in (prefer or ()) if n in heads), None)
     if inview is not None:
         return {"perturbed": True, "removed": sorted(heads[inview]), "chosen": inview, "carried": heads[inview][1:], "inview": True,
                 "inview_rank": list(prefer).index(inview), "order_head": order[:5]}
@@ -518,7 +524,8 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
                 vis = {"method": "seg_instance at recorded head-camera poses", "threshold_px": int(vis_threshold),
                        "ranked": [[h, px[h]] for h in sp[:10]], "fallback": "offline in-view ranking" if not sp else None}
                 prefer = sp + [n for n in (prefer or ()) if n not in sp]
-            d = draw_one(units, group_key(seed, group or demo.name, round_), float(cfg["p_episode"]), prefer=prefer)
+            d = draw_one(units, group_key(seed, group or demo.name, round_), float(cfg["p_episode"]), prefer=prefer,
+                         prefer_pick=cfg.get("prefer_pick", "first"))
             if vis is not None:
                 vis["chosen_px"] = unit_pixels(units, visible_px).get(d.get("chosen"))
                 d["visibility"] = vis
