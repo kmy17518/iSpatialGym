@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vastctl as V  # noqa: E402
 
 RV = V.W
+LONG_FRAMES = 4000
 LANE_LINE = re.compile(r"^\[(?P<t>[0-9T:\-]+)Z\] (?P<kind>START|DONE|FAIL) (?:\([a-z]+\) )?(?P<uid>u\d{4}_[^ :]+)")
 
 
@@ -73,9 +74,10 @@ def lane_state(log_dir: Path, jobs):
                     cur = (m["uid"], ts(m["t"]))
                 else:
                     cur = None
-                    r = re.search(r"replay ([0-9.]+) fps", line)
-                    if m["kind"] == "DONE" and r:
-                        fps.append(float(r.group(1)))
+                    r = re.search(r"DONE \S+: (\d+) frames .*replay ([0-9.]+) fps", line)
+                    # only long units measure the GPU: a short unit's replay rate is dominated by its per-demo restores
+                    if m["kind"] == "DONE" and r and int(r.group(1)) >= LONG_FRAMES:
+                        fps.append(float(r.group(2)))
         st[j] = {"current": cur, "fps": fps}
     return st
 
