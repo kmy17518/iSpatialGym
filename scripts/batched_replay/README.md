@@ -46,6 +46,13 @@ Fixed flags: `--slots 1 --batched-usd-edits --async-flush --proprio loaded --war
 
 ## Pitfalls
 
+- **Never use the visionlab partition / visionlab-* nodes (owner 2026-11-15), not even for CPU helpers.** Loops, finishers, collectors,
+  merges: minyeong `-A vision -p svl` or `-A viscam -p viscam`, shiyuc `-A vision -p svl`, always `--exclude=visionlab-dgx1` (that node
+  is in the svl partition too).
+- Several vastctl loops share one ledger: listing / reaping / destroying is scoped to the loop's own run (before the fix, two loops
+  destroyed each other's healthy instances as heartbeat-less).
+- The eval_production tree is rebuilt in place: merges resolve paths / category / group from its current index.json (tree_index.py).
+
 - 953 eval-1000 input files (80 online units) are shiyuc-owned mode 600: `readable.py` reads them from the shiyuc-made mirror
   `/vision/u/shiyuc/minyeong/isgrend_mirror/<abs path>` (refresh: as shiyuc, `cp -p` each unreadable file there and chmod 644).
 - s5cmd's temporary download names overflow 255 characters on the replayed TRO names: `sync.py` streams `instances/`.
