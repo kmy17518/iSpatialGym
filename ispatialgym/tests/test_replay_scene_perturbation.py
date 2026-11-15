@@ -320,27 +320,36 @@ def test_merged_lighting_crop_view_and_outside():
     A.apply_lighting(view, sim, req, expected=rec)
 
 
-def test_draw_one_single_object_group_keyed():
-    units = [["chair"], ["pillow", "sofa"], ["lamp_table"], ["stool"]]
+def test_draw_one_object_with_its_carried_group_group_keyed():
+    units = [["chair"], ["sofa", "pillow"], ["lamp_table"], ["stool"]]
     keys = [RSP.group_key(0, f"group{g}") for g in range(40)]
     picks = [RSP.draw_one(units, k, 1.0) for k in keys]
-    assert all(len(p["removed"]) == 1 and p["removed"][0] in ("chair", "lamp_table", "stool") for p in picks)  # groups never split
-    assert len({p["removed"][0] for p in picks}) == 3
+    assert all(p["chosen"] in ("chair", "sofa", "lamp_table", "stool") for p in picks)
+    assert all(p["removed"] == (["pillow", "sofa"] if p["chosen"] == "sofa" else [p["chosen"]]) for p in picks)  # minimal group
+    assert len({p["chosen"] for p in picks}) == 4
     assert RSP.draw_one(units, keys[0], 1.0) == picks[0]  # same group -> same object
-    assert RSP.draw_one([["a", "b"]], keys[0], 1.0) == {"perturbed": False, "removed": [], "no_single": True,
-                                                         "order_head": RSP.draw_one([["a", "b"]], keys[0], 1.0)["order_head"]}
+    assert RSP.draw_one([], keys[0], 1.0)["no_unit"]
     n = sum(RSP.draw_one(units, RSP.group_key(1, f"g{i}"), 0.5)["perturbed"] for i in range(2000))
     assert 900 < n < 1100
-    # a member whose removable set lacks the group's first pick takes the next one in the same order
-    k = keys[0]
-    first = picks[0]["removed"][0]
-    other = RSP.draw_one([u for u in units if u != [first]], k, 1.0)["removed"][0]
-    assert other != first
+
+
+def test_carried_units_rests_on_and_inside():
+    b = lambda lo, hi: (np.asarray(lo, float), np.asarray(hi, float))
+    boxes = {"table": b([0, 0, 0], [1, 1, 0.8]), "vase": b([0.4, 0.4, 0.8], [0.5, 0.5, 1.0]),
+             "chair": b([1.0, 0, 0], [1.5, 0.5, 1.0]),  # touches the table, does not rest on it
+             "shelf": b([3, 0, 0], [3.5, 1, 2]), "book": b([3.1, 0.1, 1.0], [3.3, 0.3, 1.3]),  # inside the shelf
+             "crop_box": b([5, 0, 0.8], [5.2, 0.2, 1.0]), "stand": b([4.9, -0.1, 0], [5.3, 0.3, 0.8])}  # crop object on an outside stand
+    u = RSP.carried_units(["table", "vase", "chair", "shelf", "book", "stand"], boxes, {}, others=["crop_box"])
+    heads = {x[0]: x for x in u}
+    assert heads["table"] == ["table", "vase"] and heads["chair"] == ["chair"] and heads["shelf"] == ["shelf", "book"]
+    assert "stand" not in heads  # it carries a crop object
+    u2 = RSP.carried_units(["table", "vase", "chair"], boxes, {"vase": "moved"})
+    assert [x[0] for x in u2] == ["chair"]  # the table carries a protected object; the protected vase is never a head
 
 
 def test_plan_one_object_same_for_group(tmp_path):
     (tmp_path / "meta.json").write_text(json.dumps({"tracked_objects": {"cup.n.01_1": "target_cup"}, "task_family": "x"}))
     a = RSP.plan(_Scene(), _Demo(str(tmp_path), "member_a"), 0, 0, {"p_episode": 1.0}, group="G1")
     b = RSP.plan(_Scene(), _Demo(str(tmp_path), "member_b"), 0, 0, {"p_episode": 1.0}, group="G1")
-    assert a["removed"] == b["removed"] and len(a["removed"]) == 1 and a["group"] == "G1"
-    assert a["removed"][0] == "chair"  # the only single-object unit (pillow+sofa is a group)
+    assert a["removed"] == b["removed"] and a["chosen"] == b["chosen"] and a["group"] == "G1"
+    assert a["chosen"] in ("chair", "pillow", "sofa") and a["removed"] in (["chair"], ["pillow"], ["pillow", "sofa"])

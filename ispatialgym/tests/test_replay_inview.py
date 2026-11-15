@@ -43,12 +43,12 @@ def test_rooms_doors_and_rankings():
 
 
 def test_draw_one_prefers_in_view_single():
-    units = [["chair"], ["pillow", "sofa"], ["tv"]]
+    units = [["chair"], ["sofa", "pillow"], ["tv"]]
     k = RSP.group_key(0, "g")
-    d = RSP.draw_one(units, k, 1.0, prefer=["sofa", "tv", "chair"])
-    assert d["removed"] == ["tv"] and d["inview"]  # sofa is in a touch group: skipped
-    fb = RSP.draw_one(units, k, 1.0, prefer=["sofa"])
-    assert "inview" not in fb and len(fb["removed"]) == 1 and fb["removed"][0] in ("chair", "tv")
+    d = RSP.draw_one(units, k, 1.0, prefer=["pillow", "sofa", "tv"])
+    assert d["chosen"] == "sofa" and d["removed"] == ["pillow", "sofa"] and d["inview"]  # pillow is carried, not a head
+    fb = RSP.draw_one(units, k, 1.0, prefer=["lamp"])
+    assert "inview" not in fb and fb["chosen"] in ("chair", "sofa", "tv")
     assert RSP.draw_one(units, RSP.group_key(0, "x"), 0.0, prefer=["tv"])["removed"] == []  # p gate first
 
 

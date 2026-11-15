@@ -169,27 +169,63 @@ def goal_group(demo_dir: str) -> str:
     return str(g) if g else os.path.basename(os.path.normpath(demo_dir))
 
 
+def rests_on(y: Tuple[np.ndarray, np.ndarray], z: Tuple[np.ndarray, np.ndarray], tol: float = 0.05) -> bool:
+    """Box ``y`` is carried by box ``z``: it stands on z's top (overlapping footprint, bottom within ``tol`` of z's top) or sits
+    inside z (a shelf's or cabinet's contents)."""
+    (ylo, yhi), (zlo, zhi) = (np.asarray(y[0]), np.asarray(y[1])), (np.asarray(z[0]), np.asarray(z[1]))
+    overlap = bool(np.all(ylo[:2] < zhi[:2] - 0.01) and np.all(yhi[:2] > zlo[:2] + 0.01))
+    on_top = overlap and abs(float(ylo[2] - zhi[2])) <= tol
+    inside = bool(np.all(ylo >= zlo - 0.01) and np.all(yhi <= zhi + 0.01)) and float(np.prod(yhi - ylo)) < float(np.prod(zhi - zlo))
+    return on_top or inside
+
+
+def carried_units(names: Sequence[str], boxes: Mapping[str, Tuple[np.ndarray, np.ndarray]], protected: Mapping[str, str],
+                  others: Sequence[str] = ()) -> List[List[str]]:
+    """Owner 2026-11-15 (one object per instance; a chosen object that carries others goes with its minimal group): for every
+    unprotected candidate X, [X] + everything that rests on X, transitively. X is not removable when that group holds a protected
+    object or any non-candidate ``others`` (crop objects: they must never float)."""
+    known = [n for n in names if boxes.get(n) is not None]
+    pool = sorted(set(known) | {n for n in others if boxes.get(n) is not None})
+    units = []
+    for x in sorted(known):
+        if x in protected:
+            continue
+        group, frontier = {x}, [x]
+        while frontier:
+            z = frontier.pop()
+            for y in pool:
+                if y not in group and rests_on(boxes[y], boxes[z]):
+                    group.add(y)
+                    frontier.append(y)
+        carried = sorted(group - {x})
+        if any(n in protected or n not in set(known) for n in carried):
+            continue
+        units.append([x] + carried)
+    return units
+
+
 def draw_one(units: Sequence[Sequence[str]], key: int, p_episode: float, prefer: Optional[Sequence[str]] = None) -> Dict[str, Any]:
-    """Owner 2026-11-15: a perturbed instance (probability ``p_episode``) loses exactly ONE object. The object is the first
-    removable *single-object* unit (it carries nothing and touches no other candidate) in a key-seeded order of all candidate names,
-    so every member of a goal group whose removable set contains it picks the same object. A multi-object touch group is never
-    split and never removed; with no single-object unit the instance stays unperturbed (``no_single``)."""
+    """Owner 2026-11-15: a perturbed instance (probability ``p_episode``) loses ONE chosen object (``units``: [object, objects it
+    carries...], see :func:`carried_units`; a carried object goes with it - the minimal group, never a floating one). The object is
+    the first of the planner's in-view ranking ``prefer`` that has a unit, else the first in a key-seeded order of all unit heads,
+    so the members of a goal group pick the same object. No unit: unperturbed (``no_unit``)."""
     rng = random.Random(int(key))
     perturbed = rng.random() < float(p_episode)
-    singles = sorted(u[0] for u in units if len(u) == 1)
-    names = sorted({n for u in units for n in u})
-    order = names[:]
+    heads = {u[0]: list(u) for u in units}
+    order = sorted(heads)
     rng.shuffle(order)
     if not perturbed:
         return {"perturbed": False, "removed": [], "order_head": order[:5]}
     # owner 2026-11-15 04:15: prefer the planner's in-view ranking (offline, CPU); fall back to the group-keyed order
-    inview = next((n for n in (prefer or ()) if n in set(singles)), None)
+    inview = next((n for n in (prefer or ()) if n in heads), None)
     if inview is not None:
-        return {"perturbed": True, "removed": [inview], "inview": True, "inview_rank": list(prefer).index(inview), "order_head": order[:5]}
-    pick = next((n for n in order if n in set(singles)), None)
-    if pick is None:
-        return {"perturbed": False, "removed": [], "no_single": True, "order_head": order[:5]}
-    return {"perturbed": True, "removed": [pick], "rank": order.index(pick), "order_head": order[:5]}
+        return {"perturbed": True, "removed": sorted(heads[inview]), "chosen": inview, "carried": heads[inview][1:], "inview": True,
+                "inview_rank": list(prefer).index(inview), "order_head": order[:5]}
+    if not order:
+        return {"perturbed": False, "removed": [], "no_unit": True, "order_head": []}
+    pick = order[0]
+    return {"perturbed": True, "removed": sorted(heads[pick]), "chosen": pick, "carried": heads[pick][1:], "rank": 0,
+            "order_head": order[:5]}
 
 
 def draw(units: Sequence[Sequence[str]], key: int, p_episode: float, p_unit: float) -> Dict[str, Any]:
@@ -442,6 +478,13 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
     if not n_robot_boxes or min(n_robot_boxes) == 0:
         raise RuntimeError(f"scene perturbation: no robot link boxes for {demo.name} (robot contact cannot be protected)")
     units, protected = removable_units(candidates, boxes, protected, float(cfg["touch_margin"]))
+    if cfg.get("mode", "one") == "one":
+        # one chosen object + what it carries (not whole touch clusters): a chair touching a cubicle is removable alone
+        crop_objs = [n for n in sorted(inside & set(objs)) if not is_structural(getattr(objs[n], "category", None))]
+        for n in crop_objs:
+            boxes.setdefault(n, object_aabb(objs[n]))
+        prot_one = {n: why for n, why in protected.items() if not why.startswith("unit:")}
+        units = carried_units([n for n in candidates if boxes.get(n) is not None], boxes, prot_one, others=crop_objs)
     if forced is not None:
         bad = sorted(set(forced) - {n for u in units for n in u})
         if bad:
