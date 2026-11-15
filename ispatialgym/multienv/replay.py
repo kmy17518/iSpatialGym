@@ -30,6 +30,13 @@ of the loaded state instead. Renders per tick: ``--first-renders`` when a slot h
 by run_isg after demo.hdf5), taken in the order they finish; the environment is built from the first one, idle slots
 take new demos as they appear, and the process ends when ``--done-file`` exists and every finished demo is replayed.
 
+``--scene-pert remove`` (owner 2026-11-14: training-set scene perturbation at batched-replay time, every class but camera
+relocalization): per slot and replayed episode, a deterministic (``--scene-pert-seed``, demo, replay index) draw hides removable
+scene objects - never the task's objects, anything the demo moves or that touches them or the robot, nothing structural; see
+:mod:`ispatialgym.multienv.replay_scene_perturbation`. The recorded states still load, so the scene state is the recorded one; only
+the images change. Each episode's record is printed as ``REPLAY_SCENE_PERT {json}``, carried by ``REPLAY_DEMO.scene_perturbation``
+and appended to ``<root>/scene_perturbation.jsonl``; ``--scene-pert-from`` replays the removals of earlier records exactly.
+
 Prints ``REPLAY_DEMO {json}`` per finished demo and ``REPLAY_SUMMARY {json}`` (env-steps/s, per-tick time split, CPU,
 GPU memory) at the end; ``--results`` appends the same lines as json.
 
@@ -535,6 +542,10 @@ class Slot:
         #: --delta-load: every object's recorded state as last loaded into this slot (None: load everything next)
         self.loaded: Optional[Dict[str, Any]] = None
         self.campaign_restoration = None
+        #: --scene-pert: the objects hidden in this slot's scene for the current episode, and its record
+        self.hidden: List[str] = []
+        self.scene_pert: Optional[Dict[str, Any]] = None
+        self.pert_check: Dict[str, Any] = {}
 
     def start(self, demo: Demo) -> None:
         from omnigibson.envs.data_wrapper import _align_scene_object_states_with_recorded_schema
@@ -589,6 +600,23 @@ class Slot:
         return len(objs), len(changed)
 
 
+def save_frames(out_dir: str, s: "Slot", d: Demo, i: int, obs: Dict[str, Any]) -> None:
+    """--scene-pert-frames: the slot's rgb observations of frame ``i`` as png."""
+    from PIL import Image
+
+    os.makedirs(out_dir, exist_ok=True)
+    ri = (s.scene_pert or {}).get("replay_index", 0)
+    for key, v in obs.items():
+        if not key.endswith("rgb") or not isinstance(v, th.Tensor):
+            continue
+        a = v.numpy()
+        if a.ndim != 3:
+            continue
+        a = a[..., :3].astype(np.uint8)
+        cam = key.split("::")[-2].replace(":", "_").replace("/", "_") if "::" in key else key.replace(":", "_")
+        Image.fromarray(a).save(os.path.join(out_dir, f"slot{s.k}_{d.name[-14:]}_r{ri}_f{i:05d}_{cam}.png"))
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--demos", default="", help="demo dirs (demo.hdf5 inside), comma-separated, or @file with one per line")
@@ -632,6 +660,19 @@ def main(argv=None) -> int:
     ap.add_argument("--goal-occlusion", choices=("auto", "on", "off"), default="auto",
                     help="screen the goal occlusion at each demo's last frame and leave an occluded demo out of the dataset (module doc); "
                          "auto: the demos the sampler did not measure")
+    ap.add_argument("--scene-pert", choices=("off", "remove"), default="off",
+                    help="replay-time scene perturbation: hide removable non-task scene objects per slot and episode (module doc)")
+    ap.add_argument("--scene-pert-seed", type=int, default=0)
+    ap.add_argument("--scene-pert-p-episode", type=float, default=0.5, help="probability that a replayed episode is perturbed")
+    ap.add_argument("--scene-pert-p-unit", type=float, default=0.5, help="probability that a removable unit is removed")
+    ap.add_argument("--scene-pert-index-base", type=int, default=0,
+                    help="replay index of a demo's first replay in this run (the n-th replay of a demo in the run is base + n)")
+    ap.add_argument("--scene-pert-from", default=None, help="REPLAY_SCENE_PERT records (results jsonl or log): apply exactly these removals")
+    ap.add_argument("--scene-pert-verify", action="store_true",
+                    help="per tick: the slots' tracked-object poses against the recorded isg/object_pose; at the last frame the "
+                         "loaded scene state against the recorded one")
+    ap.add_argument("--scene-pert-frames", default=None, help="save each slot's rgb frames at --scene-pert-frame-at to this dir (png)")
+    ap.add_argument("--scene-pert-frame-at", default="0,0.5,1", help="frame positions as fractions of the demo length")
     ap.add_argument("--profile-ticks", default=None, help="START:COUNT: cProfile those ticks, stats to <results>.prof.txt (or stdout)")
     args = ap.parse_args(argv)
 
@@ -702,19 +743,79 @@ def main(argv=None) -> int:
             for k in range(n_slots):
                 writers.append(BL.ShardWriter(make_slot_view(env, k), args.root, f"{args.repo_prefix}_slot{k}", args.task, async_flush=args.async_flush))
         slots = [Slot(k, env.scenes[k], writers[k], robot_name, scene_mode=scene) for k in range(n_slots)]
-        slots[0].start(first)
+        replay_counts: Dict[str, int] = defaultdict(int)
+        pert_from = None
+        if args.scene_pert_from:
+            from ispatialgym.multienv.replay_scene_perturbation import load_from_records
+
+            pert_from = load_from_records(args.scene_pert_from)
+        pert_path = os.path.join(args.root, "scene_perturbation.jsonl")
+
+        def start_slot(s: "Slot", demo: Demo) -> None:
+            s.start(demo)
+            if args.scene_pert == "off" and pert_from is None:
+                return
+            from ispatialgym.multienv import replay_scene_perturbation as RSP
+
+            RSP.clear(s.scene, s.hidden)
+            s.hidden = []
+            ri = args.scene_pert_index_base + replay_counts[demo.dir]
+            replay_counts[demo.dir] += 1
+            forced = None
+            if pert_from is not None:
+                forced = pert_from.get((demo.name, ri))
+                if forced is None:
+                    raise SystemExit(f"--scene-pert-from: no record for {demo.name} replay {ri}")
+            t_p = time.perf_counter()
+            rec = RSP.plan(s.scene, demo, ri, args.scene_pert_seed,
+                           {"p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit}, forced=forced)
+            s.hidden = RSP.apply(s.scene, rec["removed"])
+            s.scene.load_state(demo.state_at(0), serialized=True)
+            rec["slot"], rec["plan_s"] = s.k, round(time.perf_counter() - t_p, 2)
+            s.scene_pert = rec
+            meta = RSP._read_json(os.path.join(demo.dir, "meta.json"))
+            s.pert_check = {"tracked": meta.get("tracked_objects") or {}, "pos_m": 0.0, "ori_rad": 0.0, "frames": 0,
+                            "recorded_success": meta.get("success")}
+            print("REPLAY_SCENE_PERT " + json.dumps(rec), flush=True)
+            if args.results:
+                with open(args.results, "a") as fo:
+                    fo.write(json.dumps({"tag": "REPLAY_SCENE_PERT", **rec}) + "\n")
+
+        def pert_visibility(tag: str) -> None:
+            if args.scene_pert == "off" and pert_from is None:
+                return
+            from ispatialgym.multienv.replay_scene_perturbation import visibility_matrix
+
+            vm = visibility_matrix([s.scene for s in slots], [s.hidden for s in slots])
+            vm["when"] = tag
+            print("REPLAY_SCENE_PERT_VISIBILITY " + json.dumps(vm), flush=True)
+            if args.results:
+                with open(args.results, "a") as fo:
+                    fo.write(json.dumps({"tag": "REPLAY_SCENE_PERT_VISIBILITY", **vm}) + "\n")
+
+        start_slot(slots[0], first)
         n_objects_recorded_first = slots[0].n_objects_recorded  # REPLAY_SUMMARY (PARTIAL_SCENE): the first demo's recorded objects
         n_demos = 1
 
         def fill_idle(force: bool = False) -> None:
+            nonlocal n_demos
+            started: List[int] = []
+            try:
+                _fill(force, started)
+            finally:
+                if started:
+                    pert_visibility(f"start slots {started}")
+
+        def _fill(force: bool, started: List[int]) -> None:
             nonlocal n_demos
             for s in slots:
                 if s.demo is None:
                     d = source.next(force)
                     if d is None:
                         return
-                    s.start(usable(d))
+                    start_slot(s, usable(d))
                     n_demos += 1
+                    started.append(s.k)
 
         fill_idle(force=True)
         t_warm = time.time()
@@ -783,6 +884,22 @@ def main(argv=None) -> int:
                     n_in, n_loaded = s.load(s.demo.state_at(s.i), args.delta_load)
                     objs_in += n_in
                     objs_loaded += n_loaded
+            if args.scene_pert_verify:
+                from ispatialgym.multienv.replay_scene_perturbation import pose_errors
+
+                for s in active:
+                    e = pose_errors(s.scene, s.demo, s.i, s.pert_check.get("tracked") or {})
+                    pc = s.pert_check
+                    pc["pos_m"], pc["ori_rad"] = max(pc.get("pos_m", 0.0), e["pos_m"]), max(pc.get("ori_rad", 0.0), e["ori_rad"])
+                    pc["frames"] = pc.get("frames", 0) + 1
+                    pc["n_tracked"] = e["n"]
+                    if s.i == s.demo.T - 1:
+                        rec_state = s.demo.state_at(s.i)
+                        cur = s.scene.dump_state(serialized=True)
+                        cur = cur if isinstance(cur, th.Tensor) else th.as_tensor(cur)
+                        pc["final_state_len"] = [int(cur.numel()), int(rec_state.numel())]
+                        pc["final_state_max_abs"] = (float((cur.float().cpu() - rec_state).abs().max())
+                                                     if cur.numel() == rec_state.numel() else None)
             t2 = time.perf_counter()
             for _ in range(args.first_renders if any(s.i == 0 for s in active) else args.renders):
                 og.sim.render()
@@ -807,6 +924,10 @@ def main(argv=None) -> int:
                 obs = {key: ((v.detach().cpu() if v.is_cuda else v.clone()) if isinstance(v, th.Tensor) else v) for key, v in obs_list[s.k].items()}
                 if args.proprio == "recorded":
                     obs[s.proprio_key] = th.as_tensor(d.proprio[i], dtype=th.float32)
+                if args.scene_pert_frames:
+                    at = {min(d.T - 1, int(round(float(x) * (d.T - 1)))) for x in args.scene_pert_frame_at.split(",") if x}
+                    if i in at:
+                        save_frames(args.scene_pert_frames, s, d, i, obs)
                 from ispatialgym.multienv.campaign_render_cleanup import write_frame
                 error, cleanup = write_frame(s.writer, d, i, obs, fault=diagnostic_fault_pending if args.diagnostic_fault_boundary == "writer" else None)
                 if error is not None:
@@ -849,8 +970,17 @@ def main(argv=None) -> int:
                     emit("REPLAY_DEMO", {"demo": d.dir, "slot": s.k, "frames": d.T, "episode_index": index, "wall_s": round(time.time() - s.t0, 2),
                                          "dataset": os.path.join(args.root, f"{args.repo_prefix}_slot{s.k}"), "kept": keep,
                                          "campaign_restoration": s.campaign_restoration,
+                                         "scene_perturbation": None if s.scene_pert is None else {
+                                             "removed": s.scene_pert["removed"], "replay_index": s.scene_pert["replay_index"],
+                                             "seed": s.scene_pert["seed"], "perturbed": s.scene_pert["perturbed"],
+                                             "exempt": s.scene_pert.get("exempt"), "check": dict(s.pert_check)},
                                          "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
                                                                                       "occluded": occl.get("occluded")}})
+                    if s.scene_pert is not None:
+                        os.makedirs(args.root, exist_ok=True)
+                        with open(pert_path, "a") as fo:
+                            fo.write(json.dumps({"dataset": f"{args.repo_prefix}_slot{s.k}", "episode_index": index, "kept": keep,
+                                                 "check": dict(s.pert_check), **s.scene_pert}) + "\n")
                     s.demo = None
             fill_idle()
             t5 = time.perf_counter()
