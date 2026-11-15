@@ -226,7 +226,9 @@ def replay_block(rec: Mapping[str, Any]) -> Dict[str, Any]:
     light = rec.get("lighting") or None
     return {"schema": REPLAY_BLOCK_SCHEMA, "replay_index": int(rec["replay_index"]), "demo_name": rec["demo_name"],
             "scene": {"schema": rec.get("schema"), "seed": rec.get("seed"), "scope": rec.get("scope"), "scene_mode": rec.get("scene_mode"),
-                      "removed_objects": list(rec.get("removed") or []), "perturbed": bool(rec.get("perturbed"))},
+                      "removed_objects": list(rec.get("removed") or []), "perturbed": bool(rec.get("perturbed")),
+                      "chosen": rec.get("chosen"), "carried": rec.get("carried"), "visibility": rec.get("visibility"),
+                      "inview": rec.get("inview")},
             "goal_group": rec.get("group"), "round": rec.get("round"),
             "lighting": None if light is None else {"schema": light.get("schema"), "seed": light.get("seed"), "cfg": light.get("cfg"),
                                                     "fixtures_draw": light["fixtures_draw"], "skybox": light["skybox"],

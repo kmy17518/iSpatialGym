@@ -667,6 +667,50 @@ def replay_goal_image(s: "Slot", d: Demo, obs: Dict[str, Any], out_dir: str) -> 
             "frame": int(d.T - 1)}
 
 
+def seg_visibility(s: "Slot", d: Demo, render, n_poses: int = 3, renders: int = 4) -> Dict[str, Any]:
+    """Owner 2026-11-15 06:05: visible pixels per object of the slot's (unperturbed) scene from its head camera placed at
+    ``n_poses`` recorded head-camera poses of the demo (first, middle, last; ``isg/head_camera_pose``, scene frame), instance
+    segmentation only (an annotator added for these renders and removed after). The camera's parent-frame pose is restored."""
+    from ispatialgym.oracle.r1pro_model import HEAD_CAMERA_SENSOR_SUFFIX
+
+    t0 = time.perf_counter()
+    robot = s.scene.robots[0]
+    key = next(k for k in robot.sensors if k.endswith(HEAD_CAMERA_SENSOR_SUFFIX))
+    sensor = robot.sensors[key]
+    with h5py.File(os.path.join(d.dir, "demo.hdf5"), "r") as f:
+        cams = f["data/demo_0/isg/head_camera_pose"][()]
+    idx = sorted({0, len(cams) // 2, len(cams) - 1})[:max(1, int(n_poses))]
+    saved = sensor.get_position_orientation(frame="parent")
+    added = "seg_instance" not in sensor.modalities
+    px: Dict[str, int] = defaultdict(int)
+    n = 0
+    try:
+        if added:
+            sensor.add_modality("seg_instance")
+        for i in idx:
+            sensor.set_position_orientation(th.as_tensor(cams[i, :3], dtype=th.float32), th.as_tensor(cams[i, 3:7], dtype=th.float32),
+                                            frame="scene")
+            for _ in range(int(renders)):
+                render()
+                n += 1
+            obs, info = sensor.get_obs()
+            seg = obs["seg_instance"]
+            mapping = {int(k): str(v) for k, v in (info.get("seg_instance") or {}).items()}
+            ids, counts = th.unique(th.as_tensor(seg).cpu(), return_counts=True)
+            for i_, c in zip(ids.tolist(), counts.tolist()):
+                name = mapping.get(int(i_))
+                if name:
+                    px[name.rsplit("/", 1)[-1]] += int(c)
+    finally:
+        sensor.set_position_orientation(*saved, frame="parent")
+        if added:
+            sensor.remove_modality("seg_instance")
+        for _ in range(2):
+            render()
+            n += 1
+    return {"px": dict(px), "poses": [int(i) for i in idx], "renders": n, "s": round(time.perf_counter() - t0, 3)}
+
+
 def save_frames(out_dir: str, s: "Slot", d: Demo, i: int, obs: Dict[str, Any]) -> None:
     """--scene-pert-frames: the slot's rgb observations of frame ``i`` as png."""
     from PIL import Image
@@ -737,6 +781,11 @@ def main(argv=None) -> int:
     ap.add_argument("--scene-pert-plan", default=None,
                     help="the render planner's in-view ranking (ispatialgym.multienv.replay_inview, offline CPU): a perturbed group "
                          "removes the first removable single object of its ranking, else the group-keyed draw")
+    ap.add_argument("--scene-pert-visibility", choices=("off", "seg"), default="off",
+                    help="seg (owner 2026-11-15): per goal group, before its first episode, instance segmentation of the unperturbed "
+                         "scene at 3 recorded head-camera poses ranks the removal units by visible pixels (the group's choice); "
+                         "nothing visible: the offline ranking / group-keyed draw")
+    ap.add_argument("--scene-pert-vis-threshold", type=int, default=500, help="min visible pixels of a unit (summed over the poses)")
     ap.add_argument("--scene-pert-p-episode", type=float, default=0.5, help="probability that a replayed episode is perturbed")
     ap.add_argument("--scene-pert-p-unit", type=float, default=0.5, help="--scene-pert-mode subset: probability that a removable unit is removed")
     ap.add_argument("--scene-pert-mode", choices=("one", "subset"), default="one",
@@ -903,6 +952,8 @@ def main(argv=None) -> int:
                 writers.append(BL.ShardWriter(make_slot_view(env, k), args.root, f"{args.repo_prefix}_slot{k}", args.task, async_flush=args.async_flush))
         slots = [Slot(k, env.scenes[k], writers[k], robot_name, scene_mode=scene) for k in range(n_slots)]
         replay_counts: Dict[str, int] = defaultdict(int)
+        seg_decisions: Dict[str, Dict[str, Any]] = {}  # goal group -> its segmentation counts (computed once, before its first episode)
+        seg_time = [0.0, 0]
         pert_from = None
         if args.scene_pert_from:
             from ispatialgym.multienv.replay_scene_perturbation import load_from_records
@@ -944,10 +995,22 @@ def main(argv=None) -> int:
                     rec = {"schema": RSP.SCHEMA, "demo": demo.dir, "demo_name": demo.name, "replay_index": ri,
                            "seed": args.scene_pert_seed, "removed": [], "perturbed": False, "camera": "collection-time removals kept"}
                 else:
+                    g = groups_of.get(demo.name, demo.name)
+                    vis_px = None
+                    if (args.scene_pert_visibility == "seg" and forced is None and args.scene_pert_mode == "one"
+                            and RSP.group_gate(RSP.group_key(args.scene_pert_seed, g, args.scene_pert_index_base), args.scene_pert_p_episode)):
+                        if g not in seg_decisions:
+                            seg_decisions[g] = seg_visibility(s, demo, og.sim.render)
+                            seg_time[0] += seg_decisions[g]["s"]
+                            seg_time[1] += 1
+                        vis_px = seg_decisions[g]["px"]
                     rec = RSP.plan(s.scene, demo, ri, args.scene_pert_seed,
                                    {"mode": args.scene_pert_mode, "p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit},
                                    forced=forced, inside_crop=inside, group=groups_of.get(demo.name), round_=args.scene_pert_index_base,
-                                   prefer=(inview_plan or {}).get("rankings", {}).get(groups_of.get(demo.name)))
+                                   prefer=(inview_plan or {}).get("rankings", {}).get(groups_of.get(demo.name)),
+                                   visible_px=vis_px, vis_threshold=args.scene_pert_vis_threshold)
+                    if vis_px is not None and rec.get("visibility") is not None:
+                        rec["visibility"].update({k: seg_decisions[g][k] for k in ("poses", "renders", "s")})
                 rec["scope"], rec["scene_mode"] = args.scene_pert_scope, s.scene_mode
                 s.hidden = RSP.apply(s.scene, rec["removed"])
             else:
@@ -1262,7 +1325,8 @@ def main(argv=None) -> int:
             "objects_per_state": round(objs_in / max(1, n_steps), 1) if args.delta_load else None,
             "objects_loaded_per_state": round(objs_loaded / max(1, n_steps), 1) if args.delta_load else None,
             "renders": args.renders, "first_renders": args.first_renders, "omp_threads": os.environ.get("OMP_NUM_THREADS"),
-            "scene": scene, "goal_occlusion": {"mode": args.goal_occlusion, **n_occl}, "n_objects_scene": slots[0].n_objects_scene, "n_objects_recorded": n_objects_recorded_first,
+            "scene": scene, "goal_occlusion": {"mode": args.goal_occlusion, **n_occl},
+            "scene_pert_seg": {"groups": seg_time[1], "s": round(seg_time[0], 3)}, "n_objects_scene": slots[0].n_objects_scene, "n_objects_recorded": n_objects_recorded_first,
             "cpus_allowed": len(os.sched_getaffinity(0)), "host": os.uname().nodename, "pid": os.getpid()})
         if out is not None:
             out.close()

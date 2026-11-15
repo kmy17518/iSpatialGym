@@ -204,6 +204,22 @@ def carried_units(names: Sequence[str], boxes: Mapping[str, Tuple[np.ndarray, np
     return units
 
 
+def group_gate(key: int, p_episode: float) -> bool:
+    """The p gate of :func:`draw_one` for ``key`` (its rng's first draw), so a caller can skip work for unperturbed groups."""
+    return random.Random(int(key)).random() < float(p_episode)
+
+
+def unit_pixels(units: Sequence[Sequence[str]], visible_px: Mapping[str, int]) -> Dict[str, int]:
+    """Visible pixels of every removal unit (object + what it carries) from per-object segmentation counts."""
+    return {u[0]: int(sum(int(visible_px.get(n, 0)) for n in u)) for u in units}
+
+
+def seg_prefer(units: Sequence[Sequence[str]], visible_px: Mapping[str, int], threshold: int) -> List[str]:
+    """Unit heads by visible pixels, most first, those with at least ``threshold`` pixels."""
+    px = unit_pixels(units, visible_px)
+    return [h for h, v in sorted(px.items(), key=lambda kv: (-kv[1], kv[0])) if v >= int(threshold)]
+
+
 def draw_one(units: Sequence[Sequence[str]], key: int, p_episode: float, prefer: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """Owner 2026-11-15: a perturbed instance (probability ``p_episode``) loses ONE chosen object (``units``: [object, objects it
     carries...], see :func:`carried_units`; a carried object goes with it - the minimal group, never a floating one). The object is
@@ -396,7 +412,8 @@ def demo_task_context(demo) -> Tuple[Dict[str, Any], Dict[str, Any], List[str]]:
 
 def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, Any]] = None,
          forced: Optional[Sequence[str]] = None, inside_crop: Optional[Set[str]] = None, group: Optional[str] = None,
-         round_: int = 0, prefer: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+         round_: int = 0, prefer: Optional[Sequence[str]] = None, visible_px: Optional[Mapping[str, int]] = None,
+         vis_threshold: int = 500) -> Dict[str, Any]:
     """Decide this replayed episode's removals in ``scene`` (a slot's scene). Loads sampled recorded states into the scene (the
     caller reloads frame 0 afterwards). ``forced``: the removed names of a previous record (``--scene-pert-from``), checked
     against this run's protection."""
@@ -493,7 +510,18 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
     else:
         if cfg.get("mode", "one") == "one":
             # one object per perturbed instance, keyed by the goal group (the demo when it has none)
+            vis = None
+            if visible_px is not None:
+                # owner 2026-11-15 06:05: the group's segmentation counts at recorded head-camera poses choose the unit
+                sp = seg_prefer(units, visible_px, vis_threshold)
+                px = unit_pixels(units, visible_px)
+                vis = {"method": "seg_instance at recorded head-camera poses", "threshold_px": int(vis_threshold),
+                       "ranked": [[h, px[h]] for h in sp[:10]], "fallback": "offline in-view ranking" if not sp else None}
+                prefer = sp + [n for n in (prefer or ()) if n not in sp]
             d = draw_one(units, group_key(seed, group or demo.name, round_), float(cfg["p_episode"]), prefer=prefer)
+            if vis is not None:
+                vis["chosen_px"] = unit_pixels(units, visible_px).get(d.get("chosen"))
+                d["visibility"] = vis
         else:
             d = draw(units, episode_key(seed, demo.name, replay_index), float(cfg["p_episode"]), float(cfg["p_unit"]))
         d["group"], d["round"] = group or demo.name, int(round_)

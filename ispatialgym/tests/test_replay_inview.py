@@ -84,3 +84,15 @@ def test_wall_boxes_block_segments():
     pts = np.array([[2.0, 0.0, 1.0], [-1.0, 0.0, 1.0], [0.05, 0.0, 1.0], [2.0, 0.0, 8.0]])
     out = IV.segments_blocked(np.array([-2.0, 0.0, 1.0]), pts, walls)
     assert out.tolist() == [True, False, False, False]  # behind the wall; same side; wall-mounted (inside the wall); above it
+
+
+def test_seg_visibility_ranking_and_gate():
+    units = [["bar"], ["sofa", "pillow"], ["lamp"]]
+    px = {"bar": 300, "sofa": 200, "pillow": 400, "lamp": 10, "target": 9999}
+    assert RSP.unit_pixels(units, px) == {"bar": 300, "sofa": 600, "lamp": 10}
+    assert RSP.seg_prefer(units, px, 100) == ["sofa", "bar"]
+    k = RSP.group_key(0, "g")
+    d = RSP.draw_one(units, k, 1.0, prefer=RSP.seg_prefer(units, px, 100))
+    assert d["chosen"] == "sofa" and d["removed"] == ["pillow", "sofa"]
+    assert RSP.group_gate(k, 1.0) and not RSP.group_gate(k, 0.0)
+    assert RSP.group_gate(k, 0.5) == RSP.draw_one(units, k, 0.5)["perturbed"]  # the gate is draw_one's
