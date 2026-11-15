@@ -50,3 +50,19 @@ def test_draw_one_prefers_in_view_single():
     fb = RSP.draw_one(units, k, 1.0, prefer=["sofa"])
     assert "inview" not in fb and len(fb["removed"]) == 1 and fb["removed"][0] in ("chair", "tv")
     assert RSP.draw_one(units, RSP.group_key(0, "x"), 0.0, prefer=["tv"])["removed"] == []  # p gate first
+
+
+def test_merged_extent_is_task_rooms_plus_adjacent(tmp_path):
+    import json
+    from types import SimpleNamespace
+
+    from ispatialgym.multienv.replay import merged_extent
+
+    tro = tmp_path / "x-tro_state.json"
+    tro.write_text(json.dumps({"ispatialgym": {"scene": {"task_rooms": ["meeting_room_0"], "model": "office"}}}))
+    demo = SimpleNamespace(tro_path=str(tro), scene_file={}, full_rooms=["meeting_room_0", "conference_hall_0", "corridor_0"])
+    adj = lambda model, rooms: ["conference_hall_0", "corridor_0"] if model == "office" and rooms == ["meeting_room_0"] else []
+    ok = merged_extent(demo, adjacent=adj)
+    assert ok["equal"] and ok["scene_extent"] == "task_rooms+adjacent"
+    demo.full_rooms = demo.full_rooms + ["kitchen_0"]  # the whole house (or any extra room) is refused
+    assert not merged_extent(demo, adjacent=adj)["equal"]

@@ -328,6 +328,26 @@ class DemoSource:
             time.sleep(self.poll_s)
 
 
+def merged_extent(demo: "Demo", adjacent=None) -> Dict[str, Any]:
+    """Render switch 2026-11-15 (owner): the merged scene = the task rooms + their adjacent rooms, not the whole house. The demo's
+    ``isg_full_load_room_instances`` (the rooms ``--scene full`` loads) must equal its TRO ``scene.task_rooms`` U
+    ``sim_utils.adjacent_rooms(scene, task_rooms)``; ``adjacent`` overrides that function (tests)."""
+    tro = {}
+    if demo.tro_path and os.path.exists(demo.tro_path):
+        with open(demo.tro_path) as f:
+            tro = json.load(f).get("ispatialgym") or {}
+    scene_info = tro.get("scene") or {}
+    tasks = list(scene_info.get("task_rooms") or [])
+    model = scene_info.get("model") or (demo.scene_file.get("init_info") or {}).get("args", {}).get("scene_model")
+    if adjacent is None:
+        from ispatialgym.sampling.sim_utils import adjacent_rooms as adjacent
+    adj = list(adjacent(model, tasks)) if tasks else []
+    loaded = sorted(demo.full_rooms or [])
+    expect = sorted(set(tasks) | set(adj))
+    return {"scene_extent": "task_rooms+adjacent", "task_rooms": tasks, "adjacent": sorted(adj), "loaded": loaded,
+            "equal": bool(tasks) and expect == loaded}
+
+
 def env_config(first: Demo, demos: List[Demo], first_dir: str, n_slots: int, scene: str = "recorded") -> Dict[str, Any]:
     """``create_from_hdf5``'s config edits for replay_obs's settings (include_contacts=False, include_task_obs=False,
     replay_obs's robot sensors / modalities / proprioception), with ``n_slots`` envs and DummyTask. ``scene="full"`` (2026-11-01
@@ -857,6 +877,13 @@ def main(argv=None) -> int:
     # when their slot starts them
     # 2026-11-01 train-fast (PARTIAL_SCENE): the world - recorded scene file or the full template - from the first demo
     scene = scene_mode(args.scene, first.scene_crop)
+    extent = None
+    if scene == "full" and is_cropped(first.scene_crop):
+        extent = merged_extent(first)
+        print("REPLAY_SCENE_EXTENT " + json.dumps(extent), flush=True)
+        if not extent["equal"]:
+            raise SystemExit(f"--scene full: the merged scene's rooms {extent['loaded']} are not the task rooms + adjacent rooms "
+                             f"{sorted(set(extent['task_rooms']) | set(extent['adjacent']))}")
     config = env_config(first, [first], first.dir, n_slots, scene=scene)
     env = og.Environment(configs=config)
     load_s = time.time() - t_start
