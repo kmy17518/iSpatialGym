@@ -176,7 +176,8 @@ def main():
                     if t - float(r.get("started") or t) > a.startup_s:
                         flagged[uid] = f"no demo {(t - r['started']) / 60:.0f} min after start ({r.get('phase')})"
                     continue
-                if t - p["since"] > a.stall_s:
+                lim = max(a.stall_s, 2.5 * (float(r["frames"]) / n) / 4.0)  # long demos (e.g. block design) take longer
+                if t - p["since"] > lim:
                     flagged[uid] = f"stalled: no new demo for {(t - p['since']) / 60:.0f} min ({d}/{n} demos)"
                     continue
                 if n_open == 0 and d >= 2 and r.get("steady_fps"):  # the steady rate only: a first demo carries the start-up
