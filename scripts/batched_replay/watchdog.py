@@ -160,7 +160,8 @@ def main():
             # ---------- Vast units ----------
             running = {}
             for iid, hb in hbs.items():
-                if not iid.isdigit() or t - hb.get("time", 0) > V.HB_STALE_S or hb.get("phase") in ("destroyed", "done", "failed"):
+                if not iid.isdigit() or t - hb.get("time", 0) > V.HB_STALE_S or hb.get("phase") in ("destroyed", "done", "failed") \
+                        or iid in state.setdefault("destroyed", []):
                     continue
                 for r in hb.get("running") or []:
                     if r.get("unit") in units and r["unit"] not in done:
@@ -210,8 +211,13 @@ def main():
                 if not gone:
                     ok = a.dry_run or V.destroy(c, int(iid), f"watchdog: {dr['why']}")
                     act(a, "destroy_instance", instance=iid, ok=bool(ok), units=dr["units"], healthy_lost=healthy)
+                state.setdefault("destroyed", []).append(iid)
                 rel = [u for u in set(dr["units"]) | set(healthy) if u not in done]
                 for uid in rel:
+                    cl = V.r2_json(s3, f"claims/{uid}.json") or {}
+                    if str(cl.get("instance")) not in (iid, "None"):  # already re-claimed by another worker: leave it
+                        act(a, "keep_claim", unit=uid, owner=cl.get("instance"))
+                        continue
                     rm(f"claims/{uid}.json")
                     state["prog"].pop(uid, None)
                     place(uid, f"{dr['why']} (instance {iid})")
