@@ -39,6 +39,7 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from readable import readable  # noqa: E402
+from tree_index import refresh as tree_refresh  # noqa: E402
 
 RV = Path(os.environ.get("RV", "/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1"))
 FAMILIES = ("alignment", "camera_relocalization", "configuration_matching", "disembedding", "inter_object_relation_satisfaction",
@@ -167,7 +168,7 @@ def merge(a):
                             f"videos/{k}/from_timestamp": r[f"videos/{k}/from_timestamp"], f"videos/{k}/to_timestamp": r[f"videos/{k}/to_timestamp"]})
             ep_rows.append(row)
             # isg_meta
-            inst = rec.get("instance") or {}
+            inst = tree_refresh(rec.get("instance") or {})
             gname = f"episode_{gidx:06d}"
             goal_rel = None
             if rec.get("goal_image"):

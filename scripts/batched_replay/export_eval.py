@@ -34,6 +34,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from readable import readable  # noqa: E402
+from tree_index import refresh as tree_refresh  # noqa: E402
 
 RV = Path(os.environ.get("RV", "/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1"))
 FAMILY_ORDER = ("alignment", "camera_relocalization", "configuration_matching", "disembedding", "inter_object_relation_satisfaction",
@@ -96,7 +97,9 @@ def main():
     customs = json.load(open(EC.CUSTOMS))
     items = []
     for run, u, d, e in episodes_of(a.runs.split(",")):
-        inst = dict(e["instance"])
+        inst = tree_refresh(dict(e["instance"]))
+        if inst.get("category") not in (None, "standard-eval"):
+            continue  # the eval layout holds standard-eval instances only
         if inst.get("tree_tro"):  # eval_production tree: its readable copies
             inst.update({"tro_path": inst["tree_tro"], "oracle_sidecar": inst["tree_oracle"],
                          "template_json": os.path.join(inst["tree_template_dir"], "template.json"),
@@ -183,7 +186,7 @@ def main():
             src = {k: it["inst"].get(k) for k in ("class_id", "eval_manifest", "eval_unit_id", "eval_unit_dir", "eval_instance_id",
                                                    "eval_source", "instance_id", "variant", "demo_dir", "demo_sha256", "template_dir", "category", "goal_group_id",
                                                    "goal_key", "eval_production", "relation", "origin", "production_group_id", "tree_tro",
-                                                   "tree_template_dir",
+                                                   "tree_template_dir", "duplicate_start_flagged", "tree_stale_fields",
                                                    "template_json", "tro_path", "tro_sha256", "oracle_sidecar")}
             src.update({"template_sha256": sha, "template_index": t, "problem_source": psrc})
             replay = {"run": it["run"], "unit": it["unit"]["unit"], "dataset": it["ep"]["dataset"], "episode_index": it["ep"]["episode_index"],
