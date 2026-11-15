@@ -28,6 +28,7 @@ PURPOSE_FLAGS = {  # = vast/worker.py PURPOSE_FLAGS
     "eval": ["--scene-pert", "off", "--lighting-pert", "off", "--goal-occlusion", "off"],
 }
 JOB = os.environ.get("SLURM_JOB_ID", f"local{os.getpid()}")
+UNITS_FILE = [None]  # the lane's unit list (minyeong-side, read by either account)
 
 
 def log(msg):
@@ -54,7 +55,7 @@ def claim(lane: Path, uid: str) -> bool:
 
 
 def next_unit(lane: Path, units: dict):
-    order = [u for u in (lane / "units.txt").read_text().split() if u in units]
+    order = [u for u in Path(UNITS_FILE[0]).read_text().split() if u in units]
     done = {p.name for p in (lane / "out").iterdir() if (p / "done.json").exists()} if (lane / "out").exists() else set()
     for uid in order:
         if uid in done or (lane / "dead" / uid).exists():
@@ -169,7 +170,9 @@ def main():
     ap.add_argument("--run", required=True)
     ap.add_argument("--lane", required=True)
     ap.add_argument("--max-units", type=int, default=0)
+    ap.add_argument("--units-file", required=True)
     a = ap.parse_args()
+    UNITS_FILE[0] = a.units_file
     os.umask(0o022)
     lane = Path(a.lane)
     for d in ("claims", "out", "fail", "dead"):

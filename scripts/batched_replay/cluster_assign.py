@@ -32,6 +32,12 @@ def names(base, sub):
     return {line.split()[-1][:-5] for line in s5("ls", f"{base}/{sub}/*", check=False).splitlines() if line.strip()}
 
 
+def units_file(run, name):
+    p = RV / "cluster_lanes" / run / f"{name}.units.txt"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
 def lanes_of(specs):
     out = []
     for s in specs:
@@ -67,7 +73,6 @@ def main():
             plan[k].append(u["unit"])
             got[k] += u["frames"]
         for name, path, _ in lanes:
-            path.mkdir(parents=True, exist_ok=True)
             ok = []
             for uid in plan[name]:
                 body = json.dumps({"instance": f"cluster:{name}", "lane": str(path), "time": time.time()})
@@ -75,9 +80,10 @@ def main():
                                    capture_output=True)
                 if r.returncode == 0:
                     ok.append(uid)
-            with open(path / "units.txt", "a") as f:
+            uf = units_file(a.run, name)
+            with open(uf, "a") as f:
                 f.write("".join(uid + "\n" for uid in ok))
-            print(f"lane {name}: {len(ok)} units, {sum(units[u]['frames'] for u in ok)} frames -> {path}/units.txt")
+            print(f"lane {name}: {len(ok)} units, {sum(units[u]['frames'] for u in ok)} frames -> {uf} (work dir {path})")
         print(f"vast queue: {len(plan['vast'])} units, {got['vast']} frames left open; total open was {len(open_units)} units, {total} frames")
     elif a.cmd == "collect":
         n = 0
@@ -100,11 +106,11 @@ def main():
         print(f"collected {n}")
     elif a.cmd == "release":
         for name, path, _ in lanes:
-            listed = (path / "units.txt").read_text().split()
+            listed = units_file(a.run, name).read_text().split()
             started = {p.name for p in (path / "claims").glob("*")} | {p.name for p in (path / "out").glob("*")}
             give = set(a.units.split(",")) if a.units else {u for u in listed if u not in started} if a.unstarted else set()
             give &= set(listed) - started
-            (path / "units.txt").write_text("".join(u + "\n" for u in listed if u not in give))
+            units_file(a.run, name).write_text("".join(u + "\n" for u in listed if u not in give))
             for uid in give:
                 s5("rm", f"{base}/claims/{uid}.json", check=False)
             print(f"lane {name}: released {len(give)} units to the Vast queue")

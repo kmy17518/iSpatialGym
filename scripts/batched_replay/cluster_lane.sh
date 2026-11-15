@@ -15,7 +15,7 @@ unset ISPATIALGYM_HEAD_CAMERA_ONLY ISPATIALGYM_PHYSICS_ONLY
 KIT_RC=1
 trap 'kit_appdata_teardown' EXIT
 echo "=== $(date -u +%FT%TZ) $(hostname) $USER $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader | head -1) lane=$LANE"
-python -u "$ISGE_CODE/scripts/batched_replay/cluster_lane.py" --run "${RUN:?run}" --lane "${LANE:?lane}"
+python -u "$ISGE_CODE/scripts/batched_replay/cluster_lane.py" --run "${RUN:?run}" --lane "${LANE:?lane}" --units-file "${UNITS_FILE:?units file}"
 RC=$?
 [ "$USER" = minyeong ] && [ $RC = 0 ] && KIT_RC=0
 exit $RC
