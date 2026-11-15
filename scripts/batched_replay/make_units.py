@@ -276,7 +276,9 @@ def build(a):
         # goal groups whole, in order; cut at --frames / --max-demos between goal groups
         by_group = collections.OrderedDict()
         for r in sorted(rs, key=lambda r: (facts[r["demo_dir"]]["group"], facts[r["demo_dir"]]["name"])):
-            by_group.setdefault(facts[r["demo_dir"]]["group"], []).append(r)
+            # --split-groups: per-demo draws (--pert-unit demo) need no goal group kept whole; every demo may go its own way
+            gk = facts[r["demo_dir"]]["name"] if a.split_groups else facts[r["demo_dir"]]["group"]
+            by_group.setdefault(gk, []).append(r)
         cur, frames = [], 0
         chunks = []
         for g, members in by_group.items():
@@ -388,6 +390,7 @@ def main():
     p.add_argument("--settle-pad-min", type=int, default=50)
     p.add_argument("--upload", action="store_true")
     p.add_argument("--repeat", type=int, default=1, help="sweep runs: copies of every unit")
+    p.add_argument("--split-groups", action="store_true", help="cut units between demos of one goal group (per-demo draws)")
     p.add_argument("--demo-repeat", type=int, default=1, help="sweep runs: every unit plays its demos this many times")
     a = ap.parse_args()
     {"rows-eval1000": rows_eval1000, "rows-eval-production": rows_eval_production, "rows-receipts": rows_receipts, "build": build}[a.cmd](a)
