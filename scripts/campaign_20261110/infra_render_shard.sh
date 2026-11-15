@@ -1,5 +1,8 @@
 #!/bin/bash
 # One owned GPU process renders accepted episodes; source data is read-only.
+# Render switch 2026-11-15 (owner-approved): the scene mode and the replay-time perturbation arguments come from the shard plan
+# (render_shard.py writes $RENDER_OUT/replay.args): --scene full (merged: task rooms + adjacent) + --scene-pert remove (in-view
+# preferred, offline plan) + --lighting-pert replay, seeded by the shard's policy seed; legacy shards keep --scene recorded.
 set -euo pipefail
 CAMPAIGN_ROOT=${1:?campaign root}
 RELEASE=${2:?immutable accepted release}
@@ -24,7 +27,7 @@ KIT_RC=1
 trap 'kit_appdata_teardown' EXIT
 set +e
 python -m ispatialgym.multienv.replay --demos "@$RENDER_OUT/demos.txt" --campaign-manifest "$RELEASE/instances.jsonl" \
-  --root "$RENDER_OUT/lerobot" --task "${INPUTS[1]}" --slots 1 --scene recorded --batched-usd-edits --async-flush \
+  --root "$RENDER_OUT/lerobot" --task "${INPUTS[1]}" --slots 1 $(cat "$RENDER_OUT/replay.args") --batched-usd-edits --async-flush \
   --proprio recorded --warmup-s 60 --repo-prefix replay --goal-occlusion auto --results "$RENDER_OUT/results.jsonl" \
   > "$RENDER_OUT/replay.log" 2>&1
 RENDER_RC=$?

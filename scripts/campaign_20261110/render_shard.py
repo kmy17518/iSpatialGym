@@ -26,17 +26,46 @@ def prepare(root, release, shard_id, snapshot, output, limit=None):
     if limit is not None:
         require(limit > 0, "invalid canary episode limit")
         demos = demos[:limit]
-    records = selected_records(release / "instances.jsonl", demos)
+    merged = shard.get("scene_mode", "recorded") == "full"
+    records = selected_records(release / "instances.jsonl", demos, replay_lighting=merged)
     require(all(row["variant"] == shard["variant"] for row in records.values()), "shard mixes variants")
     source_job = Path(demos[0]).parent.parent
     require(source_job.is_relative_to(root / "out") and (source_job / "job.env").is_file(), "missing owned rendering environment")
     output.mkdir(parents=True, exist_ok=False)
     (output / "demos.txt").write_text("".join(path + "\n" for path in demos))
+    replay_args, inview = ["--scene", "recorded"], None
+    if merged:
+        # owner-approved render switch 2026-11-15: merged scene (task rooms + adjacent), replay-time scene perturbation with the
+        # offline in-view ranking (CPU, recorded data only) and replay-time lighting, all seeded by the shard's policy seed
+        require(shard.get("scene_extent") == "task_rooms+adjacent", "merged render shard without the task-rooms+adjacent extent")
+        from ispatialgym.multienv.replay_inview import build_plan
+        from ispatialgym.multienv.replay_scene_perturbation import goal_group, STRUCTURAL, EXTRA_STRUCTURAL
+
+        policy = shard["replay_perturbation"]
+        seed = int(policy["seed"])
+        data = snapshot / "Behavior-1K" / "datasets"
+        groups = {Path(d).name: goal_group(d) for d in demos}
+        inview = build_plan(demos, groups, [str(data / "behavior-1k-assets"), str(data / "ispatialgym-assets")],
+                            structural=sorted(STRUCTURAL | EXTRA_STRUCTURAL))
+        write_json_atomic(output / "scene_pert_plan.json", inview)
+        replay_args = ["--scene", "full", "--scene-pert", "remove", "--scene-pert-mode", policy["scene"]["mode"],
+                       "--scene-pert-scope", policy["scene"]["scope"], "--scene-pert-p-episode", str(policy["scene"]["p"]),
+                       "--scene-pert-seed", str(seed), "--scene-pert-plan", str(output / "scene_pert_plan.json"),
+                       "--lighting-pert", "replay", "--lighting-pert-seed", str(seed), "--lighting-pert-p", str(policy["lighting"]["p"]),
+                       "--lighting-pert-dist", policy["lighting"]["dist"],
+                       "--lighting-pert-range", ",".join(str(x) for x in policy["lighting"]["range"]),
+                       "--lighting-pert-color-sigma", str(policy["lighting"]["color_sigma"])]
+    (output / "replay.args").write_text(" ".join(replay_args) + "\n")
     plan = {"schema": "isg-render-launch-v1", "purpose": "kinematic_observation_rendering", "release": str(release),
             "release_sha256": file_digest(release / "release.json"), "snapshot": str(snapshot),
             "snapshot_sha256": file_digest(snapshot / ".snapshot_commit"), "shard": shard,
             "instances": [row["instance_id"] for row in records.values()], "source_job": str(source_job),
-            "output": str(output), "canary_limit": limit, "scene_mode": "recorded"}
+            "output": str(output), "canary_limit": limit, "scene_mode": "full" if merged else "recorded",
+            "scene_extent": shard.get("scene_extent") if merged else "recorded crop", "replay_args": replay_args,
+            "replay_perturbation": shard.get("replay_perturbation"),
+            "scene_pert_plan": None if inview is None else {"path": str(output / "scene_pert_plan.json"),
+                                                            "sha256": file_digest(output / "scene_pert_plan.json"),
+                                                            "cpu_s_total": inview["cpu_s_total"]}}
     write_json_atomic(output / "launch.json", plan)
     return plan
 
@@ -48,7 +77,15 @@ def reconcile(output, returncode):
     episodes = [r for r in results if r.get("tag") == "REPLAY_DEMO"]
     expected = set(launch["instances"])
     seen = [Path(row["demo"]).name for row in episodes]
-    passed = (returncode == 0 and len(seen) == len(set(seen)) and set(seen) == expected
+    group_lighting_ok = True
+    if launch.get("scene_mode") == "full":
+        from ispatialgym.multienv.replay_lighting import check_group_skybox
+
+        try:  # every goal group of the shard rendered with one lighting draw (fixtures per group, skybox per shard)
+            check_group_skybox([r for r in results if r.get("tag") == "REPLAY_SCENE_PERT"])
+        except ValueError:
+            group_lighting_ok = False
+    passed = (returncode == 0 and group_lighting_ok and len(seen) == len(set(seen)) and set(seen) == expected
               and any(r.get("tag") == "REPLAY_SUMMARY" for r in results)
               and all(r.get("kept") is True and r.get("episode_index") is not None
                       and (r.get("campaign_restoration") or {}).get("scale_verified") is True for r in episodes))

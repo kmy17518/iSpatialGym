@@ -18,6 +18,12 @@ def test_render_plan_only_accepts_committed_members_and_is_exclusive(tmp_path):
     plan = render.prepare(tmp_path, destination, shard["id"], tmp_path / "code/snapshot", output, limit=1)
     assert plan["instances"] == [rows[0]["instance_id"]]
     assert plan["source_job"] == str(f.job)
+    # render switch 2026-11-15: merged scene (task rooms + adjacent) with replay-time perturbation arguments from the shard policy
+    assert shard["scene_mode"] == plan["scene_mode"] == "full" and plan["scene_extent"] == shard["scene_extent"] == "task_rooms+adjacent"
+    args = (output / "replay.args").read_text().split()
+    assert args[:2] == ["--scene", "full"] and "--scene-pert-plan" in args and args[args.index("--lighting-pert") + 1] == "replay"
+    assert args[args.index("--scene-pert-seed") + 1] == args[args.index("--lighting-pert-seed") + 1] == str(shard["replay_perturbation"]["seed"])
+    assert (output / "scene_pert_plan.json").exists() and plan["scene_pert_plan"]["sha256"]
     with pytest.raises(FileExistsError):
         render.prepare(tmp_path, destination, shard["id"], tmp_path / "code/snapshot", output)
     with pytest.raises(c.ContractError, match="not in accepted manifest"):
@@ -79,3 +85,30 @@ def test_restoration_probe_allows_only_exact_aba_and_preserves_configuration_iso
     rows[1]['render_compatibility_sha256']='changed'
     path.write_text('\n'.join(c.canonical_json(r)for r in rows))
     with pytest.raises(c.ContractError,match='mixes scene'):selected_records(path,['/data/a','/data/b','/data/a'])
+
+
+def test_render_hash_ignores_recorded_lighting_and_shards_keep_goal_groups():
+    p = {"scales": {"a": 1}, "removed_objects": ["x"], "lighting": {"intensity_factor": 1.2}}
+    assert ex.render_perturbations(p) == {"scales": {"a": 1}, "removed_objects": ["x"]}
+    assert ex.render_augmentation({"lighting": {"f": 1}, "moved_objects": {}}) == {"moved_objects": {}}
+    rows = [{"instance_id": f"i{n:02d}", "group_id": f"g{n // 3}"} for n in range(10)] + [{"instance_id": "solo", "group_id": None}]
+    batches = ex.group_batches(rows, 4)
+    assert all(len(b) <= 4 for b in batches) and sum(len(b) for b in batches) == len(rows)
+    where = {}
+    for i, b in enumerate(batches):
+        for r in b:
+            where.setdefault(r["group_id"] or r["instance_id"], set()).add(i)
+    assert all(len(v) == 1 for v in where.values())  # no goal group spans two shards
+    with pytest.raises(c.ContractError):
+        ex.group_batches([{"instance_id": f"j{n}", "group_id": "big"} for n in range(5)], 4)
+
+
+def test_reconcile_refuses_a_group_rendered_with_two_lighting_draws(tmp_path):
+    c.write_json_atomic(tmp_path / "launch.json", {"instances": ["one"], "scene_mode": "full"})
+    row = {"tag": "REPLAY_DEMO", "demo": "/data/one", "kept": True, "episode_index": 0, "campaign_restoration": {"scale_verified": True}}
+    light = lambda f: {"tag": "REPLAY_SCENE_PERT", "group": "g", "lighting": {"skybox": {"intensity_factor": 1.0}, "fixtures_draw": {"intensity_factor": f}}}
+    def finish(extra):
+        (tmp_path / "results.jsonl").write_text("".join(c.canonical_json(r) + "\n" for r in [row, *extra, {"tag": "REPLAY_SUMMARY"}]))
+        return render.reconcile(tmp_path, 0)["success"]
+    assert finish([light(1.1), light(1.1)])
+    assert not finish([light(1.1), light(0.9)])

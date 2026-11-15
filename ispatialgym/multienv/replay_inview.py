@@ -264,7 +264,10 @@ def build_plan(demo_dirs: Sequence[str], groups: Mapping[str, str], roots: Seque
                **kwargs) -> Dict[str, Any]:
     per = {}
     for d in demo_dirs:
-        rec = score_demo(d, roots, **kwargs)
+        try:
+            rec = score_demo(d, roots, **kwargs)
+        except Exception as e:  # noqa: BLE001  (no ranking for this demo: the replay falls back to its group-keyed draw)
+            rec = {"schema": SCHEMA, "demo": os.path.basename(os.path.normpath(d)), "error": repr(e)[:300], "scores": {}, "cpu_s": 0.0}
         per[rec["demo"]] = rec
     return {"schema": SCHEMA, "threshold": threshold, "demos": per, "groups": {d: groups.get(d, d) for d in per},
             "rankings": group_rankings(per, groups, threshold),

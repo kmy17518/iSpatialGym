@@ -32,6 +32,35 @@ from scripts.campaign_20261110.binding_pools import audit_objects, load_pool_for
 from scripts.campaign_20261110.storage import atomic_directory_lock
 from scripts.campaign_20261110.reservation_policy import active_policy
 from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
+
+# Owner-approved render switch (2026-11-15): kinematic rendering replays every episode in the MERGED scene - the recorded crop
+# merged back into the template restricted to the task rooms and their adjacent rooms (sim_utils.adjacent_rooms; the demo's
+# isg_full_load_room_instances) - with replay-time scene perturbation (one outside-crop object per perturbed goal group, in-view
+# preferred) and replay-time lighting (fixtures per goal group, skybox per shard). The recorded collection lighting is not
+# rendered, so it is not part of render compatibility; goal groups are never split across shards (one skybox draw per shard).
+RENDER_SCENE_MODE = "full"
+RENDER_SCENE_EXTENT = "task_rooms+adjacent"
+REPLAY_PERTURBATION = {"schema": "isg-replay-perturbation-policy-v1",
+                       "scene": {"mode": "one", "scope": "outside_crop", "p": 0.5, "prefer": "in_view (replay_inview, offline CPU)"},
+                       "lighting": {"mode": "replay", "p": 0.5, "dist": "uniform", "range": [0.5, 1.5], "color_sigma": 0.04,
+                                    "skybox": "per shard"},
+                       "keyed_by": "goal group", "camera_relocalization": "collection-time removals kept; replay lighting"}
+
+
+def render_perturbations(perturbations):
+    """The collection-time perturbations that still shape the rendered scene (scales, sampling-time parking); lighting is replaced
+    by the replay-time draw."""
+    return {k: v for k, v in (perturbations or {}).items() if k != "lighting"}
+
+
+def render_augmentation(augmentation):
+    return {k: v for k, v in (augmentation or {}).items() if k != "lighting"}
+
+
+def replay_seed(campaign_id):
+    import hashlib
+
+    return int(hashlib.sha256(("replay-perturbation|" + str(campaign_id)).encode()).hexdigest()[:8], 16)
 from scripts.campaign_20261110.goal_reuse_policy import POLICY as GOAL_REUSE_POLICY, POLICY_KEY
 
 CAMERA_STATES = ("camera_quota.json", "camera_obstructed_quota.json", "camera_category_quota.json")
@@ -206,11 +235,12 @@ def normalize_record(row, *, root, started_at, templates, reservations, reservat
         report.get('scene_crop'), read(artifacts['tro']['path']), auditor)
     if scene_reference is not None:
         artifacts = {**artifacts, 'recorded_scene': scene_reference}
-    # A shared skybox is global. Absolute lighting, actual scales, removals and
-    # the exact code/data/physics key all participate in compatibility.
+    # Actual scales, sampling-time removals and the exact code/data/physics key participate in compatibility. The recorded
+    # lighting does not: rendering applies replay-time lighting (skybox per shard, fixtures per goal group).
     render_config = {"physical_template": physical_template(template), "validation_key": row["validation_key"],
-                     "variant": report_variant, "scene_mode": "recorded", "scene_crop": crop_identity,
-                     "perturbations": block["perturbations"], "augmentation": runtime.get("augmentation", {})}
+                     "variant": report_variant, "scene_mode": RENDER_SCENE_MODE, "scene_extent": RENDER_SCENE_EXTENT,
+                     "scene_crop": crop_identity, "perturbations": render_perturbations(block["perturbations"]),
+                     "augmentation": render_augmentation(runtime.get("augmentation", {}))}
     result = {"instance_id": row["instance_id"], "campaign_id": block["campaign_id"], "split": row["split"],
               "sampling_split": row["sampling_split"], "task": template.task, "class_id": template.class_id,
               "template": asdict(template), "physical_template_sha256": physical_template(template),
@@ -276,6 +306,25 @@ def audit_assignments(rows, groups, templates):
     require(all(len(values) == 1 for values in pinned.values()), "evaluation class changed conceptual template")
 
 
+def group_batches(rows, shard_size):
+    """Shards of at most ``shard_size`` rows that never split a goal group (a group is <= 3 members): groups in order of their
+    first member's instance id, members by instance id; a row without a group is its own group."""
+    groups = defaultdict(list)
+    for row in rows:
+        groups[row.get("group_id") or row["instance_id"]].append(row)
+    batches, current = [], []
+    for members in sorted(groups.values(), key=lambda ms: min(m["instance_id"] for m in ms)):
+        members = sorted(members, key=lambda m: m["instance_id"])
+        require(len(members) <= shard_size, "goal group larger than a render shard")
+        if current and len(current) + len(members) > shard_size:
+            batches.append(current)
+            current = []
+        current.extend(members)
+    if current:
+        batches.append(current)
+    return batches
+
+
 def publish(root, tag, rows, groups, inputs, *, shard_size=32):
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", tag) is not None, "unsafe release tag")
     require(isinstance(shard_size, int) and shard_size > 0, "invalid shard size")
@@ -292,15 +341,17 @@ def publish(root, tag, rows, groups, inputs, *, shard_size=32):
             by_key[row["render_compatibility_sha256"]].append(row)
         shards = []
         for key, values in sorted(by_key.items()):
-            for offset in range(0, len(values), shard_size):
-                batch = values[offset:offset + shard_size]
-                sid = f"{key[:20]}_{offset // shard_size:04d}"
+            for index, batch in enumerate(group_batches(values, shard_size)):
+                sid = f"{key[:20]}_{index:04d}"
                 listing = temporary / "shards" / (sid + ".txt")
                 listing.parent.mkdir(exist_ok=True)
                 listing.write_text("".join(str(Path(row["artifacts"]["demo"]["path"]).parent) + "\n" for row in batch))
                 shards.append({"id": sid, "compatibility_sha256": key, "variant": batch[0]["variant"],
                                "instances": [m["instance_id"] for m in batch], "list": str(destination / "shards" / listing.name),
-                               "list_sha256": file_digest(listing), "scene_mode": "recorded", "slots": 1,
+                               "list_sha256": file_digest(listing), "scene_mode": RENDER_SCENE_MODE,
+                               "scene_extent": RENDER_SCENE_EXTENT, "slots": 1,
+                               "goal_groups": sorted({m.get("group_id") or m["instance_id"] for m in batch}),
+                               "replay_perturbation": dict(REPLAY_PERTURBATION, seed=replay_seed(batch[0]["campaign_id"])),
                                "purpose": "kinematic_observation_rendering"})
         write_json_atomic(temporary / "shards.json", {"schema": "isg-render-shards-v1", "shards": shards})
         write_json_atomic(temporary / "groups.json", groups)
