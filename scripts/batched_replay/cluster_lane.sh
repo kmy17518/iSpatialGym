@@ -6,9 +6,16 @@ R=/vision/u/minyeong/projects/isg_home/campaign_20261110
 export ISGE_CODE=${CODE:?code dir}
 export ISGF_JB_NFS=${JBNFS:?writable NFS fallback dir}
 export KIT_TPL_NFS_ROOT=$R/kit_templates KIT_TEX_STORE=$R/kit_textures
-export EXP_PATH=$R/isaacsim_overlay/apps
+# a world-readable copy of $R/isaacsim_overlay (its .kit app files are minyeong-only; shiyuc's Kit could not start)
+export EXP_PATH=$R/training_generation/batched_replay_r1/isaacsim_overlay_readable/apps
 export OPTIX_CACHE_PATH=/tmp/isgrend_optix_${SLURM_JOB_ID:-local}
+# shiyuc: git refuses minyeong's repos ("dubious ownership") and the Kit key would lose its Behavior-1K commit (cold starts)
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'
 source "$ISGE_CODE/scripts/trainfast/env_fast.sh"
+export KIT_KEY KIT_TPL_NFS_ROOT KIT_TEX_STORE
+# cache deltas after every unit (cluster_lane.py): minyeong into the shared stores, shiyuc into its own (promoted by finisher.py)
+if [ "$USER" = minyeong ]; then export ISGREND_TEX_OUT=$KIT_TEX_STORE ISGREND_TPL_OUT=$KIT_TPL_NFS_ROOT
+else export ISGREND_TEX_OUT=/vision/u/shiyuc/minyeong/isgrend/cache_delta/kit_textures ISGREND_TPL_OUT=/vision/u/shiyuc/minyeong/isgrend/cache_delta/kit_templates; fi
 export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR="$JB/numba_cache" ISPATIALGYM_SHARD_FORMAT=legacy ISGREND_SCRATCH=$JB/isgrend
 unset ISPATIALGYM_HEAD_CAMERA_ONLY ISPATIALGYM_PHYSICS_ONLY
 # minyeong publishes the Kit template / converted textures to the shared stores at the end; shiyuc only reads them

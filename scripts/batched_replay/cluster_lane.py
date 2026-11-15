@@ -28,7 +28,8 @@ PURPOSE_FLAGS = {  # = vast/worker.py PURPOSE_FLAGS
     "eval": ["--scene-pert", "off", "--lighting-pert", "off", "--goal-occlusion", "off"],
 }
 JOB = os.environ.get("SLURM_JOB_ID", f"local{os.getpid()}")
-UNITS_FILE = [None]  # the lane's unit list (minyeong-side, read by either account)
+UNITS_FILE = [None]
+STARTUP_FAILS = [0]  # consecutive failures of this job with nothing replayed  # the lane's unit list (minyeong-side, read by either account)
 
 
 def log(msg):
@@ -101,6 +102,71 @@ def validate(ds: Path, kept, image_size):
     return {"episodes": len(lengths), "frames": sum(lengths), "bytes": sum(f.stat().st_size for f in ds.rglob("*") if f.is_file())}
 
 
+TPL_EXCLUDE = ("local/logs", "tmp", "local/data/documents/Kit/shared/screenshots", "global/cache/texturecache")
+
+
+def copy_new(src: Path, dst: Path, tag: str) -> int:
+    """dst/<name> <- src unless it exists: a temporary name, then a hard link into place (never replaces a file others read)."""
+    if dst.exists() or dst.is_symlink():
+        return 0
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.parent / f".{dst.name}.{tag}.tmp"
+    shutil.copyfile(src, tmp)
+    os.chmod(tmp, 0o444)
+    try:
+        os.link(tmp, dst)
+        n = 1
+    except FileExistsError:
+        n = 0
+    os.unlink(tmp)
+    return n
+
+
+def publish_cache_deltas() -> str:
+    """Owner 2026-11-15: warm Kit starts for later jobs, delta only. Textures this job's Kit converted itself (regular files in its
+    texture cache; the store's are links) go into ISGREND_TEX_OUT, data files first and .desc last; the app-data files (shader /
+    Kit caches; logs, tmp, screenshots and textures left out) missing from ISGREND_TPL_OUT/<KIT_KEY> are added there, and a new key
+    is marked .complete once its first copy is in. Never overwrites."""
+    app = Path(os.environ.get("OMNIGIBSON_APPDATA_PATH", ""))
+    key, tex_out, tpl_out = os.environ.get("KIT_KEY"), os.environ.get("ISGREND_TEX_OUT"), os.environ.get("ISGREND_TPL_OUT")
+    if not (app.is_dir() and key and tex_out and tpl_out) or "nob1k" in key:
+        return "skipped"
+    t0, tag = time.time(), f"{JOB}.{os.getpid()}"
+    n_tex = n_tpl = 0
+    try:
+        tex = app / "global/cache/texturecache"
+        store = Path(tex_out)
+        have = set(os.listdir(store)) if store.is_dir() else set()
+        parts = {}
+        for name in os.listdir(tex) if tex.is_dir() else []:
+            stem, sep, _ = name.partition(".ovtex.")
+            if sep and not (tex / name).is_symlink():
+                parts.setdefault(stem, []).append(name)
+        for stem, names in parts.items():
+            desc = stem + ".ovtex.desc"
+            if desc not in names or desc in have:
+                continue
+            for name in sorted(n for n in names if n != desc) + [desc]:
+                copy_new(tex / name, store / name, tag)
+            n_tex += 1
+        dst = Path(tpl_out) / key
+        new_key = not (dst / ".complete").exists()
+        subprocess.run(["chmod", "-R", "u+rwX", str(app)], capture_output=True)
+        for root, dirs, files in os.walk(app):
+            rel = os.path.relpath(root, app)
+            dirs[:] = [d for d in dirs if os.path.normpath(os.path.join(rel, d)) not in TPL_EXCLUDE]
+            for f in files:
+                src = Path(root) / f
+                if src.is_symlink() or not src.is_file():
+                    continue
+                n_tpl += copy_new(src, dst / rel / f, tag)
+        if new_key and n_tpl:
+            (dst / ".complete").touch()
+    except OSError as e:
+        return f"failed: {e}"
+    return f"textures +{n_tex}, app-data files +{n_tpl} ({key}) in {time.time() - t0:.0f}s"
+
+
 def run_unit(lane: Path, spec: dict, u: dict, code: Path) -> bool:
     uid = u["unit"]
     tmp = Path(os.environ.get("ISGREND_SCRATCH", f"/tmp/{os.environ.get('USER')}/isgrend_{JOB}")) / uid
@@ -138,16 +204,20 @@ def run_unit(lane: Path, spec: dict, u: dict, code: Path) -> bool:
             raise ValueError(f"goal images missing {missing[:5]}")
     except Exception as e:  # noqa: BLE001
         (lane / "fail").mkdir(exist_ok=True)
-        n = len(list((lane / "fail").glob(f"{uid}.*")))
-        shutil.copy(tmp / "replay.log", lane / "fail" / f"{uid}.{n}.{JOB}.log")
-        (lane / "fail" / f"{uid}.{n}.{JOB}.txt").write_text(f"{type(e).__name__}: {e}\n")
-        log(f"FAIL {uid}: {e}")
-        if n + 1 >= 3:
+        startup = not recs  # nothing replayed: the job / host, not the unit (does not count toward dead)
+        kind = "startup" if startup else "unit"
+        n = len(list((lane / "fail").glob(f"{uid}.*.unit.txt")))
+        shutil.copy(tmp / "replay.log", lane / "fail" / f"{uid}.{n}.{JOB}.{kind}.log")
+        (lane / "fail" / f"{uid}.{n}.{JOB}.{kind}.txt").write_text(f"{type(e).__name__}: {e}\n")
+        log(f"FAIL ({kind}) {uid}: {e}")
+        if not startup and n + 1 >= 3:
             (lane / "dead").mkdir(exist_ok=True)
             (lane / "dead" / uid).write_text(str(e))
         (lane / "claims" / uid).unlink(missing_ok=True)
         shutil.rmtree(tmp, ignore_errors=True)
+        STARTUP_FAILS[0] = STARTUP_FAILS[0] + 1 if startup else 0
         return False
+    STARTUP_FAILS[0] = 0
     shutil.copy(tmp / "replay.log", out / "replay.log")
     dst = lane / "out" / uid
     shutil.rmtree(dst, ignore_errors=True)
@@ -162,6 +232,7 @@ def run_unit(lane: Path, spec: dict, u: dict, code: Path) -> bool:
     shutil.rmtree(tmp, ignore_errors=True)
     log(f"DONE {uid}: {stats['frames']} frames in {done['seconds']:.0f}s, replay {summary.get('env_steps_per_s')} fps, load "
         f"{summary.get('load_s')} s")
+    log(f"CACHE_DELTA {publish_cache_deltas()}")
     return True
 
 
@@ -189,6 +260,9 @@ def main():
             break
         run_unit(lane, spec, units[uid], code)
         n += 1
+        if STARTUP_FAILS[0] >= 2:
+            log("2 consecutive startup failures (nothing replayed): this job / host is unusable; exiting without taking more units")
+            return 3
     return 0
 
 
