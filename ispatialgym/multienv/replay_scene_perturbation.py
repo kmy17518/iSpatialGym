@@ -487,3 +487,92 @@ def trajectory_update(check: Dict[str, Any], scene, tracked: Mapping[str, str]) 
         h.update(np.round(np.concatenate([_np(p), _np(q)]), 7).astype(np.float64).tobytes())
     for r in scene.robots:
         h.update(np.round(_np(r.get_joint_positions()), 7).astype(np.float64).tobytes())
+
+
+def probe_targets(names_per_slot: Sequence[Sequence[str]], limit: int = 3) -> List[str]:
+    """Objects removed in some slots and kept in others (the ones a probe view can show as absent only where removed)."""
+    k = len(names_per_slot)
+    count: Dict[str, int] = {}
+    for names in names_per_slot:
+        for n in set(names):
+            count[n] = count.get(n, 0) + 1
+    both = sorted((n for n, c in count.items() if 0 < c < k), key=lambda n: (-min(count[n], k - count[n]), n))
+    return both[:limit]
+
+
+def look_at_quat(eye: np.ndarray, target: np.ndarray) -> np.ndarray:
+    """xyzw quaternion of a USD camera (looks along its -z, +y up) at ``eye`` looking at ``target`` (world z up)."""
+    f = np.asarray(target, float) - np.asarray(eye, float)
+    f /= max(1e-9, np.linalg.norm(f))
+    z = -f
+    up = np.array([0.0, 0.0, 1.0])
+    x = np.cross(up, z)
+    if np.linalg.norm(x) < 1e-6:
+        x = np.array([1.0, 0.0, 0.0])
+    x /= np.linalg.norm(x)
+    y = np.cross(z, x)
+    m = np.stack([x, y, z], axis=1)
+    from scipy.spatial.transform import Rotation
+
+    return Rotation.from_matrix(m).as_quat()
+
+
+def probe_views(scenes, hidden_per_slot: Sequence[Sequence[str]], render, out_dir: str, limit: int = 3,
+                renders: int = 30) -> Dict[str, Any]:
+    """--scene-pert-probe: for up to ``limit`` objects removed in some slots and kept in others, point every slot's head camera at
+    the object (in that slot's scene), render, save the rgb per slot and measure how much the image differs between slots that
+    removed it and slots that kept it. The cameras' parent-frame poses are restored afterwards (the replay's states are untouched)."""
+    import torch as th
+    from PIL import Image
+
+    from ispatialgym.oracle.r1pro_model import HEAD_CAMERA_SENSOR_SUFFIX
+
+    os.makedirs(out_dir, exist_ok=True)
+    report: Dict[str, Any] = {"targets": [], "out_dir": out_dir}
+    sensors = []
+    for scene in scenes:
+        robot = scene.robots[0]
+        key = next(k for k in robot.sensors if k.endswith(HEAD_CAMERA_SENSOR_SUFFIX))
+        sensors.append(robot.sensors[key])
+    saved = [s.get_position_orientation(frame="parent") for s in sensors]
+    try:
+        for name in probe_targets(hidden_per_slot, limit):
+            imgs = []
+            for k, (scene, sensor) in enumerate(zip(scenes, sensors)):
+                obj = scene.object_registry("name", name)
+                lo, hi = object_aabb(obj) or (None, None)
+                if lo is None:
+                    p = _np(obj.get_position_orientation()[0])
+                    lo, hi = p - 0.3, p + 0.3
+                c = (lo + hi) / 2
+                ext = float(np.max(hi - lo))
+                rp = _np(scene.robots[0].get_position_orientation()[0])
+                d = rp[:2] - c[:2]
+                d = d / max(1e-6, np.linalg.norm(d))
+                dist = max(1.5, 1.6 * ext)
+                eye = np.array([c[0] + d[0] * dist, c[1] + d[1] * dist, c[2] + 0.6 + 0.3 * ext])
+                q = look_at_quat(eye, c)
+                sensor.set_position_orientation(th.as_tensor(eye, dtype=th.float32), th.as_tensor(q, dtype=th.float32))
+            for _ in range(renders):
+                render()
+            for k, sensor in enumerate(sensors):
+                obs = sensor.get_obs()
+                obs = obs[0] if isinstance(obs, tuple) else obs
+                rgb = obs["rgb"]
+                a = (rgb.detach().cpu().numpy() if hasattr(rgb, "detach") else np.asarray(rgb))[..., :3].astype(np.uint8)
+                removed = name in hidden_per_slot[k]
+                Image.fromarray(a).save(os.path.join(out_dir, f"probe_{name}_slot{k}_{'REMOVED' if removed else 'kept'}.png"))
+                imgs.append((k, removed, a.astype(np.int16)))
+            kept = [a for _, r, a in imgs if not r]
+            rows = []
+            for k, removed, a in imgs:
+                ref = next((b for kk, r, b in imgs if not r and kk != k), None) if kept else None
+                frac = None if ref is None else float((np.abs(a - ref).max(axis=2) > 25).mean())
+                rows.append({"slot": k, "removed": removed, "changed_frac_vs_a_kept_slot": frac})
+            report["targets"].append({"name": name, "slots": rows})
+    finally:
+        for s, (p, q) in zip(sensors, saved):
+            s.set_position_orientation(p, q, frame="parent")
+        for _ in range(3):
+            render()
+    return report

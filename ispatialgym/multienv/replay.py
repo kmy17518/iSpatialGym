@@ -673,6 +673,10 @@ def main(argv=None) -> int:
                          "loaded scene state against the recorded one")
     ap.add_argument("--scene-pert-frames", default=None, help="save each slot's rgb frames at --scene-pert-frame-at to this dir (png)")
     ap.add_argument("--scene-pert-frame-at", default="0,0.5,1", help="frame positions as fractions of the demo length")
+    ap.add_argument("--scene-pert-probe", default=None,
+                    help="after the slots' first episodes start: point every slot's head camera at up to 3 objects removed in some "
+                         "slots and kept in others, save the views to this dir and print REPLAY_SCENE_PERT_PROBE (cameras restored)")
+    ap.add_argument("--scene-pert-probe-only", action="store_true", help="stop after the probe (no dataset written)")
     ap.add_argument("--profile-ticks", default=None, help="START:COUNT: cProfile those ticks, stats to <results>.prof.txt (or stdout)")
     args = ap.parse_args(argv)
 
@@ -821,6 +825,19 @@ def main(argv=None) -> int:
                     started.append(s.k)
 
         fill_idle(force=True)
+        if args.scene_pert_probe:
+            from ispatialgym.multienv.replay_scene_perturbation import probe_views
+
+            for s in slots:
+                if s.demo is not None:
+                    s.scene.load_state(s.demo.state_at(0), serialized=True)
+            probe = probe_views([s.scene for s in slots], [s.hidden for s in slots], og.sim.render, args.scene_pert_probe)
+            print("REPLAY_SCENE_PERT_PROBE " + json.dumps(probe), flush=True)
+            if args.results:
+                with open(args.results, "a") as fo:
+                    fo.write(json.dumps({"tag": "REPLAY_SCENE_PERT_PROBE", **probe}) + "\n")
+            if args.scene_pert_probe_only:
+                return 0
         t_warm = time.time()
         n_warm = 0
         if args.warmup_s > 0:

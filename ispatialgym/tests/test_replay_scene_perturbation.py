@@ -209,3 +209,15 @@ def test_aabb_gap():
     assert RSP.aabb_gap(a, []) is None
     assert RSP.aabb_gap(a, [box([0.5, 0.5, 0.5], [2, 2, 2])]) == 0.0
     assert abs(RSP.aabb_gap(a, [box([4, 1, 1], [5, 2, 2]), box([1, 1, 3], [2, 2, 4])]) - 2.0) < 1e-12
+
+
+def test_probe_targets_and_look_at():
+    assert RSP.probe_targets([["a", "b"], ["a"], ["c"], []]) == ["a", "b", "c"]
+    assert RSP.probe_targets([["a"], ["a"]]) == []
+    from scipy.spatial.transform import Rotation
+
+    q = RSP.look_at_quat(np.array([0.0, -2.0, 1.0]), np.array([0.0, 0.0, 1.0]))
+    fwd = Rotation.from_quat(q).apply([0.0, 0.0, -1.0])
+    assert np.allclose(fwd, [0.0, 1.0, 0.0], atol=1e-9)
+    up = Rotation.from_quat(q).apply([0.0, 1.0, 0.0])
+    assert up[2] > 0.99
