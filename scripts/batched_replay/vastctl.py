@@ -54,6 +54,24 @@ def pace():
     _last_api[0] = time.time()
 
 
+def ledger_live_gpus(hbs):
+    created, ended = {}, set()
+    if LEDGER.exists():
+        for line in open(LEDGER):
+            e = json.loads(line)
+            if e["ev"] == "create" and e.get("instance") and e.get("run") == RUN[0]:
+                created[str(e["instance"])] = e
+            elif e["ev"] == "destroy":
+                ended.add(str(e["instance"]))
+    n = 0
+    for iid, e in created.items():
+        hb = hbs.get(iid) or {}
+        if iid in ended or hb.get("phase") in ("destroyed", "done", "failed"):
+            continue
+        n += int(e.get("n") or 1)
+    return n
+
+
 def stop_reason():
     if STOP_ALL.exists():
         return f"{STOP_ALL} exists"
@@ -624,6 +642,10 @@ def loop(c, s3, a):
             # (no RunPod in this campaign)
             ledger("tick", **{k: v for k, v in pr.items() if k not in ("claims", "done_ids")}, credit=credit(c))
             gpus = sum(int(i.get("num_gpus") or 0) for i in inst)
+            # the provider listing is incomplete whenever an account is 429-limited (SHOW_ERRORS) and can even miss instances
+            # without an error: count the fleet as the larger of the listing and this ledger's live instances (created, no
+            # destroy, heartbeat not finished) so an under-count never rents past the target
+            gpus = max(gpus, ledger_live_gpus(hbs))
             tf = W / "target_gpus"
             if tf.exists():
                 a.gpus = int(tf.read_text().split()[0])
