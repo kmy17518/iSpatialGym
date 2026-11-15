@@ -41,7 +41,8 @@ from ispatialgym.sampling.campaign_bucket_policy import POLICY as BUCKET_POLICY
 RENDER_SCENE_MODE = "full"
 RENDER_SCENE_EXTENT = "task_rooms+adjacent"
 REPLAY_PERTURBATION = {"schema": "isg-replay-perturbation-policy-v1",
-                       "scene": {"mode": "one", "scope": "outside_crop", "p": 0.5, "prefer": "in_view (replay_inview, offline CPU)"},
+                       "scene": {"mode": "one", "unit": "chosen object + what rests on or inside it", "scope": "outside_crop",
+                                 "p": 0.5, "prefer": "in_view (replay_inview, offline CPU)"},
                        "lighting": {"mode": "replay", "p": 0.5, "dist": "uniform", "range": [0.5, 1.5], "color_sigma": 0.04,
                                     "skybox": "per shard"},
                        "keyed_by": "goal group", "camera_relocalization": "collection-time removals kept; replay lighting"}
