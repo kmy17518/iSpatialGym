@@ -94,7 +94,12 @@ def main():
                 if not (d / "done.json").exists() or (dst / ".synced").exists():
                     continue
                 shutil.rmtree(dst, ignore_errors=True)
-                shutil.copytree(d, dst)
+                try:
+                    shutil.copytree(d, dst)
+                except (shutil.Error, PermissionError) as e:  # shiyuc's files not readable yet (its chmod loop runs every 2 min)
+                    shutil.rmtree(dst, ignore_errors=True)
+                    print(f"skip {uid} from {name} this time: {str(e)[:120]}")
+                    continue
                 (dst / ".synced").touch()
                 done = json.load(open(d / "done.json"))
                 s5("pipe", f"{base}/done/{uid}.json", inp=json.dumps({**done, "instance": f"cluster:{name}"}))
