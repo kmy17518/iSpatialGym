@@ -89,6 +89,45 @@ def rows_eval1000(a):
     print(f"{len(rows)} rows -> {a.out} ({dict(per_fam)})")
 
 
+def rows_receipts(a):
+    """Training rows from admission receipts (TG/admission_r1/receipts/<class>/*.json, TG/camera_eval100/admission/receipts/...):
+    decision admitted, members allocated to train and eligible; --exclude lists member ids to leave out (e.g. the wrong-PhysX ones)."""
+    import glob
+
+    excl = set(x.strip() for x in open(a.exclude)) if a.exclude else set()
+    classes = set(a.classes.split(",")) if a.classes else None
+    rows, seen, skipped = [], set(), collections.Counter()
+    for root in a.receipts.split(","):
+        for f in sorted(glob.glob(os.path.join(root, "*", "*.json"))):
+            d = json.load(open(readable(f)))
+            if d.get("decision") != "admitted":
+                skipped["not admitted"] += 1
+                continue
+            if classes and d.get("class_id") not in classes:
+                continue
+            elig = set(d.get("eligible_members") or [])
+            for m in d.get("members") or []:
+                mid = m.get("member_id") or os.path.basename(os.path.dirname(m["artifacts"]["demo"]["path"]))
+                if m.get("allocation") != "train" or (elig and mid not in elig) or mid in excl:
+                    skipped["member not train/eligible/excluded"] += 1
+                    continue
+                demo_dir = os.path.dirname(m["artifacts"]["demo"]["path"])
+                if demo_dir in seen:
+                    skipped["duplicate"] += 1
+                    continue
+                seen.add(demo_dir)
+                rel = d.get("admitting_release") or {}
+                rows.append({"demo_dir": demo_dir, "purpose": "train", "class_id": d["class_id"], "task_family": family_of(d["class_id"]),
+                             "member_id": mid, "receipt": f, "receipt_sha256": d.get("content_sha256"), "release": rel.get("name"),
+                             "release_commit": rel.get("candidate_commit"), "goal_group_id": d.get("group_id"),
+                             "gate_bypass": d.get("gate_bypass"), "demo_sha256": m["artifacts"]["demo"].get("sha256"),
+                             "tro": (m["artifacts"].get("tro") or {}).get("path")})
+    with open(a.out, "w") as fo:
+        for r in rows:
+            fo.write(json.dumps(r) + "\n")
+    print(f"{len(rows)} train rows -> {a.out} ({dict(collections.Counter(r['task_family'] for r in rows))}); skipped {dict(skipped)}")
+
+
 # ------------------------------------------------------------------------------------------------------------------- units
 def demo_facts(demo_dir: str) -> dict:
     """What grouping and packing need from one demo (read-only)."""
@@ -231,6 +270,11 @@ def main():
     p.add_argument("--per-family", type=int, default=0)
     p.add_argument("--per-class", type=int, default=0)
     p.add_argument("--classes", default="")
+    p = sp.add_parser("rows-receipts")
+    p.add_argument("--receipts", required=True, help="receipt roots (comma-separated), each <root>/<class>/*.json")
+    p.add_argument("--out", required=True)
+    p.add_argument("--classes", default="")
+    p.add_argument("--exclude", default="", help="file of member ids to leave out")
     p = sp.add_parser("build")
     p.add_argument("--rows", required=True)
     p.add_argument("--run", required=True)
@@ -245,7 +289,7 @@ def main():
     p.add_argument("--repeat", type=int, default=1, help="sweep runs: copies of every unit")
     p.add_argument("--demo-repeat", type=int, default=1, help="sweep runs: every unit plays its demos this many times")
     a = ap.parse_args()
-    {"rows-eval1000": rows_eval1000, "build": build}[a.cmd](a)
+    {"rows-eval1000": rows_eval1000, "rows-receipts": rows_receipts, "build": build}[a.cmd](a)
 
 
 if __name__ == "__main__":
