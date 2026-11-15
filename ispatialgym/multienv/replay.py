@@ -684,6 +684,15 @@ def seg_visibility(s: "Slot", d: Demo, render, n_poses: int = 3, renders: int = 
     added = "seg_instance" not in sensor.modalities
     px: Dict[str, int] = defaultdict(int)
     n = 0
+    # the seg_instance annotator segfaults the renderer with light shapes drawn (house_single_floor kitchen/garden views;
+    # sim_utils.SimWorld.LIGHT_SHAPES_SETTING): off for these renders only, restored before the next replay frame
+    import carb
+
+    from ispatialgym.sampling.sim_utils import SimWorld
+
+    settings = carb.settings.get_settings()
+    shapes = settings.get(SimWorld.LIGHT_SHAPES_SETTING)
+    settings.set_int(SimWorld.LIGHT_SHAPES_SETTING, 0)
     try:
         if added:
             sensor.add_modality("seg_instance")
@@ -705,6 +714,8 @@ def seg_visibility(s: "Slot", d: Demo, render, n_poses: int = 3, renders: int = 
         sensor.set_position_orientation(*saved, frame="parent")
         if added:
             sensor.remove_modality("seg_instance")
+        if shapes is not None:
+            settings.set(SimWorld.LIGHT_SHAPES_SETTING, shapes)
         for _ in range(2):
             render()
             n += 1
