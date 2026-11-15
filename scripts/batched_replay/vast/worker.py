@@ -476,6 +476,7 @@ KEEP_ENV = ("PATH", "LANG", "LC_ALL", "NVIDIA_VISIBLE_DEVICES", "NVIDIA_DRIVER_C
 
 
 def proc_env(snap, appdata, home, gpu, ncpu):
+    ncpu = max(1, min(int(ncpu), int(os.environ.get("ISG_MAX_THREADS", "8"))))  # BLAS pools: 127 threads on a solo slot is a loss
     env = {k: os.environ[k] for k in KEEP_ENV if k in os.environ}
     env.update({
         "OMNI_CRASHREPORTER_ENABLED": "0",
