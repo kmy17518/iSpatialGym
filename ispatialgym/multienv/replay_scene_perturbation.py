@@ -95,6 +95,17 @@ def touching_any(box: Tuple[np.ndarray, np.ndarray], others: Sequence[Tuple[np.n
     return bool(hit.any())
 
 
+def aabb_gap(box: Tuple[np.ndarray, np.ndarray], others: Sequence[Tuple[np.ndarray, np.ndarray]]) -> Optional[float]:
+    """Smallest Euclidean gap (m) between ``box`` and any of ``others`` (0 when overlapping); None without others."""
+    if not len(others):
+        return None
+    lo = np.asarray([o[0] for o in others], dtype=float)
+    hi = np.asarray([o[1] for o in others], dtype=float)
+    blo, bhi = np.asarray(box[0], dtype=float), np.asarray(box[1], dtype=float)
+    sep = np.maximum(0.0, np.maximum(lo - bhi, blo - hi))
+    return float(np.min(np.linalg.norm(sep, axis=1)))
+
+
 def components(names: Sequence[str], boxes: Mapping[str, Tuple[np.ndarray, np.ndarray]], margin: float) -> List[List[str]]:
     """Connected components of ``names`` under AABB touch (``margin``); sorted members, components sorted by first member."""
     names = sorted(names)
@@ -346,13 +357,22 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
     contact_frames = sample_frames(demo.T, int(cfg["contact_frames"]))
     margin = float(cfg["contact_margin"])
     hits: Dict[str, str] = {}
+    gaps: Dict[str, List[Optional[float]]] = {n: [None, None] for n in static}  # min gap to the robot links / task objects
+    n_robot_boxes: List[int] = []
+
+    def _min(a, b):
+        return b if a is None else (a if b is None else min(a, b))
+
     for i in contact_frames:
         if i != 0:
             scene.load_state(demo.state_at(i), serialized=True)
         dyn = [(n, object_aabb(objs[n])) for n in dynamic]
         dyn_boxes = [b for _, b in dyn if b is not None]
         rob_boxes = [b for r in scene.robots for b in link_boxes(r)]
+        n_robot_boxes.append(len(rob_boxes))
         for n in static:
+            gaps[n][0] = _min(gaps[n][0], aabb_gap(boxes[n], rob_boxes))
+            gaps[n][1] = _min(gaps[n][1], aabb_gap(boxes[n], dyn_boxes))
             if n in hits:
                 continue
             if touching_any(boxes[n], rob_boxes, margin):
@@ -361,6 +381,8 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
                 hits[n] = f"task/moved contact@{i}"
     for n, why in hits.items():
         protected.setdefault(n, why)
+    if not n_robot_boxes or min(n_robot_boxes) == 0:
+        raise RuntimeError(f"scene perturbation: no robot link boxes for {demo.name} (robot contact cannot be protected)")
     units, protected = removable_units(candidates, boxes, protected, float(cfg["touch_margin"]))
     if forced is not None:
         bad = sorted(set(forced) - {n for u in units for n in u})
@@ -372,7 +394,10 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
     rec.update(d)
     rec.update({"units": units, "n_candidates": len(candidates), "n_objects": len(objs),
                 "protected": dict(sorted(protected.items())), "contact_frames": len(contact_frames), "move_frames": len(idx),
-                "parked_by_campaign": sorted(parked)})
+                "parked_by_campaign": sorted(parked), "robot_boxes_min": min(n_robot_boxes),
+                "removed_min_gap_m": {n: {"robot": None if gaps.get(n, [None])[0] is None else round(gaps[n][0], 4),
+                                          "task": None if gaps.get(n, [None, None])[1] is None else round(gaps[n][1], 4)}
+                                      for n in rec.get("removed", [])}})
     return rec
 
 

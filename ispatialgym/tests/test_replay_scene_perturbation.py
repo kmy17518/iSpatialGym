@@ -179,6 +179,7 @@ def test_plan_on_fake_scene(tmp_path):
     p = rec["protected"]
     assert p["target_cup"].startswith("tracked_objects") and p["table"] == "task/moved contact@0" and p["vase"].startswith("unit:")
     assert p["shelf"].startswith("robot contact@1") and p["lamp"] == "holds light" and "walls_a" not in p
+    assert rec["robot_boxes_min"] == 1 and rec["removed_min_gap_m"]["chair"]["robot"] > 3.0
     hidden = RSP.apply(scene, rec["removed"])
     assert sorted(o.name for o in scene.objs if not o.visible) == hidden
     other = _Scene()
@@ -199,3 +200,10 @@ def test_plan_exempt_camera_relocalization(tmp_path):
     (tmp_path / "meta.json").write_text(json.dumps({"task_family": "camera_relocalization"}))
     rec = RSP.plan(_Scene(), _Demo(str(tmp_path)), 0, 0, {"p_episode": 1.0, "p_unit": 1.0})
     assert rec["exempt"] == "camera_relocalization" and rec["removed"] == []
+
+
+def test_aabb_gap():
+    a = box([0, 0, 0], [1, 1, 1])
+    assert RSP.aabb_gap(a, []) is None
+    assert RSP.aabb_gap(a, [box([0.5, 0.5, 0.5], [2, 2, 2])]) == 0.0
+    assert abs(RSP.aabb_gap(a, [box([4, 1, 1], [5, 2, 2]), box([1, 1, 3], [2, 2, 4])]) - 2.0) < 1e-12
