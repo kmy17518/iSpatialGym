@@ -112,7 +112,8 @@ def rows_eval_production(a):
                      "eval_unit_id": r.get("eval_unit_id"), "production_group_id": r.get("production_group_id"),
                      "sibling_of_unit": r.get("sibling_of_unit"), "relation": r.get("relation"), "origin": r.get("origin"),
                      "demo_sha256": r.get("sha256"), "eval_production": str(root),
-                     "tree_tro": str(inst / "tro.json"), "tree_oracle": str(inst / "oracle.json"), "tree_template_dir": tdir})
+                     "tree_tro": str(inst / "tro.json"), "tree_oracle": str(inst / "oracle.json"), "tree_template_dir": tdir,
+                     "tro_override": str(inst / "tro.json"), "full_scene_override": os.path.join(tdir, "template.json")})
     if a.limit_per_category:
         per = collections.Counter()
         keep = []
@@ -230,23 +231,21 @@ def tree_facts(demo_dir: str, row: dict) -> dict:
     T_dir = Path(row["tree_template_dir"])
     tdir = os.path.dirname(os.path.dirname(tro))
     stem = tro[: -len("-tro_state.json")]
+    # the tree's own copies at the tree's paths (the replay reads them through --instance-meta tro_override / full_scene_override);
+    # the template once more at the path the hdf5 names, for the offline in-view planner (any version of the template: same objects)
     pack = [(str(d / n), str(d / n)) for n in ("demo.hdf5", "meta.json", "oracle.json", "tro.json")]
-    pack += [(row["tree_tro"], tro), (row["tree_oracle"], stem + ".oracle.json")]
-    if meta.get("tro_path") and meta["tro_path"] != tro:
-        pack.append((row["tree_tro"], meta["tro_path"]))
-    for n in ("template.json", "template_meta.json", "template-partial_rooms.json"):
-        if (T_dir / n).exists():
-            pack.append((str(T_dir / n), os.path.join(tdir, n)))
-    if full_file and full_file != os.path.join(tdir, "template.json"):
+    pack += [(str(T_dir / n), str(T_dir / n)) for n in ("template.json", "template_meta.json", "template-partial_rooms.json")
+             if (T_dir / n).exists()]
+    if full_file:
         pack.append((str(T_dir / "template.json"), full_file))
-    try:  # the sampler's summary (goal-occlusion verdict), when readable here or mirrored
-        if os.path.exists(stem + ".summary.json"):
-            pack.append((readable(stem + ".summary.json"), stem + ".summary.json"))
-    except PermissionError:
-        pass
+    names = sorted(json.load(open(T_dir / "template.json"))["objects_info"]["init_info"])
     return {"dir": str(d), "name": d.name, "T": T, "action_steps": a, "scene": cfg["scene"]["scene_model"],
             "crop": (crop or {}).get("mode"), "template_key": full_sha or sha256_file(T_dir / "template.json"),
-            "rooms": sorted(rooms) if rooms else None, "group": row["goal_group_id"], "tro": tro, "template_dir": tdir, "pack": pack}
+            # the world one replay process builds: the template's object set (versions of a template differ only in object states;
+            # each demo restores its own version)
+            "world_key": hashlib.sha256(json.dumps(names).encode()).hexdigest(),
+            "rooms": sorted(rooms) if rooms else None, "group": row["goal_group_id"], "tro": row["tree_tro"], "template_dir": str(T_dir),
+            "pack": pack}
 
 
 def replay_frames(action_steps: int, frac: float, min_steps: int) -> int:
@@ -269,7 +268,8 @@ def build(a):
     groups = collections.defaultdict(list)
     for r in rows:
         f = facts[r["demo_dir"]]
-        key = (r["purpose"], f["template_key"], json.dumps(f["rooms"]), json.dumps(r.get("extra_args") or []), r.get("class_id"))
+        key = (r["purpose"], f.get("world_key") or f["template_key"], json.dumps(f["rooms"]), json.dumps(r.get("extra_args") or []),
+               r.get("class_id"))
         groups[key].append(r)
     units = []
     for key, rs in sorted(groups.items()):

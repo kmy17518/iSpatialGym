@@ -1029,10 +1029,19 @@ def main(argv=None) -> int:
     source = DemoSource(demo_dirs, args.watch, args.done_file, args.poll_s, claims=args.claims, campaign_records=campaign_records)
     first = source.first()
 
+    imeta_early = read_instance_meta(args.instance_meta)
+
     def usable(demo: Demo) -> Demo:
         if args.proprio == "recorded" and demo.proprio is None:
             raise SystemExit(f"no {BEHAVIOR_PROPRIO_KEY} in {demo.dir} (record with ISPATIALGYM_PHYSICS_ONLY=1 or "
                              "ISPATIALGYM_RECORD_BEHAVIOR_PROPRIO=1, or use --proprio loaded)")
+        row = (imeta_early or {}).get(demo.name) or {}
+        # batched replay 2026-11-15: the caller's own TRO / full template for the demo (the hdf5's recorded tro_path can name
+        # another instance of the same collector job; eval_production's tro.json is the instance's own)
+        if row.get("tro_override"):
+            demo.tro_path = row["tro_override"]
+        if row.get("full_scene_override"):
+            demo.full_scene_file = row["full_scene_override"]
         if args.settle_pad is not None and demo.settle is None:
             demo.pad_settle(args.settle_pad, args.settle_pad_min)
             print("REPLAY_SETTLE " + json.dumps({"demo": demo.name, **demo.settle}), flush=True)
@@ -1061,7 +1070,7 @@ def main(argv=None) -> int:
     groups_of = {os.path.basename(os.path.normpath(d)): goal_group(d) for d in demo_dirs}
     # batched replay 2026-11-15: a goal group named by the caller (--instance-meta goal_group_id, e.g. eval_production's
     # <class>__<goal key>) keys the replay-time draws
-    for name, row in read_instance_meta(args.instance_meta).items():
+    for name, row in imeta_early.items():
         if row.get("goal_group_id") and name in groups_of:
             groups_of[name] = str(row["goal_group_id"])
     # owner 2026-11-15 11:xx: --pert-unit demo (default) = an independent draw per demo (lighting coin + factor, skybox, scene coin +

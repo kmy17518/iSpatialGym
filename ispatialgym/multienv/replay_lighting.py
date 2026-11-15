@@ -266,6 +266,8 @@ def write_replayed_tro(src_tro: str, out_dir: str, rec: Mapping[str, Any]) -> st
         tro["ispatialgym"]["goal_observation"] = dict(rec["goal_observation"])
     os.makedirs(out_dir, exist_ok=True)
     name = os.path.basename(src_tro)
+    if not name.endswith("-tro_state.json"):  # e.g. eval_production's <instance>/tro.json: named after the demo
+        name = fit_name(f"{rec.get('demo_name') or 'instance'}-tro_state.json", "-tro_state.json")
     if int(rec["replay_index"]):
         name = fit_name(name.replace("-tro_state.json", f"-r{int(rec['replay_index'])}-tro_state.json"), "-tro_state.json")
     path = os.path.join(out_dir, name)
