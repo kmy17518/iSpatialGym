@@ -1040,7 +1040,8 @@ def main():
     # 2026-11-15 sweep (RTX 5090, 224 px): 4 processes per 32 GB GPU gave the most frames/s (VRAM peak 30.5 GB); 24 GB GPUs run 2
     vram = min(g["mem_mb"] for g in GPUS)
     by_vram = 4 if vram >= 30000 else 2 if vram >= 20000 else 1
-    per_gpu = int(os.environ.get("ISG_PROCS_PER_GPU", "0")) or max(1, min(by_vram, NCPU // len(GPUS) // 3, int(MEM / len(GPUS) // 12)))
+    # a replay process keeps ~3.5 cores busy (REPLAY_SUMMARY cpu_cores_busy): at most quota / 4 processes per GPU
+    per_gpu = int(os.environ.get("ISG_PROCS_PER_GPU", "0")) or max(1, min(by_vram, NCPU // len(GPUS) // 4, int(MEM / len(GPUS) // 12)))
     PER_GPU = per_gpu
     SLOTS = [(i * per_gpu + j, g["index"]) for j in range(per_gpu) for i, g in enumerate(GPUS)]
     SLOTS.sort()
