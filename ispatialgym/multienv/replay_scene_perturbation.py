@@ -161,7 +161,15 @@ def group_key(seed: int, group: str, round_: int = 0) -> int:
     return int(digest[:16], 16)
 
 
-def draw_one(units: Sequence[Sequence[str]], key: int, p_episode: float) -> Dict[str, Any]:
+def goal_group(demo_dir: str) -> str:
+    """The demo's goal group: its TRO's campaign ``goal_group_id``, else meta ``group_assignments.group_id``, else the demo."""
+    m = _read_json(os.path.join(demo_dir, "meta.json"))
+    tro = _read_json(m.get("tro_path")).get("ispatialgym") or {}
+    g = (tro.get("campaign") or {}).get("goal_group_id") or (m.get("group_assignments") or {}).get("group_id")
+    return str(g) if g else os.path.basename(os.path.normpath(demo_dir))
+
+
+def draw_one(units: Sequence[Sequence[str]], key: int, p_episode: float, prefer: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """Owner 2026-11-15: a perturbed instance (probability ``p_episode``) loses exactly ONE object. The object is the first
     removable *single-object* unit (it carries nothing and touches no other candidate) in a key-seeded order of all candidate names,
     so every member of a goal group whose removable set contains it picks the same object. A multi-object touch group is never
@@ -174,6 +182,10 @@ def draw_one(units: Sequence[Sequence[str]], key: int, p_episode: float) -> Dict
     rng.shuffle(order)
     if not perturbed:
         return {"perturbed": False, "removed": [], "order_head": order[:5]}
+    # owner 2026-11-15 04:15: prefer the planner's in-view ranking (offline, CPU); fall back to the group-keyed order
+    inview = next((n for n in (prefer or ()) if n in set(singles)), None)
+    if inview is not None:
+        return {"perturbed": True, "removed": [inview], "inview": True, "inview_rank": list(prefer).index(inview), "order_head": order[:5]}
     pick = next((n for n in order if n in set(singles)), None)
     if pick is None:
         return {"perturbed": False, "removed": [], "no_single": True, "order_head": order[:5]}
@@ -348,7 +360,7 @@ def demo_task_context(demo) -> Tuple[Dict[str, Any], Dict[str, Any], List[str]]:
 
 def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, Any]] = None,
          forced: Optional[Sequence[str]] = None, inside_crop: Optional[Set[str]] = None, group: Optional[str] = None,
-         round_: int = 0) -> Dict[str, Any]:
+         round_: int = 0, prefer: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """Decide this replayed episode's removals in ``scene`` (a slot's scene). Loads sampled recorded states into the scene (the
     caller reloads frame 0 afterwards). ``forced``: the removed names of a previous record (``--scene-pert-from``), checked
     against this run's protection."""
@@ -438,7 +450,7 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
     else:
         if cfg.get("mode", "one") == "one":
             # one object per perturbed instance, keyed by the goal group (the demo when it has none)
-            d = draw_one(units, group_key(seed, group or demo.name, round_), float(cfg["p_episode"]))
+            d = draw_one(units, group_key(seed, group or demo.name, round_), float(cfg["p_episode"]), prefer=prefer)
         else:
             d = draw(units, episode_key(seed, demo.name, replay_index), float(cfg["p_episode"]), float(cfg["p_unit"]))
         d["group"], d["round"] = group or demo.name, int(round_)

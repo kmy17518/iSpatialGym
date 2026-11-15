@@ -714,6 +714,9 @@ def main(argv=None) -> int:
                     help="outside_crop (owner 2026-11-15): for a cropped demo only objects of the replay scene outside the recorded crop "
                          "are candidates (with --scene full: the merged scene's objects the collection never simulated); an uncropped "
                          "demo: every object. all: every object of the replay scene")
+    ap.add_argument("--scene-pert-plan", default=None,
+                    help="the render planner's in-view ranking (ispatialgym.multienv.replay_inview, offline CPU): a perturbed group "
+                         "removes the first removable single object of its ranking, else the group-keyed draw")
     ap.add_argument("--scene-pert-p-episode", type=float, default=0.5, help="probability that a replayed episode is perturbed")
     ap.add_argument("--scene-pert-p-unit", type=float, default=0.5, help="--scene-pert-mode subset: probability that a removable unit is removed")
     ap.add_argument("--scene-pert-mode", choices=("one", "subset"), default="one",
@@ -806,14 +809,15 @@ def main(argv=None) -> int:
     if lighting_mode == "replay" and exempt_dirs:
         ap.error("replay-time lighting: an exempt family (collection lighting) renders in its own batch")
 
-    def goal_group(d: str) -> str:
-        """The demo's goal group (campaign goal_group_id of its TRO, else the online group, else the demo itself)."""
-        m = _rj(os.path.join(d, "meta.json"))
-        tro = _rj(m.get("tro_path")).get("ispatialgym") or {}
-        g = (tro.get("campaign") or {}).get("goal_group_id") or (m.get("group_assignments") or {}).get("group_id")
-        return str(g) if g else os.path.basename(os.path.normpath(d))
+    from ispatialgym.multienv.replay_scene_perturbation import goal_group
 
     groups_of = {os.path.basename(os.path.normpath(d)): goal_group(d) for d in demo_dirs}
+    inview_plan = None
+    if args.scene_pert_plan:
+        with open(args.scene_pert_plan) as fh:
+            inview_plan = json.load(fh)
+        if inview_plan.get("schema") != "isg-replay-inview-v1":
+            ap.error("--scene-pert-plan: unknown schema")
     lo, hi = (float(x) for x in args.lighting_pert_range.split(","))
     light_cfg = {"dist": args.lighting_pert_dist, "p": args.lighting_pert_p, "sigma": args.lighting_pert_sigma, "lo": lo, "hi": hi,
                  "color_sigma": args.lighting_pert_color_sigma, "sky_sigma": args.lighting_pert_sigma, "sky_lo": lo, "sky_hi": hi}
@@ -915,7 +919,8 @@ def main(argv=None) -> int:
                 else:
                     rec = RSP.plan(s.scene, demo, ri, args.scene_pert_seed,
                                    {"mode": args.scene_pert_mode, "p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit},
-                                   forced=forced, inside_crop=inside, group=groups_of.get(demo.name), round_=args.scene_pert_index_base)
+                                   forced=forced, inside_crop=inside, group=groups_of.get(demo.name), round_=args.scene_pert_index_base,
+                                   prefer=(inview_plan or {}).get("rankings", {}).get(groups_of.get(demo.name)))
                 rec["scope"], rec["scene_mode"] = args.scene_pert_scope, s.scene_mode
                 s.hidden = RSP.apply(s.scene, rec["removed"])
             else:
