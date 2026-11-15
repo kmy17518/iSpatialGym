@@ -249,9 +249,70 @@ class Demo:
         self.T = int(self.action.shape[0])
         if self.state.shape[0] != self.T:
             raise ValueError(f"{demo_dir}: {self.state.shape[0]} states for {self.T} actions")
+        #: --settle-pad: frame i of the replayed episode plays recorded row rows[i] (None: frame i = row i)
+        self.rows: Optional[np.ndarray] = None
+        self.T_recorded = self.T
+        self.settle: Optional[Dict[str, Any]] = None
 
     def state_at(self, i: int) -> th.Tensor:
+        if self.rows is not None:
+            i = int(self.rows[i])
         return th.as_tensor(self.state[i, : int(self.state_size[i])], dtype=th.float32)
+
+    def pad_settle(self, frac: float, min_steps: int) -> Dict[str, Any]:
+        """Batched-replay settle window (owner 2026-11-15): the replayed episode is the demo's action steps A followed by
+        ``max(ceil(frac * A), min_steps)`` settle steps - it REPLACES the recorded settle window (collection: 45 steps), it is not
+        added to it. Rows past the recorded end repeat the last recorded row (state, action, reward; the scene is settled and the
+        replay kinematic, so the frames are the settled scene); a shorter window drops recorded settle rows. ``terminated`` /
+        ``truncated`` are the recorded ones on recorded non-final rows and the recorded final row's on the last frame only."""
+        import math
+
+        a, s_rec, src = settle_split(self)
+        s_out = max(int(math.ceil(float(frac) * a)), int(min_steps))
+        n = a + s_out
+        rows = np.minimum(np.arange(n), self.T_recorded - 1)
+        last = self.T_recorded - 1
+        self.rows = rows
+        self.action = self.action[th.as_tensor(rows)]
+        self.reward = np.asarray(self.reward)[rows]
+        term, trunc = np.asarray(self.terminated), np.asarray(self.truncated)
+        self.terminated = np.where(rows == last, False, term[rows]).astype(term.dtype)
+        self.truncated = np.where(rows == last, False, trunc[rows]).astype(trunc.dtype)
+        self.terminated[-1], self.truncated[-1] = term[last], trunc[last]
+        if self.proprio is not None:
+            self.proprio = self.proprio[rows]
+        self.T = int(n)
+        self.settle = {"action_steps": int(a), "settle_steps_recorded": int(s_rec), "settle_steps": int(s_out),
+                       "length_recorded": int(self.T_recorded), "length": int(n), "frac": float(frac), "min_steps": int(min_steps),
+                       "padded_rows": int(max(0, n - self.T_recorded)), "dropped_rows": int(max(0, self.T_recorded - n)),
+                       "source": src}
+        return self.settle
+
+
+def settle_split(demo: "Demo") -> Tuple[int, int, str]:
+    """(action steps, recorded settle steps, where from) of a demo: meta.json ``n_action_steps`` (run_isg: the program's actions;
+    ``n_settle_steps`` its settle window, together the recorded rows), else the hdf5 ``isg/phase`` rows marked settle."""
+    try:
+        with open(os.path.join(demo.dir, "meta.json")) as f:
+            meta = json.load(f)
+    except (OSError, ValueError):
+        meta = {}
+    a = meta.get("n_action_steps")
+    if isinstance(a, int) and 0 < a <= demo.T_recorded:
+        s = meta.get("n_settle_steps")
+        if isinstance(s, int) and a + s != demo.T_recorded:
+            print(f"WARNING settle: {demo.name}: n_action_steps {a} + n_settle_steps {s} != {demo.T_recorded} recorded rows; "
+                  "the action steps decide", flush=True)
+        return int(a), int(demo.T_recorded - a), "meta.n_action_steps"
+    with h5py.File(os.path.join(demo.dir, "demo.hdf5"), "r") as f:
+        g = f["data/demo_0"]
+        if "isg/phase" in g:
+            ph = g["isg/phase"][()]
+            ph = [p.decode() if isinstance(p, bytes) else str(p) for p in np.asarray(ph).reshape(-1)]
+            settle = [i for i, p in enumerate(ph) if "settle" in p.lower()]
+            if settle and settle == list(range(settle[0], len(ph))):
+                return settle[0], len(ph) - settle[0], "isg/phase"
+    raise SystemExit(f"--settle-pad: {demo.dir}: no action/settle split (meta.json n_action_steps or isg/phase settle rows)")
 
 
 class DemoSource:
@@ -348,7 +409,20 @@ def merged_extent(demo: "Demo", adjacent=None) -> Dict[str, Any]:
             "equal": bool(tasks) and expect == loaded}
 
 
-def env_config(first: Demo, demos: List[Demo], first_dir: str, n_slots: int, scene: str = "recorded") -> Dict[str, Any]:
+def sensor_config(image_size: Optional[int]) -> Dict[str, Any]:
+    """The robot's sensor config: BEHAVIOR's replay_obs one (wrists 480, head 720 with a 40 mm aperture), or with ``image_size``
+    (batched replay 2026-11-15: 224) every camera at image_size x image_size - the same apertures, so the same fields of view."""
+    from ispatialgym.oracle import behavior_lerobot as BL
+
+    cfg = copy.deepcopy(BL.ROBOT_SENSOR_CONFIG)
+    if image_size:
+        for v in cfg.values():
+            v.setdefault("sensor_kwargs", {}).update({"image_height": int(image_size), "image_width": int(image_size)})
+    return cfg
+
+
+def env_config(first: Demo, demos: List[Demo], first_dir: str, n_slots: int, scene: str = "recorded",
+               image_size: Optional[int] = None) -> Dict[str, Any]:
     """``create_from_hdf5``'s config edits for replay_obs's settings (include_contacts=False, include_task_obs=False,
     replay_obs's robot sensors / modalities / proprioception), with ``n_slots`` envs and DummyTask. ``scene="full"`` (2026-11-01
     train-fast PARTIAL_SCENE): the scene file is the full template merged with the first demo's recorded objects
@@ -376,6 +450,7 @@ def env_config(first: Demo, demos: List[Demo], first_dir: str, n_slots: int, sce
     config["objects"] = []
     for robot_cfg in config["robots"]:
         robot_cfg.update(BL.robot_overrides())
+        robot_cfg["sensor_config"] = sensor_config(image_size)
     return config
 
 
@@ -637,6 +712,14 @@ def replay_goal_image(s: "Slot", d: Demo, obs: Dict[str, Any], out_dir: str) -> 
     the demo, posed at the demo's last ``isg/head_camera_pose``): the last replayed frame of this episode - same env, same replay
     lighting and removals - saved next to the replayed TRO as ``<instance>[-r<k>]-goal_rgb.png`` and registered as its
     ``goal_observation``."""
+    ri = (s.scene_pert or {}).get("replay_index", 0)
+    name = d.name + (f"-r{ri}" if ri else "") + "-goal_rgb.png"
+    return save_goal_image(s, d, obs, os.path.join(out_dir, name), rel=name)
+
+
+def save_goal_image(s: "Slot", d: Demo, obs: Dict[str, Any], path: str, rel: Optional[str] = None) -> Dict[str, Any]:
+    """The head camera's rgb of ``obs`` (the episode's last rendered frame) as a png at ``path``, and its goal-observation
+    record (``rgb_path`` = ``rel``, sha256, resolution, intrinsics, the demo's last recorded head-camera pose)."""
     import hashlib as _h
 
     from PIL import Image
@@ -647,11 +730,9 @@ def replay_goal_image(s: "Slot", d: Demo, obs: Dict[str, Any], out_dir: str) -> 
     key = next(k for k in robot.sensors if k.endswith(HEAD_CAMERA_SENSOR_SUFFIX))
     rgb_key = next(k for k in obs if k.endswith("rgb") and key.replace(robot.name + ":", "") in k)
     a = obs[rgb_key].numpy()[..., :3].astype(np.uint8)
-    ri = (s.scene_pert or {}).get("replay_index", 0)
-    os.makedirs(out_dir, exist_ok=True)
-    name = d.name + (f"-r{ri}" if ri else "") + "-goal_rgb.png"
-    path = os.path.join(out_dir, name)
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     Image.fromarray(a).save(path)
+    name = rel if rel is not None else os.path.basename(path)
     with h5py.File(os.path.join(d.dir, "demo.hdf5"), "r") as f:
         pose = [float(v) for v in f["data/demo_0/isg/head_camera_pose"][-1]]
     try:
@@ -664,7 +745,61 @@ def replay_goal_image(s: "Slot", d: Demo, obs: Dict[str, Any], out_dir: str) -> 
             "resolution": [int(a.shape[1]), int(a.shape[0])], "intrinsics": intr,
             "camera_pose_world": {"position": pose[:3], "orientation": pose[3:7]}, "n_render_iterations": 1,
             "source": "batched replay: the episode's last frame (eval set_goal semantics), replay lighting and removals of this episode",
-            "frame": int(d.T - 1)}
+            "frame": int(d.T - 1), "recorded_row": int(d.rows[-1]) if d.rows is not None else int(d.T - 1)}
+
+
+def file_sha256(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(8 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
+def instance_link(d: Demo, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """What ties a replayed episode to its instance / template (batched replay 2026-11-15; train and eval alike): the demo dir and
+    its hdf5 sha256, meta.json names (instance_id, variant, subtask, template_dir), the source TRO path + sha256 and its template
+    (template.json next to ``instances/``), the oracle sidecar and summary next to the TRO, EVAL_INSTANCE_ID when the demo dir has
+    one, plus the caller's ``--instance-meta`` row (class / unit / purpose / source receipt)."""
+    meta = {}
+    try:
+        with open(os.path.join(d.dir, "meta.json")) as f:
+            meta = json.load(f)
+    except (OSError, ValueError):
+        pass
+    tro = d.tro_path
+    tdir = os.path.dirname(os.path.dirname(tro)) if tro else meta.get("template_dir")
+    stem = tro[: -len("-tro_state.json")] if tro and tro.endswith("-tro_state.json") else None
+    rec = {"demo_dir": os.path.realpath(d.dir), "demo_name": d.name,
+           "demo_sha256": file_sha256(os.path.join(d.dir, "demo.hdf5")),
+           "instance_id": meta.get("instance_id"), "variant": meta.get("variant"), "subtask": meta.get("subtask"),
+           "template_dir": tdir, "template_json": os.path.join(tdir, "template.json") if tdir else None,
+           "template_meta": os.path.join(tdir, "template_meta.json") if tdir else None,
+           "tro_path": tro, "tro_sha256": file_sha256(tro) if tro and os.path.exists(tro) else None,
+           "oracle_sidecar": (stem + ".oracle.json") if stem and os.path.exists(stem + ".oracle.json") else None,
+           "summary": (stem + ".summary.json") if stem and os.path.exists(stem + ".summary.json") else None,
+           "scene_crop": (d.scene_crop or {}).get("mode") if d.scene_crop else None}
+    eid = os.path.join(d.dir, "EVAL_INSTANCE_ID")
+    if os.path.exists(eid):
+        with open(eid) as f:
+            rec["eval_instance_id"] = f.read().strip()
+    if extra:
+        rec.update({("listed_demo_dir" if k == "demo_dir" else k): v for k, v in extra.items()})
+    return rec
+
+
+def read_instance_meta(path: Optional[str]) -> Dict[str, Dict[str, Any]]:
+    """``--instance-meta``: jsonl rows with ``demo_dir`` (or ``demo_name``) and any fields to carry into the episode records."""
+    out: Dict[str, Dict[str, Any]] = {}
+    if not path:
+        return out
+    with open(path) as f:
+        for line in f:
+            if line.strip():
+                row = json.loads(line)
+                key = row.get("demo_dir") or row.get("demo_name")
+                out[os.path.basename(os.path.normpath(key))] = row
+    return out
 
 
 def seg_visibility(s: "Slot", d: Demo, render, n_poses: int = 3, renders: int = 4) -> Dict[str, Any]:
@@ -833,6 +968,20 @@ def main(argv=None) -> int:
     ap.add_argument("--lighting-sweep-dir", default=None, help="--lighting-sweep: save the slots' head rgb at each factor here, then stop")
     ap.add_argument("--lighting-sweep-at", type=float, default=0.5, help="--lighting-sweep: the demo frame (fraction of its length)")
     ap.add_argument("--profile-ticks", default=None, help="START:COUNT: cProfile those ticks, stats to <results>.prof.txt (or stdout)")
+    # batched replay 2026-11-15 (owner)
+    ap.add_argument("--settle-pad", type=float, default=None,
+                    help="replace the recorded settle window: the episode = the demo's action steps A + max(ceil(SETTLE_PAD * A), "
+                         "--settle-pad-min) settle steps (rows past the recorded end repeat the last recorded row); default: as recorded")
+    ap.add_argument("--settle-pad-min", type=int, default=50)
+    ap.add_argument("--image-size", type=int, default=None,
+                    help="every camera (head and wrists) renders and is written at IMAGE_SIZE x IMAGE_SIZE (same apertures); "
+                         "default: BEHAVIOR's 720 head / 480 wrists")
+    ap.add_argument("--goal-images", choices=("on", "off"), default="off",
+                    help="on: save every kept episode's last rendered head-camera frame (its goal image) as "
+                         "<root>/goal_images/<dataset>/episode_<index>.png, recorded in <root>/episodes_isg.jsonl")
+    ap.add_argument("--instance-meta", default=None,
+                    help="jsonl rows (demo_dir or demo_name + any fields: class, unit, purpose, receipt) carried into "
+                         "<root>/episodes_isg.jsonl with the demo's instance / template / TRO linkage")
     args = ap.parse_args(argv)
 
     if args.demos.startswith("@"):
@@ -869,6 +1018,9 @@ def main(argv=None) -> int:
         if args.proprio == "recorded" and demo.proprio is None:
             raise SystemExit(f"no {BEHAVIOR_PROPRIO_KEY} in {demo.dir} (record with ISPATIALGYM_PHYSICS_ONLY=1 or "
                              "ISPATIALGYM_RECORD_BEHAVIOR_PROPRIO=1, or use --proprio loaded)")
+        if args.settle_pad is not None and demo.settle is None:
+            demo.pad_settle(args.settle_pad, args.settle_pad_min)
+            print("REPLAY_SETTLE " + json.dumps({"demo": demo.name, **demo.settle}), flush=True)
         return demo
 
     usable(first)
@@ -893,7 +1045,24 @@ def main(argv=None) -> int:
 
     groups_of = {os.path.basename(os.path.normpath(d)): goal_group(d) for d in demo_dirs}
     inview_plan = None
-    if args.scene_pert_plan:
+    if args.scene_pert_plan == "auto":
+        # batched replay 2026-11-15: the render planner's offline in-view ranking (CPU, recorded data only), built here
+        from ispatialgym.multienv.replay_inview import build_plan
+        from ispatialgym.multienv.replay_scene_perturbation import STRUCTURAL, EXTRA_STRUCTURAL
+
+        data = os.environ.get("OMNIGIBSON_DATA_PATH") or ""
+        t_plan = time.time()
+        inview_plan = build_plan(demo_dirs, {os.path.basename(os.path.normpath(d)): groups_of[os.path.basename(os.path.normpath(d))]
+                                             for d in demo_dirs},
+                                 [os.path.join(data, "behavior-1k-assets"), os.path.join(data, "ispatialgym-assets")],
+                                 structural=sorted(STRUCTURAL | EXTRA_STRUCTURAL))
+        print(f"REPLAY_INVIEW_PLAN demos={len(inview_plan['demos'])} cpu_s={inview_plan['cpu_s_total']} wall_s={time.time() - t_plan:.1f} "
+              f"errors={sum(1 for r in inview_plan['demos'].values() if r.get('error'))}", flush=True)
+        if args.results:
+            os.makedirs(os.path.dirname(os.path.abspath(args.results)), exist_ok=True)
+            with open(os.path.join(os.path.dirname(os.path.abspath(args.results)), "scene_pert_plan.json"), "w") as fh:
+                json.dump(inview_plan, fh)
+    elif args.scene_pert_plan:
         with open(args.scene_pert_plan) as fh:
             inview_plan = json.load(fh)
         if inview_plan.get("schema") != "isg-replay-inview-v1":
@@ -944,7 +1113,7 @@ def main(argv=None) -> int:
         if not extent["equal"]:
             raise SystemExit(f"--scene full: the merged scene's rooms {extent['loaded']} are not the task rooms + adjacent rooms "
                              f"{sorted(set(extent['task_rooms']) | set(extent['adjacent']))}")
-    config = env_config(first, [first], first.dir, n_slots, scene=scene)
+    config = env_config(first, [first], first.dir, n_slots, scene=scene, image_size=args.image_size)
     env = og.Environment(configs=config)
     load_s = time.time() - t_start
     robot_name = env.scenes[0].robots[0].name
@@ -973,6 +1142,8 @@ def main(argv=None) -> int:
         if tro_removed is not None:
             pert_from = tro_removed
         pert_path = os.path.join(args.root, "scene_perturbation.jsonl")
+        episodes_path = os.path.join(args.root, "episodes_isg.jsonl")
+        instance_meta = read_instance_meta(args.instance_meta)
 
         def start_slot(s: "Slot", demo: Demo) -> None:
             s.ignore_recorded_lighting = lighting_mode == "replay"
@@ -1295,10 +1466,31 @@ def main(argv=None) -> int:
                                              "lighting": (s.scene_pert.get("lighting") or {}).get("fixtures_draw")},
                                          "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
                                                                                       "occluded": occl.get("occluded")}})
+                    goal = None
+                    if args.goal_images == "on" and keep and index is not None:
+                        dataset = f"{args.repo_prefix}_slot{s.k}"
+                        rel = os.path.join("goal_images", dataset, f"episode_{int(index):06d}.png")
+                        goal = save_goal_image(s, d, obs, os.path.join(args.root, rel), rel=rel)
                     if s.scene_pert is not None and d.tro_path and RSP_camera(d):
                         s.scene_pert["goal_observation"] = replay_goal_image(s, d, obs, os.path.join(args.root, "instances"))
                     if s.scene_pert is not None and (s.scene_pert.get("removed") or s.scene_pert.get("lighting")) and d.tro_path:
                         s.scene_pert["replayed_tro"] = RL.write_replayed_tro(d.tro_path, os.path.join(args.root, "instances"), s.scene_pert)
+                    sp = s.scene_pert or {}
+                    lt = sp.get("lighting") or {}
+                    ep = {"schema": "isg-batched-replay-episode-v1", "dataset": f"{args.repo_prefix}_slot{s.k}", "episode_index": index,
+                          "kept": keep, "task": args.task, "length": d.T, "length_recorded": d.T_recorded, "settle": d.settle,
+                          "image_size": args.image_size, "scene_mode": s.scene_mode, "goal_image": goal,
+                          "camera_goal_observation": sp.get("goal_observation"), "replayed_tro": sp.get("replayed_tro"),
+                          "perturbation": {"scene": args.scene_pert, "lighting": lighting_mode,
+                                           "scene_perturbed": bool(sp.get("perturbed")), "removed": sp.get("removed") or [],
+                                           "camera_collection_removals": sp.get("camera"),
+                                           "lighting_perturbed": bool(((lt.get("fixtures_draw") or {}).get("perturbed"))),
+                                           "fixtures_draw": lt.get("fixtures_draw"), "skybox": lt.get("skybox"),
+                                           "group": sp.get("group"), "replay_index": sp.get("replay_index")},
+                          "instance": instance_link(d, instance_meta.get(d.name))}
+                    os.makedirs(args.root, exist_ok=True)
+                    with open(episodes_path, "a") as fo:
+                        fo.write(json.dumps(ep) + "\n")
                     if s.scene_pert is not None:
                         os.makedirs(args.root, exist_ok=True)
                         with open(pert_path, "a") as fo:
@@ -1337,6 +1529,8 @@ def main(argv=None) -> int:
             "objects_loaded_per_state": round(objs_loaded / max(1, n_steps), 1) if args.delta_load else None,
             "renders": args.renders, "first_renders": args.first_renders, "omp_threads": os.environ.get("OMP_NUM_THREADS"),
             "scene": scene, "goal_occlusion": {"mode": args.goal_occlusion, **n_occl},
+            "image_size": args.image_size, "settle_pad": args.settle_pad, "settle_pad_min": args.settle_pad_min,
+            "lighting_pert": lighting_mode, "scene_pert": args.scene_pert,
             "scene_pert_seg": {"groups": seg_time[1], "s": round(seg_time[0], 3)}, "n_objects_scene": slots[0].n_objects_scene, "n_objects_recorded": n_objects_recorded_first,
             "cpus_allowed": len(os.sched_getaffinity(0)), "host": os.uname().nodename, "pid": os.getpid()})
         if out is not None:
