@@ -200,8 +200,8 @@ def disk_for(n_gpus, procs):
     return int(150 + 8 * n_gpus * procs)
 
 
-SEARCH_EVERY_S = 600
-SEARCH_LIMIT = 100
+SEARCH_EVERY_S = int(os.environ.get("ISGREND_SEARCH_EVERY_S", "600"))
+SEARCH_LIMIT = int(os.environ.get("ISGREND_SEARCH_LIMIT", "100"))  # a large rental: more rows per search
 QUERY_KEYS = ("VAST_QUERY_API_KEY_1", "VAST_QUERY_API_KEY_2", "VAST_QUERY_API_KEY_3")
 
 
