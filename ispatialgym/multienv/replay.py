@@ -574,10 +574,13 @@ class Slot:
             import omnigibson as og
             from ispatialgym.multienv.campaign_rendering import restore_campaign_scene
 
-            if self.scene_mode != "recorded":
-                raise ValueError("campaign rendering requires the exact recorded scene")
+            if self.scene_mode not in ("recorded", "full"):
+                raise ValueError("campaign rendering requires the recorded or the merged scene")
             self.scene.load_state(demo.state_at(0), serialized=True)
-            self.campaign_restoration = restore_campaign_scene(self.scene, og.sim, demo.campaign_meta)
+            # merged (full) scene of a cropped demo: restoration against the recorded crop's objects, outside fixtures lit alike
+            crop = (set(demo.scene_file["objects_info"]["init_info"]) if self.scene_mode == "full" and is_cropped(demo.scene_crop)
+                    else None)
+            self.campaign_restoration = restore_campaign_scene(self.scene, og.sim, demo.campaign_meta, crop_names=crop)
         self.n_objects_scene = len(self.scene.object_registry.get_dict("name"))
         self.demo, self.i, self.t0 = demo, 0, time.time()
         self.loaded = None
@@ -663,6 +666,10 @@ def main(argv=None) -> int:
     ap.add_argument("--scene-pert", choices=("off", "remove"), default="off",
                     help="replay-time scene perturbation: hide removable non-task scene objects per slot and episode (module doc)")
     ap.add_argument("--scene-pert-seed", type=int, default=0)
+    ap.add_argument("--scene-pert-scope", choices=("outside_crop", "all"), default="outside_crop",
+                    help="outside_crop (owner 2026-11-15): for a cropped demo only objects of the replay scene outside the recorded crop "
+                         "are candidates (with --scene full: the merged scene's objects the collection never simulated); an uncropped "
+                         "demo: every object. all: every object of the replay scene")
     ap.add_argument("--scene-pert-p-episode", type=float, default=0.5, help="probability that a replayed episode is perturbed")
     ap.add_argument("--scene-pert-p-unit", type=float, default=0.5, help="probability that a removable unit is removed")
     ap.add_argument("--scene-pert-index-base", type=int, default=0,
@@ -693,8 +700,9 @@ def main(argv=None) -> int:
     if args.sequential_augmentation and (not args.campaign_manifest or int(args.slots) != 1):
         ap.error('sequential augmentation requires an exact campaign manifest and one slot')
     if args.campaign_manifest:
-        if args.watch or args.scene != "recorded" or args.tiled or args.delta_load:
-            ap.error("campaign rendering requires a fixed accepted list, --scene recorded, individual cameras and full state loads")
+        if args.watch or args.scene not in ("recorded", "full") or args.tiled or args.delta_load:
+            ap.error("campaign rendering requires a fixed accepted list, --scene recorded (or full: the merged scene), individual "
+                     "cameras and full state loads")
         from ispatialgym.multienv.campaign_rendering import selected_records
 
         campaign_records = selected_records(args.campaign_manifest, demo_dirs,
@@ -777,8 +785,13 @@ def main(argv=None) -> int:
                 if forced is None:
                     raise SystemExit(f"--scene-pert-from: no record for {demo.name} replay {ri}")
             t_p = time.perf_counter()
+            inside = None
+            if args.scene_pert_scope == "outside_crop" and is_cropped(demo.scene_crop):
+                inside = set(demo.scene_file["objects_info"]["init_info"])
             rec = RSP.plan(s.scene, demo, ri, args.scene_pert_seed,
-                           {"p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit}, forced=forced)
+                           {"p_episode": args.scene_pert_p_episode, "p_unit": args.scene_pert_p_unit}, forced=forced,
+                           inside_crop=inside)
+            rec["scope"], rec["scene_mode"] = args.scene_pert_scope, s.scene_mode
             s.hidden = RSP.apply(s.scene, rec["removed"])
             s.scene.load_state(demo.state_at(0), serialized=True)
             rec["slot"], rec["plan_s"] = s.k, round(time.perf_counter() - t_p, 2)

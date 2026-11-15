@@ -316,7 +316,7 @@ def demo_task_context(demo) -> Tuple[Dict[str, Any], Dict[str, Any], List[str]]:
 
 
 def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, Any]] = None,
-         forced: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+         forced: Optional[Sequence[str]] = None, inside_crop: Optional[Set[str]] = None) -> Dict[str, Any]:
     """Decide this replayed episode's removals in ``scene`` (a slot's scene). Loads sampled recorded states into the scene (the
     caller reloads frame 0 afterwards). ``forced``: the removed names of a previous record (``--scene-pert-from``), checked
     against this run's protection."""
@@ -341,8 +341,11 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
         if n in objs:
             protected.setdefault(n, "moved")
     candidates = []
+    inside = set(inside_crop or ())
     for n, o in sorted(objs.items()):
         if n in parked or is_structural(getattr(o, "category", None)):
+            continue
+        if n in inside:  # outside_crop scope: the collection's cropped world stays as simulated
             continue
         if holds_light(o):
             protected.setdefault(n, "holds light")
@@ -381,6 +384,13 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
                 hits[n] = f"task/moved contact@{i}"
     for n, why in hits.items():
         protected.setdefault(n, why)
+    if inside:
+        # an outside object touching a non-structural crop object may hold it (a crop object resting on it would float): kept
+        crop_boxes = [b for b in (object_aabb(objs[n]) for n in sorted(inside & set(objs))
+                                  if not is_structural(getattr(objs[n], "category", None))) if b is not None]
+        for n in static:
+            if n not in protected and touching_any(boxes[n], crop_boxes, float(cfg["touch_margin"])):
+                protected[n] = "touches crop"
     # offstage: an object farther than offstage_m from the robot at every sampled frame (a template's own far parking, e.g. chairs
     # parked ~200 m away) - hiding it changes no image, so it is neither a unit nor counted as a removal
     offstage = sorted(n for n in static if n not in protected and gaps[n][0] is not None and gaps[n][0] > float(cfg["offstage_m"]))
@@ -398,7 +408,10 @@ def plan(scene, demo, replay_index: int, seed: int, cfg: Optional[Mapping[str, A
     rec.update(d)
     rec.update({"units": units, "n_candidates": len(candidates), "n_objects": len(objs),
                 "protected": dict(sorted(protected.items())), "contact_frames": len(contact_frames), "move_frames": len(idx),
-                "parked_by_campaign": sorted(parked), "offstage": offstage, "robot_boxes_min": min(n_robot_boxes),
+                "parked_by_campaign": sorted(parked), "offstage": offstage,
+                "inside_crop_excluded": len(inside & set(objs)) if inside_crop is not None else None,
+                "outside_near_robot": sorted(n for n, why in protected.items() if why.startswith("robot contact")
+                                             and inside_crop is not None and n not in inside), "robot_boxes_min": min(n_robot_boxes),
                 "removed_min_gap_m": {n: {"robot": None if gaps.get(n, [None])[0] is None else round(gaps[n][0], 4),
                                           "task": None if gaps.get(n, [None, None])[1] is None else round(gaps[n][1], 4)}
                                       for n in rec.get("removed", [])}})

@@ -53,10 +53,79 @@ def checked_metadata(record, demo_dir):
     return meta
 
 
-def restore_campaign_scene(scene, sim, meta):
-    """Call after loading the first recorded state, before rendering any frame."""
+class CropSceneView:
+    """A merged (full) replay scene seen as the cropped world a demo was collected in: ``objects`` are the crop's objects, every
+    other attribute is the scene's. Campaign restoration (parking, lighting with its exact recorded fixture set, camera context)
+    runs against this view exactly as in the recorded crop. Attributes set on the view (lighting defaults) stay on the view."""
+
+    def __init__(self, scene, crop_names):
+        object.__setattr__(self, "_scene", scene)
+        object.__setattr__(self, "_crop", frozenset(crop_names))
+
+    @property
+    def objects(self):
+        return [o for o in self._scene.objects if o.name in self._crop]
+
+    def object_registry(self, *args, **kwargs):
+        return self._scene.object_registry(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._scene, name)
+
+
+def _full_light_defaults(scene):
+    """Every fixture light's intensity of the merged scene, captured once before any campaign lighting touches it."""
+    from ispatialgym.sampling.campaign_augmentation import _lights
+
+    defaults = getattr(scene, "_isg_merged_light_defaults", None)
+    if defaults is None:
+        defaults = {name: float(attr.Get()) for name, attr in _lights(scene).items()}
+        scene._isg_merged_light_defaults = defaults
+    return defaults
+
+
+def crop_view(scene, crop_names):
+    """The slot's cached :class:`CropSceneView` for this crop, its lighting defaults seeded from the merged scene's untouched ones."""
+    from ispatialgym.sampling.campaign_augmentation import _lights
+
+    full = _full_light_defaults(scene)
+    views = getattr(scene, "_isg_crop_views", None)
+    if views is None:
+        views = scene._isg_crop_views = {}
+    key = frozenset(crop_names)
+    if key not in views:
+        view = CropSceneView(scene, key)
+        object.__setattr__(view, "_isg_campaign_light_defaults", {n: full[n] for n in _lights(view)})
+        views[key] = view
+    return views[key]
+
+
+def apply_outside_lighting(scene, sim, crop_names, request):
+    """Merged scene: the fixture lights of objects outside the crop (never part of collection) get the demo's recorded intensity
+    factor from their own untouched defaults, so the whole merged scene is lit by one draw (an unlit demo: defaults)."""
+    from ispatialgym.sampling.campaign_augmentation import _lights, _near
+
+    full = _full_light_defaults(scene)
+    factor = float((request or {}).get("intensity_factor", 1.0))
+    crop = frozenset(crop_names)
+    attrs = {n: a for n, a in _lights(scene).items() if n.split(":", 1)[0] not in crop}
+    require(set(attrs) <= set(full), "merged scene lighting fixture set changed")
+    with sim.editing_usd():
+        for name, attr in attrs.items():
+            attr.Set(full[name] * factor)
+    for name, attr in attrs.items():
+        require(_near(attr.Get(), full[name] * factor), f"outside-crop fixture intensity not applied: {name}")
+    return {"outside_fixtures": len(attrs), "factor": factor,
+            "applied_range": [min((full[n] * factor for n in attrs), default=None), max((full[n] * factor for n in attrs), default=None)]}
+
+
+def restore_campaign_scene(scene, sim, meta, crop_names=None):
+    """Call after loading the first recorded state, before rendering any frame. ``crop_names`` (merged replay of a cropped demo:
+    the recorded crop's object names): restoration runs against the crop view and the outside-crop fixtures get the same light."""
     from ispatialgym.sampling.campaign_runtime import verify_loaded
 
+    merged = crop_names is not None
+    target = crop_view(scene, crop_names) if merged else scene
     physical = {}
     for instance in meta["campaign"]["perturbations"]["scales"]:
         binding = meta["object_bindings"][instance]
@@ -69,4 +138,9 @@ def restore_campaign_scene(scene, sim, meta):
                 if binding.get(field):
                     require(getattr(obj, field) == binding[field], f"campaign render {field} differs: {instance}")
         physical[instance] = obj
-    return verify_loaded(meta["campaign"], physical, scene=scene, sim=sim)
+    result = verify_loaded(meta["campaign"], physical, scene=target, sim=sim)
+    if merged:
+        result = dict(result)
+        result["merged_lighting"] = apply_outside_lighting(scene, sim, crop_names,
+                                                           meta["campaign"]["perturbations"].get("lighting") or {})
+    return result

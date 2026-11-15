@@ -221,3 +221,94 @@ def test_probe_targets_and_look_at():
     assert np.allclose(fwd, [0.0, 1.0, 0.0], atol=1e-9)
     up = Rotation.from_quat(q).apply([0.0, 1.0, 0.0])
     assert up[2] > 0.99
+
+
+def test_plan_outside_crop_scope(tmp_path):
+    (tmp_path / "meta.json").write_text(json.dumps({"tracked_objects": {"cup.n.01_1": "target_cup"}, "task_family": "x"}))
+    scene = _Scene()
+    # the crop = table, cup, vase, shelf, sofa; outside = chair, pillow (pillow rests on the inside sofa), parked_chair (offstage)
+    inside = {"table", "target_cup", "vase", "shelf", "sofa", "walls_a"}
+    rec = RSP.plan(scene, _Demo(str(tmp_path)), 0, 0, {"p_episode": 1.0, "p_unit": 1.0}, inside_crop=inside)
+    assert rec["units"] == [["chair"]] and rec["removed"] == ["chair"]
+    assert rec["protected"]["pillow"] == "touches crop" and rec["inside_crop_excluded"] == 6
+    assert "sofa" not in rec["protected"] and "table" not in [n for u in rec["units"] for n in u]
+
+
+class _Attr:
+    def __init__(self, v):
+        self.v = v
+
+    def Get(self):
+        return self.v
+
+    def Set(self, v):
+        self.v = v
+
+
+class _LPrim:
+    def __init__(self, path, typ="Xform", children=(), intensity=None):
+        self.path, self.typ, self.children = path, typ, list(children)
+        self.attr = _Attr(intensity) if intensity is not None else None
+
+    def GetTypeName(self):
+        return self.typ
+
+    def GetChildren(self):
+        return self.children
+
+    def GetPath(self):
+        return self.path
+
+    def GetAttribute(self, name):
+        return self.attr
+
+
+class _LObj:
+    def __init__(self, name, intensity):
+        self.name = name
+        self.prim = _LPrim(f"/W/{name}", children=[_LPrim(f"/W/{name}/l", "SphereLight", intensity=intensity)])
+
+
+class _Sky:
+    intensity, color = 2500.0, (1.0, 1.0, 1.0)
+    _isg_campaign_defaults = None
+
+
+class _Sim:
+    skybox = _Sky()
+
+    def editing_usd(self):
+        import contextlib
+
+        return contextlib.nullcontext()
+
+
+class _LScene:
+    def __init__(self):
+        self.objects = [_LObj("lamp_in", 100.0), _LObj("lamp_out", 50.0), _LObj("desk_out", None)]
+        self.objects[2].prim = _LPrim("/W/desk_out")
+
+    def object_registry(self, key, name):
+        return next((o for o in self.objects if o.name == name), None)
+
+
+def test_merged_lighting_crop_view_and_outside():
+    from ispatialgym.multienv import campaign_rendering as CR
+    from ispatialgym.sampling import campaign_augmentation as A
+
+    scene, sim = _LScene(), _Sim()
+    view = CR.crop_view(scene, {"lamp_in"})
+    assert [o.name for o in view.objects] == ["lamp_in"] and view.object_registry("name", "lamp_out") is not None
+    req = {"schema": A.LIGHT_SCHEMA, "intensity_factor": 1.2, "skybox_color_factors": [1.0, 1.0, 1.0]}
+    rec = A.apply_lighting(view, sim, req)
+    assert set(rec["fixtures"]) == {"lamp_in:/l"} and abs(scene.objects[0].prim.children[0].attr.v - 120.0) < 1e-9
+    out = CR.apply_outside_lighting(scene, sim, {"lamp_in"}, req)
+    assert out["outside_fixtures"] == 1 and abs(scene.objects[1].prim.children[0].attr.v - 60.0) < 1e-9
+    # a second episode with another draw starts from the untouched defaults, inside and outside
+    assert CR.crop_view(scene, {"lamp_in"}) is view
+    req2 = dict(req, intensity_factor=0.8)
+    A.apply_lighting(view, sim, req2, expected=None)
+    CR.apply_outside_lighting(scene, sim, {"lamp_in"}, req2)
+    assert abs(scene.objects[0].prim.children[0].attr.v - 80.0) < 1e-9 and abs(scene.objects[1].prim.children[0].attr.v - 40.0) < 1e-9
+    # the recorded record of the crop (as collected in the cropped world) is accepted against the view
+    A.apply_lighting(view, sim, req, expected=rec)
