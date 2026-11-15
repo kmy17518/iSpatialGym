@@ -302,10 +302,18 @@ def build(a):
                           "inputs": f"inputs/{uid}.tar.zst", "meta": f"meta/{uid}.jsonl", "_rows": ch})
     # inputs + meta per unit
     for u in units:
-        pack = sorted({(src, arc) for r in u["_rows"] for src, arc in facts[r["demo_dir"]]["pack"]}, key=lambda x: x[1])
+        by_arc = {}
+        for r in u["_rows"]:
+            for src, arc in facts[r["demo_dir"]]["pack"]:
+                if arc in by_arc and by_arc[arc] != src:
+                    a_sha, b_sha = sha256_file(readable(by_arc[arc])), sha256_file(readable(src))
+                    if a_sha != b_sha:
+                        u.setdefault("pack_conflicts", []).append({"path": arc, "kept": by_arc[arc], "other": src})
+                        print(f"WARNING {u['unit']}: {arc}: {by_arc[arc]} and {src} differ; keeping the first", flush=True)
+                    continue
+                by_arc[arc] = src
+        pack = sorted(((src, arc) for arc, src in by_arc.items()), key=lambda x: x[1])
         files = [arc for _, arc in pack]
-        if len(set(files)) != len(files):
-            raise ValueError(f"{u['unit']}: two contents for one archive path")
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w") as tf:
             for src, arc in pack:
