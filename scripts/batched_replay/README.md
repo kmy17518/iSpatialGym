@@ -49,6 +49,10 @@ Fixed flags: `--slots 1 --batched-usd-edits --async-flush --proprio loaded --war
 - **Never use the visionlab partition / visionlab-* nodes (owner 2026-11-15), not even for CPU helpers.** Loops, finishers, collectors,
   merges: minyeong `-A vision -p svl` or `-A viscam -p viscam`, shiyuc `-A vision -p svl`, always `--exclude=visionlab-dgx1` (that node
   is in the svl partition too).
+- Camera relocalization (2026-11-15 diff1): demos replayed in one world must share their collection-time removed objects (TRO
+  `campaign.perturbations.removed_objects`), else the next demo's `scene.load_state` fails (object missing / KeyError lin_vel ->
+  rc -11); and a one_object_v1 conversion demo (`conversion.json`: its hdf5 was recorded with more objects removed than its TRO says)
+  replays only first in a fresh world. Build camera units with `--group-removals --conv-alone --split-groups`.
 - Submit cluster lanes from a CLEAN shell: `sbatch` exports the submitting environment, and after `source $RV/tool/creds.sh` the jobs
   run the controller's Python (no h5py) -> every replay fails at import (2026-11-15 diff1: 19 minyeong lanes died in 10 s).
 - Lanes get the SHORTEST units (`cluster_assign.py assign --lanes-shortest --lane-frames N`): TITAN RTX / 2080 Ti lanes replay at
