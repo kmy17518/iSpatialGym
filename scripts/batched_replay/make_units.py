@@ -279,6 +279,21 @@ def build(a):
             # --split-groups: per-demo draws (--pert-unit demo) need no goal group kept whole; every demo may go its own way
             gk = facts[r["demo_dir"]]["name"] if a.split_groups else facts[r["demo_dir"]]["group"]
             by_group.setdefault(gk, []).append(r)
+        if a.conv_last:
+            # one_object_v1 conversion demos (conversion.json): the demo replayed after one in the same world fails its state
+            # restore, so a unit holds at most one, as its last demo; the other demos are spread in front of them
+            conv = lambda r: os.path.exists(os.path.join(r["demo_dir"], "conversion.json"))  # noqa: E731
+            items = list(by_group.items())
+            cv = [it for it in items if any(conv(m) for m in it[1])]
+            other = [it for it in items if not any(conv(m) for m in it[1])]
+            if cv and not a.split_groups:
+                raise SystemExit("--conv-last needs --split-groups")
+            k = -(-len(other) // max(1, len(cv)))
+            ordered = []
+            for i, c in enumerate(cv):
+                ordered += other[i * k:(i + 1) * k] + [c]
+            ordered += other[len(cv) * k:]
+            by_group = collections.OrderedDict(ordered)
         cur, frames = [], 0
         chunks = []
         for g, members in by_group.items():
@@ -288,6 +303,9 @@ def build(a):
                 cur, frames = [], 0
             cur += members
             frames += fr
+            if a.conv_last and any(os.path.exists(os.path.join(m["demo_dir"], "conversion.json")) for m in members):
+                chunks.append(cur)
+                cur, frames = [], 0
         if cur:
             chunks.append(cur)
         for ch in chunks:
@@ -401,6 +419,7 @@ def main():
     p.add_argument("--upload", action="store_true")
     p.add_argument("--repeat", type=int, default=1, help="sweep runs: copies of every unit")
     p.add_argument("--split-groups", action="store_true", help="cut units between demos of one goal group (per-demo draws)")
+    p.add_argument("--conv-last", action="store_true", help="at most one conversion demo per unit, as its last demo")
     p.add_argument("--resume", action="store_true", help="keep the units already packed in an existing run dir (same rows)")
     p.add_argument("--pack-workers", type=int, default=24)
     p.add_argument("--demo-repeat", type=int, default=1, help="sweep runs: every unit plays its demos this many times")
