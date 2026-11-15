@@ -28,8 +28,10 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 SCHEMA = "isg-replay-lighting-v1"
 
-DEFAULTS = {"p": 0.5, "sigma": 0.3, "lo": 0.4, "hi": 1.8, "color_sigma": 0.06, "color_lo": 0.82, "color_hi": 1.18,
-            "sky_sigma": 0.3, "sky_lo": 0.4, "sky_hi": 1.8, "sky_color_sigma": 0.04, "sky_color_lo": 0.9, "sky_color_hi": 1.1}
+#: owner 2026-11-15: intensity x0.5-1.5 from a normal centred at 1. sigma 0.17 puts the clip bounds at 2.9 sigma (0.4 % of draws
+#: clipped), 68 % of draws within +-17 %, 95 % within +-34 %: large changes stay possible but rare (long tail)
+DEFAULTS = {"p": 0.5, "sigma": 0.17, "lo": 0.5, "hi": 1.5, "color_sigma": 0.04, "color_lo": 0.88, "color_hi": 1.12,
+            "sky_sigma": 0.17, "sky_lo": 0.5, "sky_hi": 1.5, "sky_color_sigma": 0.03, "sky_color_lo": 0.92, "sky_color_hi": 1.08}
 
 
 def _key(*parts) -> int:
@@ -181,3 +183,75 @@ def without_lighting(meta: Mapping[str, Any]) -> Dict[str, Any]:
     if isinstance(aug, dict):
         aug.pop("lighting", None)
     return out
+
+
+# ----------------------------------------------------------------------------------------------------------------------------
+# replayed-instance TROs (owner 2026-11-15): the replay-time perturbations live in the instance record like the collection-time ones
+# ----------------------------------------------------------------------------------------------------------------------------
+
+REPLAY_BLOCK = "replay_perturbations"
+REPLAY_BLOCK_SCHEMA = "isg-replay-perturbations-v1"
+
+
+def replay_block(rec: Mapping[str, Any]) -> Dict[str, Any]:
+    """The ``campaign.replay_perturbations`` block of one replayed episode, from its REPLAY_SCENE_PERT record."""
+    light = rec.get("lighting") or None
+    return {"schema": REPLAY_BLOCK_SCHEMA, "replay_index": int(rec["replay_index"]), "demo_name": rec["demo_name"],
+            "scene": {"schema": rec.get("schema"), "seed": rec.get("seed"), "scope": rec.get("scope"), "scene_mode": rec.get("scene_mode"),
+                      "removed_objects": list(rec.get("removed") or []), "perturbed": bool(rec.get("perturbed"))},
+            "lighting": None if light is None else {"schema": light.get("schema"), "seed": light.get("seed"), "cfg": light.get("cfg"),
+                                                    "fixtures_draw": light["fixtures_draw"], "skybox": light["skybox"],
+                                                    "recorded_ignored": light.get("recorded_ignored")}}
+
+
+def write_replayed_tro(src_tro: str, out_dir: str, rec: Mapping[str, Any]) -> str:
+    """A copy of the instance's TRO with ``ispatialgym.campaign.replay_perturbations`` (the collection-time ``perturbations`` untouched):
+    a later load of this instance (``--replay-tro-dir``) reproduces the replayed scene - removals, fixture and skybox lighting."""
+    import os
+
+    with open(src_tro) as f:
+        tro = json.load(f)
+    camp = tro["ispatialgym"].setdefault("campaign", {})
+    block = replay_block(rec)
+    from scripts.campaign_20261110.contracts import file_digest
+
+    block["source_tro"] = {"path": src_tro, "sha256": file_digest(src_tro)}
+    camp[REPLAY_BLOCK] = block
+    os.makedirs(out_dir, exist_ok=True)
+    name = os.path.basename(src_tro)
+    if int(rec["replay_index"]):
+        name = name.replace("-tro_state.json", f"-r{int(rec['replay_index'])}-tro_state.json")
+    path = os.path.join(out_dir, name)
+    with open(path, "w") as f:
+        json.dump(tro, f, indent=1)
+    return path
+
+
+def load_replayed_tros(directory: str) -> Tuple[Dict[Tuple[str, int], List[str]], Dict[Tuple[str, int], Dict[str, Any]]]:
+    """``--replay-tro-dir``: (demo name, replay index) -> removed objects, and -> lighting record, from replayed-instance TROs."""
+    import glob
+    import os
+
+    removed, lighting = {}, {}
+    for p in sorted(glob.glob(os.path.join(directory, "*-tro_state.json"))):
+        with open(p) as f:
+            block = (json.load(f)["ispatialgym"].get("campaign") or {}).get(REPLAY_BLOCK)
+        if not block:
+            continue
+        if block.get("schema") != REPLAY_BLOCK_SCHEMA:
+            raise ValueError(f"{p}: unknown replay perturbation schema")
+        k = (block["demo_name"], int(block["replay_index"]))
+        removed[k] = list(block["scene"]["removed_objects"])
+        if block.get("lighting"):
+            lighting[k] = {"fixtures_draw": block["lighting"]["fixtures_draw"], "skybox": block["lighting"]["skybox"]}
+    return removed, lighting
+
+
+def sweep_stats(rgb) -> Dict[str, float]:
+    """Clipped-black / clipped-white pixel fractions and mean luminance (Rec. 709, 0-255) of an rgb uint8 image."""
+    import numpy as np
+
+    a = np.asarray(rgb)[..., :3].astype(np.float64)
+    lum = 0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]
+    return {"black_frac": float((a.max(axis=2) <= 2).mean()), "white_frac": float((a.min(axis=2) >= 253).mean()),
+            "mean_luma": float(lum.mean())}

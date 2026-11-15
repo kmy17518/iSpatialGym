@@ -693,10 +693,16 @@ def main(argv=None) -> int:
                          "--campaign-manifest unless every demo is camera relocalization (exempt: recorded lighting), else off")
     ap.add_argument("--lighting-pert-seed", type=int, default=None, help="default: --scene-pert-seed")
     ap.add_argument("--lighting-pert-p", type=float, default=0.5)
-    ap.add_argument("--lighting-pert-sigma", type=float, default=0.3, help="fixture / skybox intensity factor ~ N(1, sigma)")
-    ap.add_argument("--lighting-pert-range", default="0.4,1.8", help="intensity factor clip lo,hi")
-    ap.add_argument("--lighting-pert-color-sigma", type=float, default=0.06, help="fixture colour factors ~ N(1, sigma) per channel")
+    ap.add_argument("--lighting-pert-sigma", type=float, default=0.17, help="fixture / skybox intensity factor ~ N(1, sigma)")
+    ap.add_argument("--lighting-pert-range", default="0.5,1.5", help="intensity factor clip lo,hi")
+    ap.add_argument("--lighting-pert-color-sigma", type=float, default=0.04, help="fixture colour factors ~ N(1, sigma) per channel")
     ap.add_argument("--lighting-pert-from", default=None, help="REPLAY_SCENE_PERT records: re-apply their lighting exactly")
+    ap.add_argument("--replay-tro-dir", default=None,
+                    help="replayed-instance TROs (campaign.replay_perturbations, written to <root>/instances by every perturbed replay): "
+                         "re-apply their removals and lighting exactly (the loader path)")
+    ap.add_argument("--lighting-sweep", default=None, help="review sheet: factors (comma separated) applied to every fixture and the skybox")
+    ap.add_argument("--lighting-sweep-dir", default=None, help="--lighting-sweep: save the slots' head rgb at each factor here, then stop")
+    ap.add_argument("--lighting-sweep-at", type=float, default=0.5, help="--lighting-sweep: the demo frame (fraction of its length)")
     ap.add_argument("--profile-ticks", default=None, help="START:COUNT: cProfile those ticks, stats to <results>.prof.txt (or stdout)")
     args = ap.parse_args(argv)
 
@@ -757,6 +763,11 @@ def main(argv=None) -> int:
                  "color_sigma": args.lighting_pert_color_sigma, "sky_sigma": args.lighting_pert_sigma, "sky_lo": lo, "sky_hi": hi}
     light_seed = args.scene_pert_seed if args.lighting_pert_seed is None else args.lighting_pert_seed
     light_from = RL.load_from_records(args.lighting_pert_from) if args.lighting_pert_from else None
+    tro_removed = None
+    if args.replay_tro_dir:
+        tro_removed, tro_light = RL.load_replayed_tros(args.replay_tro_dir)
+        if tro_light:
+            light_from, lighting_mode = tro_light, "replay"
     sky_draw = None
     if lighting_mode == "replay":
         names = [os.path.basename(os.path.normpath(d)) for d in demo_dirs]
@@ -810,6 +821,8 @@ def main(argv=None) -> int:
             from ispatialgym.multienv.replay_scene_perturbation import load_from_records
 
             pert_from = load_from_records(args.scene_pert_from)
+        if tro_removed is not None:
+            pert_from = tro_removed
         pert_path = os.path.join(args.root, "scene_perturbation.jsonl")
 
         def start_slot(s: "Slot", demo: Demo) -> None:
@@ -909,6 +922,36 @@ def main(argv=None) -> int:
                     started.append(s.k)
 
         fill_idle(force=True)
+        if args.lighting_sweep:
+            from PIL import Image
+            from ispatialgym.oracle.r1pro_model import HEAD_CAMERA_SENSOR_SUFFIX
+
+            os.makedirs(args.lighting_sweep_dir, exist_ok=True)
+            rows = []
+            for f in [float(x) for x in args.lighting_sweep.split(",")]:
+                d0 = {"intensity_factor": f, "color_factors": [1.0, 1.0, 1.0]}
+                RL.apply_skybox(og.sim, d0)
+                for s in slots:
+                    if s.demo is not None:
+                        RL.apply_fixtures(s.scene, og.sim, d0)
+                        s.scene.load_state(s.demo.state_at(min(s.demo.T - 1, int(args.lighting_sweep_at * (s.demo.T - 1)))), serialized=True)
+                for _ in range(40):
+                    og.sim.render()
+                for s in slots:
+                    if s.demo is None:
+                        continue
+                    robot = s.scene.robots[0]
+                    key = next(k for k in robot.sensors if k.endswith(HEAD_CAMERA_SENSOR_SUFFIX))
+                    obs = robot.sensors[key].get_obs()
+                    obs = obs[0] if isinstance(obs, tuple) else obs
+                    a = obs["rgb"].detach().cpu().numpy()[..., :3].astype(np.uint8)
+                    Image.fromarray(a).save(os.path.join(args.lighting_sweep_dir, f"sweep_slot{s.k}_{s.demo.name[-14:]}_x{f:.2f}.png"))
+                    rows.append({"slot": s.k, "demo": s.demo.name, "factor": f, **RL.sweep_stats(a)})
+            print("REPLAY_LIGHTING_SWEEP " + json.dumps(rows), flush=True)
+            if args.results:
+                with open(args.results, "a") as fo:
+                    fo.write(json.dumps({"tag": "REPLAY_LIGHTING_SWEEP", "rows": rows}) + "\n")
+            return 0
         if args.scene_pert_probe:
             from ispatialgym.multienv.replay_scene_perturbation import probe_views
 
@@ -1083,6 +1126,8 @@ def main(argv=None) -> int:
                                              "lighting": (s.scene_pert.get("lighting") or {}).get("fixtures_draw")},
                                          "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
                                                                                       "occluded": occl.get("occluded")}})
+                    if s.scene_pert is not None and (s.scene_pert.get("removed") or s.scene_pert.get("lighting")) and d.tro_path:
+                        s.scene_pert["replayed_tro"] = RL.write_replayed_tro(d.tro_path, os.path.join(args.root, "instances"), s.scene_pert)
                     if s.scene_pert is not None:
                         os.makedirs(args.root, exist_ok=True)
                         with open(pert_path, "a") as fo:

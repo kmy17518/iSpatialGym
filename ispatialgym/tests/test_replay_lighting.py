@@ -11,8 +11,11 @@ def test_fixture_draw_deterministic_ranges_and_rate():
     assert a == RL.draw_fixtures(1, "demo", 0, {"p": 1.0}) and a["perturbed"]
     draws = [RL.draw_fixtures(1, "demo", r, {"p": 1.0}) for r in range(400)]
     f = [d["intensity_factor"] for d in draws]
-    assert min(f) >= 0.4 and max(f) <= 1.8 and len(set(f)) > 300
-    assert all(0.82 <= c <= 1.18 for d in draws for c in d["color_factors"])
+    assert min(f) >= 0.5 and max(f) <= 1.5 and len(set(f)) > 300
+    assert all(0.88 <= c <= 1.12 for d in draws for c in d["color_factors"])
+    import statistics
+
+    assert 0.14 < statistics.pstdev(f) < 0.19 and abs(statistics.mean(f) - 1.0) < 0.03
     n = sum(RL.draw_fixtures(2, "d", r)["perturbed"] for r in range(2000))
     assert 900 < n < 1100
     off = RL.draw_fixtures(2, "d", next(r for r in range(50) if not RL.draw_fixtures(2, "d", r)["perturbed"]))
@@ -43,3 +46,36 @@ def test_records_roundtrip_and_without_lighting(tmp_path):
     assert out["campaign"]["perturbations"]["lighting"] == {} and "lighting" not in out["campaign"]["runtime"]["augmentation"]
     assert meta["campaign"]["perturbations"]["lighting"] == {"intensity_factor": 1.1}  # input untouched
     assert RL.ignored_recorded(meta) == {"intensity_factor": 1.1}
+
+
+def test_replayed_tro_roundtrip(tmp_path):
+    """Loader path: the replayed-instance TRO carries the replay perturbations; loading it gives back the same removals and lights."""
+    tro = tmp_path / "inst__1-tro_state.json"
+    camp = {"schema": "x", "perturbations": {"scales": {}, "removed_objects": [], "lighting": {"intensity_factor": 1.1}}}
+    tro.write_text(json.dumps({"ispatialgym": {"campaign": camp, "object_bindings": {}}}))
+    fx = RL.draw_fixtures(5, "inst__1", 0, {"p": 1.0})
+    sky = RL.draw_skybox(5, RL.batch_key(["inst__1"]), {"p": 1.0})
+    rec = {"schema": "isg-replay-scene-pert-v1", "demo_name": "inst__1", "replay_index": 0, "seed": 5, "removed": ["chair_0", "desk_2"],
+           "perturbed": True, "scope": "outside_crop", "scene_mode": "full",
+           "lighting": {"schema": RL.SCHEMA, "seed": 5, "cfg": {}, "fixtures_draw": fx, "skybox": sky, "recorded_ignored": {"intensity_factor": 1.1}}}
+    out = RL.write_replayed_tro(str(tro), str(tmp_path / "instances"), rec)
+    data = json.loads(open(out).read())["ispatialgym"]["campaign"]
+    assert data["perturbations"] == camp["perturbations"]  # collection-time record untouched
+    assert data[RL.REPLAY_BLOCK]["lighting"]["fixtures_draw"] == fx and data[RL.REPLAY_BLOCK]["source_tro"]["path"] == str(tro)
+    removed, lighting = RL.load_replayed_tros(str(tmp_path / "instances"))
+    assert removed == {("inst__1", 0): ["chair_0", "desk_2"]}
+    assert lighting == {("inst__1", 0): {"fixtures_draw": fx, "skybox": sky}}
+    RL.check_batch_skybox(list(lighting.values()))
+    from scripts.campaign_20261110 import contracts
+
+    assert "replay_perturbations" not in contracts.validate_campaign_block.__code__.co_consts  # no strict campaign key list
+
+
+def test_sweep_stats():
+    import numpy as np
+
+    a = np.zeros((2, 2, 3), np.uint8)
+    a[0, 0] = 255
+    a[0, 1] = 128
+    st = RL.sweep_stats(a)
+    assert st["black_frac"] == 0.5 and st["white_frac"] == 0.25 and 70 < st["mean_luma"] < 100
