@@ -467,3 +467,19 @@ def pose_errors(scene, demo, i: int, tracked: Mapping[str, str]) -> Dict[str, fl
         oe = max(oe, 2.0 * math.acos(dot))
         n += 1
     return {"pos_m": pe, "ori_rad": oe, "n": n}
+
+
+def trajectory_update(check: Dict[str, Any], scene, tracked: Mapping[str, str]) -> None:
+    """--scene-pert-verify: fold this frame's tracked-object poses (scene frame) and the robots' joint positions into
+    ``check["_traj"]`` (sha256): equal digests of a perturbed and an unperturbed replay of a demo = the same executed trajectory."""
+    h = check.get("_traj")
+    if h is None:
+        h = check["_traj"] = hashlib.sha256()
+    for inst in sorted(tracked):
+        obj = scene.object_registry("name", tracked[inst])
+        if obj is None:
+            continue
+        p, q = obj.get_position_orientation(frame="scene")
+        h.update(np.round(np.concatenate([_np(p), _np(q)]), 7).astype(np.float64).tobytes())
+    for r in scene.robots:
+        h.update(np.round(_np(r.get_joint_positions()), 7).astype(np.float64).tobytes())

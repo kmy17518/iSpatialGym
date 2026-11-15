@@ -753,6 +753,12 @@ def main(argv=None) -> int:
 
         def start_slot(s: "Slot", demo: Demo) -> None:
             s.start(demo)
+            if args.scene_pert_verify:
+                from ispatialgym.multienv.replay_scene_perturbation import _read_json
+
+                meta = _read_json(os.path.join(demo.dir, "meta.json"))
+                s.pert_check = {"tracked": meta.get("tracked_objects") or {}, "pos_m": 0.0, "ori_rad": 0.0, "frames": 0,
+                                "recorded_success": meta.get("success")}
             if args.scene_pert == "off" and pert_from is None:
                 return
             from ispatialgym.multienv import replay_scene_perturbation as RSP
@@ -773,9 +779,6 @@ def main(argv=None) -> int:
             s.scene.load_state(demo.state_at(0), serialized=True)
             rec["slot"], rec["plan_s"] = s.k, round(time.perf_counter() - t_p, 2)
             s.scene_pert = rec
-            meta = RSP._read_json(os.path.join(demo.dir, "meta.json"))
-            s.pert_check = {"tracked": meta.get("tracked_objects") or {}, "pos_m": 0.0, "ori_rad": 0.0, "frames": 0,
-                            "recorded_success": meta.get("success")}
             print("REPLAY_SCENE_PERT " + json.dumps(rec), flush=True)
             if args.results:
                 with open(args.results, "a") as fo:
@@ -885,21 +888,22 @@ def main(argv=None) -> int:
                     objs_in += n_in
                     objs_loaded += n_loaded
             if args.scene_pert_verify:
-                from ispatialgym.multienv.replay_scene_perturbation import pose_errors
+                from ispatialgym.multienv.replay_scene_perturbation import pose_errors, trajectory_update
 
                 for s in active:
-                    e = pose_errors(s.scene, s.demo, s.i, s.pert_check.get("tracked") or {})
                     pc = s.pert_check
+                    e = pose_errors(s.scene, s.demo, s.i, pc.get("tracked") or {})
                     pc["pos_m"], pc["ori_rad"] = max(pc.get("pos_m", 0.0), e["pos_m"]), max(pc.get("ori_rad", 0.0), e["ori_rad"])
                     pc["frames"] = pc.get("frames", 0) + 1
                     pc["n_tracked"] = e["n"]
+                    trajectory_update(pc, s.scene, pc.get("tracked") or {})
                     if s.i == s.demo.T - 1:
-                        rec_state = s.demo.state_at(s.i)
+                        pc["final_pos_m"], pc["final_ori_rad"] = e["pos_m"], e["ori_rad"]
+                        pc["traj_sha256"] = pc.pop("_traj").hexdigest()
                         cur = s.scene.dump_state(serialized=True)
                         cur = cur if isinstance(cur, th.Tensor) else th.as_tensor(cur)
-                        pc["final_state_len"] = [int(cur.numel()), int(rec_state.numel())]
-                        pc["final_state_max_abs"] = (float((cur.float().cpu() - rec_state).abs().max())
-                                                     if cur.numel() == rec_state.numel() else None)
+                        pc["final_scene_state_sha256"] = hashlib.sha256(cur.detach().cpu().double().numpy().tobytes()).hexdigest()
+                        pc["final_scene_state_len"] = int(cur.numel())
             t2 = time.perf_counter()
             for _ in range(args.first_renders if any(s.i == 0 for s in active) else args.renders):
                 og.sim.render()
@@ -970,17 +974,19 @@ def main(argv=None) -> int:
                     emit("REPLAY_DEMO", {"demo": d.dir, "slot": s.k, "frames": d.T, "episode_index": index, "wall_s": round(time.time() - s.t0, 2),
                                          "dataset": os.path.join(args.root, f"{args.repo_prefix}_slot{s.k}"), "kept": keep,
                                          "campaign_restoration": s.campaign_restoration,
+                                         "scene_pert_check": {k: v for k, v in s.pert_check.items() if not k.startswith("_")} or None,
                                          "scene_perturbation": None if s.scene_pert is None else {
                                              "removed": s.scene_pert["removed"], "replay_index": s.scene_pert["replay_index"],
                                              "seed": s.scene_pert["seed"], "perturbed": s.scene_pert["perturbed"],
-                                             "exempt": s.scene_pert.get("exempt"), "check": dict(s.pert_check)},
+                                             "exempt": s.scene_pert.get("exempt")},
                                          "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
                                                                                       "occluded": occl.get("occluded")}})
                     if s.scene_pert is not None:
                         os.makedirs(args.root, exist_ok=True)
                         with open(pert_path, "a") as fo:
                             fo.write(json.dumps({"dataset": f"{args.repo_prefix}_slot{s.k}", "episode_index": index, "kept": keep,
-                                                 "check": dict(s.pert_check), **s.scene_pert}) + "\n")
+                                                 "check": {k: v for k, v in s.pert_check.items() if not k.startswith("_")},
+                                                 **s.scene_pert}) + "\n")
                     s.demo = None
             fill_idle()
             t5 = time.perf_counter()
