@@ -222,6 +222,7 @@ def run_unit(lane: Path, spec: dict, u: dict, code: Path) -> bool:
     dst = lane / "out" / uid
     shutil.rmtree(dst, ignore_errors=True)
     shutil.copytree(out, dst)
+    subprocess.run(["chmod", "-R", "a+rX", str(dst)], capture_output=True)  # LeRobot writes videos 0600 (temp file + rename)
     done = {"unit": uid, "lane": str(lane), "job": JOB, "host": os.uname().nodename, "user": os.environ.get("USER"),
             "gpu": subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"], capture_output=True,
                                   text=True).stdout.strip(),
