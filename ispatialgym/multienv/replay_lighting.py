@@ -235,6 +235,17 @@ def replay_block(rec: Mapping[str, Any]) -> Dict[str, Any]:
                                                     "recorded_ignored": light.get("recorded_ignored")}}
 
 
+def fit_name(name: str, suffix: str, limit: int = 250) -> str:
+    """``name`` if it fits a file name (255 bytes; campaign instance ids reach ~250 characters), else its head + a sha256 tag of
+    the whole name + ``suffix``."""
+    if len(name.encode()) <= limit:
+        return name
+    import hashlib
+
+    tag = hashlib.sha256(name.encode()).hexdigest()[:12]
+    return name[: limit - len(suffix) - 14] + "~" + tag + suffix
+
+
 def write_replayed_tro(src_tro: str, out_dir: str, rec: Mapping[str, Any]) -> str:
     """A copy of the instance's TRO with ``ispatialgym.campaign.replay_perturbations`` (the collection-time ``perturbations`` untouched):
     a later load of this instance (``--replay-tro-dir``) reproduces the replayed scene - removals, fixture and skybox lighting."""
@@ -256,7 +267,7 @@ def write_replayed_tro(src_tro: str, out_dir: str, rec: Mapping[str, Any]) -> st
     os.makedirs(out_dir, exist_ok=True)
     name = os.path.basename(src_tro)
     if int(rec["replay_index"]):
-        name = name.replace("-tro_state.json", f"-r{int(rec['replay_index'])}-tro_state.json")
+        name = fit_name(name.replace("-tro_state.json", f"-r{int(rec['replay_index'])}-tro_state.json"), "-tro_state.json")
     path = os.path.join(out_dir, name)
     with open(path, "w") as f:
         json.dump(tro, f, indent=1)

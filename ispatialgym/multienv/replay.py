@@ -713,7 +713,9 @@ def replay_goal_image(s: "Slot", d: Demo, obs: Dict[str, Any], out_dir: str) -> 
     lighting and removals - saved next to the replayed TRO as ``<instance>[-r<k>]-goal_rgb.png`` and registered as its
     ``goal_observation``."""
     ri = (s.scene_pert or {}).get("replay_index", 0)
-    name = d.name + (f"-r{ri}" if ri else "") + "-goal_rgb.png"
+    from ispatialgym.multienv.replay_lighting import fit_name
+
+    name = fit_name(d.name + (f"-r{ri}" if ri else "") + "-goal_rgb.png", "-goal_rgb.png")
     return save_goal_image(s, d, obs, os.path.join(out_dir, name), rel=name)
 
 
