@@ -613,7 +613,7 @@ PURPOSE_FLAGS = {
     # collection-time removals) and replay-time lighting (the recorded collection lighting is ignored); eval instances neither
     "train": ["--scene-pert", "remove", "--scene-pert-plan", "auto", "--lighting-pert", "replay", "--lighting-skybox", "episode",
               "--pert-unit", "demo", "--scene-pert-inview-pick", "random",
-              "--goal-occlusion", "auto"],
+              "--goal-occlusion", "off"],
     "eval": ["--scene-pert", "off", "--lighting-pert", "off", "--goal-occlusion", "off"],
     # REPLAY_DIFF_20261115 held-out siblings (never in a training merge): clean = eval rules; perturbed = scene + lighting, each with
     # probability 1.0 (camera relocalization: lighting only, the replayer never removes for it)
