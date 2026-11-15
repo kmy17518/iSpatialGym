@@ -18,8 +18,11 @@ if [ "$USER" = minyeong ]; then export ISGREND_TEX_OUT=$KIT_TEX_STORE ISGREND_TP
 else export ISGREND_TEX_OUT=/vision/u/shiyuc/minyeong/isgrend/cache_delta/kit_textures ISGREND_TPL_OUT=/vision/u/shiyuc/minyeong/isgrend/cache_delta/kit_templates; fi
 export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR="$JB/numba_cache" ISPATIALGYM_SHARD_FORMAT=legacy ISGREND_SCRATCH=$JB/isgrend
 # OmniGibson writes its .kit app file into $EXP_PATH at every start: a job-local copy of the overlay (symlinks + small files)
-rm -rf "$JB/isaacsim_overlay" && cp -a "$(dirname "$EXP_PATH")" "$JB/isaacsim_overlay" && chmod -R u+w "$JB/isaacsim_overlay" \
-  && export EXP_PATH=$JB/isaacsim_overlay/apps
+# (cp -rP: cp -a cannot preserve NFS attributes on /tmp)
+rm -rf "$JB/isaacsim_overlay"; cp -rP "$(dirname "$EXP_PATH")" "$JB/isaacsim_overlay"; chmod -R u+w "$JB/isaacsim_overlay"
+[ -w "$JB/isaacsim_overlay/apps" ] || { echo "OVERLAY_COPY_FAILED $JB/isaacsim_overlay"; exit 4; }
+export EXP_PATH=$JB/isaacsim_overlay/apps
+echo "EXP_PATH $EXP_PATH"
 unset ISPATIALGYM_HEAD_CAMERA_ONLY ISPATIALGYM_PHYSICS_ONLY
 # minyeong publishes the Kit template / converted textures to the shared stores at the end; shiyuc only reads them
 KIT_RC=1
