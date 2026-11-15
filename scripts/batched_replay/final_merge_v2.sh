@@ -29,6 +29,14 @@ PY
   [ "$left" = 0 ] && break
   sleep 120
 done
+# 1b. a pulled unit must hold its dataset (2026-11-15: 13 units were marked .synced with only done.json): re-pull those
+for r in ${RUNS//,/ }; do
+  bad=0
+  for d in $RV/runs/$r/out/*/; do u=$(basename $d)
+    if [ -f $d/.synced ] && ! { [ -f $d/episodes_isg.jsonl ] && [ -f $d/$u/meta/info.json ]; }; then rm -rf $d; bad=$((bad+1)); fi
+  done
+  [ $bad -gt 0 ] && { echo "$r: re-pulling $bad incomplete units"; $CPY $T/sync.py --run $r pull 2>&1 | tail -1; }
+done
 # 2. merges (in parallel)
 M=$RV/merged/v2; mkdir -p $M; rm -rf $M/*.building
 for s in train eval heldout; do
