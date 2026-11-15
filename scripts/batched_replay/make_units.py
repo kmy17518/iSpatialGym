@@ -262,7 +262,7 @@ def build(a):
     facts = {}
     from concurrent.futures import ThreadPoolExecutor
 
-    with ThreadPoolExecutor(16) as ex:
+    with ThreadPoolExecutor(48) as ex:
         for r, f in zip(rows, ex.map(lambda r: demo_facts(r["demo_dir"], r), rows)):
             facts[r["demo_dir"]] = f
     groups = collections.defaultdict(list)
