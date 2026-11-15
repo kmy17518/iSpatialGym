@@ -49,6 +49,10 @@ Fixed flags: `--slots 1 --batched-usd-edits --async-flush --proprio loaded --war
 - **Never use the visionlab partition / visionlab-* nodes (owner 2026-11-15), not even for CPU helpers.** Loops, finishers, collectors,
   merges: minyeong `-A vision -p svl` or `-A viscam -p viscam`, shiyuc `-A vision -p svl`, always `--exclude=visionlab-dgx1` (that node
   is in the svl partition too).
+- Submit cluster lanes from a CLEAN shell: `sbatch` exports the submitting environment, and after `source $RV/tool/creds.sh` the jobs
+  run the controller's Python (no h5py) -> every replay fails at import (2026-11-15 diff1: 19 minyeong lanes died in 10 s).
+- Lanes get the SHORTEST units (`cluster_assign.py assign --lanes-shortest --lane-frames N`): TITAN RTX / 2080 Ti lanes replay at
+  ~5 fps per GPU against 15-30 on Vast, so a long unit on a lane is the run's tail.
 - Several vastctl loops share one ledger: listing / reaping / destroying is scoped to the loop's own run (before the fix, two loops
   destroyed each other's healthy instances as heartbeat-less).
 - The eval_production tree is rebuilt in place: merges resolve paths / category / group from its current index.json (tree_index.py).
