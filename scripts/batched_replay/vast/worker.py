@@ -1008,13 +1008,15 @@ def withdraw_fails():
         log(f"withdrew {len(keys)} fail records (host problem): {sorted({u for u, _ in keys})}")
 
 
-def slot_loop(slot, gpu, kk, cpus):
+def slot_loop(slot, gpu, kk, cpus, max_units=None):
     time.sleep(STAGGER_S * slot)
-    while not stop_claiming.is_set():
+    n = 0
+    while not stop_claiming.is_set() and (max_units is None or n < max_units):
         unit = claim_next()
         if unit is None:
             break
         run_unit(unit, gpu, slot, kk, cpus)
+        n += 1
         with lock:
             bad = state["successes"] == 0 and state["startup_fails"] >= max(2, len(SLOTS) // 2)
             segv = state["successes"] == 0 and state.get("early_segv", 0) >= 2
@@ -1060,6 +1062,9 @@ def main():
         log("no Kit template for this GPU + driver on R2: every process starts cold, in parallel with its scene load")
     log(f"GPU_MODE {GPU_MODE}")
     state["phase"] = "run"
+    sweep = [int(x) for x in os.environ.get("ISG_SWEEP", "").split(",") if x.strip()]
+    if sweep:
+        return run_sweep(sweep, kk)
     threads = [threading.Thread(target=slot_loop, args=(s, g, kk, SLOT_CPUS[s])) for s, g in SLOTS]
     for t in threads:
         t.start()
@@ -1076,6 +1081,62 @@ def main():
     log(f"WORKER END done={len(state['done'])} failed={len(state['failed'])} frames={state['frames_done']}")
     time.sleep(70)
     return 0 if state["phase"] == "done" else 3
+
+
+def run_sweep(sweep, kk):
+    """ISG_SWEEP=1,2,3,4 (processes per GPU, one phase each, on GPU 0): every phase runs P replay processes at once, each one unit
+    (the sweep run's units are copies of one workload), and records runs/<run>/sweep/<instance>_p<P>.json: phase wall, frames, GPU
+    frames/s (all processes, incl. load), per-process steady fps (REPLAY_SUMMARY env_steps_per_s), GPU memory peak."""
+    global SLOTS, SLOT_CPUS, PER_GPU
+    g = GPUS[0]["index"]
+    for P in sweep:
+        PER_GPU = P
+        SLOTS = [(k, g) for k in range(P)]
+        SLOT_CPUS = {k: slot_cpus(k, P) for k in range(P)}
+        with lock:
+            done0, frames0 = len(state["done"]), state["frames_done"]
+            state["sweep_phase"] = P
+        peak = {"gpu_mem_mb": 0, "gpu_util": []}
+        stop = threading.Event()
+
+        def sample():
+            while not stop.is_set():
+                u = utilization()
+                if u.get("gpu_mem_mb"):
+                    peak["gpu_mem_mb"] = max(peak["gpu_mem_mb"], u["gpu_mem_mb"][0])
+                    peak["gpu_util"].append(u["gpu_util"][0])
+                time.sleep(10)
+        th_s = threading.Thread(target=sample, daemon=True)
+        th_s.start()
+        t0 = time.time()
+        threads = [threading.Thread(target=slot_loop, args=(k, g, kk, SLOT_CPUS[k], 1)) for k in range(P)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        wall = time.time() - t0
+        stop.set()
+        recs = []
+        for uid in state["done"][done0:]:
+            d = get_json(f"done/{uid}.json") or {}
+            sm = d.get("summary") or {}
+            recs.append({"unit": uid, "frames": d.get("frames"), "seconds": d.get("seconds"), "load_s": sm.get("load_s"),
+                         "replay_wall_s": sm.get("replay_wall_s"), "env_steps_per_s": sm.get("env_steps_per_s"),
+                         "ms_per_tick": sm.get("ms_per_tick"), "gpu_mib_peak": sm.get("gpu_mib_peak"), "cpu_cores_busy": sm.get("cpu_cores_busy")})
+        frames = state["frames_done"] - frames0
+        util = peak["gpu_util"]
+        out = {"instance": INSTANCE, "gpu": GPUS[0]["name"], "driver": GPUS[0]["driver"], "procs": P, "units": len(recs),
+               "failed_units": P - len(recs), "wall_s": round(wall, 1), "frames": frames, "gpu_fps_incl_load": round(frames / wall, 2),
+               "proc_fps": [r["env_steps_per_s"] for r in recs],
+               "gpu_fps_steady": round(sum(r["env_steps_per_s"] or 0 for r in recs), 2),
+               "gpu_mem_peak_mb": peak["gpu_mem_mb"], "gpu_util_mean": round(sum(util) / len(util), 1) if util else None,
+               "Q": Q, "cpus_per_proc": len(SLOT_CPUS[0]), "mem_gb": round(MEM, 1), "records": recs, "time": time.time()}
+        put_json(f"sweep/{INSTANCE}_p{P}.json", out)
+        log(f"SWEEP P={P}: {len(recs)}/{P} units, {frames} frames in {wall:.0f}s = {out['gpu_fps_incl_load']} fps/GPU incl. load; "
+            f"steady {out['proc_fps']} -> {out['gpu_fps_steady']} fps/GPU; mem peak {peak['gpu_mem_mb']} MB")
+    state["phase"] = "done" if state["successes"] else "failed"
+    time.sleep(70)
+    return 0 if state["successes"] else 3
 
 
 if __name__ == "__main__":

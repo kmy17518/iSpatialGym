@@ -330,7 +330,7 @@ def launch(c, o, procs=None, prefer="", label="og-isgrend", full=None, run=None,
     if prefer:
         env["ISG_PREFER"] = prefer
     for k in ("ISG_PIN", "ISG_WARMUP_S", "ISG_GPU_ID_MODE", "ISG_NO_DESTROY", "ISG_WORKER", "ISG_DRIVER_MAX", "ISG_DIAG_ONLY",
-              "ISG_BOOT_TIMEOUT_S", "ISG_STAGGER_S"):
+              "ISG_BOOT_TIMEOUT_S", "ISG_STAGGER_S", "ISG_SWEEP"):
         if os.environ.get(k):
             env[k] = os.environ[k]
     login = f"-u {os.environ['GHCR_USERNAME']} -p {os.environ['GHCR_PULL_TOKEN']} ghcr.io"

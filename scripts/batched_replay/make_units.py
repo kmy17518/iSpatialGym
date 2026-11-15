@@ -186,6 +186,14 @@ def build(a):
         u["inputs_bytes"] = len(zst)
         u["n_files"] = len(files)
         del u["_rows"]
+    if a.demo_repeat > 1 or a.repeat > 1:
+        # throughput sweeps: identical workloads (each unit's demos played demo_repeat times, each unit copied repeat times)
+        rep_units = []
+        for u in units:
+            u = dict(u, demos=u["demos"] * a.demo_repeat, frames=u["frames"] * a.demo_repeat)
+            for k in range(a.repeat):
+                rep_units.append(dict(u, unit=f"{u['unit']}_r{k}"))
+        units = rep_units
     spec = {"run": a.run, "created": time.time(), "code": a.code, "seed": a.seed,
             "replay_flags": {"image_size": a.image_size, "settle_pad": a.settle_pad, "settle_pad_min": a.settle_pad_min},
             "units": units}
@@ -227,6 +235,8 @@ def main():
     p.add_argument("--settle-pad", type=float, default=0.2)
     p.add_argument("--settle-pad-min", type=int, default=50)
     p.add_argument("--upload", action="store_true")
+    p.add_argument("--repeat", type=int, default=1, help="sweep runs: copies of every unit")
+    p.add_argument("--demo-repeat", type=int, default=1, help="sweep runs: every unit plays its demos this many times")
     a = ap.parse_args()
     {"rows-eval1000": rows_eval1000, "build": build}[a.cmd](a)
 
