@@ -122,11 +122,12 @@ def s5(*args, check=True):
 
 
 def fetch_tar(url, dest):
-    """A .tar.zst (s3 url, or a key under the job root) unpacked at dest."""
+    """A .tar.zst or plain .tar (s3 url, or a key under the job root) unpacked at dest (the texture packs are plain tars)."""
     url = url if url.startswith("s3://") else f"{ROOT_URL}/{url}"
     Path(dest).mkdir(parents=True, exist_ok=True)
+    unpack = "zstd -d -q | tar -x --no-same-owner" if url.endswith(".zst") else "tar -x --no-same-owner"
     for attempt in range(4):
-        r = subprocess.run(f"{' '.join(S5)} cat '{url}' | zstd -d -q | tar -x --no-same-owner -C '{dest}'", shell=True, capture_output=True, text=True)
+        r = subprocess.run(f"{' '.join(S5)} cat '{url}' | {unpack} -C '{dest}'", shell=True, capture_output=True, text=True)
         if r.returncode == 0:
             return
         log(f"FETCH_RETRY {url}: {r.stderr[-200:]}")
