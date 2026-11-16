@@ -643,7 +643,14 @@ def run_unit(unit, gpu, slot, port, kk, cpus):
                                        total_s=2400 + 3.0 * unit["budget"], cpus=cpus, n_expected=len(insts))
         elapsed = time.time() - t0
         bad = [r for r in results if r.get("status") in (None, "error")]
-        if len(results) != len(insts) or bad:
+        # a retry (an earlier attempt anywhere already failed) that again ends short keeps what it finished
+        partial = 0 < len(results) < len(insts) and not bad and len(list_names(f"fail/{uid}/")) >= 1
+        if partial:
+            # the process ended before the last instances (full1 2026-11-16: a clean exit inside an episode, repeatable): keep the finished
+            # ones (a follow-up run covers the rest) instead of discarding them on every retry
+            log(f"PARTIAL {uid}: {len(results)}/{len(insts)} results (rc={rc} {reason}); recording them, the rest stay missing")
+            insts = insts[:len(results)]
+        elif len(results) != len(insts) or bad:
             raise RuntimeError(f"rc={rc} {len(results)}/{len(insts)} results, {len(bad)} errors {reason} "
                                f"{str((bad[0] if bad else {}).get('error'))[:300]}")
         rows = []
@@ -662,7 +669,9 @@ def run_unit(unit, gpu, slot, port, kk, cpus):
         put_json(f"done/{uid}.json", {"unit": uid, "ckpt": unit["ckpt"], "instance": INSTANCE, "tag": TAG,
                                       "gpu_name": GPUS[gpu]["name"], "driver": GPUS[gpu]["driver"], "slot": slot, "procs_per_gpu": PER_GPU,
                                       "servers_per_gpu": SERVERS_PER_GPU, "cpus": len(cpus), "seconds": elapsed, "warm": warm, "rc": rc,
-                                      "instances": rows, "time": time.time()})
+                                      "instances": rows, "partial": partial,
+                                      "missing_indices": [x["index"] for x in (unit.get("instances") or [])[len(rows):]] if partial else [],
+                                      "time": time.time()})
         n_ok = sum(bool(r["result"].get("success")) for r in rows)
         with lock:
             state["done"].append(uid)
