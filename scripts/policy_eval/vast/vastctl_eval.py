@@ -296,9 +296,9 @@ def cached_offers(max_eff, live_machines=None):
             continue
         cpu_g = float(o.get("cpu_cores_effective") or 0) / n
         ram_g = float(o.get("cpu_ram") or 0) / 1024 / n
-        p_est = int(min(4, float(o.get("gpu_ram") or 0) // 9000, cpu_g // 3, ram_g // 14))  # eval: >= 1 process + its server
+        p_est = int(min(4, float(o.get("gpu_ram") or 0) // 9000, cpu_g // 4, ram_g // 14))
         eff = float(o["dph_total"]) / n
-        if p_est < 1 or eff >= max_eff:
+        if p_est < 2 or cpu_g < 8 or eff >= max_eff:
             continue
         o = dict(o)
         o["_eff"], o["_disk"], o["_cpu_g"], o["_ram_g"], o["_procs"] = eff, disk_for(n, p_est), cpu_g, ram_g, p_est

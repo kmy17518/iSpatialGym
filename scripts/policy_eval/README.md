@@ -45,3 +45,29 @@ Task ids: the instance's `source.class_id` = the training set's `task_name` -> `
 - `bench_server.py`, `ws_overhead.py`: server throughput; websocket overhead.
 - `world_groups.py`: instances whose templates are compatible (run_isg's reuse rule) -> 100 worlds of 10 (one per class).
 - `make_eval_run.py`, `vast/{build_bundle.sh,boot.sh,eval_worker.py,vastctl_eval.py,watch_run.sh}`, `summarize.py`: the Vast fleet.
+
+## Speed (measured 2026-11-16)
+
+Per instance: Kit start ~45 s + world build (scene import 100-430 s) + episode. One world per instance would spend more time
+loading than evaluating; the 1000 instances need only **100 worlds** (each class's 10 instances: templates equal outside their task
+objects within 0.75 mm, same simulator records, same BDDL problem; `world_groups.py`), so units are chunks of a world group run with
+`run_isg --instance-list` (first instance builds the world, the others attach: 5-14 s instead of 100-430 s). Reused vs fresh worlds
+with GT actions (6 instances, 2 classes): same success, steps and evaluated step, final object poses within 10 um, errors within 2e-4;
+a reused start differs only in velocities (base <= 4e-3 m/s, joints <= 0.06 rad/s), positions within 1e-3.
+
+| setup (RTX 5090 unless noted) | steps/s per process | steps/s per GPU |
+|---|---|---|
+| pi goal, 1 process (28 CPUs) | 16.4 | 16.4 |
+| pi goal, 2 processes (9 CPUs each) | 14.8 | 29.7 |
+| ACT --temporal-agg, 3 processes, 1 server | 5.9 | 17.8 |
+| ACT --temporal-agg, 2 processes (RTX 4090) | 6.5 | 13.0 |
+| DP, 2 processes, 4 servers (RTX 3090) | ~5 | ~10 |
+
+- Websocket vs local policy: the websocket costs 1.45 ms per request (1.6 % of a pi request, ~0.1 ms per control step); a local policy
+  would load the model into every simulator process (pi: ~9 GB VRAM each; JAX 0.11 needs Python >= 3.12, the simulator env is 3.10).
+  One server per GPU shared by the GPU's processes.
+- Processes per GPU: VRAM-bound (a 224 px eval process ~8.5 GB, a pi server ~10 GB): 2 per 32 GB GPU with pi, 3 with ACT / DP; more
+  processes per GPU scale nearly linearly while CPUs last (~4+ per process).
+- ACT --temporal-agg queries every step (~10 ms solo; 43 ms with 3 clients on one server): give ACT one server per process.
+- DP: 100 DDPM steps per 8-step plan (~350 ms on a 4090), server-bound; several servers per GPU (4: 2.2x of one). Its sampling draws
+  fresh noise every denoising step, so a faster sampler would not be output-identical; not changed.
