@@ -7,6 +7,13 @@ source "$CODE/scripts/policy_eval/job_env.sh"
 trap 'kit_appdata_teardown' EXIT
 echo "=== $(date -u +%FT%TZ) $(hostname) $USER $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader | head -1) code=$CODE"
 mkdir -p "$OUT"
+if [ "${LIST_MODE:-0}" = 1 ]; then  # one process, one world: run_isg --instance-list
+  t0=$(date +%s.%N)
+  python -u -m ispatialgym.run_isg --instance-list "$LIST" --out "$OUT" $ARGS
+  echo "JOBLIST_DONE rc=$? wall_s=$(python3 -c "import time; print(round(time.time() - $t0, 1))") list=$LIST"
+  KIT_RC=0
+  exit 0
+fi
 while read -r tro; do
   [ -z "$tro" ] && continue
   t0=$(date +%s.%N)

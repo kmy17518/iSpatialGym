@@ -87,9 +87,13 @@ def main() -> int:
                 st[cam] = {"shape": list(got.shape), "mean_abs": float(np.abs(got.astype(np.int16) - ref.astype(np.int16)).mean()), "psnr": psnr(got, ref)}
             sref = item["observation.state"].numpy()
             sgot = dump["proprio"][k]
-            st["proprio_max_abs"] = {g: float(np.abs(sgot[i:j] - sref[i:j]).max()) for g, (i, j) in PROPRIO.items()}
-            st["train_state_max_abs"] = float(np.abs(train_state(sgot) - train_state(sref)).max())
-            st["train_state_absdiff"] = np.round(np.abs(train_state(sgot) - train_state(sref)), 5).tolist()
+            if sgot.shape != sref.shape:  # a run before the policy-mode 61-D proprio fix: images only
+                st["proprio_max_abs"], st["train_state_max_abs"], st["train_state_absdiff"] = {}, float("nan"), None
+                st["proprio_dims"] = [int(sgot.shape[0]), int(sref.shape[0])]
+            else:
+                st["proprio_max_abs"] = {g: float(np.abs(sgot[i:j] - sref[i:j]).max()) for g, (i, j) in PROPRIO.items()}
+                st["train_state_max_abs"] = float(np.abs(train_state(sgot) - train_state(sref)).max())
+                st["train_state_absdiff"] = np.round(np.abs(train_state(sgot) - train_state(sref)), 5).tolist()
             row["steps"][int(step)] = st
         # goal: the released PNG vs the episode's decoded last head frame
         goal_png = np.asarray(Image.open(os.path.join(a.instances, rec["files"]["goal_rgb"])).convert("RGB"))

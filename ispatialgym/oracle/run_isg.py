@@ -1431,7 +1431,7 @@ def policy_actions(policy, executor: Executor, obs0, info0, max_steps: int) -> I
 # ==========================================================================================
 
 
-INSTANCE_OPTIONS = ("task", "instance_indices", "instances_root", "instance", "queue", "claims", "done_file", "results", "deadline", "max_instances", "poll_s")
+INSTANCE_OPTIONS = ("task", "instance_indices", "instances_root", "instance", "queue", "claims", "done_file", "results", "deadline", "max_instances", "poll_s", "instance_list")
 
 
 def record_views(text: str) -> Tuple[str, ...]:
@@ -1482,6 +1482,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="--task: instance indices (a task's instances are its subtasks' instances in the dataset's order)")
     p.add_argument("--instances-root", default=None,
                    help="--task: dataset root (default $ISPATIALGYM_INSTANCES_PATH or $OMNIGIBSON_DATA_PATH/ispatialgym-eval-instances)")
+    p.add_argument("--instance-list", default=None, metavar="FILE", help="instead of --instance: a file of eval dataset instance files (one *-tro_state.json per line) run one after the other in one world (the first builds it, the others attach to it: run_queue's world reuse); every instance must share the first one's scene and BDDL problem, and its template must be compatible (scripts/policy_eval/world_groups.py groups them)")
     p.add_argument("--queue", default=None, metavar="INST_ROOT",
                    help="instead of --instance: replay every instance a sampler writes under INST_ROOT (sample_isg --out), one after "
                         "the other in this process's world (run_queue)")
@@ -1627,8 +1628,8 @@ def parse_args(argv=None, default_policy: bool = False):
     argv = list(sys.argv[1:] if argv is None else argv)
     config = p.parse_known_args(argv)[0].config
     args = p.parse_args((config_argv(config, p) if config else []) + argv)
-    if sum(x is not None for x in (args.instance, args.queue, args.task)) != 1:
-        p.error("exactly one of --instance, --queue and --task")
+    if sum(x is not None for x in (args.instance, args.queue, args.task, getattr(args, "instance_list", None))) != 1:
+        p.error("exactly one of --instance, --queue, --task and --instance-list")
     if args.mode == "policy" and not args.policy:
         p.error("--policy is required")
     if args.mode == "policy" and not isinstance(args.policy_kwargs, dict):
@@ -1718,11 +1719,41 @@ def _run_with_args(args, argv=None) -> int:
     if pool_enabled(args) and not args.queue:
         return run_pool(sys.modules[__name__], args)
     apply_driver_env(args)
+    if getattr(args, "instance_list", None):
+        return run_instance_list(args)
     if args.queue:
         return run_queue(args)
     if args.task:
         return run_task(args, argv)
     return run_instance(args, args.instance)[0]
+
+
+def run_instance_list(args) -> int:
+    """``--instance-list FILE`` (policy eval 2026-11-16): eval dataset instances one after the other in one world - the first builds it, each
+    next one attaches to it (:meth:`InstanceLoader.attach`, run_queue's world reuse: the previous episode's hinges / grasps / attachment
+    joints removed, the whole scene back to its state after the build, the planner map back to the template's, then the instance's own
+    restore). Every instance must name the first one's scene directory and BDDL problem (the caller groups instances whose templates are
+    compatible outside their task objects: scripts/policy_eval/world_groups.py). One ``RUN_ISG_RESULT`` line per instance; stops at the
+    first instance that errors (the world may be inconsistent), returning its exit code, else the largest exit code."""
+    with open(args.instance_list) as f:
+        tros = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+    first = resolve_instance(tros[0])
+    for tro in tros[1:]:
+        r = resolve_instance(tro)
+        if os.path.abspath(r[1]) != os.path.abspath(first[1]) or r[2].get("problem") != first[2].get("problem"):
+            raise SystemExit(f"--instance-list: {tro} has scene dir / problem {r[1]} / {r[2].get('problem')}, the world "
+                             f"{first[1]} / {first[2].get('problem')}")
+    shared: Dict[str, Any] = {}
+    worst = EXIT_SUCCESS
+    for k, tro in enumerate(tros):
+        t0 = time.time()
+        code, result = run_instance(args, tro, shared)
+        log.info("--instance-list %d/%d %s: rc %s in %.0fs (reused world: %s)", k + 1, len(tros), os.path.basename(tro), code,
+                 time.time() - t0, k > 0)
+        if code == EXIT_ERROR:
+            return code
+        worst = max(worst, code)
+    return worst
 
 
 def run_task(args, argv=None) -> int:

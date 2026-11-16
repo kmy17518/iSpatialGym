@@ -40,6 +40,7 @@ INSTANCE_OPTIONS = (
     "deadline",
     "max_instances",
     "poll_s",
+    "instance_list",
 )
 
 
@@ -74,6 +75,7 @@ def build_parser(default_policy: bool = True) -> argparse.ArgumentParser:
         default=None,
         help="--task: dataset root (default $ISPATIALGYM_INSTANCES_PATH or $OMNIGIBSON_DATA_PATH/ispatialgym-eval-instances)",
     )
+    p.add_argument("--instance-list", default=None, metavar="FILE", help="instead of --instance: a file of eval dataset instance files (one *-tro_state.json per line) run one after the other in one world (the first builds it, the others attach to it: run_queue's world reuse); every instance must share the first one's scene and BDDL problem, and its template must be compatible (scripts/policy_eval/world_groups.py groups them)")
     p.add_argument(
         "--queue",
         default=None,
@@ -183,8 +185,8 @@ def parse_args(argv: Optional[Sequence[str]] = None, default_policy: bool = True
     argv = list(sys.argv[1:] if argv is None else argv)
     config = p.parse_known_args(argv)[0].config
     args = p.parse_args((config_argv(config, p) if config else []) + argv)
-    if sum(x is not None for x in (args.instance, args.queue, args.task)) != 1:
-        p.error("exactly one of --instance, --queue and --task")
+    if sum(x is not None for x in (args.instance, args.queue, args.task, args.instance_list)) != 1:
+        p.error("exactly one of --instance, --queue, --task and --instance-list")
     if args.mode == "policy" and not args.policy:
         p.error("--policy is required")
     if args.mode == "policy" and not isinstance(args.policy_kwargs, dict):

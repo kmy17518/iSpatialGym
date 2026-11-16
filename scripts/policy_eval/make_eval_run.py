@@ -21,9 +21,9 @@ EV = Path(os.environ.get("EV", "/vision/u/minyeong/projects/isg_home/campaign_20
 DEFAULT_INSTANCES = "/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1/merged/v2/eval-layout/ispatialgym-eval-instances"
 #: the owner's eval settings (2026-11-16): settled evaluation, 45 settle steps, 224 px cameras; the step budget alone ends an episode
 DEFAULT_ARGS = "--image-size 224 --settle-eval on --settle-steps 45 --wallclock 1000000 --record video"
-POLICY_ENVS = {"pi": "bundle/policy/policy_env_pi.tar.zst", "act": "bundle/policy/policy_env_act.tar.zst", "dp": "bundle/policy/policy_env_dp.tar.zst"}
+POLICY_ENVS = {"pi": ["bundle/policy/policy_env_pi.tar.zst", "bundle/policy/openpi_data.tar.zst"], "act": "bundle/policy/policy_env_act.tar.zst", "dp": "bundle/policy/policy_env_dp.tar.zst"}
 _P = "/home/minyeongk/Desktop/projects/isg-train224-eval"
-POLICY_PATHS = {"pi": {"cwd": f"{_P}/openpi", "python": f"{_P}/openpi/.venv-jax/bin/python"},
+POLICY_PATHS = {"pi": {"cwd": f"{_P}/openpi", "python": f"{_P}/openpi/.venv-jax/bin/python", "openpi_data": f"{_P}/openpi_data"},
                 "act": {"cwd": f"{_P}/act", "python": f"{_P}/act/.venv/bin/python"},
                 "dp": {"cwd": f"{_P}/diffusion_policy", "python": f"{_P}/diffusion_policy/.venv/bin/python"}}
 
@@ -37,6 +37,9 @@ def main():
     ap.add_argument("--run-isg-args", default=DEFAULT_ARGS)
     ap.add_argument("--code", default="eval_9eec9441")
     ap.add_argument("--dataset", default="bundle/data/eval_v2.tar.zst")
+    ap.add_argument("--worlds", default=None, help="world groups (world_groups.py --json): a unit is a chunk of one group, run in one world "
+                    "(run_isg --instance-list); without it a unit is one instance (one world each)")
+    ap.add_argument("--chunk-steps", type=int, default=8000, help="--worlds: a unit's instances sum to at most this step budget")
     a = ap.parse_args()
     ckpts = json.load(open(a.ckpts))
     recs = [json.loads(l) for l in open(os.path.join(a.instances, "metadata/instances.jsonl")) if l.strip()]
@@ -55,16 +58,38 @@ def main():
         sel = [i for i, r in enumerate(recs) if r["task_family"] in fams]
     elif a.select.startswith("indices:"):
         sel = [int(x) for x in a.select.split(":", 1)[1].split(",")]
+    def budget_of(r):
+        return int(r.get("max_steps") or max(300, round(1.5 * int(r["length"]))))
+
+    def inst(i):
+        r = recs[i]
+        return {"index": i, "tro": r["files"]["tro_state"], "budget": budget_of(r), "task_family": r["task_family"], "subtask": r["subtask"],
+                "class_id": r["source"]["class_id"]}
+
+    groups = json.load(open(a.worlds)) if a.worlds else [[i] for i in range(len(recs))]
+    chosen = set(sel)
     units = []
     for tag, c in ckpts.items():
         fams = set(c.get("families") or [])
-        for i in sel:
-            r = recs[i]
-            if fams and r["task_family"] not in fams:
-                continue
-            budget = int(r.get("max_steps") or max(300, round(1.5 * int(r["length"]))))
-            units.append({"unit": f"{tag}__{i:04d}", "ckpt": tag, "index": i, "tro": r["files"]["tro_state"], "budget": budget, "frames": budget,
-                          "scene": r["scene"], "task_family": r["task_family"], "subtask": r["subtask"], "class_id": r["source"]["class_id"]})
+        for g in groups:
+            members = [i for i in g if i in chosen and (not fams or recs[i]["task_family"] in fams)]
+            # chunks of at most --chunk-steps (longest first, so each chunk's world build is amortised over as many steps as allowed)
+            chunks, cur, tot = [], [], 0
+            for i in sorted(members, key=lambda i: -budget_of(recs[i])):
+                if cur and tot + budget_of(recs[i]) > a.chunk_steps:
+                    chunks.append(cur)
+                    cur, tot = [], 0
+                cur.append(i)
+                tot += budget_of(recs[i])
+            if cur:
+                chunks.append(cur)
+            for ch in chunks:
+                ins = [inst(i) for i in sorted(ch)]
+                budget = sum(x["budget"] for x in ins)
+                units.append({"unit": f"{tag}__{ins[0]['index']:04d}" + (f"-{len(ins)}" if len(ins) > 1 else ""), "ckpt": tag, "index": ins[0]["index"],
+                              "instances": ins, "budget": budget, "frames": budget, "scene": recs[ins[0]["index"]]["scene"],
+                              "task_family": ins[0]["task_family"], "subtask": ins[0]["subtask"], "class_id": ins[0]["class_id"],
+                              "tro": ins[0]["tro"]})
     spec = {"run": a.run, "code": a.code, "dataset": a.dataset, "policy_envs": POLICY_ENVS, "policy_paths": POLICY_PATHS, "ckpts": ckpts,
             "run_isg_args": shlex.split(a.run_isg_args), "units": units}
     d = EV / "runs" / a.run
@@ -72,7 +97,8 @@ def main():
     json.dump(spec, open(d / "spec.json", "w"), indent=1)
     json.dump({"units": units}, open(d / "units.json", "w"))
     per = collections.Counter(u["ckpt"] for u in units)
-    print(f"{a.run}: {len(units)} units {dict(per)}, {sum(u['budget'] for u in units)} budget steps -> {d}/spec.json")
+    print(f"{a.run}: {len(units)} units {dict(per)}, {sum(len(u['instances']) for u in units)} instances, {sum(u['budget'] for u in units)} "
+          f"budget steps, largest unit {max(u['budget'] for u in units)} -> {d}/spec.json")
 
 
 if __name__ == "__main__":

@@ -361,7 +361,9 @@ def ensure_policy_env(kind):
     marker = WORK / f".policy_env_{kind}"
     if marker.exists():
         return
-    fetch_tar(SPEC["policy_envs"][kind], "/")
+    tars = SPEC["policy_envs"][kind]
+    for t in ([tars] if isinstance(tars, str) else tars):
+        fetch_tar(t, "/")
     marker.touch()
     log(f"policy env {kind} ready")
 
@@ -413,7 +415,7 @@ class Server:
         pe = SPEC["policy_paths"][c["kind"]]
         env = {k: v for k, v in os.environ.items() if k in ("PATH", "LANG", "LC_ALL", "HOME", "NVIDIA_VISIBLE_DEVICES", "NVIDIA_DRIVER_CAPABILITIES")}
         env.update({"CUDA_VISIBLE_DEVICES": str(self.gpu), "CUDA_DEVICE_ORDER": "PCI_BUS_ID", "HF_HUB_OFFLINE": "1", "PYTHONUNBUFFERED": "1",
-                    "XLA_PYTHON_CLIENT_PREALLOCATE": "false", "OPENPI_DATA_HOME": str(WORK / "openpi_data"), "TORCH_HOME": str(WORK / "torch_home"),
+                    "XLA_PYTHON_CLIENT_PREALLOCATE": "false", "OPENPI_DATA_HOME": pe.get("openpi_data", str(WORK / "openpi_data")), "TORCH_HOME": str(WORK / "torch_home"),
                     "OMP_NUM_THREADS": "2", "MKL_NUM_THREADS": "2"})
         if c["kind"] == "pi":
             cmd = [pe["python"], "scripts/b1k/serve_b1k.py", "--robot", "b1k/R1Pro", "--task", f"b1k/{c['task_alias']}", "--policy.config", "pi05_b1k",
@@ -513,16 +515,40 @@ def proc_env(snap, appdata, home, gpu, ncpu):
     return env
 
 
-def run_proc(cmd, env, cwd, logf, status, startup_s, stall_s, total_s, cpus=None):
+SIM_CLIENT_DEPS = ("msgpack==1.1.1", "websockets==16.0")
+deps_lock = threading.Lock()
+
+
+def ensure_sim_client_deps():
+    """The websocket client's packages (ispatialgym.eval.ws_policy: msgpack, websockets) in the simulator env, once per instance (the
+    isg-1020-b1k env predates the policy client)."""
+    with deps_lock:
+        marker = WORK / ".sim_client_deps"
+        if marker.exists():
+            return
+        py = f"{ENVP}/bin/python"
+        if subprocess.run([py, "-c", "import msgpack, websockets.sync.client"], capture_output=True).returncode != 0:
+            for attempt in range(3):
+                r = subprocess.run([py, "-m", "pip", "install", "--no-deps", "-q", *SIM_CLIENT_DEPS], capture_output=True, text=True)
+                if r.returncode == 0:
+                    break
+                log(f"pip retry: {r.stderr[-200:]}")
+                time.sleep(10)
+            subprocess.run([py, "-c", "import msgpack, websockets.sync.client"], check=True, capture_output=True)
+            log(f"sim client deps installed: {SIM_CLIENT_DEPS}")
+        marker.touch()
+
+
+def run_proc(cmd, env, cwd, logf, status, startup_s, stall_s, total_s, cpus=None, n_expected=1):
     """Run one run_isg process in its own session, pinned to ``cpus``; kill it on a start / log stall or timeout. Returns
-    (rc, the RUN_ISG_RESULT record or None, reason)."""
+    (rc, the RUN_ISG_RESULT records in order, reason)."""
     if PIN and cpus:
         cmd = ["taskset", "-c", ",".join(map(str, cpus))] + list(cmd)
     with open(logf, "ab") as fh:
         p = subprocess.Popen(cmd, env=env, cwd=cwd, stdout=fh, stderr=subprocess.STDOUT, start_new_session=True)
     status["pid"] = p.pid
     t0 = last_growth = time.time()
-    size, pending, result, result_at, started = 0, "", None, None, False
+    size, pending, results, result_at, started = 0, "", [], None, False
     reason = ""
     while True:
         rc = p.poll()
@@ -541,15 +567,17 @@ def run_proc(cmd, env, cwd, logf, status, startup_s, stall_s, total_s, cpus=None
             for line in lines:
                 if line.startswith("RUN_ISG_RESULT "):
                     try:
-                        result = json.loads(line[len("RUN_ISG_RESULT "):])
+                        results.append(json.loads(line[len("RUN_ISG_RESULT "):]))
                     except ValueError:
-                        result = {"status": "unparsable"}
-                    result_at = time.time()
+                        results.append({"status": "unparsable"})
+                    status["done_instances"] = len(results)
+                    if len(results) >= n_expected:
+                        result_at = time.time()
                 elif "Welcome to OmniGibson" in line:
                     started = True
                     status["phase"] = "load"
         if rc is not None:
-            return rc, result, reason
+            return rc, results, reason
         now = time.time()
         if result_at is not None and now - result_at > 180:
             reason = "exit hang after RUN_ISG_RESULT"
@@ -566,7 +594,7 @@ def run_proc(cmd, env, cwd, logf, status, startup_s, stall_s, total_s, cpus=None
             except ProcessLookupError:
                 pass
             p.wait()
-            return -9, result, reason
+            return -9, results, reason
         time.sleep(3)
 
 
@@ -595,42 +623,51 @@ def run_unit(unit, gpu, slot, port, kk, cpus):
         ensure_scene_textures(unit["scene"])
         warm = make_appdata(appdata)
         env = proc_env(snap, appdata, udir / "home", gpu, len(cpus))
-        tro = data / "ispatialgym-eval-instances" / unit["tro"]
+        insts = unit.get("instances") or [{"index": unit["index"], "tro": unit["tro"], "budget": unit["budget"]}]
+        (udir / "instances.txt").write_text("".join(f"{data / 'ispatialgym-eval-instances' / x['tro']}\n" for x in insts))
         out = udir / "out"
         if c["kind"] == "gt":
             policy, pk = "ispatialgym.eval.gt_policy:GTPolicy", dict(c.get("policy_kwargs") or {})
         else:
             policy, pk = "ispatialgym.eval.ws_run_policy:WSPolicy", {"url": f"ws://127.0.0.1:{port}", **(c.get("policy_kwargs") or {})}
-        cmd = [f"{ENVP}/bin/python", "-u", "-m", "ispatialgym.run_isg", "--instance", str(tro), "--out", str(out), "--mode", "policy",
+        cmd = [f"{ENVP}/bin/python", "-u", "-m", "ispatialgym.run_isg", "--instance-list", str(udir / "instances.txt"), "--out", str(out), "--mode", "policy",
                "--policy", policy, "--policy-kwargs", json.dumps(pk)] + list(SPEC.get("run_isg_args") or []) + list(c.get("run_isg_args") or [])
         logf = udir / "run.log"
         status["phase"] = "start"
         log(f"START {uid} slot={slot} gpu={gpu} port={port} budget={unit['budget']} warm={warm}")
-        rc, result, reason = run_proc(cmd, env, str(snap), logf, status, startup_s=1500, stall_s=1800,
-                                      total_s=2400 + 3.0 * unit["budget"], cpus=cpus)
+        rc, results, reason = run_proc(cmd, env, str(snap), logf, status, startup_s=1500, stall_s=1800,
+                                       total_s=2400 + 3.0 * unit["budget"], cpus=cpus, n_expected=len(insts))
         elapsed = time.time() - t0
-        runs = [d for d in out.iterdir() if d.is_dir()] if out.exists() else []
-        meta = json.loads((runs[0] / "meta.json").read_text()) if runs and (runs[0] / "meta.json").exists() else {}
-        status_ = (result or {}).get("status") or meta.get("status")
-        if result is None or status_ in (None, "error"):
-            raise RuntimeError(f"rc={rc} status={status_} {reason} {str((result or {}).get('error'))[:300]}")
+        bad = [r for r in results if r.get("status") in (None, "error")]
+        if len(results) != len(insts) or bad:
+            raise RuntimeError(f"rc={rc} {len(results)}/{len(insts)} results, {len(bad)} errors {reason} "
+                               f"{str((bad[0] if bad else {}).get('error'))[:300]}")
+        rows = []
+        for x, res in zip(insts, results):
+            d = Path(res.get("out") or "")
+            meta = json.loads((d / "meta.json").read_text()) if (d / "meta.json").exists() else {}
+            if os.path.abspath(meta.get("tro_path") or "") != os.path.abspath(str(data / "ispatialgym-eval-instances" / x["tro"])):
+                raise RuntimeError(f"result order: {meta.get('tro_path')} is not {x['tro']}")
+            rows.append({"index": x["index"], "result": res, "meta": meta_summary(meta), "reused_world": meta.get("reused_world")})
         status["phase"] = "upload"
-        shutil.copy2(logf, runs[0] / "run.log")
+        shutil.copy2(logf, out / "run.log")
         r = subprocess.run(f"tar -C {out} -cf - . | zstd -q -T2 -3 | {' '.join(S5)} pipe '{S3_URL}/out/{unit['ckpt']}/{uid}.tar.zst'",
                            shell=True, capture_output=True, text=True)
         if r.returncode:
             raise RuntimeError(f"upload failed: {r.stderr[-300:]}")
-        put_json(f"done/{uid}.json", {"unit": uid, "ckpt": unit["ckpt"], "index": unit["index"], "instance": INSTANCE, "tag": TAG,
+        put_json(f"done/{uid}.json", {"unit": uid, "ckpt": unit["ckpt"], "instance": INSTANCE, "tag": TAG,
                                       "gpu_name": GPUS[gpu]["name"], "driver": GPUS[gpu]["driver"], "slot": slot, "procs_per_gpu": PER_GPU,
                                       "servers_per_gpu": SERVERS_PER_GPU, "cpus": len(cpus), "seconds": elapsed, "warm": warm, "rc": rc,
-                                      "result": result, "meta": meta_summary(meta), "time": time.time()})
+                                      "instances": rows, "time": time.time()})
+        n_ok = sum(bool(r["result"].get("success")) for r in rows)
         with lock:
             state["done"].append(uid)
             state["successes"] += 1
-            state["episodes_ok"] += bool(result.get("success"))
+            state["episodes_ok"] += n_ok
             first = state["successes"] == 1
-        log(f"DONE {uid} success={result.get('success')} steps={result.get('n_steps')} in {elapsed:.0f}s "
-            f"(load {(meta.get('timings') or {}).get('load_s')}, episode {(meta.get('timings') or {}).get('episode_s')})")
+        loads = [round((r["meta"].get("timings") or {}).get("load_s") or 0) for r in rows]
+        eps = [round((r["meta"].get("timings") or {}).get("episode_s") or 0) for r in rows]
+        log(f"DONE {uid} {n_ok}/{len(rows)} success in {elapsed:.0f}s; load s {loads}; episode s {eps}")
         save_textures(appdata)
         if first:
             save_template(appdata, kk, "unit")
@@ -753,6 +790,7 @@ def main():
         log("no Kit template for this GPU + driver: processes start cold")
     ensure_snapshot(SPEC["code"])
     ensure_dataset()
+    ensure_sim_client_deps()
     port0 = 8100
     while not stop_claiming.is_set():
         tag = pick_ckpt()

@@ -64,21 +64,23 @@ def main():
     a = ap.parse_args()
     spec = json.load(open(os.path.join(a.run_dir, "spec.json")))
     done_dir = a.done or os.path.join(a.run_dir, "done")
-    done = {}
+    done = {}  # (ckpt, dataset index) -> {"result", "meta", worker fields}; a unit record holds one instance or a world chunk's list
     for p in glob.glob(os.path.join(done_dir, "*.json")):
         d = json.load(open(p))
-        done[d["unit"]] = d
+        for x in (d.get("instances") or [{"index": d.get("index"), "result": d.get("result"), "meta": d.get("meta")}]):
+            done[(d["ckpt"], int(x["index"]))] = {**{k: v for k, v in d.items() if k != "instances"}, **x}
     out_dir = a.out or a.run_dir
-    by_ckpt = collections.defaultdict(list)
+    by_ckpt = collections.defaultdict(list)  # ckpt -> its instances (a unit's instances, or the unit itself)
     for u in spec["units"]:
-        by_ckpt[u["ckpt"]].append(u)
+        for x in (u.get("instances") or [u]):
+            by_ckpt[u["ckpt"]].append({**x, "unit": f"{u['ckpt']}__{int(x['index']):04d}", "ckpt": u["ckpt"]})
     md = [f"# Policy eval {spec['run']}\n", f"run_isg args: `{' '.join(spec['run_isg_args'])}`\n"]
     all_rows = []
     for tag, units in by_ckpt.items():
         rows, missing = [], []
         for u in units:
-            if u["unit"] in done:
-                rows.append(instance_row(u, done[u["unit"]]))
+            if (tag, int(u["index"])) in done:
+                rows.append(instance_row(u, done[(tag, int(u["index"]))]))
             else:
                 missing.append(u["unit"])
         metrics = sorted({q for r in rows for q in r["qa"]})
