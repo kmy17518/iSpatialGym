@@ -70,7 +70,18 @@ class WSPolicy:
         alias = (rec.source or {}).get("class_id") if rec is not None else None
         if alias is None or alias not in self.tasks:
             raise RuntimeError(f"WSPolicy: no training task for instance {loader.tro_path} (class_id {alias!r})")
-        goal_path = self.goal or loader.goal_image_path
+        # run_isg --cross-goal: the instance's cross-episode goal image (eval dataset files.cross_episode_goal_rgb: another episode of its
+        # goal group) instead of its own; an instance without one (a singleton goal group) keeps its own
+        cross = bool(((meta or {}).get("config") or {}).get("cross_goal"))
+        cross_path = rec.path("cross_episode_goal_rgb") if rec.files.get("cross_episode_goal_rgb") else None
+        if self.goal:
+            goal_path, goal_kind = self.goal, "given"
+        elif cross and cross_path and os.path.exists(cross_path):
+            goal_path, goal_kind = cross_path, "cross_episode"
+        elif cross:
+            goal_path, goal_kind = loader.goal_image_path, "own (no cross-episode goal)"
+        else:
+            goal_path, goal_kind = loader.goal_image_path, "own"
         goal = load_rgb(goal_path)
         t0 = time.time()
         self.client = _Client(self.url, slots=[0], task_ids={0: self.tasks[alias]}, goals={0: {"zed_link": goal}}, protocol=self.protocol,
@@ -82,7 +93,9 @@ class WSPolicy:
         self.meta = meta
         if meta is not None:
             meta["policy_client"] = {"url": self.url, "alias": alias, "task_id": self.tasks[alias], "send_task_name": self.send_task_name,
-                                     "goal_path": goal_path, "goal_shape": list(goal.shape), "goal_sha256": self.client.goal_sha256.get(0),
+                                     "goal_path": goal_path, "goal_kind": goal_kind,
+                                     "cross_episode_goal": (rec.extra or {}).get("cross_episode_goal", {}).get("difficulty") if goal_kind == "cross_episode" else None,
+                                     "goal_shape": list(goal.shape), "goal_sha256": self.client.goal_sha256.get(0),
                                      "server_metadata": {k: v for k, v in (server or {}).items() if isinstance(v, (str, int, float, bool, list, type(None)))},
                                      "connect_s": round(self.t_connect, 3)}
 

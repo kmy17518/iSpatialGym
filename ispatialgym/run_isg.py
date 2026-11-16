@@ -104,6 +104,7 @@ def build_parser(default_policy: bool = True) -> argparse.ArgumentParser:
     )
     p.add_argument("--video-size", type=int, default=None, help="scale every video to this width (aspect kept)")
     p.add_argument("--goal-image", action="store_true", help="capture the goal image after the settled check and write goal_observation into the TRO")
+    p.add_argument("--cross-goal", action="store_true", help="policy mode, eval dataset: condition the policy on the instance's cross-episode goal image (files.cross_episode_goal_rgb: the goal image of another episode of its goal group) instead of its own goal image; an instance without one (singleton goal group) keeps its own, recorded in meta.policy_client.goal_kind")
     p.add_argument("--no-goal-override", action="store_true", help="do not write the settled values back into the TRO goal poses")
     p.add_argument("--qa", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--carry-leg", default="straight", choices=["straight", "trajopt"])

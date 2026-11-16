@@ -303,7 +303,7 @@ def loaded_scene_path(template_dir: str, tmeta: Optional[dict] = None) -> str:
 
 
 def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str, activity: str, did: int, robot_name: str, image_size: int, proprio: bool = True,
-                     behavior_output: bool = False, scene_crop: Optional[Dict[str, Any]] = None) -> dict:
+                     behavior_output: bool = False, scene_crop: Optional[Dict[str, Any]] = None, behavior_proprio: bool = False) -> dict:
     """Evaluator configuration (mirrors ``validate_instances.py``) with the robot spawned at the TRO base pose so the
     holonomic base's virtual joints stay near zero. ``behavior_output``: the robot carries BEHAVIOR replay_obs.py's sensors,
     modalities and proprioception (``behavior_lerobot.robot_overrides``) instead of the evaluation camera profile.
@@ -329,6 +329,13 @@ def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str,
     else:
         sensors = {"obs_modalities": ["rgb", "proprio"] if proprio else ["rgb"],
                    "sensor_config": {"VisionSensor": {"sensor_kwargs": {"image_height": image_size, "image_width": image_size}}}, **M.camera_overrides()}
+        if behavior_proprio:
+            # policy eval 2026-11-16 (run_isg --mode policy): the proprioception the training data holds and the policy servers read -
+            # BEHAVIOR's 61-D layout (PROPRIOCEPTION_INDICES["R1Pro"], the batched replay's robot_overrides) instead of the robot's
+            # default 48-D one; an observation-only change (no physics, controller or camera setting differs)
+            from ispatialgym.oracle.behavior_lerobot import ROBOT_PROPRIO_KEYS
+
+            sensors["proprio_obs"] = list(ROBOT_PROPRIO_KEYS)
     return {
         "env": {"action_frequency": 30, "physics_frequency": 120},
         "scene": {
@@ -520,7 +527,8 @@ class InstanceLoader:
                 with gm.unlocked():
                     setattr(gm, name, value)
         self.cfg = build_env_config(self.template_dir, self.tmeta, self.tro, self.tro_path, self.activity, self.did, self.robot_name, self.image_size,
-                                    behavior_output=getattr(self, "behavior_output", False), scene_crop=self.scene_crop)
+                                    behavior_output=getattr(self, "behavior_output", False), scene_crop=self.scene_crop,
+                                    behavior_proprio=getattr(self, "behavior_proprio", False))
         if self.pool_world is not None:
             self.cfg = self.pool_world.configuration(self.cfg)
         if self.scene_crop:
@@ -1510,6 +1518,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "JoyLo replay video: left wrist | head | right wrist in 480 px tiles over the external camera, 1440 x 1440)")
     p.add_argument("--video-size", type=int, default=None, help="scale every video to this width (aspect kept)")
     p.add_argument("--goal-image", action="store_true", help="capture the goal image after the settled check (>= 3 renders) and write goal_observation into the TRO")
+    p.add_argument("--cross-goal", action="store_true", help="policy mode, eval dataset: condition the policy on the instance's cross-episode goal image (files.cross_episode_goal_rgb: the goal image of another episode of its goal group) instead of its own goal image; an instance without one (singleton goal group) keeps its own, recorded in meta.policy_client.goal_kind")
     p.add_argument("--no-goal-override", action="store_true", help="do not write the settled values back into the TRO goal poses")
     p.add_argument("--qa", action=argparse.BooleanOptionalAction, default=True,
                    help="the QA metrics of BEHAVIOR's demo QA plus the demo gates (ispatialgym.oracle.qa.QA_METRICS), logged in meta.qa "
@@ -1783,6 +1792,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None, *,
                                 restoration_policy=restoration_policy, pool_consumers=pool_consumers, pool_world=pool_world)
         loader.external_camera = bool({"external", "tiled"} & set(args.record_view))
         loader.behavior_output = bool(args.behavior_shard)
+        loader.behavior_proprio = args.mode == "policy"  # policy eval: the training data's 61-D proprioception
         loader.physics_overrides = SA.rigid_overrides(args)
         # run_isg_vec's physics (oracle.sleep_assist; ISG_VEC_LEAN_STEP): what this run used, for the demo's provenance
         assist = {"config": os.environ.get("ISG_SLEEP_ASSIST"), "mode": SA.sleep_assist_mode(), "max_mass_kg": SA.sleep_assist_max_mass(),
@@ -2053,7 +2063,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None, *,
             loader.pool_consumers.prepare_recording(build_env_config(
                 loader.template_dir, loader.tmeta, loader.tro, loader.tro_path,
                 loader.activity, loader.did, loader.robot_name, loader.image_size,
-                behavior_output=loader.behavior_output, scene_crop=loader.scene_crop))
+                behavior_output=loader.behavior_output, scene_crop=loader.scene_crop, behavior_proprio=loader.behavior_proprio))
         if loader.scene_crop and hasattr(recorder, "scene_crop"):
             # 2026-11-01 train-fast (PARTIAL_SCENE): the hdf5 says its recorded scene file is the cropped world and where the full one is
             recorder.scene_crop = dict(loader.scene_crop)
