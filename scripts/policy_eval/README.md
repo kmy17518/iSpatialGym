@@ -91,3 +91,13 @@ env -i HOME=$HOME PATH=/usr/bin:/bin bash -c 'source tool/creds.sh; bash code/ev
 
 Bundle changes (code / worker / dataset / policy envs): `vast/build_bundle.sh <code dir> [boot code data worker policy]`.
 Cluster (one GPU, one world): `job_policy.sh` (server + `run_isg --instance-list`), `job_list.sh` (GT / any policy, `LIST_MODE=1`).
+
+## Full run `full1` (2026-11-16, Vast, $EV/runs/full1/summary.md)
+
+Six checkpoints at once: pi goal 15k, pi shuffle 10k (`--cross-goal`), ACT 130k, DP 80k (1000 instances each), pi goal-iors 15k and
+pi text-iors 15k (the 350 iors instances): 4700 episodes, 742 world-chunk units (<= 13000 budget steps), fleet loop at up to 250 GPUs
+(~90 hosts, mostly RTX 3090 / 4090, >= 8 CPUs per GPU). Boot (bundle + policy env + checkpoint) took ~25 min; 739/742 units done at
+2 h 45 min; spend ~$200. Cost per 1000 instances on that fleet: 35-40 GPU-h (pi goal 34.8, ACT 35.9, DP 40.2): one checkpoint in 1.5 h
+needs ~35 such GPUs (or ~20 RTX 5090s at 2 processes each); world loading is 11-17 % of process time.
+Lessons: give ACT / DP smaller chunks (~6000 steps; they run 4-5 steps/s, a 13000-step chunk is ~1 h) and pi larger ones; a few slow
+hosts (RTX 6000 Ada with DP: 2 steps/s) and retried units set the tail; keep the fleet warm across checkpoints (boot is per host).
