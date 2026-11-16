@@ -91,8 +91,8 @@ python scripts/llm_harness/run_eval.py --policy ispatialgym.eval.gt_policy:GTPol
 Each instance starts its own simulator: expect ~1 min of Isaac Sim start-up (much longer the very first time: shader cache),
 1-7 min to build the scene, then the episode. Logs: `results/0_setup_check/gt/_logs/<instance id>.log`.
 `reference_gt_100.csv` lists what the demo replay scored per instance on our machines (TITAN RTX / L40S cluster GPUs): every
-instance replayed so far succeeds under all four verdicts (`status` = `pending` marks the few still running when this was
-pushed). If yours do not, the install differs from ours (check the Behavior-1K branch and the dataset revision).
+one of the 100 succeeds under all four verdicts. If yours do not, the install differs from ours (check the Behavior-1K branch
+and the dataset revision).
 
 Then try the example adapter (it holds still, so it fails every task, but it exercises the whole harness path, including
 the text and cross-episode conditions):

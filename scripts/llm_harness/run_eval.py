@@ -78,7 +78,10 @@ def record_request(out_root, a, tag, run_rec):
 
     cj = out_root / "ckpt.json"
     with open(out_root / ".ckpt.json.lock", "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        except OSError:  # a file system without locks (some NFS mounts): the atomic replace below still keeps the file whole
+            pass
         try:
             info = json.load(open(cj)) if cj.exists() else None
         except ValueError:
