@@ -211,6 +211,9 @@ def resolve_instance(path: str) -> Tuple[str, str, dict, str, int]:
         with open(dataset["template_meta"]) as f:
             meta = from_legacy_keys(json.load(f))
         meta["_paths"] = {"scene_file": dataset["template"], "activity_definitions_root": dataset["activity_definitions"], "dataset_root": dataset["root"]}
+        # an eval dataset instance is lit as its goal image and training-format renders were: the stock lights (the batched replay ignored
+        # collection lighting draws; the dataset's eval_lighting "stock"); ISPATIALGYM_EVAL_IGNORE_COLLECTION_LIGHTING=0 restores them
+        os.environ.setdefault("ISPATIALGYM_EVAL_IGNORE_COLLECTION_LIGHTING", "1")
         activity, did = meta["problem"].rsplit("-", 1)
         return iid, os.path.dirname(dataset["template"]), meta, activity, int(did)
     template_dir = os.path.dirname(os.path.dirname(path))

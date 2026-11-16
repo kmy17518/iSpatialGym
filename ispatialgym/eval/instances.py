@@ -279,7 +279,11 @@ def template_files(tro_path: str) -> Optional[Dict[str, str]]:
         template, meta = f"{prefix}_0_0_template.json", f"{prefix}_0_0_template-meta.json"
     if not os.path.exists(meta):
         return None
-    return {"template": template, "template_meta": meta, "activity_definitions": instance_bddl_root(tro_path), "root": root}
+    # the dataset's own copy of the instance's BDDL problem (re-export 2026-11-16: files.bddl_root), else the overlay / release tree
+    bddl = rec.path("bddl_root") if rec is not None and rec.files.get("bddl_root") else None
+    if bddl is None or not os.path.isdir(bddl):
+        bddl = instance_bddl_root(tro_path)
+    return {"template": template, "template_meta": meta, "activity_definitions": bddl, "root": root}
 
 
 #: policy eval 2026-11-15: per-instance BDDL roots (<root>/<instance id>/<activity>/problem<id>.bddl, the exact problem each instance was

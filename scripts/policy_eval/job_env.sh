@@ -23,5 +23,7 @@ export ISPATIALGYM_INSTANCES_PATH=${ISPATIALGYM_INSTANCES_PATH:-$ISGEV_CAMP/trai
 for _p in "$ISPATIALGYM_EVAL_BDDL_OVERLAY/overlay.json" "$ISPATIALGYM_INSTANCES_PATH/metadata/instances.jsonl"; do
   [ -f "$_p" ] || { echo "JOB_ENV_MISSING $_p"; exit 5; }
 done
+# ISGEV_DEFAULTS_ONLY=1: no overlay / lighting switch - the dataset (files.bddl_root, eval_lighting) and the evaluator's defaults alone
+if [ "${ISGEV_DEFAULTS_ONLY:-0}" = 1 ]; then unset ISPATIALGYM_EVAL_BDDL_OVERLAY ISPATIALGYM_EVAL_IGNORE_COLLECTION_LIGHTING; fi
 echo "JOB_ENV overlay=$ISPATIALGYM_EVAL_BDDL_OVERLAY instances=$ISPATIALGYM_INSTANCES_PATH"
 KIT_RC=1
