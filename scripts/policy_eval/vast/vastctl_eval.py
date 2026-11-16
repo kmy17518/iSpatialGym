@@ -752,7 +752,7 @@ def main():
                 print(f"launch {e}")
             except Exception as e:  # noqa: BLE001
                 ledger("tried", offer=oid, machine_id=offers[oid].get("machine_id"), error=(vast_error(e) or str(e))[:120])
-                print(f"launch {oid} failed: {(vast_error(e) or str(e))[:200]}")
+                print(f"launch {oid} failed: {(vast_error(e) or str(e))[:200]} {(getattr(getattr(e, 'response', None), 'text', '') or '')[:400]}")
     elif a.cmd == "status":
         status(c, s3)
     elif a.cmd == "reap":
