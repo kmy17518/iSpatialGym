@@ -139,6 +139,15 @@ def main():
         for fam, g in list(levels["task_family"].items()) + [("**total**", total)]:
             md.append(f"| {fam} | {g['n']} | {100 * g['success_rate']:.1f}% | "
                       + " | ".join(f"{g['qa'][q]['mean_steps']:.1f} / {g['qa'][q]['mean_runs']:.2f} / {100 * g['qa'][q]['triggered_rate']:.0f}%" for q in metrics) + " |")
+        kinds = collections.Counter((r["goal_kind"], r["cross_episode_goal"]) for r in rows)
+        if any(k[0] and k[0] != "own" for k in kinds):  # run_isg --cross-goal: success per goal kind / difficulty
+            md.append("\n| goal image | n | success |\n|---|---|---|")
+            for (kind, diff), n in sorted(kinds.items(), key=lambda kv: str(kv[0])):
+                g = [r for r in rows if (r["goal_kind"], r["cross_episode_goal"]) == (kind, diff)]
+                md.append(f"| {kind}{' / ' + diff if diff else ''} | {n} | {100 * sum(r['success'] for r in g) / n:.1f}% |")
+            summ["by_goal_kind"] = {f"{k}/{d}": {"n": n, "success": sum(r["success"] for r in rows if (r["goal_kind"], r["cross_episode_goal"]) == (k, d))}
+                                    for (k, d), n in kinds.items()}
+            json.dump(summ, open(os.path.join(out_dir, f"summary_{tag}.json"), "w"), indent=1)
         md.append("")
     open(os.path.join(out_dir, "summary.md"), "w").write("\n".join(md) + "\n")
     if all_rows:
