@@ -29,6 +29,13 @@ from ispatialgym.eval.ws_policy import BatchedWSPolicy, load_rgb
 
 class _Client(BatchedWSPolicy):
     task_names: Optional[Dict[int, str]] = None
+    send_goal: bool = True
+
+    def _build_goal_msg(self) -> None:
+        if self.send_goal:
+            return super()._build_goal_msg()
+        # text-only checkpoints: no goal image on the wire (their server reads only the goal views it trained with: none)
+        self._goal_msg, self.goal_views = {}, []
 
     def _message(self, obs_by_slot):
         msg = super()._message(obs_by_slot)
@@ -49,13 +56,14 @@ def _tasks(path: str) -> Dict[str, int]:
 
 class WSPolicy:
     def __init__(self, url: str = "ws://127.0.0.1:8000", tasks: Optional[str] = None, protocol: str = "auto",
-                 action_chunk: Optional[int] = None, send_task_name: bool = False, goal: Optional[str] = None,
+                 action_chunk: Optional[int] = None, send_task_name: bool = False, goal: Optional[str] = None, send_goal: bool = True,
                  timeout: float = 300.0, open_timeout: float = 600.0):
         self.url = os.environ.get("ISG_POLICY_URL", url)
         self.tasks = _tasks(tasks or os.environ["ISG_TRAIN_TASKS"])
         self.protocol = protocol
         self.action_chunk = action_chunk
         self.send_task_name = bool(send_task_name)
+        self.send_goal = bool(send_goal)
         self.goal = goal
         self.timeout = float(timeout)
         self.open_timeout = float(open_timeout)
@@ -88,6 +96,9 @@ class WSPolicy:
                               action_chunk=self.action_chunk, timeout=self.timeout, open_timeout=self.open_timeout, client_image_size=None)
         if self.send_task_name:
             self.client.task_names = {0: alias}
+        self.client.send_goal = self.send_goal
+        if not self.send_goal:
+            goal_kind = "none (send_goal false)"
         server = self.client.connect()
         self.t_connect = time.time() - t0
         self.meta = meta
