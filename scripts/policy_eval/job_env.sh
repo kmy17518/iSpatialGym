@@ -19,11 +19,12 @@ unset ISPATIALGYM_HEAD_CAMERA_ONLY ISPATIALGYM_PHYSICS_ONLY
 export ISPATIALGYM_EVAL_IGNORE_COLLECTION_LIGHTING=${ISPATIALGYM_EVAL_IGNORE_COLLECTION_LIGHTING:-1}
 # each instance's exact collection-time BDDL problem (scripts/policy_eval/build_bddl_overlay.py; the v2 export's ids are the templates' own)
 export ISPATIALGYM_EVAL_BDDL_OVERLAY=${ISPATIALGYM_EVAL_BDDL_OVERLAY:-$ISGEV_REC/inputs/bddl_overlay_v2}
-export ISPATIALGYM_INSTANCES_PATH=${ISPATIALGYM_INSTANCES_PATH:-$ISGEV_CAMP/training_generation/batched_replay_r1/merged/v2/eval-layout/ispatialgym-eval-instances}
+# the 2026-11-16 re-export (= kmy17518/isg-standard-eval-224-instances-v2 after that upload): BDDLs inside, no collection crop
+export ISPATIALGYM_INSTANCES_PATH=${ISPATIALGYM_INSTANCES_PATH:-$ISGEV_REC/dataset/eval-layout-v2r/ispatialgym-eval-instances}
 for _p in "$ISPATIALGYM_EVAL_BDDL_OVERLAY/overlay.json" "$ISPATIALGYM_INSTANCES_PATH/metadata/instances.jsonl"; do
   [ -f "$_p" ] || { echo "JOB_ENV_MISSING $_p"; exit 5; }
 done
 # ISGEV_DEFAULTS_ONLY=1: no overlay / lighting switch - the dataset (files.bddl_root, eval_lighting) and the evaluator's defaults alone
 if [ "${ISGEV_DEFAULTS_ONLY:-0}" = 1 ]; then unset ISPATIALGYM_EVAL_BDDL_OVERLAY ISPATIALGYM_EVAL_IGNORE_COLLECTION_LIGHTING; fi
-echo "JOB_ENV overlay=$ISPATIALGYM_EVAL_BDDL_OVERLAY instances=$ISPATIALGYM_INSTANCES_PATH"
+echo "JOB_ENV overlay=${ISPATIALGYM_EVAL_BDDL_OVERLAY:-none} lighting=${ISPATIALGYM_EVAL_IGNORE_COLLECTION_LIGHTING:-default} instances=$ISPATIALGYM_INSTANCES_PATH"
 KIT_RC=1

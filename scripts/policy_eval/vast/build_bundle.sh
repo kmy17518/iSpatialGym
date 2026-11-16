@@ -20,7 +20,8 @@ for w in $WHAT; do case $w in
       | $S5 pipe "$JOB_S3/bundle/code/$NAME.tar.zst" >/dev/null; echo "code $NAME uploaded" ;;
   data)  # /work/evaldata: the eval instances + demos, the per-instance BDDL overlay, the training task list (alias -> task_index)
     cp $M/train-lerobot/meta/tasks.jsonl $STAGE/train_tasks.jsonl
-    tar -h -cf - -C $M/eval-layout ispatialgym-eval-instances ispatialgym-eval-demos -C $EV/inputs --transform 's|^bddl_overlay_v2|bddl_overlay|' \
+    # the dataset: the 2026-11-16 re-export (BDDLs inside, files.bddl_root) unless EVAL_LAYOUT names another; the overlay stays for older layouts
+    tar -h -cf - -C ${EVAL_LAYOUT:-$EV/dataset/eval-layout-v2r} ispatialgym-eval-instances ispatialgym-eval-demos -C $EV/inputs --transform 's|^bddl_overlay_v2|bddl_overlay|' \
         bddl_overlay_v2 -C $STAGE train_tasks.jsonl | zstd -q -T8 -6 | $S5 pipe "$JOB_S3/bundle/data/eval_v2.tar.zst" >/dev/null
     echo "data uploaded" ;;
   worker)
