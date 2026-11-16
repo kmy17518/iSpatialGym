@@ -182,6 +182,8 @@ class InstanceRecord:
     extra: Dict[str, Any] = field(default_factory=dict)
     root: str = ""
     episode: Dict[str, Any] = field(default_factory=dict)
+    #: the line's 0-based position in ``instances.jsonl`` (the dataset index of the instance)
+    position: Optional[int] = None
 
     def path(self, kind: str) -> str:
         return os.path.join(self.root, self.files[kind])
@@ -225,7 +227,7 @@ def load_index(root: Optional[str] = None) -> List[InstanceRecord]:
             if line.strip():
                 d = json.loads(line)
                 recs.append(InstanceRecord(**{k: d[k] for k in known if k in d}, extra={k: v for k, v in d.items() if k not in known}, root=root,
-                                           episode=episodes.get((d["subtask"], int(d["instance"])), {})))
+                                           episode=episodes.get((d["subtask"], int(d["instance"])), {}), position=len(recs)))
     return recs
 
 

@@ -3,7 +3,10 @@
 and ``units.json`` (vastctl_eval.py's progress: ``frames`` = the unit's step budget).
 
     make_eval_run.py --run <name> --ckpts ckpts.json [--instances <eval-instances root>] [--select all | n_per_class:K | family:F,...]
-                     [--run-isg-args "..."] [--code eval_<sha>]
+                     [--run-isg-args "..."] [--code eval_<sha>] [--results-dir <dir>]
+
+``--results-dir``: where ``vast/collect.sh`` gathers the run's results (default ``$EV/runs/<run>/results``): ``<dir>/<ckpt>/<instance id>/``
+holds every artifact of the instance's episode; ``summarize.py <dir>`` reports total / family / task class / task metrics.
 
 ``ckpts.json``: ``{tag: {"kind": "pi" | "act" | "dp" | "gt", "repo": "kmy17518/<run>", "step": N, "task_alias": <any training alias:
 pi's --task>, "server_args": [...], "servers_per_gpu": n, "procs_per_gpu": n, "policy_kwargs": {...}, "run_isg_args": [...],
@@ -18,8 +21,10 @@ import shlex
 from pathlib import Path
 
 EV = Path(os.environ.get("EV", "/vision/u/minyeong/projects/isg_home/campaign_20261110/eval_policy_r1"))
-DEFAULT_INSTANCES = "/vision/u/minyeong/projects/isg_home/campaign_20261110/training_generation/batched_replay_r1/merged/v2/eval-layout/ispatialgym-eval-instances"
-#: the owner's eval settings (2026-11-16): settled evaluation, 45 settle steps, 224 px cameras; the step budget alone ends an episode
+#: the 2026-11-16 re-export (= kmy17518/isg-standard-eval-224-instances-v2 revision cf94275c; same index order as the first export)
+DEFAULT_INSTANCES = str(EV / "dataset/eval-layout-v2r/ispatialgym-eval-instances")
+#: the owner's eval settings (2026-11-16): settled evaluation, 45 settle steps, 224 px cameras; the step budget alone ends an episode.
+#: No videos by default (owner 2026-11-16); add e.g. --record-view head to a run's --run-isg-args for <instance id>/head_rgb.mp4.
 DEFAULT_ARGS = "--image-size 224 --settle-eval on --settle-steps 45 --wallclock 1000000 --record video"
 POLICY_ENVS = {"pi": ["bundle/policy/policy_env_pi.tar.zst", "bundle/policy/openpi_data.tar.zst"], "act": "bundle/policy/policy_env_act.tar.zst", "dp": "bundle/policy/policy_env_dp.tar.zst"}
 _P = "/home/minyeongk/Desktop/projects/isg-train224-eval"
@@ -40,6 +45,7 @@ def main():
     ap.add_argument("--worlds", default=None, help="world groups (world_groups.py --json): a unit is a chunk of one group, run in one world "
                     "(run_isg --instance-list); without it a unit is one instance (one world each)")
     ap.add_argument("--chunk-steps", type=int, default=8000, help="--worlds: a unit's instances sum to at most this step budget")
+    ap.add_argument("--results-dir", default=None, help="where collect.sh gathers the results (default $EV/runs/<run>/results)")
     a = ap.parse_args()
     ckpts = json.load(open(a.ckpts))
     recs = [json.loads(l) for l in open(os.path.join(a.instances, "metadata/instances.jsonl")) if l.strip()]
@@ -93,6 +99,7 @@ def main():
     spec = {"run": a.run, "code": a.code, "dataset": a.dataset, "policy_envs": POLICY_ENVS, "policy_paths": POLICY_PATHS, "ckpts": ckpts,
             "run_isg_args": shlex.split(a.run_isg_args), "units": units}
     d = EV / "runs" / a.run
+    spec["results_dir"] = os.path.abspath(a.results_dir) if a.results_dir else str(d / "results")
     d.mkdir(parents=True, exist_ok=True)
     json.dump(spec, open(d / "spec.json", "w"), indent=1)
     json.dump({"units": units}, open(d / "units.json", "w"))

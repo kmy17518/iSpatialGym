@@ -1867,6 +1867,10 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None, *,
         meta.update(names)
         # an eval dataset instance's demo: the default --replay, and its length the step budget
         dataset_rec = _dataset_record(loader) if loader.tmeta.get("_paths") else None
+        if dataset_rec is not None:  # the instance's identity in the eval dataset (scripts/policy_eval/summarize.py groups a results dir by it)
+            meta["eval_instance"] = {"index": dataset_rec.position, "instance_id": dataset_rec.instance_id,
+                                     "class_id": (dataset_rec.source or {}).get("class_id"), "task_family": dataset_rec.task_family,
+                                     "task": dataset_rec.task, "subtask": dataset_rec.subtask, "dataset_root": dataset_rec.root}
         replay, replay_n = None, None
         if args.mode == "replay":
             replay = args.replay or (dataset_rec.demo_path() if dataset_rec else None)
@@ -2310,9 +2314,19 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None, *,
 
                     record_execution_failure(tro_arg, out_dir, result)
                 dump_json(os.path.join(out_dir, "meta.json"), meta)
+                # policy mode: the goal image the policy was conditioned on, next to init_rgb / final_rgb
+                goal_path = (meta.get("policy_client") or {}).get("goal_path")
+                if goal_path and os.path.isfile(goal_path):
+                    import shutil
+
+                    shutil.copyfile(goal_path, os.path.join(out_dir, "goal_rgb.png"))
             except Exception as e:  # noqa: BLE001
                 traceback.print_exc()
                 result["meta_error"] = repr(e)
+            try:
+                dump_json(os.path.join(out_dir, "result.json"), result)  # the RUN_ISG_RESULT record
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
         _result_line(result)
 
 

@@ -84,15 +84,35 @@ python3 code/eval_<sha>/scripts/policy_eval/make_eval_run.py --run <run> --ckpts
 env -i HOME=$HOME PATH=/usr/bin:/bin bash -c 'source tool/creds.sh; $S5 cp runs/<run>/spec.json $JOB_S3/runs/<run>/spec.json'
 # 2. fleet: keeps N GPUs working while units are open (og-isgeval- labels, own ledger; driver >= 580 for pi; >= 8 CPUs / GPU)
 bash code/eval_<sha>/scripts/policy_eval/vast/start_loop.sh <run> 150 1.0     # stop: kill $(cat logs/loop_<run>.pid)
-# 3. results (any time): per instance / class / task / family / total + QA violations
-env -i HOME=$HOME PATH=/usr/bin:/bin bash -c 'source tool/creds.sh; bash code/eval_<sha>/scripts/policy_eval/vast/collect.sh <run>'
-#    -> runs/<run>/summary.md, summary_<ckpt>.json, instances.csv
+# 3. results (any time, idempotent): gathered into the results dir (make_eval_run.py --results-dir, default runs/<run>/results)
+env -i HOME=$HOME PATH=/usr/bin:/bin bash -c 'source tool/creds.sh; bash code/eval_<sha>/scripts/policy_eval/vast/collect.sh <run> [--dest <dir>]'
 ```
 
 Bundle changes (code / worker / dataset / policy envs): `vast/build_bundle.sh <code dir> [boot code data worker policy]`.
-Cluster (one GPU, one world): `job_policy.sh` (server + `run_isg --instance-list`), `job_list.sh` (GT / any policy, `LIST_MODE=1`).
+Cluster (one GPU, one world): `job_policy.sh` (server + `run_isg --instance-list`; `OUT=<results dir>/<ckpt>`), `job_list.sh`
+(GT / any policy, `LIST_MODE=1`).
 
-## Full run `full1` (2026-11-16, Vast, $EV/runs/full1/summary.md)
+## Results dir and metrics
+
+```
+<results>/<ckpt>/ckpt.json                  checkpoint spec, the runs collected into it, the instances each expected (-> missing)
+<results>/<ckpt>/<instance id>/             every artifact of the episode: meta.json (incl. eval_instance = dataset index / class_id /
+                                            task / family), result.json (the RUN_ISG_RESULT record), init_rgb.png, goal_rgb.png (the
+                                            image the policy was conditioned on), final_rgb.png, annotations.json, config.yaml,
+                                            campaign_execution_failure.json (failed episodes), <view>_rgb.mp4 (only with --record-view),
+                                            worker.json (Vast: unit, host, GPU, seconds)
+<results>/<ckpt>/_unit_logs/<unit>.log      run_isg log of each Vast unit (one world, several instances)
+```
+
+`summarize.py <results>` (collect.sh runs it) writes into the dir: `summary.md` (overview across checkpoints; per checkpoint the four
+success rates with counts and the pos / ori errors per family, per task class (the 23 classes) and per task (dataset `class_id`); soft
+QA over all rollouts and over each success type's successful rollouts, with their count), `summary_<ckpt>.json` (every group, every
+instance), `instances.csv`, `groups.csv` and `qa.csv` (long form: ckpt, level, group, rollouts = all | settled/unsettled x
+geometric/symbolic successes, n, metric, mean violations, mean runs, fired share). Several runs or checkpoints can share one dir.
+A redone Vast unit overwrites its tar and done record: collect re-extracts it into cleared instance dirs (the earlier collector kept
+the first attempt's files for 45 pi_goal_15k instances of full1; corrected 2026-11-16).
+
+## Full run `full1` (2026-11-16, Vast, results dir $EV/runs/full1/results, summary.md there)
 
 Six checkpoints at once: pi goal 15k, pi shuffle 10k (`--cross-goal`), ACT 130k, DP 80k (1000 instances each), pi goal-iors 15k and
 pi text-iors 15k (the 350 iors instances): 4700 episodes, 742 world-chunk units (<= 13000 budget steps), fleet loop at up to 250 GPUs
