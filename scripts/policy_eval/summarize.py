@@ -20,12 +20,42 @@ import os
 import statistics
 
 
+#: QA metrics counted by their violating steps (``steps``; ``runs`` = separate stretches of them)
+STEP_METRICS = ("robot_touching_objects", "robot_touching_itself", "arm_hand_contacts", "held_object_drift", "stalled")
+
+
+def violations(name, m):
+    """(violation count, separate runs) of one ``meta.qa.metrics`` record (run_isg --qa: logged, never failing a policy episode).
+    Step metrics: violating steps; ``pause`` / ``goal_occlusion``: 1 when it fired; ``jerky_motion``: limits exceeded; ``ghost_hand`` /
+    ``bad_release`` / ``arm_stutter``: events; ``head_camera_upright``: tilted steps while driving; ``robot_wobble``: steps over the
+    limit; others: 1 when triggered."""
+    if name in STEP_METRICS:
+        return int(m.get("steps") or 0), len(m.get("runs") or [])
+    if name == "jerky_motion":
+        return len(m.get("failed") or []), 0
+    if name == "ghost_hand":
+        return len(m.get("events") or []), len(m.get("events") or [])
+    if name == "bad_release":
+        return len(m.get("violations") or []), len(m.get("violations") or [])
+    if name == "arm_stutter":
+        return len(m.get("stutters") or []), len(m.get("stutters") or [])
+    if name == "head_camera_upright":
+        return int(m.get("steps_tilted_while_navigating") or 0), 0
+    if name == "robot_wobble":
+        o = m.get("over_limit") or {}
+        return int(o.get("steps") or 0), len(o.get("runs") or [])
+    if name == "goal_occlusion":
+        return int(bool((m.get("report") or {}).get("occluded"))), 0
+    return int(bool(m.get("triggered"))), 0
+
+
 def qa_counts(meta):
     out = {}
     for name, m in ((meta.get("qa") or {}).get("metrics") or {}).items():
-        if not isinstance(m, dict):
+        if not isinstance(m, dict) or m.get("measured") is False:  # oracle-only rules (gripper_in_view, failed_grasp) in a stream
             continue
-        out[name] = {"steps": int(m.get("steps") or 0), "runs": len(m.get("runs") or []), "triggered": bool(m.get("triggered"))}
+        v, runs = violations(name, m)
+        out[name] = {"steps": v, "runs": runs, "triggered": bool(m.get("triggered"))}
     return out
 
 
@@ -104,7 +134,7 @@ def main():
         md.append(head + "\n")
         if not rows:
             continue
-        md.append("| family | n | success | " + " | ".join(f"{q} (steps / runs / trig)" for q in metrics) + " |")
+        md.append("| family | n | success | " + " | ".join(f"{q} (violations / runs / fired)" for q in metrics) + " |")
         md.append("|---|---|---|" + "---|" * len(metrics))
         for fam, g in list(levels["task_family"].items()) + [("**total**", total)]:
             md.append(f"| {fam} | {g['n']} | {100 * g['success_rate']:.1f}% | "

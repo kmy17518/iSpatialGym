@@ -748,7 +748,7 @@ def layout(tag):
         vram = min(g["mem_mb"] for g in GPUS) / 1024
         srv = {"pi": 10.0, "act": 1.5, "dp": 1.5, "gt": 0.0}[c["kind"]] * servers
         procs = max(1, int((vram - srv - 1.0) // 8.0))
-        procs = min(procs, max(1, int((Q - 1 - 2 * servers * len(GPUS)) // (3 * len(GPUS)))), max(1, int(mem_gb() / len(GPUS) // 14)))
+        procs = min(procs, max(1, int((Q - 1 - servers * len(GPUS)) // (3 * len(GPUS)))), max(1, int(mem_gb() / len(GPUS) // 14)))
     return procs, servers
 
 
@@ -822,7 +822,7 @@ def main():
         state["server_objs"] = servers
         state["servers"] = {s.port: s.gpu for s in servers}
         n_slots = PER_GPU * len(GPUS)
-        reserve = 1 + 2 * len(servers)
+        reserve = 1 + len(servers)  # a policy server keeps ~1 CPU busy (its Python + kernel launches)
         slots = []
         for j in range(PER_GPU):
             for i, g in enumerate(GPUS):
