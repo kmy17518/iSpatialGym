@@ -73,7 +73,8 @@ B1K_DIR="$SCRIPT_DIR/Behavior-1K"
 B1K_SETUP="$B1K_DIR/setup.sh"
 B1K_URL="${ISPATIALGYM_B1K_URL:-git@github.com:kmy17518/BEHAVIOR-1K.git}"
 B1K_URL_HTTPS="https://github.com/kmy17518/BEHAVIOR-1K.git"
-B1K_BRANCH="${ISPATIALGYM_B1K_BRANCH:-ispatialgym}"
+# llm-harness-100: the Behavior-1K the campaign_20261110 policy evaluation ran with (6a6194600 + its eval snapshot patches)
+B1K_BRANCH="${ISPATIALGYM_B1K_BRANCH:-isg-llm-harness-100}"
 
 # Pre-converted custom assets (Kohs block `toy_dice/isgblk`) that OmniGibson
 # loads as dataset `ispatialgym-assets` from gm.DATA_PATH.

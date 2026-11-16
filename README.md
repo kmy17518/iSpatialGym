@@ -1,5 +1,9 @@
 # iSpatialGym
 
+> **Evaluating an external policy / LLM harness on the 100-instance eval set (branch `llm-harness-100`): start at
+> [`scripts/llm_harness/README.md`](scripts/llm_harness/README.md).** On this branch `setup.sh` clones Behavior-1K branch
+> `isg-llm-harness-100` (the simulator version the evals ran with) instead of `ispatialgym`.
+
 iSpatialGym builds on [BEHAVIOR-1K](https://github.com/StanfordVL/BEHAVIOR-1K)
 (our fork [kmy17518/BEHAVIOR-1K](https://github.com/kmy17518/BEHAVIOR-1K), branch
 `ispatialgym`, checked out under `Behavior-1K/`) and upgrades the motion-planning
