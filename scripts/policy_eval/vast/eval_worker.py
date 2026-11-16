@@ -724,17 +724,23 @@ def heartbeat_loop(kk):
 
 
 def pick_ckpt():
-    """The checkpoint with the most open units (ISG_CKPT pins one; ISG_PREFER_CKPT orders)."""
+    """A checkpoint with open units: ISG_CKPT pins one, ISG_PREFER_CKPT orders, else a random draw weighted by each checkpoint's open
+    step budget (many workers starting at once spread over the checkpoints in proportion to their remaining work)."""
+    import random
+
     pinned = os.environ.get("ISG_CKPT")
     opens = {}
     for u in open_units():
-        opens[u["ckpt"]] = opens.get(u["ckpt"], 0) + 1
+        opens[u["ckpt"]] = opens.get(u["ckpt"], 0) + int(u["budget"])
     if pinned:
         return pinned if opens.get(pinned) else None
     prefer = [t for t in os.environ.get("ISG_PREFER_CKPT", "").split(",") if t in opens]
     if prefer:
         return prefer[0]
-    return max(opens, key=opens.get) if opens else None
+    if not opens:
+        return None
+    tags = sorted(opens)
+    return random.Random(f"{INSTANCE}-{time.time()}").choices(tags, weights=[opens[t] for t in tags])[0]
 
 
 def layout(tag):

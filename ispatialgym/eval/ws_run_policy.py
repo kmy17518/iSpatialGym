@@ -106,7 +106,10 @@ class WSPolicy:
         if self.client is None:
             return
         st = self.client.stats()
+        merged = dict((self.meta or {}).get("policy_client") or {})
+        merged.update(st)
         if self.meta is not None:
-            self.meta.setdefault("policy_client", {}).update(st)
-        result["policy_client"] = st
+            self.meta["policy_client"] = merged
+        # run_isg copies the episode's policy_client over meta's: keep the bind-time record (alias, task id, goal kind / sha) in it
+        result["policy_client"] = merged
         self.client.close()
