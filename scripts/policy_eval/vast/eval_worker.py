@@ -603,7 +603,10 @@ def meta_summary(meta):
     """The fields of a run's meta.json the eval summary reads (scripts/policy_eval/summarize.py)."""
     keep = ("success", "status", "reason", "n_steps", "evaluation_step", "evaluation_kind", "evaluation_settled", "success_first_step",
             "success_final", "closest_approach", "closest_goal_approach", "settle_eval", "settle_steps", "budget", "timings", "qa",
-            "policy_client", "task_family", "task", "subtask", "variant", "instance_id", "error_metric", "errors", "gt_policy")
+            "policy_client", "task_family", "task", "subtask", "variant", "instance_id", "error_metric", "errors", "gt_policy",
+            # the four verdicts: settled (this run's mode) geometric / symbolic, and the other settle mode's (other_mode), with errors
+            "geometric_success", "geometric_success_step", "geometric_first_step", "symbolic_success", "symbolic_success_step",
+            "symbolic_first_step", "other_mode", "errors_final_step", "tro_path")
     return {k: meta.get(k) for k in keep if k in meta}
 
 
