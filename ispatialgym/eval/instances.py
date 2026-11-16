@@ -268,11 +268,48 @@ def template_files(tro_path: str) -> Optional[Dict[str, str]]:
         return None
     json_dir = os.path.dirname(inst_dir)
     prefix = os.path.join(json_dir, m.group("prefix"))
-    meta = f"{prefix}_0_0_template-meta.json"
+    root = os.path.dirname(os.path.dirname(os.path.dirname(json_dir)))  # <root>/scenes/<scene>/json
+    # policy eval 2026-11-15: a dataset with several templates per subtask (scripts/batched_replay/export_eval.py writes
+    # <prefix>_<t>_<i>_template-*: t = the subtask's t-th distinct template) names each instance's own template in its index record;
+    # the first-template convention below would load another instance's template for t > 0
+    rec = _index_record(root, tro_path)
+    if rec is not None and rec.files.get("template") and rec.files.get("template_meta"):
+        template, meta = rec.path("template"), rec.path("template_meta")
+    else:
+        template, meta = f"{prefix}_0_0_template.json", f"{prefix}_0_0_template-meta.json"
     if not os.path.exists(meta):
         return None
-    root = os.path.dirname(os.path.dirname(os.path.dirname(json_dir)))  # <root>/scenes/<scene>/json
-    return {"template": f"{prefix}_0_0_template.json", "template_meta": meta, "activity_definitions": ACTIVITY_DEFINITIONS, "root": root}
+    return {"template": template, "template_meta": meta, "activity_definitions": instance_bddl_root(tro_path), "root": root}
+
+
+#: policy eval 2026-11-15: per-instance BDDL roots (<root>/<instance id>/<activity>/problem<id>.bddl, the exact problem each instance was
+#: collected with; scripts/policy_eval/build_bddl_overlay.py) for a dataset whose problems are not the release tree's (the v2 batched-replay
+#: export names each template's own problem id)
+BDDL_OVERLAY_ENV = "ISPATIALGYM_EVAL_BDDL_OVERLAY"
+
+
+def instance_bddl_root(tro_path: str) -> str:
+    """The BDDL root an instance's problem is loaded from: ``$ISPATIALGYM_EVAL_BDDL_OVERLAY/<instance id>`` when it exists, else the
+    repository's release tree (:data:`ACTIVITY_DEFINITIONS`)."""
+    overlay = os.environ.get(BDDL_OVERLAY_ENV)
+    if overlay:
+        d = os.path.join(overlay, os.path.basename(tro_path)[: -len(TRO_SUFFIX)])
+        if os.path.isdir(d):
+            return d
+    return ACTIVITY_DEFINITIONS
+
+
+_INDEX_BY_TRO: Dict[str, Dict[str, InstanceRecord]] = {}
+
+
+def _index_record(root: str, tro_path: str) -> Optional[InstanceRecord]:
+    """The index record of ``tro_path`` in the dataset at ``root`` (cached per root; None without an index)."""
+    if root not in _INDEX_BY_TRO:
+        try:
+            _INDEX_BY_TRO[root] = {os.path.abspath(r.path("tro_state")): r for r in load_index(root)}
+        except FileNotFoundError:
+            _INDEX_BY_TRO[root] = {}
+    return _INDEX_BY_TRO[root].get(os.path.abspath(tro_path))
 
 
 def goal_record_path(rec: "InstanceRecord") -> str:

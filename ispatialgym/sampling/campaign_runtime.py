@@ -426,7 +426,11 @@ def verify_loaded(meta, physical, *, scene=None, sim=None):
         require(scene is not None, "scene runtime adapter needs a loaded scene")
         augmentation.verify_parking(scene, perturbations.removed_objects, state.get("moved_objects", {}),
                                     [obj.name for obj in physical.values()])
-    if perturbations.lighting:
+    # policy eval 2026-11-15 (ISPATIALGYM_EVAL_IGNORE_COLLECTION_LIGHTING=1): the eval set's goal images and training-format renders
+    # come from the batched replay, which ignores the collection-time lighting (eval units: --lighting-pert off), so an eval
+    # episode is lit as they were - the stock lights - even when the instance's TRO records a collection lighting draw
+    ignore_lighting = bool(perturbations.lighting) and os.environ.get("ISPATIALGYM_EVAL_IGNORE_COLLECTION_LIGHTING") == "1"
+    if perturbations.lighting and not ignore_lighting:
         require(scene is not None and sim is not None, "lighting runtime adapter needs a loaded scene and simulator")
         require(bool(state.get("lighting")), "recorded lighting runtime adapter state missing")
         augmentation.apply_lighting(scene, sim, perturbations.lighting, state["lighting"])
@@ -447,6 +451,8 @@ def verify_loaded(meta, physical, *, scene=None, sim=None):
     result = {"observed_scales": verify_scales(physical, perturbations.scales), "scale_verified": True,
             "camera_context": context_observed,
             "scene_augmentation": bool(perturbations.removed_objects), "lighting_augmentation": bool(perturbations.lighting)}
+    if ignore_lighting:
+        result["collection_lighting_ignored"] = True
     from ispatialgym.sampling.campaign_class_routes import verify_recorded
     route = verify_recorded(meta, physical=physical)
     if route is not None:

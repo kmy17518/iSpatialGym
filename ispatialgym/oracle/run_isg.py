@@ -286,6 +286,10 @@ def scene_crop_of(tmeta: dict) -> Optional[Dict[str, Any]]:
     crop = (tmeta or {}).get("scene_crop")
     if not isinstance(crop, dict) or (crop.get("mode") or "full") == "full":
         return None
+    if (tmeta or {}).get("eval"):
+        # policy eval 2026-11-15: an eval dataset template (scripts/batched_replay/export_eval.py writes the "eval" block) ships the full
+        # template.json only, and its goal image / training-format renders come from the full world (batched replay --scene full)
+        return None
     return crop if fast_on("PARTIAL_SCENE") else None
 
 

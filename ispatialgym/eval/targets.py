@@ -390,6 +390,9 @@ class ISGTroMeta:
         "object_bindings",
         "robot_state",
         "goal_observation",
+        # 2026-11-15 batched replay (scripts/batched_replay/export_eval.py): the collection's goal record, kept beside the replay's
+        # goal_observation for provenance; informational, never read
+        "goal_observation_collection",
         "pose_targets",
         "groups",
         "articulation_targets",
