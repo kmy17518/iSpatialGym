@@ -71,3 +71,23 @@ a reused start differs only in velocities (base <= 4e-3 m/s, joints <= 0.06 rad/
 - ACT --temporal-agg queries every step (~10 ms solo; 43 ms with 3 clients on one server): give ACT one server per process.
 - DP: 100 DDPM steps per 8-step plan (~350 ms on a 4090), server-bound; several servers per GPU (4: 2.2x of one). Its sampling draws
   fresh noise every denoising step, so a faster sampler would not be output-identical; not changed.
+
+## Running an eval (Vast fleet)
+
+```bash
+# on svl11 as minyeong; EV=/vision/u/minyeong/projects/isg_home/campaign_20261110/eval_policy_r1; code snapshot $EV/code/eval_<sha>
+cd $EV
+# 1. checkpoints: {tag: {kind, repo, step, task_alias (pi), server_args, policy_kwargs, run_isg_args, families, servers_per_gpu, procs_per_gpu}}
+#    e.g. inputs/ckpts_full1.json (pi goal / shuffle --cross-goal / iors / text-iors send_task_name, ACT --temporal-agg, DP 4 servers)
+python3 code/eval_<sha>/scripts/policy_eval/make_eval_run.py --run <run> --ckpts inputs/<ckpts>.json \
+    --worlds inputs/world_groups_v2.json --chunk-steps 13000          # one unit = one class's world (<= 13000 budget steps)
+env -i HOME=$HOME PATH=/usr/bin:/bin bash -c 'source tool/creds.sh; $S5 cp runs/<run>/spec.json $JOB_S3/runs/<run>/spec.json'
+# 2. fleet: keeps N GPUs working while units are open (og-isgeval- labels, own ledger; driver >= 580 for pi; >= 8 CPUs / GPU)
+bash code/eval_<sha>/scripts/policy_eval/vast/start_loop.sh <run> 150 1.0     # stop: kill $(cat logs/loop_<run>.pid)
+# 3. results (any time): per instance / class / task / family / total + QA violations
+env -i HOME=$HOME PATH=/usr/bin:/bin bash -c 'source tool/creds.sh; bash code/eval_<sha>/scripts/policy_eval/vast/collect.sh <run>'
+#    -> runs/<run>/summary.md, summary_<ckpt>.json, instances.csv
+```
+
+Bundle changes (code / worker / dataset / policy envs): `vast/build_bundle.sh <code dir> [boot code data worker policy]`.
+Cluster (one GPU, one world): `job_policy.sh` (server + `run_isg --instance-list`), `job_list.sh` (GT / any policy, `LIST_MODE=1`).
