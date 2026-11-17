@@ -2956,7 +2956,7 @@ def test_replay_stream_logs_its_qa_metrics_and_the_goal_decides(tmp_path):
     assert qa["mode"] == "stream" and qa["stopped_by"] is None and "robot_touching_objects" in qa["hard_triggered"]
     assert qa["metrics"]["robot_touching_objects"]["runs"] == [{"link": "base_link", "object": "plate_pkkgzc_0", "action": None,
                                                                 "first_step": 5, "last_step": 8, "n": 4}]
-    assert qa["metrics"]["gripper_in_view"] == {"measured": False, "why": "oracle only", "mode": "soft", "triggered": False}
+    assert qa["metrics"]["gripper_in_view"] == {"measured": False, "why": "oracle / policy eval only", "mode": "soft", "triggered": False}
 
 
 def test_checkpoint_restore_fixes_a_broken_ag_roundtrip(tmp_path):

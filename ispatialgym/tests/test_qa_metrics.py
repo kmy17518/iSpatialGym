@@ -65,7 +65,7 @@ def test_the_metric_table_mirrors_behavior_plus_the_demo_gates_and_the_oracle_ru
     assert set(QA.HARD_METRICS) == {"robot_touching_objects", "robot_touching_itself", "pause", "jerky_motion", "ghost_hand", "object_tilt",
                                     "goal_occlusion", "robot_wobble", "bad_release", "arm_stutter"}  # arm_stutter: train-fast's former gate
     assert set(QA.SOFT_METRICS) == {"held_object_drift", "stalled", "gripper_in_view", "failed_grasp", "head_camera_upright", "arm_hand_contacts"}
-    assert {k for k, v in QA.QA_METRICS.items() if v.get("oracle_only")} == {"gripper_in_view", "failed_grasp"}
+    assert {k for k, v in QA.QA_METRICS.items() if v.get("oracle_only")} == {"failed_grasp"}
     assert {k for k, v in QA.QA_METRICS.items() if v.get("retried")} == set(QA.RULE_METRICS.values()) == {"held_object_drift", "stalled", "gripper_in_view", "failed_grasp"}
     assert set(QA.RULE_METRICS) <= set(QA.CATEGORIES) and {"held_object_drift", "stalled", "gripper_out_of_fov"} <= set(QA.STEP_CATEGORIES)
     assert set(QA.HARD_METRICS) <= set(QA.CATEGORIES) and set(QA.EPILOGUE_CATEGORIES) < set(QA.CATEGORIES)
@@ -152,8 +152,8 @@ def test_a_stream_logs_every_metric_and_never_stops():
     assert rep["mode"] == "stream" and rep["stopped_by"] is None
     assert rep["hard_triggered"] == ["robot_touching_objects", "goal_occlusion", "bad_release"] and rep["soft_triggered"] == ["arm_hand_contacts"]
     assert rep["metrics"]["arm_hand_contacts"]["runs"][0]["task_object"] is True  # a stream has no intended contacts
-    for name in ("gripper_in_view", "failed_grasp"):
-        assert rep["metrics"][name] == {"measured": False, "why": "oracle only", "mode": "soft", "triggered": False}
+    assert rep["metrics"]["failed_grasp"] == {"measured": False, "why": "oracle only", "mode": "soft", "triggered": False}
+    assert rep["metrics"]["gripper_in_view"] == {"measured": False, "why": "oracle / policy eval only", "mode": "soft", "triggered": False}
 
 
 def test_pause_fires_after_50_still_action_steps_and_skips_the_settle_window():
@@ -242,6 +242,35 @@ def test_gripper_in_view_logs_the_out_of_view_steps_of_an_open_span_in_the_oracl
     assert fov["measured"] and fov["out_of_view"]["runs"] == [{"arm": "right", "action": "grasp", "first_step": 3, "last_step": 6, "n": 4}]
     assert fov["grasp_changes_outside_view"] == [{"step": 6, "arm": "right", "command": "open", "action": "grasp"}]
     assert rep["soft_triggered"] == ["gripper_in_view"] and rep["hard_triggered"] == [] and rep["stopped_by"] is None
+
+
+def test_gripper_in_view_in_a_policy_eval_judges_the_grasps_and_releases_by_the_fingertips_at_the_command():
+    robot, qa, _ = world(oracle=False, camera=QA.CameraModel.from_hfov(), stream_fov=True)
+    out_q = th.tensor([-3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])  # the right eef far behind the robot: outside the frame
+    in_q = th.tensor([0.4, 0.0, 0.4, 0.0, 0.0, 0.0, 1.0])
+    r = robot.arm_control_idx["right"]
+    none, cup = {"left": None, "right": None}, {"left": None, "right": "cup_0"}
+    robot.q[r] = in_q
+    assert qa.observe(1, hold(robot, grip=(1.0, 1.0)), held_by_arm=none) is None
+    qa.observe(2, hold(robot, grip=(1.0, -0.2)), held_by_arm=none)  # closes in view (a ramp: the sign change is the command)
+    qa.observe(3, hold(robot, grip=(1.0, -0.6)), held_by_arm=cup)  # attaches: a grasp in view
+    robot.q[r] = out_q
+    qa.observe(4, hold(robot, grip=(1.0, 1.0)), held_by_arm=none)  # opens out of the frame and detaches: a release out of view
+    qa.observe(5, hold(robot, grip=(1.0, -1.0)), held_by_arm=none)  # closes out of the frame on nothing
+    for i in range(6, 6 + qa.t.grasp_attach_steps):
+        qa.observe(i, hold(robot, grip=(1.0, -1.0)), held_by_arm=none)
+    robot.q[r] = in_q
+    qa.observe(40, hold(robot, grip=(1.0, -1.0)), held_by_arm=cup)  # attaches after the window: not judged
+    rep = qa.report()
+    fov = rep["metrics"]["gripper_in_view"]
+    assert fov["measured"] and (fov["grasps"], fov["releases"]) == (1, 1) and fov["grasps_out_of_view"] == []
+    assert fov["releases_out_of_view"] == [{"step": 4, "kind": "release", "arm": "right", "object": "cup_0", "command_step": 4, "after_steps": 0}]
+    assert rep["soft_triggered"] == ["gripper_in_view"] and rep["hard_triggered"] == []
+    # replays (no stream_fov) and runs without a camera model do not measure it
+    assert world(oracle=False, camera=QA.CameraModel.from_hfov())[1].report()["metrics"]["gripper_in_view"]["measured"] is False
+    _, nocam, _ = world(oracle=False, stream_fov=True)
+    nocam.observe(1, hold(robot), held_by_arm=none)
+    assert nocam.report()["metrics"]["gripper_in_view"]["measured"] is False
 
 
 def test_the_oracle_rules_are_logged_soft_with_their_retry():

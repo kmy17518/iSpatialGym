@@ -196,7 +196,11 @@ released (not grasped) before the hold.
 ramp (not 0.2, 0.4, ... 1.0). Any other release is a `bad_release` violation. Closing may be gradual (ramp toward -1 as
 slowly as you like).
 
-**3. Keep the motion clean (QA metrics).** Every step is also checked against quality metrics. At eval time they are all
+**3. Grasp and release where the head camera sees the hand.** Before commanding a gripper to close on an object or to open
+and let go of one, bring that hand's fingertips into the head camera image. A grasp or release with the fingertips out of
+frame is a `gripper_in_view` violation (below). Moving the hand out of frame at other times is fine.
+
+**4. Keep the motion clean (QA metrics).** Every step is also checked against quality metrics. At eval time they are all
 *soft*: logged and reported, they never fail an episode. They are still part of the results, so avoid them:
 
 | metric | what counts as a violation |
@@ -209,6 +213,7 @@ slowly as you like).
 | `arm_stutter` | an arm's commanded motion jolts back and forth (>= 3 velocity changes of >= 0.6 rad/s within 6 steps while moving) |
 | `ghost_hand` | an arm is more than 0.1 rad away from its commanded joints when its gripper starts opening (opening while the arm is still being pushed / lagging) |
 | `bad_release` | a release that does not come from a gripper command of exactly +1 |
+| `gripper_in_view` | a grasp or release made with the fingertips outside the head camera image: a close command after which an object attaches within 30 steps, or an open command that lets go of a held object, while that hand's fingertips are out of frame at the command |
 | `held_object_drift` | the held object slips in the hand |
 | `stalled` | every joint nearly still for too long (the final hold counts too, see below) |
 | `head_camera_upright` | the head camera tilted more than 0.4 rad for more than 30 steps while driving |
@@ -218,12 +223,16 @@ slowly as you like).
 
 Practical consequences: move the arms smoothly (small joint steps per control step, no back-and-forth), keep the head level
 while driving, do not bump furniture with the base or torso, do not brush other objects with the hands, keep the objects
-visible, and do not stand still for long stretches mid-task.
+visible, grasp and release only with the hand in view, and do not stand still for long stretches mid-task.
 
 Holding vs. `pause` / `stalled`: the evaluator does not know when the policy considers itself done, so the final hold of rule 1
 also registers as `pause` / `stalled` once it lasts more than 50 steps. That is expected and fine: rule 1 (hold) wins, because
 the settled success depends on it. The trained policies were scored with the same metric definitions, so the numbers stay
 comparable; when reading `pause` / `stalled`, look at the successful rollouts separately (the summary reports them).
+
+`gripper_in_view` is measured only in policy eval (`--mode policy`, what `run_eval.py` runs). It is newer than the trained
+policies' first evals, whose results do not have it. The demos are judged by a stricter oracle version (fingertips in view
+throughout each contact), so a demo-like policy passes it.
 
 Conditioning, to explain per eval:
 

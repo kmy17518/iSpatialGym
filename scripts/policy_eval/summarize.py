@@ -75,6 +75,9 @@ def violations(name, m):
         return len(m.get("violations") or []), len(m.get("violations") or [])
     if name == "arm_stutter":
         return len(m.get("stutters") or []), len(m.get("stutters") or [])
+    if name == "gripper_in_view" and "grasps_out_of_view" in m:  # policy eval: grasps / releases out of view
+        n = len(m.get("grasps_out_of_view") or []) + len(m.get("releases_out_of_view") or [])
+        return n, n
     if name == "head_camera_upright":
         return int(m.get("steps_tilted_while_navigating") or 0), 0
     if name == "robot_wobble":
@@ -88,7 +91,7 @@ def violations(name, m):
 def qa_counts(meta):
     out = {}
     for name, m in ((meta.get("qa") or {}).get("metrics") or {}).items():
-        if not isinstance(m, dict) or m.get("measured") is False:  # oracle-only rules (gripper_in_view, failed_grasp) in a stream
+        if not isinstance(m, dict) or m.get("measured") is False:  # failed_grasp (oracle only); gripper_in_view before the policy-eval definition
             continue
         v, runs = violations(name, m)
         out[name] = {"steps": v, "runs": runs, "triggered": bool(m.get("triggered"))}

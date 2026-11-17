@@ -155,6 +155,9 @@ class ExecutorConfig:
     #: ``run_isg --qa`` (``ispatialgym.oracle.qa.QA``): the demo QA metrics, logged in ``result.qa``; a hard metric fails an
     #: oracle demo at once (no retry), a stream only logs them. The oracle's retry rules (``Monitors``) run either way.
     qa: bool = True
+    #: policy eval only (``run_isg --mode policy``): ``gripper_in_view`` measures a stream's grasps / releases made with the
+    #: fingertips out of the head camera frame (``QA(stream_fov=True)``); replays and the oracle are unchanged
+    qa_stream_fov: bool = False
     #: the placed-orientation fact of an oracle demo (``result.placed_orientation``, no verdict): every placed object (place /
     #: drop / attach, not pushes) against its recorded orientation target's tolerance (``orientation_tolerance``, 0.2 rad
     #: default; nearest equivalence, the evaluator's own error). Cylinders (owner decision 2026-09-16 17:10 item 4): an object
@@ -1009,7 +1012,7 @@ class Executor:
         _t4 = time.perf_counter()
         if self.qa is not None:
             verdict = self.qa.observe(self.n, action, acting=acting, live=monitor, held=[n for n in ag_after.values() if n],
-                                      release_violations=new_violations, settling=settling)
+                                      release_violations=new_violations, settling=settling, held_by_arm=ag_after)
             if verdict is not None:
                 verdict.action_index, verdict.attempt = action_index, attempt
                 self.stats.record(verdict)
@@ -1647,7 +1650,8 @@ class Executor:
         limits = self.monitors.rule_limits() if self.monitors is not None and hasattr(self.monitors, "rule_limits") else None
         self.qa = QA(self.robot, oracle=oracle, scene=getattr(self.env, "scene", None), camera=camera, cam_in_zed=cam_in_zed,
                      roots=watched, roots_skipped=skipped, task_objects=[getattr(o, "name", n) for n, o in self.tracked.items() if o is not self.robot],
-                     contact_pairs=pairs, rules=self.monitors is not None, rule_limits=limits)
+                     contact_pairs=pairs, rules=self.monitors is not None, rule_limits=limits,
+                     stream_fov=not oracle and bool(self.cfg.qa_stream_fov))
 
     def operated_roots(self, actions: Optional[Sequence[Action]] = None) -> Tuple[Dict[str, Any], Dict[str, str]]:
         """``(watched, skipped)``: the tracked articulated objects whose joint the program (``actions``, default the running

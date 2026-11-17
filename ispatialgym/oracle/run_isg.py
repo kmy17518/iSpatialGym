@@ -2123,7 +2123,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None, *,
             budget["wallclock_s"] = min(budget["wallclock_s"], remaining) if budget["wallclock_s"] else remaining
         ex_cfg = ExecutorConfig(max_steps=budget["episode_cap"], max_wall_s=budget["wallclock_s"], retries=args.retries, settle_steps=budget["settle_steps"],
                                 success_metric=args.success_metric, stop_on_success=args.mode == "policy", goal_image=args.goal_image,
-                                record_state=rec_cfg.hdf5, qa=args.qa)
+                                record_state=rec_cfg.hdf5, qa=args.qa, qa_stream_fov=args.mode == "policy")
         from ispatialgym.oracle import execute as _execute
 
         _execute.CONFIG.carry_leg = args.carry_leg

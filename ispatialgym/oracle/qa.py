@@ -96,10 +96,14 @@ rows of a replayed demo (``Executor.stream_phases``) and the oracle's hold / set
                                   owner 2026-10-13), judged after the settle window
 ``held_object_drift``       soft  the oracle's held-object-drift rule (retried): its verdicts (a stream: its steps)
 ``stalled``                 soft  the oracle's stalled rule (retried): its verdicts (a stream: its steps)
-``gripper_in_view``         soft  oracle only, while the gripper-out-of-FOV rule runs (the program's actions): the rule's
+``gripper_in_view``         soft  oracle: while the gripper-out-of-FOV rule runs (the program's actions): the rule's
                                   verdicts (retried), the steps an acting arm's fingertips are out of the frame while its
                                   span is open, and the gripper toggles made out of the frame while its span is open
-                                  (BEHAVIOR ``gripper_in_fov``)
+                                  (BEHAVIOR ``gripper_in_fov``). Policy eval (``stream_fov``; a stream has no spans): a grasp
+                                  out of view - a close command after which an object attaches by assisted grasp within
+                                  ``grasp_attach_steps``, the fingertips out of the frame at the close - and a release out
+                                  of view - an open command that detaches a held object within that window, the fingertips
+                                  out of the frame at the open. Replays: not measured
 ``failed_grasp``            soft  oracle only: grasps whose assisted grasp did not attach (BEHAVIOR ``failed_grasp``;
                                   retried by the oracle)
 ``head_camera_upright``     soft  steps with the head camera link pitched more than 0.4 rad after 3 s of driving, limit 30
@@ -137,7 +141,7 @@ QA_METRICS: Dict[str, Dict[str, Any]] = {
     "ghost_hand": {"mode": HARD},
     "held_object_drift": {"mode": SOFT, "retried": True},
     "stalled": {"mode": SOFT, "retried": True},
-    "gripper_in_view": {"mode": SOFT, "oracle_only": True, "retried": True},
+    "gripper_in_view": {"mode": SOFT, "retried": True, "policy_eval": "grasps / releases out of view"},
     "failed_grasp": {"mode": SOFT, "oracle_only": True, "retried": True},
     "head_camera_upright": {"mode": SOFT},
     "arm_hand_contacts": {"mode": SOFT},
@@ -1254,6 +1258,9 @@ class QAThresholds:
     #: is recorded in the report either way
     wobble_min_steps: int = field(default_factory=lambda: int(os.environ.get("ISPATIALGYM_QA_WOBBLE_MIN_STEPS", "1")))
     max_runs: int = 200
+    #: policy-eval ``gripper_in_view``: steps after a close (open) command within which an assisted-grasp attach (detach)
+    #: counts as that command's grasp (release)
+    grasp_attach_steps: int = 30
 
 
 def _quat_xyzw(q) -> Tuple[float, float, float, float]:
@@ -1300,7 +1307,8 @@ class QA:
     def __init__(self, robot, *, oracle: bool, scene=None, thresholds: Optional[QAThresholds] = None, camera: Optional[CameraModel] = None,
                  cam_in_zed=None, roots: Optional[Dict[str, Any]] = None, roots_skipped: Optional[Dict[str, str]] = None,
                  task_objects: Iterable[str] = (), contact_pairs: Optional[Callable[[], set]] = None,
-                 ground_categories: frozenset = GROUND_CATEGORIES, rules: bool = True, rule_limits: Optional[Dict[str, Dict[str, Any]]] = None):
+                 ground_categories: frozenset = GROUND_CATEGORIES, rules: bool = True, rule_limits: Optional[Dict[str, Dict[str, Any]]] = None,
+                 stream_fov: bool = False):
         self.robot = robot
         self.oracle = bool(oracle)
         self.scene = scene if scene is not None else getattr(robot, "scene", None)
@@ -1323,6 +1331,13 @@ class QA:
         self.out_of_view = _Spans(cap)
         self.wobble = _Spans(cap)
         self.toggles_out_of_view: List[Dict[str, Any]] = []
+        #: policy eval (``stream_fov``, a stream only): the grasps / releases (gripper command -> assisted-grasp attach / detach)
+        self.stream_fov = bool(stream_fov) and not self.oracle
+        self.stream_fov_fed = False
+        self.grip_events: List[Dict[str, Any]] = []
+        self.n_grip_events = {"grasp": 0, "release": 0}
+        self._last_toggle: Dict[str, Dict[str, Any]] = {}
+        self._held_arm_prev: Optional[Dict[str, Optional[str]]] = None
         self.rules = bool(rules)
         self.rule_limits = dict(rule_limits or {})
         #: per soft rule metric: the oracle's verdicts (attempts) and, in a stream, the runs of steps a rule fired
@@ -1435,12 +1450,14 @@ class QA:
     # ------------------------------------------------------------------ per step
 
     def observe(self, step: int, action, acting: bool = True, live: bool = True, held: Iterable[str] = (),
-                release_violations: Sequence[Dict[str, Any]] = (), settling: bool = False) -> Optional[Verdict]:
+                release_violations: Sequence[Dict[str, Any]] = (), settling: bool = False,
+                held_by_arm: Optional[Dict[str, Optional[str]]] = None) -> Optional[Verdict]:
         """One control step, after ``env.step``. ``acting``: an action / stream step (False in the settle windows and on the
         settle rows of a replayed demo); ``live``: a hard metric of this step may stop the oracle (False on the hold step after
         a rollback); ``held``: names of the objects in hand; ``release_violations``: this step's assisted-grasp releases that
         did not come from a gripper command of +1; ``settling``: a hold / settle wait of the oracle's motion layer (not counted
-        as a pause)."""
+        as a pause); ``held_by_arm``: arm -> the object its assisted grasp holds after the step (policy-eval
+        ``gripper_in_view``)."""
         self._setup()
         self.n_steps += 1
         step = int(step)
@@ -1462,6 +1479,8 @@ class QA:
         self._ghost(step, q, a, opens, hard)
         if self.oracle and self.fov_active:
             self._fov(step, q, opens)
+        elif self.stream_fov and held_by_arm is not None:
+            self._grip_fov(step, q, opens, held_by_arm)
         self._open_prev = opens
         self._q_prev = q.clone()
         self._tilt(step, hard)
@@ -1618,6 +1637,43 @@ class QA:
             log.warning("QA gripper_in_view disabled: %r", e)
             self.camera = None
 
+    def _grip_fov(self, step: int, q: th.Tensor, opens: Dict[str, bool], held_by_arm: Dict[str, Optional[str]]) -> None:
+        """Policy eval: a gripper command toggle records whether the arm's fingertips are in the frame (the camera pose is only
+        computed on a toggle); an assisted-grasp attach (detach) within ``grasp_attach_steps`` of the arm's latest close (open)
+        command is that command's grasp (release), out of view if the fingertips were out of the frame at the command. An attach
+        / detach with no such command (a release outside +1 is ``bad_release``) is not judged here."""
+        held = {arm: held_by_arm.get(arm) for arm in M.ARMS}
+        prev, self._held_arm_prev = self._held_arm_prev, held
+        if self.camera is None:
+            return
+        self.stream_fov_fed = True
+        try:
+            cam = None
+            for arm, o in opens.items():
+                if arm in self._open_prev and self._open_prev[arm] != o:
+                    cam = self._camera_pose(q) if cam is None else cam
+                    self._last_toggle[arm] = {"step": step, "command": "open" if o else "close", "in_view": bool(self._in_view(cam, arm))}
+        except Exception as e:  # noqa: BLE001  (a robot without the conventions' camera chain: not measured, reported once)
+            log.warning("QA gripper_in_view (policy eval) disabled: %r", e)
+            self.camera = None
+            self.stream_fov_fed = False
+            return
+        if prev is None:
+            return
+        k = int(self.t.grasp_attach_steps)
+        for arm in M.ARMS:
+            before, now = prev.get(arm), held.get(arm)
+            if before == now:
+                continue
+            tog = self._last_toggle.get(arm)
+            for kind, command, obj in (("release", "open", before), ("grasp", "close", now)):
+                if obj is None or tog is None or tog["command"] != command or step - tog["step"] > k:
+                    continue
+                self.n_grip_events[kind] += 1
+                if not tog["in_view"] and len(self.grip_events) < self.t.max_runs:
+                    self.grip_events.append({"step": step, "kind": kind, "arm": arm, "object": obj, "command_step": tog["step"],
+                                             "after_steps": step - tog["step"]})
+
     # -- head camera upright ---------------------------------------------------------------------------------------
 
     def _head_sample(self, step: int) -> None:
@@ -1712,7 +1768,8 @@ class QA:
     def snapshot(self) -> Dict[str, Any]:
         return {"fov_span": dict(self.fov_span), "pause_streak": self._pause_streak, "pause_start": self._pause_start,
                 "q_prev": None if self._q_prev is None else self._q_prev.clone(), "open_prev": dict(self._open_prev),
-                "root_watch": self.root_watch.snapshot() if self.root_watch is not None else None, "tilted": set(self._tilted)}
+                "root_watch": self.root_watch.snapshot() if self.root_watch is not None else None, "tilted": set(self._tilted),
+                "last_toggle": {k: dict(v) for k, v in self._last_toggle.items()}, "held_arm_prev": self._held_arm_prev}
 
     def restore(self, snap: Dict[str, Any], step: int) -> None:
         """Back to a checkpoint taken at ``step``: the rolled-back steps leave every per-step record (the logged rule verdicts
@@ -1723,6 +1780,8 @@ class QA:
         self._q_prev = snap["q_prev"]
         self._open_prev = dict(snap["open_prev"])
         self._tilted = set(snap["tilted"])
+        self._last_toggle = {k: dict(v) for k, v in (snap.get("last_toggle") or {}).items()}
+        self._held_arm_prev = snap.get("held_arm_prev")
         if self.root_watch is not None:
             self.root_watch.load(snap["root_watch"])
         if self.torso is not None:
@@ -1732,7 +1791,7 @@ class QA:
         self._arm_q = {s: v for s, v in self._arm_q.items() if s <= step}
         self._head = {s: v for s, v in self._head.items() if s <= step}
         self._ghost_steps = {arm: {s for s in v if s <= step} for arm, v in self._ghost_steps.items()}
-        for name in ("toggles_out_of_view", "ghost_events", "tilt_events", "bad_releases", "pause_runs"):
+        for name in ("toggles_out_of_view", "ghost_events", "tilt_events", "bad_releases", "pause_runs", "grip_events"):
             setattr(self, name, [e for e in getattr(self, name) if int(e.get("step", e.get("first_step", 0)) or 0) <= step])
         self.triggered = {k: v for k, v in self.triggered.items() if (v["step"] or 0) <= step}
 
@@ -1812,7 +1871,14 @@ class QA:
                                     "grasp_changes_outside_view": list(self.toggles_out_of_view)}
             m["failed_grasp"] = {"limit": 0, **rule("failed_grasp", True)}
         else:
-            m["gripper_in_view"] = {"measured": False, "why": "oracle only"}
+            if self.stream_fov and self.stream_fov_fed:
+                m["gripper_in_view"] = {"measured": True, "definition": "policy eval: grasps / releases with the fingertips out of the frame",
+                                        "attach_window_steps": int(t.grasp_attach_steps), "margin": t.fov_margin,
+                                        "grasps": self.n_grip_events["grasp"], "releases": self.n_grip_events["release"],
+                                        "grasps_out_of_view": [e for e in self.grip_events if e["kind"] == "grasp"],
+                                        "releases_out_of_view": [e for e in self.grip_events if e["kind"] == "release"]}
+            else:
+                m["gripper_in_view"] = {"measured": False, "why": "no head camera model" if self.stream_fov else "oracle / policy eval only"}
             m["failed_grasp"] = {"measured": False, "why": "oracle only"}
         m["head_camera_upright"] = dict(self.head_upright or {"measured": False})
         m["arm_hand_contacts"] = self.arm_hand.report()
@@ -1830,7 +1896,8 @@ class QA:
             "ghost_hand": bool(self.ghost_events),
             "held_object_drift": bool(self.rule_events["held_object_drift"]) or self.rule_runs["held_object_drift"].steps > 0,
             "stalled": bool(self.rule_events["stalled"]) or self.rule_runs["stalled"].steps > 0,
-            "gripper_in_view": self.oracle and bool(self.out_of_view.runs or self.toggles_out_of_view or self.rule_events["gripper_in_view"]),
+            "gripper_in_view": (bool(self.out_of_view.runs or self.toggles_out_of_view or self.rule_events["gripper_in_view"]) if self.oracle
+                                else bool(self.grip_events)),
             "failed_grasp": self.oracle and bool(self.rule_events["failed_grasp"]),
             "head_camera_upright": (self.head_upright or {}).get("steps_tilted_while_navigating", 0) > t.head_tilt_steps,
             "arm_hand_contacts": self.arm_hand.steps > 0,
